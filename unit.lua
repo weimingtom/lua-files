@@ -1,0 +1,49 @@
+glue = require'glue'
+glue.update(_G, glue)
+update(string, glue.glue_string)
+
+local function escape_byte(c)
+	return string.format('\\%03d', c:byte())
+end
+local escapes = { --don't add unpopular escapes here
+	['\t'] = '\\t',
+	['\n'] = '\\n',
+	['\r'] = '\\r',
+}
+local function tostr(s)
+	return tostring(s):gsub('.', escapes):gsub('[^\32-\126]', escape_byte)
+end
+
+function _test(t1, t2, prefix, level)
+	if type(t1)=='table' and type(t2)=='table' then
+		--for k,v in pairs(t1) do print('>t1',k,v) end
+		--for k,v in pairs(t2) do print('>t2',k,v) end
+		for k,v in pairs(t1) do
+			_test(t2[k], v, prefix .. '.' .. tostr(k), level + 1)
+		end
+		for k,v in pairs(t2) do
+			_test(t1[k], v, prefix .. '.' .. tostr(k), level + 1)
+		end
+	else
+		if (t1 == t1 and t1 ~= t2) or (t1 ~= t1 and t2 == t2) then
+			error("'" .. tostr(t1) .. "' ~= '" .. tostr(t2) ..
+								"' [" .. prefix .. "]", level)
+		end
+	end
+end
+
+function test(t1, t2)
+	return _test(t1, t2, 't', 3)
+end
+
+function testmatch(s, pat)
+	if not s:match(pat) then
+		error("'" .. s .. "'" .. " not matching '" .. pat .. "'", 2)
+	end
+end
+
+function ptest(t1,t2)
+	print(t1)
+	test(t1,t2,nil,3)
+end
+

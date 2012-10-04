@@ -1,0 +1,31 @@
+steps toward delphi
+-------------------
+component pallette:
+	- control icons (make them or find some with a good license)
+	- customizable toolbar (hide/show/move icons)
+
+object inspector:
+	- value editors:
+		- primitive types: bool, number, string
+		- objects of a specific class
+		- windows objects: cursors, icons, images, colors, pens, brushes, fonts, imagelists
+		- nested tables with string keys and values of any of the above types
+		- menu and popup menu designers
+		- toolbar designer
+	- allow changing of read-only properties by recreating the control
+
+selection panel:
+	- cut/copy/paste control trees (incl. pasting into the selected control)
+
+serialization:
+	- identity-preserving serialization (two phase)
+
+winapi features needed by the designer:
+	- published properties for each class with: name, type description, read-only status.
+	- design_mode property for top-level windows so that properties like `state` can be set in the
+	object inspector independently of the state of the window at runtime.
+	- flag to distinguish container controls: accepts_children.
+	- the list of event handlers with function signature for integration with a code editor
+
+integration with a code editor (eg. scite):
+   - need API for: insert line, delete line, find line by regex, goto line

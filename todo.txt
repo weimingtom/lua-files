@@ -1,0 +1,18 @@
+
+- important: blur, shadow, 2d projection, perspective projection, contrast, gamma, brightness, saturation, grayscale
+
+- bitmaps: vflip, hflip, crop, tile
+- downsampling: dithering, quantization, grayscale
+- projection:
+	- scale up/down (linear, bilinear, bicubic, spline, lanczos), rotate (wrap, smooth), stretch, skew
+	- perspective
+- distortions: mesh-based warp (envelope tool, lens), wave, twist, shake, ripple
+- effects: blur (split, gaussian), sharpen, antialias, solorize, posterize, emboss
+- blending: porter-duff modes
+- color: brightness, contrast, gamma, hue, stauration, invert
+
+- antialiasing gamma adjustment at primitive level
+- rendering modes: full, solid, outline, wireframe
+
+rasterizer:
+- gradients: linear, radial, radial focus, conic, conic angle, diamond, xy, sqrt xy, contour, auto contour, gouraud shading
