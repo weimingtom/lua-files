@@ -119,20 +119,26 @@ local arcs02 = {type = 'svg', file = {string = [[
 </svg>
 ]]}}
 
-local leon = {type = 'svg', file = {path = 'media/svg/leon.svg'}}
+local svgfile = {type = 'svg', file = {path = 'media/svg/beach_towel.svg'}}
 
 local scene = {type = 'group', x = 600, --y = 100,
 	{type = 'color',1,1,1},
-	leon,
+	svgfile,
 	{type = 'group', x = -500, arcs01},
 	{type = 'group', x = -500, y = 300, arcs02},
 }
 
 local zoom = 1
 
+local stroke_extents_stroke = {type = 'color', 0, 0, 1, 0.5}
+local fill_extents_stroke = {type = 'color', 1, 0, 0, 0.5}
+
 function panel:on_render()
 	scene.scale = zoom
+	self.scene_graph.stroke_extents_stroke = stroke_extents_stroke
+	self.scene_graph.fill_extents_stroke = fill_extents_stroke
 	self.scene_graph:render(scene)
+	self.scene_graph.cache:clear()
 end
 
 function main:on_mouse_wheel(x, y, buttons, delta)

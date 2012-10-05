@@ -1,7 +1,7 @@
 --[[ lightweight object interface over cairo ffi binding:
 	- cairo types have metamethods
-	- objects allocated by cairo have __gc
-	- ref-counted objects have a free() method that checks ref. count
+	- pointers to objects for which cairo holds no references get a __gc
+	- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
 	- functions accept/return Lua strings
 	- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to,
 		cairo_skew, cairo_transform, cairo_matrix_transform, cairo_matrix_skew.
@@ -13,11 +13,234 @@ local C = ffi.load'cairo'
 local M = setmetatable({}, {__index = C})
 M.lib = C
 
-local function returns_bool(f)
-	return f and function(...)
-		return f(...) ~= 0
+-- garbage collector integration
+-- note: it's important for free() and destroy() to not return anything so you can use self.obj = self.obj:free().
+
+local function free_ref_counted(o)
+	local n = o:get_reference_count() - 1
+	o:destroy()
+	if n ~= 0  then
+		error(string.format('refcount of %s is %d, should be 0', tostring(o), n))
 	end
 end
+
+function M.cairo_destroy(cr)
+	ffi.gc(cr, nil)
+	C.cairo_destroy(cr)
+end
+
+function M.cairo_surface_destroy(surface)
+	ffi.gc(surface, nil)
+	C.cairo_surface_destroy(surface)
+end
+
+function M.cairo_device_destroy(device)
+	ffi.gc(device, nil)
+	C.cairo_device_destroy(device)
+end
+
+function M.cairo_pattern_destroy(pattern)
+	ffi.gc(pattern, nil)
+	C.cairo_pattern_destroy(pattern)
+end
+
+function M.cairo_scaled_font_destroy(font)
+	ffi.gc(font, nil)
+	C.cairo_scaled_font_destroy(font)
+end
+
+function M.cairo_font_face_destroy(ff)
+	ffi.gc(ff, nil)
+	C.cairo_font_face_destroy(ff)
+end
+
+function M.cairo_font_options_destroy(ff)
+	ffi.gc(ff, nil)
+	C.cairo_font_options_destroy(ff)
+end
+
+function M.cairo_region_destroy(region)
+	ffi.gc(region, nil)
+	C.cairo_region_destroy(region)
+end
+
+function M.cairo_path_destroy(path)
+	ffi.gc(path, nil)
+	C.cairo_path_destroy(path)
+end
+
+function M.cairo_rectangle_list_destroy(rl)
+	ffi.gc(rl, nil)
+	C.cairo_rectangle_list_destroy(rl)
+end
+
+function M.cairo_glyph_free(c)
+	ffi.gc(c, nil)
+	C.cairo_glyph_free(c)
+end
+
+function M.cairo_text_cluster_free(c)
+	ffi.gc(c, nil)
+	C.cairo_text_cluster_free(c)
+end
+
+function M.cairo_create(...)
+	return ffi.gc(C.cairo_create(...), M.cairo_destroy)
+end
+
+function M.cairo_reference(...)
+	return ffi.gc(C.cairo_reference(...), M.cairo_destroy)
+end
+
+function M.cairo_pop_group(...)
+	return ffi.gc(C.cairo_pop_group(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_surface_create_similar(...)
+	return ffi.gc(C.cairo_surface_create_similar(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_surface_create_similar_image(...)
+	return ffi.gc(C.cairo_surface_create_similar_image(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_surface_create_for_rectangle(...)
+	return ffi.gc(C.cairo_surface_create_for_rectangle(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_surface_create_for_data(...)
+	return ffi.gc(C.cairo_surface_create_for_data(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_surface_create_observer(...)
+	return ffi.gc(C.cairo_surface_create_observer(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_surface_reference(...)
+	return ffi.gc(C.cairo_surface_reference(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_image_surface_create(...)
+	return ffi.gc(C.cairo_image_surface_create(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_image_surface_create_for_data(...)
+	return ffi.gc(C.cairo_image_surface_create_for_data(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_image_surface_create_from_png(...)
+	return ffi.gc(C.cairo_image_surface_create_from_png(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_image_surface_create_from_png_stream(...)
+	return ffi.gc(C.cairo_image_surface_create_from_png_stream(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_recording_surface_create(...)
+	return ffi.gc(C.cairo_recording_surface_create(...), M.cairo_surface_destroy)
+end
+
+function M.cairo_device_reference(...)
+	return ffi.gc(C.cairo_device_reference(...), M.cairo_device_destroy)
+end
+
+function M.cairo_pattern_create_raster_source(...)
+	return ffi.gc(C.cairo_pattern_create_raster_source(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_create_rgb(...)
+	return ffi.gc(C.cairo_pattern_create_rgb(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_create_rgba(...)
+	return ffi.gc(C.cairo_pattern_create_rgba(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_create_for_surface(...)
+	return ffi.gc(C.cairo_pattern_create_for_surface(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_create_linear(...)
+	return ffi.gc(C.cairo_pattern_create_linear(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_create_radial(...)
+	return ffi.gc(C.cairo_pattern_create_radial(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_create_mesh(...)
+	return ffi.gc(C.cairo_pattern_create_mesh(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_pattern_reference(...)
+	return ffi.gc(C.cairo_pattern_reference(...), M.cairo_pattern_destroy)
+end
+
+function M.cairo_scaled_font_create(...)
+	return ffi.gc(C.cairo_scaled_font_create(...), M.cairo_scaled_font_destroy)
+end
+
+function M.cairo_scaled_font_reference(...)
+	return ffi.gc(C.cairo_scaled_font_reference(...), M.cairo_scaled_font_destroy)
+end
+
+function M.cairo_toy_font_face_create(...)
+	return ffi.gc(C.cairo_toy_font_face_create(...), M.cairo_font_face_destroy)
+end
+
+function M.cairo_user_font_face_create(...)
+	return ffi.gc(C.cairo_user_font_face_create(...), M.cairo_font_face_destroy)
+end
+
+function M.cairo_font_face_reference(...)
+	return ffi.gc(C.cairo_font_face_reference(...), M.cairo_font_face_destroy)
+end
+
+function M.cairo_font_options_create(...)
+	return ffi.gc(C.cairo_font_options_create(...), M.cairo_font_options_destroy)
+end
+
+function M.cairo_region_create(...)
+	return ffi.gc(C.cairo_region_create(...), M.cairo_region_destroy)
+end
+
+function M.cairo_region_create_rectangle(...)
+	return ffi.gc(C.cairo_region_create_rectangle(...), M.cairo_region_destroy)
+end
+
+function M.cairo_region_create_rectangles(...)
+	return ffi.gc(C.cairo_region_create_rectangles(...), M.cairo_region_destroy)
+end
+
+function M.cairo_region_copy(...)
+	return ffi.gc(C.cairo_region_copy(...), M.cairo_region_destroy)
+end
+
+function M.cairo_region_reference(...)
+	return ffi.gc(C.cairo_region_reference(...), M.cairo_region_destroy)
+end
+
+function M.cairo_copy_path(...)
+	return ffi.gc(C.cairo_copy_path(...), M.cairo_path_destroy)
+end
+
+function M.cairo_copy_path_flat(...)
+	return ffi.gc(C.cairo_copy_path_flat(...), M.cairo_path_destroy)
+end
+
+function M.cairo_copy_clip_rectangle_list(...)
+	return ffi.gc(C.cairo_copy_clip_rectangle_list(...), M.cairo_rectangle_list_destroy)
+end
+
+function M.cairo_glyph_allocate(...)
+	return ffi.gc(C.cairo_glyph_allocate(...), M.cairo_glyph_free)
+end
+
+function M.cairo_text_cluster_allocate(...)
+	return ffi.gc(C.cairo_text_cluster_allocate(...), M.cairo_text_cluster_free)
+end
+
+-- char* return -> string return
 
 function M.cairo_version_string()
 	return ffi.string(C.cairo_version_string())
@@ -26,6 +249,12 @@ end
 function M.cairo_status_to_string(status)
 	return ffi.string(C.cairo_status_to_string(status))
 end
+
+local function status_string(self)
+	return M.cairo_status_to_string(self:status())
+end
+
+-- output args -> return values
 
 function M.cairo_get_matrix(cr, mt)
 	mt = mt or ffi.new'cairo_matrix_t'
@@ -74,14 +303,29 @@ function M.cairo_device_to_user(cr, x, y, dx, dy)
 	return dx[0], dy[0]
 end
 
-function M.cairo_clip_extents(cr, x1, y1, x2, y2)
-	x1 = x1 or ffi.new'double[1]'
-	y1 = y1 or ffi.new'double[1]'
-	x2 = x2 or ffi.new'double[1]'
-	y2 = y2 or ffi.new'double[1]'
-	C.cairo_clip_extents(cr, x1, y1, x2, y2)
-	return x1[0], y1[0], x2[0], y2[0]
+local function extents_function(f)
+	return function(cr, x1, y1, x2, y2)
+		x1 = x1 or ffi.new'double[1]'
+		y1 = y1 or ffi.new'double[1]'
+		x2 = x2 or ffi.new'double[1]'
+		y2 = y2 or ffi.new'double[1]'
+		f(cr, x1, y1, x2, y2)
+		return x1[0], y1[0], x2[0], y2[0]
+	end
 end
+
+M.cairo_clip_extents = extents_function(C.cairo_clip_extents)
+M.cairo_fill_extents = extents_function(C.cairo_fill_extents)
+M.cairo_stroke_extents = extents_function(C.cairo_stroke_extents)
+M.cairo_path_extents = extents_function(C.cairo_path_extents)
+
+function M.cairo_pattern_get_surface(self, surface)
+	surface = surface or ffi.new'cairo_surface_t*[1]'
+	C.cairo_pattern_get_surface(self, surface)
+	return surface[0]
+end
+
+-- quad beziers addition
 
 function M.cairo_quad_curve_to(cr, x1, y1, x2, y2)
 	local x0, y0 = cr:get_current_point()
@@ -97,25 +341,15 @@ function M.cairo_rel_quad_curve_to(cr, x1, y1, x2, y2)
 	M.cairo_quad_curve_to(cr, x0+x1, y0+y1, x0+x2, y0+y2)
 end
 
-function M.cairo_pattern_get_surface(self, surface)
-	surface = surface or ffi.new'cairo_surface_t*[1]'
-	C.cairo_pattern_get_surface(self, surface)
-	return surface[0]
-end
+-- metamethods
 
-local function status_string(self)
-	return M.cairo_status_to_string(self:status())
-end
-
-local function free_ref_counted(o) --it's important to not return anything so you can use self.obj = self.obj:free()
-	local n = o:get_reference_count() - 1
-	o:destroy()
-	if n ~= 0  then
-		error(string.format('refcount of %s is %d, should be 0', tostring(o), n))
+local function returns_bool(f)
+	return f and function(...)
+		return f(...) ~= 0
 	end
 end
 
-ffi.metatype('cairo_t', {__gc = M.cairo_destroy, __index = {
+ffi.metatype('cairo_t', {__index = {
 	reference = M.cairo_reference,
 	destroy = M.cairo_destroy,
 	free = free_ref_counted,
@@ -230,7 +464,7 @@ ffi.metatype('cairo_t', {__gc = M.cairo_destroy, __index = {
 	status_string = status_string,
 }})
 
-ffi.metatype('cairo_surface_t', {__gc = M.cairo_surface_destroy, __index = {
+ffi.metatype('cairo_surface_t', {__index = {
 	create_context = M.cairo_create,
 	create_similar = M.cairo_surface_create_similar,
 	create_for_rectangle = M.cairo_surface_create_for_rectangle,
@@ -264,7 +498,7 @@ ffi.metatype('cairo_surface_t', {__gc = M.cairo_surface_destroy, __index = {
 	create_pattern = M.cairo_pattern_create_for_surface,
 }})
 
-ffi.metatype('cairo_device_t', {__gc = M.cairo_device_destroy, __index = {
+ffi.metatype('cairo_device_t', {__index = {
 	reference = M.cairo_device_reference,
 	get_type = M.cairo_device_get_type,
 	status = M.cairo_device_status,
@@ -280,7 +514,7 @@ ffi.metatype('cairo_device_t', {__gc = M.cairo_device_destroy, __index = {
 	set_user_data = M.cairo_device_set_user_data,
 }})
 
-ffi.metatype('cairo_pattern_t', {__gc = M.cairo_pattern_destroy, __index = {
+ffi.metatype('cairo_pattern_t', {__index = {
 	reference = M.cairo_pattern_reference,
 	destroy = M.cairo_pattern_destroy,
 	free = free_ref_counted,
@@ -306,7 +540,7 @@ ffi.metatype('cairo_pattern_t', {__gc = M.cairo_pattern_destroy, __index = {
 	get_radial_circles = M.cairo_pattern_get_radial_circles,
 }})
 
-ffi.metatype('cairo_scaled_font_t', {__gc = M.cairo_scaled_font_destroy, __index = {
+ffi.metatype('cairo_scaled_font_t', {__index = {
 	reference = M.cairo_scaled_font_reference,
 	destroy = M.cairo_scaled_font_destroy,
 	free = free_ref_counted,
@@ -327,7 +561,7 @@ ffi.metatype('cairo_scaled_font_t', {__gc = M.cairo_scaled_font_destroy, __index
 	get_font_options = M.cairo_scaled_font_get_font_options,
 }})
 
-ffi.metatype('cairo_font_face_t', {__gc = M.cairo_font_face_destroy, __index = {
+ffi.metatype('cairo_font_face_t', {__index = {
 	reference = M.cairo_font_face_reference,
 	destroy = M.cairo_font_face_destroy,
 	free = free_ref_counted,
@@ -351,7 +585,7 @@ ffi.metatype('cairo_font_face_t', {__gc = M.cairo_font_face_destroy, __index = {
 	user_get_unicode_to_glyph_func = M.cairo_user_font_face_get_unicode_to_glyph_func,
 }})
 
-ffi.metatype('cairo_font_options_t', {__gc = M.cairo_font_options_destroy, __index = {
+ffi.metatype('cairo_font_options_t', {__index = {
 	copy = M.cairo_font_options_copy,
 	free = M.cairo_font_options_destroy,
 	status = M.cairo_font_options_status,
@@ -369,7 +603,7 @@ ffi.metatype('cairo_font_options_t', {__gc = M.cairo_font_options_destroy, __ind
 	get_hint_metrics = M.cairo_font_options_get_hint_metrics,
 }})
 
-ffi.metatype('cairo_region_t', {__gc = M.cairo_region_destroy, __index = {
+ffi.metatype('cairo_region_t', {__index = {
 	create = M.cairo_region_create,
 	create_rectangle = M.cairo_region_create_rectangle,
 	create_rectangles = M.cairo_region_create_rectangles,
@@ -397,19 +631,18 @@ ffi.metatype('cairo_region_t', {__gc = M.cairo_region_destroy, __index = {
 	xor_rectangle = M.cairo_region_xor_rectangle,
 }})
 
-ffi.metatype('cairo_path_t', {__gc = M.cairo_path_destroy, __index = {
+ffi.metatype('cairo_path_t', {__index = {
 	free = M.cairo_path_destroy,
 }})
 
-ffi.metatype('cairo_rectangle_list_t', {__gc = M.cairo_rectangle_list_destroy, __index = {
+ffi.metatype('cairo_rectangle_list_t', {__index = {
 	free = M.cairo_rectangle_list_destroy,
 }})
 
-ffi.metatype('cairo_glyph_t', {__gc = M.cairo_glyph_free, __index = {
+ffi.metatype('cairo_glyph_t', {__index = {
 	free = M.cairo_glyph_free,
 }})
-
-ffi.metatype('cairo_text_cluster_t', {__gc = M.cairo_text_cluster_free, __index = {
+ffi.metatype('cairo_text_cluster_t', {__index = {
 	free = M.cairo_text_cluster_free,
 }})
 

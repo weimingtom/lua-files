@@ -88,7 +88,14 @@ function SG:create_font_file(e)
 	local ft_face = self.freetype:new_face(e.path)
 	local load_options = bitmask(freetype, e.load_options, 'FT_LOAD_')
 	local cairo_face = cairo.cairo_ft_font_face_create_for_ft_face(ft_face, load_options)
-	return {ft_face = ft_face, cairo_face = cairo_face, free = font_file_free}
+	local ff_object = newproxy(true)
+	getmetatable(ff_object).__index = {
+		ft_face = ft_face,
+		cairo_face = cairo_face,
+		free = font_file_free,
+	}
+	getmetatable(ff_object).__gc = font_file_free
+	return ff_object
 end
 
 function SG:load_font_file(e) --for preloading
@@ -106,6 +113,10 @@ SG:state_object('font_file',
 	end
 )
 
+SG:state_value('font_size', function(self, size)
+	self.cr:set_font_size(size)
+end)
+
 SG:state_value('font',
 	function(self, font)
 		if font.file then
@@ -116,12 +127,9 @@ SG:state_value('font',
 											font_weights[font.weight or self.defaults.font.weight])
 		end
 		self:set_font_options(font.options)
+		self:set_font_size(font.size)
 	end
 )
-
-SG:state_value('font_size', function(self, size)
-	self.cr:set_font_size(size)
-end)
 
 SG:state_object('line_dashes',
 	function(self, e)
@@ -206,7 +214,8 @@ local function transform_matrix(mt, transforms)
 end
 
 function SG:transform(e)
-	if e.abs then self.cr:identity_matrix() end
+	if e.type == 'color' then return end
+	if e.absolute then self.cr:identity_matrix() end
 	if e.matrix then safe_transform(self.cr, new_matrix(unpack(e.matrix))) end
 	if e.x or e.y then self.cr:translate(e.x or 0, e.y or 0) end
 	if e.angle then
@@ -432,7 +441,7 @@ function SG:draw_path(path)
 		elseif s == 'round_rect' then
 			self:draw_round_rect(get(5))
 		elseif s == 'text' then
-			local font,x,y,s = get(4)
+			local font,x,y,s = path[i], path[i+1], path[i+2], path[i+3]; i=i+4
 			self:set_font(font)
 			self.cr:move_to(x,y)
 			self.cr:text_path(s)
@@ -461,7 +470,13 @@ function SG:set_path(e)
 	end
 end
 
+function SG:path_extents(e)
+	self:set_path(e)
+	return self.cr:path_extents()
+end
+
 function SG:set_color_source(e, alpha)
+	if self.measure_only then return end
 	self.cr:set_source_rgba(e[1], e[2], e[3], (e[4] or 1) * alpha)
 end
 
@@ -469,6 +484,7 @@ SG.pattern_filters = cairo_enum'CAIRO_FILTER_'
 SG.pattern_extends = cairo_enum'CAIRO_EXTEND_'
 
 function SG:set_pattern_source(e, alpha)
+	if self.measure_only then return end
 	local pat = self.cache:get(e)
 	if not pat then
 		if e.r1 then
@@ -533,13 +549,23 @@ function SG:load_image_file(e)
 			return
 		end
 		--cache it, alnong with the image bits which we need to keep around
-		source = {surface = surface, data = img.data, alpha = 1, free = image_source_free}
+		source = newproxy(true)
+		local source_t = {
+			surface = surface,
+			data = img.data,
+			alpha = 1,
+			free = image_source_free
+		}
+		getmetatable(source).__index = source_t
+		getmetatable(source).__newindex = function(t,k,v) source_t[k] = v end
+		getmetatable(source).__gc = image_source_free
 		self.cache:set(e, source)
 	end
 	return source
 end
 
 function SG:set_image_source(e, alpha)
+	if self.measure_only then return end
 	local source = self:load_image_file(e.file)
 	if not source then return end
 	if source.alpha ~= alpha then --if it has a different alpha, it's invalid
@@ -555,14 +581,20 @@ function SG:set_image_source(e, alpha)
 end
 
 function SG:set_object_source(e, alpha)
+	if self.measure_only then
+		if not self:draw_object(e) then
+			self:error('unknwon object type %s', e.type or '<unknown>')
+		end
+		return
+	end
 	local state = self:push_group()
 	if not self:draw_object(e) then
 		self:error('unknwon object type %s', e.type or '<unknown>')
 	end
 	local source = self:pop_group(state)
 	make_translucent(source:get_surface(), alpha)
-	self.cr:set_source(source)
-	source:destroy() --cr still has a reference to it; so the surface will be freed when cr selects another source.
+	self.cr:set_source(source) --now cr has a reference to source that will go away when cr selects another source
+	source:destroy() --release our reference to source, leave only cr's
 end
 
 function SG:set_source(e, alpha)
@@ -578,10 +610,10 @@ function SG:set_source(e, alpha)
 end
 
 function SG:draw_group(e)
-	local cm = self.cr:get_matrix()
+	local mt = self.cr:get_matrix()
 	for i=1,#e do
 		self:render_object(e[i])
-		self.cr:set_matrix(cm)
+		self.cr:set_matrix(mt)
 	end
 end
 
@@ -619,6 +651,7 @@ end
 
 function SG:paint_object(e, alpha) --composite objects with alpha and/or fancy operators must be sourced and painted
 	self:set_source(e, 1)
+	if self.measure_only then return end
 	self:set_operator(e.op)
 	if alpha == 1 then
 		self.cr:paint()
@@ -653,12 +686,23 @@ function SG:render_object(e, alpha) --the node drawing entry-point/dispatcher
 	if e.hidden then return end
 	alpha = clamp01(e.alpha or 1) * clamp01(alpha or 1)
 	if alpha == 0 then return end
-	if e.type ~= 'color' then self:transform(e) end
+	self:transform(e)
 	if not self:draw_simple(e, alpha) then
 		if e.paint_it or not self:draw_composite(e, alpha) then
 			self:paint_object(e, alpha)
 		end
 	end
+end
+
+function SG:draw_extents(extents, with)
+	if not with then return end
+	self.cr:new_path()
+	self:set_source(with, 1)
+	local x1,y1,x2,y2 = unpack(extents)
+	--print(x2-x1,y2-y1)
+	self.cr:rectangle(x1,y1,x2-x1,y2-y1)
+	self:set_line_width(1)
+	self.cr:stroke()
 end
 
 function SG:draw_fill(e, alpha)
@@ -667,6 +711,7 @@ function SG:draw_fill(e, alpha)
 	local state = self:save()
 	self:set_path(e.path)
 	self.cr:clip()
+	e.fill_extents = {self.cr:clip_extents()}
 	self:render_object(e.fill, alpha)
 
 	if self.mouse_x and e.in_fill then
@@ -679,6 +724,7 @@ function SG:draw_fill(e, alpha)
 	end
 
 	self:restore(state)
+	self:draw_extents(e.fill_extents, self.fill_extents_stroke)
 end
 
 function SG:draw_stroke(e, alpha)
@@ -691,28 +737,30 @@ function SG:draw_stroke(e, alpha)
 	self:set_miter_limit(e.miter_limit)
 	self:set_line_dashes(e.line_dashes)
 	self:set_path(e.path)
-	local mt
-	if e.fill then
-		mt = self.cr:get_matrix()
-		self:transform(e.fill)
-	end
+	e.stroke_extents = {self.cr:stroke_extents()}
 	self:set_source(e.stroke, alpha)
 	self:set_operator(e.stroke.op)
-	self.cr:stroke()
-	if mt then self.cr:set_matrix(mt) end
+	if not self.measure_only then
+		self.cr:stroke()
+	end
+	self:draw_extents(e.stroke_extents, self.stroke_extents_stroke)
 end
 
 function SG:draw_shape(e, alpha)
+	local mt = self.cr:get_matrix()
 	if e.stroke_first then
 		self:draw_stroke(e, alpha)
+		self.cr:set_matrix(mt)
 		self:draw_fill(e, alpha)
 	else
 		self:draw_fill(e, alpha)
+		self.cr:set_matrix(mt)
 		self:draw_stroke(e, alpha)
 	end
 end
 
-function SG:render(e)
+function SG:render(e, measure_only)
+	self.measure_only = measure_only == 'measure_only'
 	self.cr:identity_matrix()
 	self:render_object(e)
 	self.cr:set_source_rgb(0,0,0) --release source, if any
@@ -724,14 +772,14 @@ function SG:render(e)
 end
 
 function SG:preload(e)
-	if e.type == 'image' then
-		self:load_image_file(e.file)
-	elseif e.type == 'svg' then
-		self:load_svg_file(e.file)
-	elseif e.type == 'group' then
+	if e.type == 'group' then
 		for _,e in ipairs(e) do
 			self:preload(e)
 		end
+	elseif e.type == 'image' then
+		self:load_image_file(e.file)
+	elseif e.type == 'svg' then
+		self:load_svg_file(e.file)
 	elseif e.type == 'shape' then
 		if e.fill then self:preload(e.fill) end
 		if e.stroke then self:preload(e.stroke) end
@@ -742,6 +790,10 @@ function SG:preload(e)
 		end
 	end
 	self:errors_flush()
+end
+
+function SG:measure(e)
+	self:render(e, 'measure_only')
 end
 
 if not ... then require'svg_parser_test' end

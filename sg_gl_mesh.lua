@@ -1,5 +1,5 @@
---scenegraph/gl/mesh: render mesh objects made of one or more vbos, a texture and an ibo.
---supports interlaved or separate v/n/t/c vbos in any combination.
+--scenegraph/gl/mesh: render mesh objects made of VBOs, IBOs and IBO slices.
+--supports interlaved or separate v/n/t/c VBOs in any combination.
 --textures can be either image files or 2D scene graphs rendered with cairo on a pixman surface.
 --imagefile module is loaded on-demand for image-type textures (which in turn loads libpng, etc. on demand).
 --sg_cairo module is loaded on-demand for surface-type textures.
