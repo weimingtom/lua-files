@@ -268,6 +268,67 @@ function M.cairo_pattern_get_matrix(pat, mt)
 	return mt
 end
 
+function M.cairo_get_current_point(cr, dx, dy)
+	dx = dx or ffi.new'double[1]'
+	dy = dy or ffi.new'double[1]'
+	C.cairo_get_current_point(cr, dx, dy)
+	return dx[0], dy[0]
+end
+
+local function extents_function(f)
+	return function(cr, dx1, dy1, dx2, dy2)
+		dx1 = dx1 or ffi.new'double[1]'
+		dy1 = dy1 or ffi.new'double[1]'
+		dx2 = dx2 or ffi.new'double[1]'
+		dy2 = dy2 or ffi.new'double[1]'
+		f(cr, dx1, dy1, dx2, dy2)
+		return dx1[0], dy1[0], dx2[0], dy2[0]
+	end
+end
+
+M.cairo_clip_extents = extents_function(C.cairo_clip_extents)
+M.cairo_fill_extents = extents_function(C.cairo_fill_extents)
+M.cairo_stroke_extents = extents_function(C.cairo_stroke_extents)
+M.cairo_path_extents = extents_function(C.cairo_path_extents)
+
+function M.cairo_pattern_get_surface(self, surface)
+	surface = surface or ffi.new'cairo_surface_t*[1]'
+	C.cairo_pattern_get_surface(self, surface)
+	return surface[0]
+end
+
+local function point_transform_function(f)
+	return function(cr, x, y, dx, dy)
+		dx = dx or ffi.new('double[1]', x)
+		dy = dy or ffi.new('double[1]', y)
+		f(cr, dx, dy)
+		return dx[0], dy[0]
+	end
+end
+
+M.cairo_device_to_user = point_transform_function(C.cairo_device_to_user)
+M.cairo_user_to_device = point_transform_function(C.cairo_user_to_device)
+M.cairo_user_to_device_distance = point_transform_function(C.cairo_user_to_device_distance)
+M.cairo_device_to_user_distance = point_transform_function(C.cairo_device_to_user_distance)
+
+-- quad beziers addition
+
+function M.cairo_quad_curve_to(cr, x1, y1, x2, y2)
+	local x0, y0 = cr:get_current_point()
+	cr:curve_to((x0 + 2 * x1) / 3,
+					(y0 + 2 * y1) / 3,
+					(x2 + 2 * x1) / 3,
+					(y2 + 2 * y1) / 3,
+					x2, y2)
+end
+
+function M.cairo_rel_quad_curve_to(cr, x1, y1, x2, y2)
+	local x0, y0 = cr:get_current_point()
+	M.cairo_quad_curve_to(cr, x0+x1, y0+y1, x0+x2, y0+y2)
+end
+
+-- matrix additions
+
 function M.cairo_skew(cr, ax, ay)
 	local sm = ffi.new'cairo_matrix_t'
 	sm:init_identity()
@@ -287,58 +348,6 @@ function M.cairo_matrix_skew(mt, ax, ay)
 	sm.xy = math.tan(ax)
 	sm.yx = math.tan(ay)
 	mt:transform(sm)
-end
-
-function M.cairo_get_current_point(cr, dx, dy)
-	dx = dx or ffi.new'double[1]'
-	dy = dy or ffi.new'double[1]'
-	C.cairo_get_current_point(cr, dx, dy)
-	return dx[0], dy[0]
-end
-
-function M.cairo_device_to_user(cr, x, y, dx, dy)
-	dx = dx or ffi.new'double[1]'
-	dy = dy or ffi.new'double[1]'
-	C.cairo_device_to_user(cr, dx, dy)
-	return dx[0], dy[0]
-end
-
-local function extents_function(f)
-	return function(cr, x1, y1, x2, y2)
-		x1 = x1 or ffi.new'double[1]'
-		y1 = y1 or ffi.new'double[1]'
-		x2 = x2 or ffi.new'double[1]'
-		y2 = y2 or ffi.new'double[1]'
-		f(cr, x1, y1, x2, y2)
-		return x1[0], y1[0], x2[0], y2[0]
-	end
-end
-
-M.cairo_clip_extents = extents_function(C.cairo_clip_extents)
-M.cairo_fill_extents = extents_function(C.cairo_fill_extents)
-M.cairo_stroke_extents = extents_function(C.cairo_stroke_extents)
-M.cairo_path_extents = extents_function(C.cairo_path_extents)
-
-function M.cairo_pattern_get_surface(self, surface)
-	surface = surface or ffi.new'cairo_surface_t*[1]'
-	C.cairo_pattern_get_surface(self, surface)
-	return surface[0]
-end
-
--- quad beziers addition
-
-function M.cairo_quad_curve_to(cr, x1, y1, x2, y2)
-	local x0, y0 = cr:get_current_point()
-	cr:curve_to((x0 + 2 * x1) / 3,
-					(y0 + 2 * y1) / 3,
-					(x2 + 2 * x1) / 3,
-					(y2 + 2 * y1) / 3,
-					x2, y2)
-end
-
-function M.cairo_rel_quad_curve_to(cr, x1, y1, x2, y2)
-	local x0, y0 = cr:get_current_point()
-	M.cairo_quad_curve_to(cr, x0+x1, y0+y1, x0+x2, y0+y2)
 end
 
 -- metamethods

@@ -1,5 +1,5 @@
 --cache class: provides shared caching for scene graphs elements.
---an element's fields "invalid", "nocache", and "free" are reserved for cache control.
+--an element's fields "invalid", "nocache", and "invalidate" are reserved for cache control.
 local glue = require'glue'
 
 local Cache = {} --if you have shared nodes between scene graphs, then share the cache too.
@@ -8,34 +8,47 @@ local weak_keys = {__mode = 'k'} --when elements go, associated objects go too.
 
 function Cache:new()
 	local objects = setmetatable({}, weak_keys) --we rely on objects ability to free resources on their __gc.
-	local free_function = function(e)
-		local o = self:get(e)
-		if o.free then o:free() end
-		e.free = nil --presence of a free() method indicates a cached object
+	local release_function = function(e)
+		self:release(e)
 	end
-	return glue.merge({objects = objects, free_function = free_function}, self)
+	return glue.merge({objects = objects, release_function = release_function}, self)
 end
 
 function Cache:get(e)
-	local o = self.objects[e]
-	if o and (e.invalid or e.nocache) then
-		if o.free then o:free() end
-		e.invalid = nil
-		self.objects[e] = nil
+	if e.invalid or e.nocache then
+		self:release(e)
 		return
 	end
-	return o
+	return self.objects[e]
 end
 
 function Cache:set(e,o)
 	assert(self.objects[e] == nil, 'cache: object alreay set')
 	self.objects[e] = o
-	e.free = self.free_function --give elements a convenient way to clear their cached object
+	e.release = self.release_function --give elements a convenient way to clear their cached object on-demand
+end
+
+function Cache:release(e) --clear cached objects of e
+	local o = self.objects[e]
+	if o then
+		if o.free then o:free() end
+		self.objects[e] = nil
+		e.release = nil
+	end
+end
+
+function Cache:release_all(e) --clear cached objects of e and its children
+	if type(e) ~= 'table' then return end
+	self:release(e)
+	for k,v in pairs(e) do
+		self:release_all(k)
+		self:release_all(v)
+	end
 end
 
 function Cache:clear()
-	for e,o in pairs(self.objects) do
-		if o.free then o:free() end
+	for e in pairs(self.objects) do
+		self:release(e)
 	end
 	self.objects = {}
 end
@@ -43,15 +56,6 @@ end
 function Cache:free()
 	self:clear()
 	self.objects = nil
-end
-
-function Cache:delete(e) --clear objects of e and its children; assume only table values (not keys) can cache objects.
-	local o = self.objects[e]
-	if o and o.free then o:free() end
-	if type(e) ~= 'table' then return end
-	for k,v in pairs(e) do
-		self:clear(v)
-	end
 end
 
 return Cache

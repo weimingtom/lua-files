@@ -317,8 +317,6 @@ local function preserveAspectRatio(s) --[defer] <align> [<meetOrSlice>]
 	return preserveAspectRatio_re:match(s or 'xMidYMax')
 end
 
---pp(preserveAspectRatio()) os.exit(1)
-
 --style parsing: input is a style name and value and some context, output is a parsed style value
 --or nil if the value should be inherited or it's invalid. uri references are resolved to unparsed
 --xml nodes (we have to compute all styles before we can start parsing the nodes themselves).
@@ -671,7 +669,7 @@ end
 
 function tags.polygon(t, ct)
 	local shape = tags.polyline(t, ct)
-	shape.path[#path+1] = 'close'
+	shape.path[#shape.path+1] = 'close'
 	return shape
 end
 
@@ -724,7 +722,7 @@ end
 if not ... then
 --require'svg_parser_test'
 --pp(assert(parse{file = '../svg/test_files/leon.svg'}))
-parse{path = 'media/svg/sts/pservers-grad-21-b.svg'}
+pp(parse{path = 'media/svg/futurama/Homer_and_Bender___Drinking_by_sircle.svg'})
 end
 
 return {

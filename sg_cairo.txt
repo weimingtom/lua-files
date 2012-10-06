@@ -1,0 +1,145 @@
+cairo scene graph schema definition
+-----------------------------------
+N is number, S is string, true | false is boolean, enum values, path commands etc. are strings.
+Defaults are on the side in parens. Missing values are replaced with defaults, not inherited,
+so that an object is fully specified independent of its context.
+
+<object> = {
+	<color> | <pattern> | <image> | <shape> | <svg> | <group> | <extension>,
+
+	absolute = true | false (false),
+	matrix = {a, b, c, d, e, f},
+	x = translation_x (0),
+	y = translation_y (0),
+	angle = rotation_angle_degrees (0),
+	cx = rotation_center_x (0),
+	cy = rotation_center_y (0),
+	sx = scale_x (1),
+	sy = scale_y (1),
+	scale = scale (1),
+	skew_x = skew_x (0),
+	skew_y = skew_y (0),
+	transforms = {
+		{'matrix', a, b, c, d, e, f} |
+		{'translate', x, y (0)} |
+		{'rotate', angle, cx (0), cy (0)} |
+		{'scale', scale | sx, sy} |
+		{'skew', x, y},
+		...
+	}
+
+	alpha = N (1),
+
+	operator =
+		clear | source | over | in | out | atop | dest | dest_over | dest_in | dest_out |
+		dest_atop | xor | add | saturate | multiply | screen | overlay | darken |
+		lighten | color_dodge | color_burn | hard_light | soft_light | difference |
+		exclusion | hsl_hue | hsl_saturation | hsl_color | hsl_luminosity (over),
+
+	hidden = true | false (false),
+}
+
+
+<color> =
+	type = 'color', r, g, b, a (1)
+
+
+<pattern> =
+	type = 'pattern',
+	<linear-pattern> | <radial-pattern>
+
+	<linear-pattern> =
+	x1 = N, y1 = N, x2 = N, y2 = N,
+
+	<radial-pattern> =
+	x1 = N, y1 = N, x2 = N, y2 = N, r1 = N, r2 = N,
+
+	relative = true | false (false),
+	filter = fast | good | best | nearest | bilinear | gaussian (fast),
+	extend = none | repeat | reflect | pad (pad)
+
+
+<image> =
+	type = 'image',
+	file = {type = S (infered from file extension), path = S | string = S | cdata = cdata, size = N},
+	filter = fast | good | best | nearest | bilinear | gaussian (best),
+	extend = none | repeat | reflect | pad (none)
+
+
+<shape> =
+	type = 'shape',
+	path = {
+		move | rel_move, x2, y2, ... |
+		line | rel_line, x2, y2, ... |
+		hline | rel_hline, x2, ... |
+		vline | rel_vline, y2, ... |
+		curve | rel_curve, x2, y2, x3, y3, x4, y4, ... |
+		smooth_curve | rel_smooth_curve, x2, y2, x3, y3, ... |
+		quad_curve | rel_quad_curve, x2, y2, x3, y3, ... |
+		smooth_quad_curve | rel_smooth_quad_curve, x3, y3, ... |
+		elliptical_arc | rel_elliptical_arc, rx, ry, x_axis_rotation, large_flag, sweep_flag, x3, y3, ... |
+		close |
+		break |
+		arc | negative_arc, cx, cy, r, angle1, angle2, ... |
+		ellipse, cx, cy, rx, ry, ... |
+		circle, cx, cy, r, ... |
+		rect, x, y, w, h, ... |
+		round_rect, x, y, w, h, r, ... |
+		text, <font>, x, y, S, ... |
+		...
+	},
+
+	fill = <object>,
+	fill_rule = nonzero | evenodd (nonzero),
+
+	stroke = <object>,
+	line_dashes = {offset = N (0), N1,...}
+	line_width = N,
+	line_cap = butt | round | square (square),
+	line_join = miter | round | bevel (miter),
+	miter_limit = N (4),
+
+	stroke_first = true | false (false),
+
+
+<font> = {
+	<font-spec> | <font-file>
+
+	<font-spec> =
+		family = S (Arial),
+		slant = normal | italic | oblique (normal),
+		weight = normal | bold (normal),
+
+	<font-file> =
+		file = {
+			path = S,
+			load_options = {
+				default = , no_scale = , no_hinting = , render = , no_bitmap = ,
+				vertical_layout = , force_autohint = , crop_bitmap = , pedantic = ,
+				ignore_global_advance_width = , no_recurse = , ignore_transform = ,
+				monochrome = , linear_design = , no_autohint =
+			}
+		},
+
+	options = {
+		antialias = default | none | gray | subpixel | fast | good | best,
+		subpixel_order = default | rgb | bgr | vrgb | vbgr,
+		hint_style = default | none | slight | medium | full,
+		hint_metrics = default | off | on,
+	},
+	size = N (12),
+}
+
+
+<svg> =
+	type = 'svg',
+	file = {path = S | string = S | cdata = cdata, size = N | read = function() -> S, size},
+
+
+<group> =
+	type = 'group', <object>, ...
+
+
+<extension> =
+	type = <name>, ... (the object is drawn by invoking the render function sg.draw[name])
+

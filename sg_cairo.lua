@@ -225,7 +225,7 @@ function SG:transform(e)
 	end
 	if e.sx or e.sy then self.cr:scale(e.sx or 1, e.sy or 1) end
 	if e.scale then self.cr:scale(e.scale, e.scale) end
-	if e.skewx or e.skewy then self.cr:skew(math.rad(t.skewx or 0), math.rad(t.skewy or 0)) end
+	if e.skew_x or e.skew_y then self.cr:skew(math.rad(t.skew_x or 0), math.rad(t.skew_y or 0)) end
 	if e.transforms then
 		self.cr:set_matrix(transform_matrix(self.cr:get_matrix(), e.transforms))
 	end
@@ -470,13 +470,7 @@ function SG:set_path(e)
 	end
 end
 
-function SG:path_extents(e)
-	self:set_path(e)
-	return self.cr:path_extents()
-end
-
 function SG:set_color_source(e, alpha)
-	if self.measure_only then return end
 	self.cr:set_source_rgba(e[1], e[2], e[3], (e[4] or 1) * alpha)
 end
 
@@ -484,7 +478,6 @@ SG.pattern_filters = cairo_enum'CAIRO_FILTER_'
 SG.pattern_extends = cairo_enum'CAIRO_EXTEND_'
 
 function SG:set_pattern_source(e, alpha)
-	if self.measure_only then return end
 	local pat = self.cache:get(e)
 	if not pat then
 		if e.r1 then
@@ -497,7 +490,7 @@ function SG:set_pattern_source(e, alpha)
 			pat:add_color_stop_rgba(offset, c[1], c[2], c[3], (c[4] or 1) * alpha)
 		end
 
-		if e.relative then
+		if e.relative then --fill follows the bounding box of the shape on which it is applied
 			local bx1, by1, bx2, by2 = self.cr:clip_extents()
 			local w, h = bx2-bx1, by2-by1
 			local x, y = bx1, by1
@@ -557,15 +550,21 @@ function SG:load_image_file(e)
 			free = image_source_free
 		}
 		getmetatable(source).__index = source_t
-		getmetatable(source).__newindex = function(t,k,v) source_t[k] = v end
+		getmetatable(source).__newindex = function(t,k,v) source_t[k] = v end --so we can change alpha
 		getmetatable(source).__gc = image_source_free
 		self.cache:set(e, source)
 	end
 	return source
 end
 
+function SG:measure_image(e)
+	self:load_image_file(e.file)
+	local x1,y1 = self.cr:user_to_device(0,0)
+	local x2,y2 = self.cr:user_to_device(e.w, e.h)
+	return x1,y1,x2,y2
+end
+
 function SG:set_image_source(e, alpha)
-	if self.measure_only then return end
 	local source = self:load_image_file(e.file)
 	if not source then return end
 	if source.alpha ~= alpha then --if it has a different alpha, it's invalid
@@ -581,12 +580,6 @@ function SG:set_image_source(e, alpha)
 end
 
 function SG:set_object_source(e, alpha)
-	if self.measure_only then
-		if not self:draw_object(e) then
-			self:error('unknwon object type %s', e.type or '<unknown>')
-		end
-		return
-	end
 	local state = self:push_group()
 	if not self:draw_object(e) then
 		self:error('unknwon object type %s', e.type or '<unknown>')
@@ -609,12 +602,75 @@ function SG:set_source(e, alpha)
 	end
 end
 
-function SG:draw_group(e)
-	local mt = self.cr:get_matrix()
-	for i=1,#e do
-		self:render_object(e[i])
-		self.cr:set_matrix(mt)
+function SG:draw_extents(with, x1,y1,x2,y2)
+	if not with then return end
+	self.cr:new_path()
+	self:set_source(with, 1)
+	self.cr:rectangle(x1,y1,x2-x1,y2-y1)
+	self:set_line_width(1)
+	self.cr:stroke()
+end
+
+function SG:draw_fill(e, alpha)
+	if not e.fill or e.fill.hidden then return end
+	self:set_fill_rule(e.fill_rule)
+	local state = self:save()
+	self:set_path(e.path)
+	self.cr:clip()
+	self:render_object(e.fill, alpha)
+
+	if self.mouse_x and e.in_fill then
+		self.tx = self.tx or ffi.new'double[1]'
+		self.ty = self.ty or ffi.new'double[1]'
+		self.tx[0] = self.mouse_x
+		self.ty[0] = self.mouse_y
+		self.cr:device_to_user(self.tx[0], self.ty[0], self.tx, self.ty)
+		e.in_fill(self, e, self.cr:in_clip(self.tx[0], self.ty[0]))
 	end
+
+	self:restore(state)
+	self:draw_extents(self.fill_extents_stroke, self.cr:clip_extents())
+end
+
+local function clamp01(x)
+	return x < 0 and 0 or x > 1 and 1 or x
+end
+
+function SG:draw_stroke(e, alpha)
+	if not e.stroke or e.stroke.hidden then return end
+	alpha = clamp01(e.stroke.alpha or 1) * clamp01(alpha or 1)
+	if alpha == 0 then return end
+	self:set_line_width(e.line_width)
+	self:set_line_cap(e.line_cap)
+	self:set_line_join(e.line_join)
+	self:set_miter_limit(e.miter_limit)
+	self:set_line_dashes(e.line_dashes)
+	self:set_path(e.path)
+	self:set_source(e.stroke, alpha)
+	self:set_operator(e.stroke.op)
+	self.cr:stroke()
+	self:draw_extents(self.stroke_extents_stroke, self.cr:stroke_extents())
+end
+
+function SG:draw_shape(e, alpha)
+	local mt = self.cr:get_matrix()
+	if e.stroke_first then
+		self:draw_stroke(e, alpha)
+		self.cr:set_matrix(mt)
+		self:draw_fill(e, alpha)
+	else
+		self:draw_fill(e, alpha)
+		self.cr:set_matrix(mt)
+		self:draw_stroke(e, alpha)
+	end
+end
+
+function SG:measure_shape(e)
+	self:set_path(e.path)
+	local x1,y1,x2,y2 = self.cr:path_extents()
+	x1,y1 = self.cr:user_to_device(x1,y1)
+	x2,y2 = self.cr:user_to_device(x2,y2)
+	return x1,y1,x2,y2
 end
 
 function SG:load_svg_file(e)
@@ -632,6 +688,38 @@ function SG:draw_svg(e)
 	self:render_object(self:load_svg_file(e.file))
 end
 
+function SG:measure_svg(e)
+	self:measure_object(self:load_svg_file(e.file))
+end
+
+function SG:draw_group(e)
+	local mt = self.cr:get_matrix()
+	for i=1,#e do
+		e[i].parent = e --parent is only contextual because the same element can be shared in multiple groups
+		self:render_object(e[i])
+		e[i].parent = nil
+		self.cr:set_matrix(mt)
+	end
+end
+
+function SG:measure_group(e)
+	if #e == 0 then return end
+	local mt = self.cr:get_matrix()
+	local dx1,dy1,dx2,dy2 = 0,0,0,0
+	for i=1,#e do
+		local x1,y1,x2,y2 = self:measure_object(e[i])
+		dx1 = math.min(dx1,x1)
+		dy1 = math.min(dy1,y1)
+		dx2 = math.max(dx2,x2)
+		dy2 = math.max(dy2,y2)
+		self.cr:set_matrix(mt)
+	end
+	return dx1,dy1,dx2,dy2
+end
+
+SG.draw = {} --{object_type = draw_function}
+SG.measure = {} --{object_type = measure_function}
+
 function SG:draw_object(e)
 	if e.type == 'group' then
 		self:draw_group(e)
@@ -642,16 +730,29 @@ function SG:draw_object(e)
 	elseif e.type == 'svg' then
 		self:draw_svg(e)
 		return true
+	elseif self.draw[e.type] then
+		self.draw[e.type](self, e)
+		return true
 	end
 end
 
-local function clamp01(x)
-	return x < 0 and 0 or x > 1 and 1 or x
+function SG:measure_object(e)
+	self:transform(e)
+	if e.type == 'group' then
+		return self:measure_group(e)
+	elseif e.type == 'shape' then
+		return self:measure_shape(e)
+	elseif e.type == 'svg' then
+		return self:measure_svg(e)
+	elseif e.type == 'image' then
+		return self:measure_image(e)
+	elseif self.measure[e.type] then
+		return self.measure[e.type](self, e)
+	end
 end
 
 function SG:paint_object(e, alpha) --composite objects with alpha and/or fancy operators must be sourced and painted
 	self:set_source(e, 1)
-	if self.measure_only then return end
 	self:set_operator(e.op)
 	if alpha == 1 then
 		self.cr:paint()
@@ -694,73 +795,7 @@ function SG:render_object(e, alpha) --the node drawing entry-point/dispatcher
 	end
 end
 
-function SG:draw_extents(extents, with)
-	if not with then return end
-	self.cr:new_path()
-	self:set_source(with, 1)
-	local x1,y1,x2,y2 = unpack(extents)
-	--print(x2-x1,y2-y1)
-	self.cr:rectangle(x1,y1,x2-x1,y2-y1)
-	self:set_line_width(1)
-	self.cr:stroke()
-end
-
-function SG:draw_fill(e, alpha)
-	if not e.fill or e.fill.hidden then return end
-	self:set_fill_rule(e.fill_rule)
-	local state = self:save()
-	self:set_path(e.path)
-	self.cr:clip()
-	e.fill_extents = {self.cr:clip_extents()}
-	self:render_object(e.fill, alpha)
-
-	if self.mouse_x and e.in_fill then
-		self.tx = self.tx or ffi.new'double[1]'
-		self.ty = self.ty or ffi.new'double[1]'
-		self.tx[0] = self.mouse_x
-		self.ty[0] = self.mouse_y
-		self.cr:device_to_user(self.tx[0], self.ty[0], self.tx, self.ty)
-		e.in_fill(self, e, self.cr:in_clip(self.tx[0], self.ty[0]))
-	end
-
-	self:restore(state)
-	self:draw_extents(e.fill_extents, self.fill_extents_stroke)
-end
-
-function SG:draw_stroke(e, alpha)
-	if not e.stroke or e.stroke.hidden then return end
-	alpha = clamp01(e.stroke.alpha or 1) * clamp01(alpha or 1)
-	if alpha == 0 then return end
-	self:set_line_width(e.line_width)
-	self:set_line_cap(e.line_cap)
-	self:set_line_join(e.line_join)
-	self:set_miter_limit(e.miter_limit)
-	self:set_line_dashes(e.line_dashes)
-	self:set_path(e.path)
-	e.stroke_extents = {self.cr:stroke_extents()}
-	self:set_source(e.stroke, alpha)
-	self:set_operator(e.stroke.op)
-	if not self.measure_only then
-		self.cr:stroke()
-	end
-	self:draw_extents(e.stroke_extents, self.stroke_extents_stroke)
-end
-
-function SG:draw_shape(e, alpha)
-	local mt = self.cr:get_matrix()
-	if e.stroke_first then
-		self:draw_stroke(e, alpha)
-		self.cr:set_matrix(mt)
-		self:draw_fill(e, alpha)
-	else
-		self:draw_fill(e, alpha)
-		self.cr:set_matrix(mt)
-		self:draw_stroke(e, alpha)
-	end
-end
-
-function SG:render(e, measure_only)
-	self.measure_only = measure_only == 'measure_only'
+function SG:render(e)
 	self.cr:identity_matrix()
 	self:render_object(e)
 	self.cr:set_source_rgb(0,0,0) --release source, if any
@@ -784,7 +819,7 @@ function SG:preload(e)
 		if e.fill then self:preload(e.fill) end
 		if e.stroke then self:preload(e.stroke) end
 		for i=1,#e.path do
-			if e.path[i] == 'text' then
+			if e.path[i] == 'text' and e.path[i+1].file then
 				self:load_font_file(e.path[i+1].file)
 			end
 		end
@@ -793,7 +828,8 @@ function SG:preload(e)
 end
 
 function SG:measure(e)
-	self:render(e, 'measure_only')
+	self.cr:identity_matrix()
+	return self:measure_object(e)
 end
 
 if not ... then require'svg_parser_test' end

@@ -119,7 +119,7 @@ local arcs02 = {type = 'svg', file = {string = [[
 </svg>
 ]]}}
 
-local svgfile = {type = 'svg', file = {path = 'media/svg/beach_towel.svg'}}
+local svgfile = {type = 'svg', file = {path = 'media/svg/futurama/nibbler.svg'}}
 
 local scene = {type = 'group', x = 600, --y = 100,
 	{type = 'color',1,1,1},
