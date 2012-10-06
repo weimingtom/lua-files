@@ -28,7 +28,7 @@ so that an object is fully specified independent of its context.
 		...
 	}
 
-	alpha = N (1),
+	alpha = N (1), --clamped to 0..1
 
 	operator =
 		clear | source | over | in | out | atop | dest | dest_over | dest_in | dest_out |
@@ -41,7 +41,7 @@ so that an object is fully specified independent of its context.
 
 
 <color> =
-	type = 'color', r, g, b, a (1)
+	type = 'color', r, g, b, a (1) --values are clamped to 0..1
 
 
 <pattern> =
@@ -118,14 +118,14 @@ so that an object is fully specified independent of its context.
 				vertical_layout = , force_autohint = , crop_bitmap = , pedantic = ,
 				ignore_global_advance_width = , no_recurse = , ignore_transform = ,
 				monochrome = , linear_design = , no_autohint =
-			}
+			} ({default = true})
 		},
 
 	options = {
-		antialias = default | none | gray | subpixel | fast | good | best,
-		subpixel_order = default | rgb | bgr | vrgb | vbgr,
-		hint_style = default | none | slight | medium | full,
-		hint_metrics = default | off | on,
+		antialias = default | none | gray | subpixel | fast | good | best (default),
+		subpixel_order = default | rgb | bgr | vrgb | vbgr (default),
+		hint_style = default | none | slight | medium | full (default),
+		hint_metrics = default | off | on (default),
 	},
 	size = N (12),
 }
