@@ -647,7 +647,7 @@ function SG:draw_stroke(e, alpha)
 	self:set_line_dashes(e.line_dashes)
 	self:set_path(e.path)
 	self:set_source(e.stroke, alpha)
-	self:set_operator(e.stroke.op)
+	self:set_operator(e.stroke.operator)
 	self.cr:stroke()
 	self:draw_extents(self.stroke_extents_stroke, self.cr:stroke_extents())
 end
@@ -753,7 +753,7 @@ end
 
 function SG:paint_object(e, alpha) --composite objects with alpha and/or fancy operators must be sourced and painted
 	self:set_source(e, 1)
-	self:set_operator(e.op)
+	self:set_operator(e.operator)
 	if alpha == 1 then
 		self.cr:paint()
 	else
@@ -779,7 +779,7 @@ function SG:draw_simple(e, alpha) --non-composite objects can be drawn directly 
 end
 
 function SG:draw_composite(e, alpha) --composite objects without alpha and without fancy operators can be drawn directly
-	if alpha < 1 or (e.op and e.op ~= 'over' and e.op ~= 'source') then return end
+	if alpha < 1 or (e.operator and e.operator ~= 'over' and e.operator ~= 'source') then return end
 	return self:draw_object(e)
 end
 
@@ -789,7 +789,7 @@ function SG:render_object(e, alpha) --the node drawing entry-point/dispatcher
 	if alpha == 0 then return end
 	self:transform(e)
 	if not self:draw_simple(e, alpha) then
-		if e.paint_it or not self:draw_composite(e, alpha) then
+		if not self:draw_composite(e, alpha) then
 			self:paint_object(e, alpha)
 		end
 	end

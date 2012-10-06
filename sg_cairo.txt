@@ -4,6 +4,7 @@ N is number, S is string, true | false is boolean, enum values, path commands et
 Defaults are on the side in parens. Missing values are replaced with defaults, not inherited,
 so that an object is fully specified independent of its context.
 
+
 <object> = {
 	<color> | <pattern> | <image> | <shape> | <svg> | <group> | <extension>,
 
@@ -37,7 +38,14 @@ so that an object is fully specified independent of its context.
 		exclusion | hsl_hue | hsl_saturation | hsl_color | hsl_luminosity (over),
 
 	hidden = true | false (false),
+
+	invalid = true | false (false) (*),
+	nocache = true | false (false) (*),
+
+	parent = <object> --set automatically and available only while the object is being rendered
 }
+
+(*) cache control options apply to path, font.file, image.file, svg.file, and pattern nodes.
 
 
 <color> =
@@ -63,8 +71,8 @@ so that an object is fully specified independent of its context.
 	type = 'image',
 	file = {type = S (infered from file extension), path = S | string = S | cdata = cdata, size = N},
 	filter = fast | good | best | nearest | bilinear | gaussian (best),
-	extend = none | repeat | reflect | pad (none)
-
+	extend = none | repeat | reflect | pad (none),
+	w = N, h = N --set automatically when the image is loaded
 
 <shape> =
 	type = 'shape',
@@ -134,6 +142,7 @@ so that an object is fully specified independent of its context.
 <svg> =
 	type = 'svg',
 	file = {path = S | string = S | cdata = cdata, size = N | read = function() -> S, size},
+	object = <object> --set automatically when the svg is loaded
 
 
 <group> =
