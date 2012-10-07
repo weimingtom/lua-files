@@ -9,7 +9,7 @@ so that an object is fully specified independent of its context.
 	<color> | <pattern> | <image> | <shape> | <svg> | <group> | <extension>,
 
 	absolute = true | false (false),
-	matrix = {a, b, c, d, e, f},
+	matrix = {a, b, c, d, e, f} (nil),
 	x = translation_x (0),
 	y = translation_y (0),
 	angle = rotation_angle_degrees (0),
@@ -27,7 +27,7 @@ so that an object is fully specified independent of its context.
 		{'scale', scale | sx, sy} |
 		{'skew', x, y},
 		...
-	}
+	} (nil)
 
 	alpha = N (1), --clamped to 0..1
 
@@ -43,6 +43,7 @@ so that an object is fully specified independent of its context.
 	nocache = true | false (false) (*),
 
 	parent = <object> --set automatically and available only while the object is being rendered
+							--parent objects have their parent property set as well at this point
 }
 
 (*) cache control options apply to path, font.file, image.file, svg.file, and pattern nodes.
@@ -72,7 +73,6 @@ so that an object is fully specified independent of its context.
 	file = {type = S (infered from file extension), path = S | string = S | cdata = cdata, size = N},
 	filter = fast | good | best | nearest | bilinear | gaussian (best),
 	extend = none | repeat | reflect | pad (none),
-	w = N, h = N --set automatically when the image is loaded
 
 <shape> =
 	type = 'shape',
@@ -88,7 +88,7 @@ so that an object is fully specified independent of its context.
 		elliptical_arc | rel_elliptical_arc, rx, ry, x_axis_rotation, large_flag, sweep_flag, x3, y3, ... |
 		close |
 		break |
-		arc | negative_arc, cx, cy, r, angle1, angle2, ... |
+		arc | negative_arc | rel_arc | rel_negative_arc, cx, cy, r, angle1, angle2, ... |
 		ellipse, cx, cy, rx, ry, ... |
 		circle, cx, cy, r, ... |
 		rect, x, y, w, h, ... |
@@ -97,12 +97,12 @@ so that an object is fully specified independent of its context.
 		...
 	},
 
-	fill = <object>,
+	fill = <object> (nil),
 	fill_rule = nonzero | evenodd (nonzero),
 
-	stroke = <object>,
-	line_dashes = {offset = N (0), N1,...}
-	line_width = N,
+	stroke = <object> (nil),
+	line_dashes = {offset = N (0), N1,...} (nil, no dashes)
+	line_width = N (1),
 	line_cap = butt | round | square (square),
 	line_join = miter | round | bevel (miter),
 	miter_limit = N (4),
@@ -121,12 +121,15 @@ so that an object is fully specified independent of its context.
 	<font-file> =
 		file = {
 			path = S,
-			load_options = {
-				default = , no_scale = , no_hinting = , render = , no_bitmap = ,
-				vertical_layout = , force_autohint = , crop_bitmap = , pedantic = ,
-				ignore_global_advance_width = , no_recurse = , ignore_transform = ,
-				monochrome = , linear_design = , no_autohint =
-			} ({default = true})
+			--see http://www.cairographics.org/manual/cairo-FreeType-Fonts.html#cairo-ft-font-face-create-for-ft-face
+			load_options = { --default is false for all options
+				default = true | false, no_scale = true | false, no_hinting = true | false,
+				render = true | false, no_bitmap = true | false, vertical_layout = true | false,
+				force_autohint = true | false, crop_bitmap = true | false, pedantic = true | false,
+				ignore_global_advance_width = true | false, no_recurse = true | false,
+				ignore_transform = true | false, monochrome = true | false, linear_design = true | false,
+				no_autohint = true, false
+			} (nil, all false)
 		},
 
 	options = {
@@ -142,7 +145,6 @@ so that an object is fully specified independent of its context.
 <svg> =
 	type = 'svg',
 	file = {path = S | string = S | cdata = cdata, size = N | read = function() -> S, size},
-	object = <object> --set automatically when the svg is loaded
 
 
 <group> =

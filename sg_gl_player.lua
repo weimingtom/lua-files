@@ -5,7 +5,6 @@ require'winapi.messageloop'
 require'winapi.wglpanel'
 
 local GLSG = require'sg_gl'
-require'sg_gl_cairo'
 require'sg_gl_mesh'
 require'sg_gl_obj'
 

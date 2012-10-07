@@ -37,11 +37,9 @@ SG:state_object('vbo',
 		local data, sz
 		if e.data then
 			data, sz = e.data, e.size
-			e.data, e.size = nil --clear reference to save space
 		elseif e.values then
 			data = ffi.new('float[?]', #e.values, e.values)
 			sz = ffi.sizeof(data)
-			e.values = nil --clear reference to save space
 		else
 			error'vbo data or values missing'
 		end
@@ -125,12 +123,10 @@ SG:state_object('ibo',
 				assert(count, 'ibo: count expected in absence of size')
 				sz = ffi.sizeof(ibo_ctype(count), count)
 			end
-			e.data, e.size, e.count = nil --clear reference to save space
 		elseif e.values then
 			count = #e.values
 			data = ffi.new(ibo_ctype(count), count, e.values)
 			sz = ffi.sizeof(data)
-			e.values = nil --clear reference to save space
 			--for i=0,(sz-1)/2 do print(data[i]) end
 		elseif e.count then
 			count = e.count
@@ -258,7 +254,7 @@ function SG:gl_draw_elements(mode, from, count, buffer_count, transparent)
 end
 
 function SG.type:mesh(e)
-	assert(e.vbo_v or e.vbo_n or e.vbo_t or e.vbo_c, 'vbo_v or vbo_n or vbo_t or vbo_c or a combination thereof exected')
+	assert(e.vbo_v, 'vbo_v expected')
 	self:set_vbo_v(e.vbo_v)
 	self:set_vbo_n(e.vbo_n)
 	self:set_vbo_t(e.vbo_t)
@@ -266,11 +262,11 @@ function SG.type:mesh(e)
 	self:set_texture(e.texture)
 	if not e.ibo then --create a default ibo that selects all vertices
 		local vbo_v = self.cache:get(e.vbo_v)
-		local vbo_n = self.cache:get(e.vbo_n)
-		local vbo_t = self.cache:get(e.vbo_t)
-		local vbo_c = self.cache:get(e.vbo_c)
+		local vbo_n = e.vbo_n and self.cache:get(e.vbo_n)
+		local vbo_t = e.vbo_t and self.cache:get(e.vbo_t)
+		local vbo_c = e.vbo_c and self.cache:get(e.vbo_c)
 		local count = math.min(
-							vbo_v and vbo_v.count or math.huge,
+							vbo_v.count or math.huge,
 							vbo_n and vbo_n.count or math.huge,
 							vbo_t and vbo_t.count or math.huge,
 							vbo_c and vbo_c.count or math.huge)

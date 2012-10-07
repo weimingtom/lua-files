@@ -1,17 +1,15 @@
 --cache class: provides shared caching for scene graphs elements.
---an element's fields "invalid", "nocache", and "invalidate" are reserved for cache control.
+--an element's fields "invalid" and "nocache" are used for cache control.
+--a cache object's method "free" is used for freeing the object.
 local glue = require'glue'
 
 local Cache = {} --if you have shared nodes between scene graphs, then share the cache too.
 
-local weak_keys = {__mode = 'k'} --when elements go, associated objects go too.
+local weak_keys = {__mode = 'k'} --the cache is weak: when elements go, associated objects go too.
 
 function Cache:new()
 	local objects = setmetatable({}, weak_keys) --we rely on objects ability to free resources on their __gc.
-	local release_function = function(e)
-		self:release(e)
-	end
-	return glue.merge({objects = objects, release_function = release_function}, self)
+	return glue.merge({objects = objects}, self)
 end
 
 function Cache:get(e)
@@ -25,7 +23,6 @@ end
 function Cache:set(e,o)
 	assert(self.objects[e] == nil, 'cache: object alreay set')
 	self.objects[e] = o
-	e.release = self.release_function --give elements a convenient way to clear their cached object on-demand
 end
 
 function Cache:release(e) --clear cached objects of e
@@ -33,7 +30,6 @@ function Cache:release(e) --clear cached objects of e
 	if o then
 		if o.free then o:free() end
 		self.objects[e] = nil
-		e.release = nil
 	end
 end
 

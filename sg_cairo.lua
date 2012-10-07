@@ -23,7 +23,8 @@ function SG:free()
 end
 
 SG.defaults = {
-	font = {family = 'Arial', slant = 'normal', weight = 'normal', size = 12},
+	font = {family = 'Arial', slant = 'normal', weight = 'normal'},
+	font_size = 12,
 	font_options = {antialias = 'default', subpixel_order = 'default',
 							hint_style = 'default', hint_metrics = 'default'},
 	fill_rule = 'nonzero',
@@ -188,7 +189,7 @@ local function invertible(mt)
 end
 
 local function safe_transform(cr, mt)
-	if invertible(mt) then cr:transform(mt) end
+	if invertible(mt) then cr:transform(mt) else print(mt) end
 end
 
 local function transform_matrix(mt, transforms)
@@ -218,14 +219,12 @@ function SG:transform(e)
 	if e.absolute then self.cr:identity_matrix() end
 	if e.matrix then safe_transform(self.cr, new_matrix(unpack(e.matrix))) end
 	if e.x or e.y then self.cr:translate(e.x or 0, e.y or 0) end
-	if e.angle then
-		if e.cx or e.cy then self.cr:translate(e.cx or 0, e.cy or 0) end
-		self.cr:rotate(math.rad(e.angle))
-		if e.cx or e.cy then self.cr:translate(-(e.cx or 0), -(e.cy or 0)) end
-	end
-	if e.sx or e.sy then self.cr:scale(e.sx or 1, e.sy or 1) end
+	if e.cx or e.cy then self.cr:translate(e.cx or 0, e.cy or 0) end
+	if e.angle then self.cr:rotate(math.rad(e.angle)) end
 	if e.scale then self.cr:scale(e.scale, e.scale) end
-	if e.skew_x or e.skew_y then self.cr:skew(math.rad(t.skew_x or 0), math.rad(t.skew_y or 0)) end
+	if e.sx or e.sy then self.cr:scale(e.sx or 1, e.sy or 1) end
+	if e.cx or e.cy then self.cr:translate(-(e.cx or 0), -(e.cy or 0)) end
+	if e.skew_x or e.skew_y then self.cr:skew(math.rad(e.skew_x or 0), math.rad(e.skew_y or 0)) end
 	if e.transforms then
 		self.cr:set_matrix(transform_matrix(self.cr:get_matrix(), e.transforms))
 	end
@@ -321,7 +320,6 @@ end
 
 function SG:draw_path(path)
 	self.cr:new_path() --no current point after this
-	self.cr:move_to(0,0) --default current point to avoid cairo shutting down on invalid input
 	if type(path[1]) ~= 'string' then
 		self:error'path must start with a command'
 		return
@@ -400,7 +398,7 @@ function SG:draw_path(path)
 			local x2,y2 = get(2)
 			local cpx, cpy = self.cr:get_current_point()
 			local x1,y1 = opposite_point(qx, qy, cpx, cpy)
-			self.cr:rel_quad_curve_to(x1-cpx,y1-cpx,x2,y2)
+			self.cr:rel_quad_curve_to(x1-cpx,y1-cpy,x2,y2)
 			qx,qy = x1,y1
 		elseif s == 'elliptical_arc' then
 			local cpx, cpy = self.cr:get_current_point()
@@ -414,13 +412,20 @@ function SG:draw_path(path)
 			self.cr:close_path()
 		elseif s == 'break' then --only useful for drawing a standalone arc
 			self.cr:new_sub_path() --no current point after this
-			self.cr:move_to(0,0) --default current point to avoid cairo shutting down
 		elseif s == 'arc' then
 			local cx, cy, r, a1, a2 = get(5)
-			self.cr:arc(cy, cx, r, math.rad(a1), math.rad(a2))
+			self.cr:arc(cx, cy, r, math.rad(a1), math.rad(a2))
 		elseif s == 'negative_arc' then
 			local cx, cy, r, a1, a2 = get(5)
-			self.cr:negative_arc(cy, cx, r, math.rad(a1), math.rad(a2))
+			self.cr:arc_negative(cx, cy, r, math.rad(a1), math.rad(a2))
+		elseif s == 'rel_arc' then
+			local cx, cy, r, a1, a2 = get(5)
+			local cpx, cpy = self.cr:get_current_point()
+			self.cr:arc(cpx+cx, cpy+cy, r, math.rad(a1), math.rad(a2))
+		elseif s == 'rel_negative_arc' then
+			local cx, cy, r, a1, a2 = get(5)
+			local cpx, cpy = self.cr:get_current_point()
+			self.cr:arc_negative(cpx+cx, cpy+cy, r, math.rad(a1), math.rad(a2))
 		elseif s == 'ellipse' then
 			local cx, cy, rx, ry = get(4)
 			local mt = self.cr:get_matrix()
@@ -530,8 +535,6 @@ function SG:load_image_file(e)
 		local imagefile = require'imagefile'
 		local img = self:assert(glue.unprotect(glue.pcall(imagefile.load, e, imagefile_load_options)))
 		if not img then return end
-		e.w = img.w
-		e.h = img.h
 		--link image bits to a surface
 		local surface = cairo.cairo_image_surface_create_for_data(img.data,
 									cairo.CAIRO_FORMAT_ARGB32, img.w, img.h, img.w * 4)
@@ -547,6 +550,7 @@ function SG:load_image_file(e)
 			surface = surface,
 			data = img.data,
 			alpha = 1,
+			w = w, h = h,
 			free = image_source_free
 		}
 		getmetatable(source).__index = source_t
@@ -616,18 +620,14 @@ function SG:draw_fill(e, alpha)
 	self:set_fill_rule(e.fill_rule)
 	local state = self:save()
 	self:set_path(e.path)
+	--at this point in_fill() tests the would-be filled area
+	--at this point (in_clip() and in_fill() tests the visible filled area
+	if e.before_clip then e:before_clip(self) end
 	self.cr:clip()
+	--at this point in_clip() tests the visible filled area
+	--at this point in_fill() doesn't work as there's no path at this point
+	if e.before_fill then e:before_fill(self) end
 	self:render_object(e.fill, alpha)
-
-	if self.mouse_x and e.in_fill then
-		self.tx = self.tx or ffi.new'double[1]'
-		self.ty = self.ty or ffi.new'double[1]'
-		self.tx[0] = self.mouse_x
-		self.ty[0] = self.mouse_y
-		self.cr:device_to_user(self.tx[0], self.ty[0], self.tx, self.ty)
-		e.in_fill(self, e, self.cr:in_clip(self.tx[0], self.ty[0]))
-	end
-
 	self:restore(state)
 	self:draw_extents(self.fill_extents_stroke, self.cr:clip_extents())
 end
@@ -648,6 +648,9 @@ function SG:draw_stroke(e, alpha)
 	self:set_path(e.path)
 	self:set_source(e.stroke, alpha)
 	self:set_operator(e.stroke.operator)
+	--at this point in_stroke() tests the would-be stroked area
+	--at this point (in_clip() and in_stroke()) tests the visible stroked area
+	if e.before_stroke then e:before_stroke(self) end
 	self.cr:stroke()
 	self:draw_extents(self.stroke_extents_stroke, self.cr:stroke_extents())
 end
@@ -679,7 +682,6 @@ function SG:load_svg_file(e)
 		local svg_parser = require'svg_parser'
 		object = svg_parser.parse(e)
 		self.cache:set(e, object)
-		e.object = object --the object can be now modified between frames just as any other node
 	end
 	return object
 end
@@ -695,7 +697,7 @@ end
 function SG:draw_group(e)
 	local mt = self.cr:get_matrix()
 	for i=1,#e do
-		e[i].parent = e --parent is only contextual because the same element can be shared in multiple groups
+		e[i].parent = e --parent is a contextual notion because the same element can be shared in multiple groups
 		self:render_object(e[i])
 		e[i].parent = nil
 		self.cr:set_matrix(mt)
@@ -717,8 +719,8 @@ function SG:measure_group(e)
 	return dx1,dy1,dx2,dy2
 end
 
-SG.draw = {} --{object_type = draw_function}
-SG.measure = {} --{object_type = measure_function}
+SG.draw = {} --{object_type = draw_function(e)}
+SG.measure = {} --{object_type = measure_function(e) -> x1, y1, x2, y2}
 
 function SG:draw_object(e)
 	if e.type == 'group' then
@@ -765,7 +767,7 @@ function SG:draw_simple(e, alpha) --non-composite objects can be drawn directly 
 	if e.type == 'color' or e.type == 'pattern' then
 		self:paint_object(e, alpha)
 		return true
-	elseif e.type == 'shape' then
+	elseif e.type == 'shape' and not e.operator then
 		local hasfill = e.fill and not e.fill.hidden
 		local hasstroke = e.stroke and not e.stroke.hidden
 		if ((hasfill and not hasstroke) or (hasstroke and not hasfill))
@@ -793,6 +795,23 @@ function SG:render_object(e, alpha) --the node drawing entry-point/dispatcher
 			self:paint_object(e, alpha)
 		end
 	end
+end
+
+--public API available only while rendering
+
+function SG:in_stroke(x, y) return self.cr:in_stroke(x, y) end
+function SG:in_fill(x, y) return self.cr:in_fill(x, y) end
+function SG:in_clip(x, y) return self.cr:in_clip(x, y) end
+
+--public API available all the time
+
+function SG:get_image_size(e)
+	local source = self:load_image_file(e)
+	return source.w, source.h
+end
+
+function SG:get_svg_object(e) --the object can be modified between frames as long as the svg is not invalidated
+	return self:load_svg_file(e)
 end
 
 function SG:render(e)

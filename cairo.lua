@@ -655,6 +655,11 @@ ffi.metatype('cairo_text_cluster_t', {__index = {
 	free = M.cairo_text_cluster_free,
 }})
 
+local function cairo_matrix_tostring(mt)
+	return string.format('[\t%d\t%d\t]\n[\t%d\t%d\t]\n[\t%d\t%d\t]',
+		mt.xx, mt.yx, mt.xy, mt.yy, mt.x0, mt.y0)
+end
+
 ffi.metatype('cairo_matrix_t', {__index = {
 	init = M.cairo_matrix_init,
 	init_identity = M.cairo_matrix_init_identity,
@@ -670,7 +675,7 @@ ffi.metatype('cairo_matrix_t', {__index = {
 	transform_point = M.cairo_matrix_transform_point,
 	transform = M.cairo_matrix_transform,
 	skew = M.cairo_matrix_skew,
-}})
+}, __tostring = cairo_matrix_tostring})
 
 ffi.metatype('cairo_rectangle_int_t', {__index = {
 	create_region = M.cairo_region_create_rectangle,

@@ -2,9 +2,9 @@ local winapi = require'winapi'
 require'winapi.messageloop'
 local SGPanel = require'winapi.cairosgpanel'
 
-local main = winapi.Window{autoquit = true,visible=false}
+local main = winapi.Window{autoquit = true, visible = false}
 local panel = SGPanel{
-	parent = main,  w = main.client_w, h = main.client_h,
+	parent = main, w = main.client_w, h = main.client_h,
 	anchors = {left=true,right=true,top=true,bottom=true}
 }
 local scene = {type = 'group', scale = 1}

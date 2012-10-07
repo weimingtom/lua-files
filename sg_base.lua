@@ -1,4 +1,4 @@
---cache class and scene graph mixin: provides shared caching, state synchronization and error reporting.
+--scene graph mixin: provides shared caching, state synchronization and error reporting.
 local glue = require'glue'
 local Cache = require'sg_cache'
 
