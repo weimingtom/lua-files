@@ -142,9 +142,15 @@ SG:state_object('line_dashes',
 	end
 )
 
+--[[
 SG:state_value('line_width', function(self, width)
 	self.cr:set_line_width(width)
 end)
+]]
+function SG:set_line_width(width)
+	self.cr:set_line_width(width)
+end
+
 
 --like state_value but use an lookup table; for invalid values, set the default value and record the error.
 function SG:state_enum(k, enum, set) --too much abstraction?
@@ -189,7 +195,7 @@ local function invertible(mt)
 end
 
 local function safe_transform(cr, mt)
-	if invertible(mt) then cr:transform(mt) else print(mt) end
+	if invertible(mt) then cr:transform(mt) end
 end
 
 local function transform_matrix(mt, transforms)
@@ -550,7 +556,7 @@ function SG:load_image_file(e)
 			surface = surface,
 			data = img.data,
 			alpha = 1,
-			w = w, h = h,
+			w = img.w, h = img.h,
 			free = image_source_free
 		}
 		getmetatable(source).__index = source_t
@@ -559,13 +565,6 @@ function SG:load_image_file(e)
 		self.cache:set(e, source)
 	end
 	return source
-end
-
-function SG:measure_image(e)
-	self:load_image_file(e.file)
-	local x1,y1 = self.cr:user_to_device(0,0)
-	local x2,y2 = self.cr:user_to_device(e.w, e.h)
-	return x1,y1,x2,y2
 end
 
 function SG:set_image_source(e, alpha)
@@ -668,13 +667,6 @@ function SG:draw_shape(e, alpha)
 	end
 end
 
-function SG:measure_shape(e)
-	self:set_path(e.path)
-	local x1,y1,x2,y2 = self.cr:path_extents()
-	x1,y1 = self.cr:user_to_device(x1,y1)
-	x2,y2 = self.cr:user_to_device(x2,y2)
-	return x1,y1,x2,y2
-end
 
 function SG:load_svg_file(e)
 	local object = self.cache:get(e)
@@ -690,10 +682,6 @@ function SG:draw_svg(e)
 	self:render_object(self:load_svg_file(e.file))
 end
 
-function SG:measure_svg(e)
-	self:measure_object(self:load_svg_file(e.file))
-end
-
 function SG:draw_group(e)
 	local mt = self.cr:get_matrix()
 	for i=1,#e do
@@ -704,23 +692,7 @@ function SG:draw_group(e)
 	end
 end
 
-function SG:measure_group(e)
-	if #e == 0 then return end
-	local mt = self.cr:get_matrix()
-	local dx1,dy1,dx2,dy2 = 0,0,0,0
-	for i=1,#e do
-		local x1,y1,x2,y2 = self:measure_object(e[i])
-		dx1 = math.min(dx1,x1)
-		dy1 = math.min(dy1,y1)
-		dx2 = math.max(dx2,x2)
-		dy2 = math.max(dy2,y2)
-		self.cr:set_matrix(mt)
-	end
-	return dx1,dy1,dx2,dy2
-end
-
-SG.draw = {} --{object_type = draw_function(e)}
-SG.measure = {} --{object_type = measure_function(e) -> x1, y1, x2, y2}
+SG.ext_draw = {} --{object_type = draw_function(e)}
 
 function SG:draw_object(e)
 	if e.type == 'group' then
@@ -732,24 +704,9 @@ function SG:draw_object(e)
 	elseif e.type == 'svg' then
 		self:draw_svg(e)
 		return true
-	elseif self.draw[e.type] then
-		self.draw[e.type](self, e)
+	elseif self.ext_draw[e.type] then
+		self.ext_draw[e.type](self, e)
 		return true
-	end
-end
-
-function SG:measure_object(e)
-	self:transform(e)
-	if e.type == 'group' then
-		return self:measure_group(e)
-	elseif e.type == 'shape' then
-		return self:measure_shape(e)
-	elseif e.type == 'svg' then
-		return self:measure_svg(e)
-	elseif e.type == 'image' then
-		return self:measure_image(e)
-	elseif self.measure[e.type] then
-		return self.measure[e.type](self, e)
 	end
 end
 
@@ -789,12 +746,38 @@ function SG:render_object(e, alpha) --the node drawing entry-point/dispatcher
 	if e.hidden then return end
 	alpha = clamp01(e.alpha or 1) * clamp01(alpha or 1)
 	if alpha == 0 then return end
+	local mt = self.cr:get_matrix()
 	self:transform(e)
+
+	--[[
+	self.cr:new_path()
+	self.cr:move_to(0,0)
+	self.cr:line_to(0,1000)
+	self.cr:move_to(0,0)
+	self.cr:line_to(1000,0)
+	self:set_line_width(1)
+	self:set_color_source({1,1,1,1}, 1)
+	self.cr:stroke()
+	]]
+
 	if not self:draw_simple(e, alpha) then
 		if not self:draw_composite(e, alpha) then
 			self:paint_object(e, alpha)
 		end
 	end
+
+	--[[
+	if e.type ~= 'shape' then return end
+	--self.cr:identity_matrix()
+	local x1,y1,x2,y2 = self:measure_shape(e)
+	print(e.type, x1,y1,x2,y2)
+	self.cr:set_matrix(mt)
+	self.cr:new_path()
+	self.cr:rectangle(x1, y1, x2-x1, y2-y1)
+	self:set_line_width(10)
+	self:set_color_source({1,1,1,.3}, 1)
+	self.cr:stroke()
+	]]
 end
 
 --public API available only while rendering
@@ -846,24 +829,86 @@ function SG:preload(e)
 	self:errors_flush()
 end
 
-function SG:measure(e)
-	self.cr:identity_matrix()
-	return self:measure_object(e)
+--measuring API
+
+function SG:box_to_device(x1,y1,x2,y2)
+	local dx1,dy1 = self.cr:user_to_device(x1,y1)
+	local dx2,dy2 = self.cr:user_to_device(x2,y2)
+	local dx3,dy3 = self.cr:user_to_device(x1,y2)
+	local dx4,dy4 = self.cr:user_to_device(x2,y1)
+	return
+		math.min(dx1,dx2,dx3,dx4), math.min(dy1,dy2,dy3,dy4),
+		math.max(dx1,dx2,dx3,dx4), math.max(dy1,dy2,dy3,dy4)
 end
 
-if not ... then require'svg_parser_test' end
+function SG:measure_image(e)
+	local source = self:load_image_file(e.file)
+	return self:box_to_device(0,0,source.w,source.h)
+end
 
-TSG = glue.update({}, SG)
-local pp = require'pp'
-for k,f in pairs(SG) do
-	if type(f) == 'function' then
-		TSG[k] = function(self,...)
-			local t = {...}
-			for i,v in ipairs(t) do t[i] = pp.pformat(v) end
-			print(k..'('..table.concat(t, ', ')..')')
-			return f(self,...)
-		end
+function SG:measure_shape(e)
+	self:set_path(e.path)
+	if e.stroke then
+		self:set_line_width(e.line_width)
+		self:set_line_cap(e.line_cap)
+		self:set_line_join(e.line_join)
+		self:set_miter_limit(e.miter_limit)
+		self:set_line_dashes(e.line_dashes)
+		self.cr:identity_matrix()
+		--return self:box_to_device(self.cr:path_extents())
+		return self:box_to_device(self.cr:stroke_extents())
+	else
+		self.cr:identity_matrix()
+		return self:box_to_device(self.cr:path_extents())
 	end
 end
+
+function SG:measure_group(e)
+	local mt = self.cr:get_matrix()
+	local dx1,dy1,dx2,dy2 = math.huge, math.huge, -math.huge, -math.huge
+	for i=1,#e do
+		local x1,y1,x2,y2 = self:measure_object(e[i])
+		if x1 then
+			dx1, dy1 = math.min(dx1,x1), math.min(dy1,y1)
+			dx2, dy2 = math.max(dx2,x2), math.max(dy2,y2)
+		end
+		self.cr:set_matrix(mt)
+	end
+	if dx1 == math.huge then return end
+	return dx1,dy1,dx2,dy2
+end
+
+SG.ext_measure = {} --{object_type = measure_function(e) -> x1, y1, x2, y2}
+
+function SG:measure_object(e)
+	self:transform(e)
+	if e.type == 'group' then
+		return self:measure_group(e)
+	elseif e.type == 'shape' then
+		return self:measure_shape(e)
+	elseif e.type == 'svg' then
+		return self:measure_svg(e)
+	elseif e.type == 'image' then
+		return self:measure_image(e)
+	elseif self.ext_measure[e.type] then
+		return self.ext_measure[e.type](self, e)
+	end
+end
+
+function SG:measure_svg(e)
+	return self:measure_object(self:load_svg_file(e.file))
+end
+
+function SG:measure(e)
+	--local mt = self.cr:get_matrix()
+	self.cr:identity_matrix()
+	local x1,y1,x2,y2 = self:measure_object(e)
+	--self.cr:set_matrix(mt)
+	return x1,y1,x2,y2
+end
+
+--showcase
+
+if not ... then require'sg_cairo_test_measure' end
 
 return SG

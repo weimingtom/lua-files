@@ -4,7 +4,7 @@
 	- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
 	- functions accept/return Lua strings
 	- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to,
-		cairo_skew, cairo_transform, cairo_matrix_transform, cairo_matrix_skew.
+		cairo_skew, cairo_matrix_transform, cairo_matrix_skew.
 ]]
 
 local ffi = require'ffi'
@@ -656,7 +656,7 @@ ffi.metatype('cairo_text_cluster_t', {__index = {
 }})
 
 local function cairo_matrix_tostring(mt)
-	return string.format('[\t%d\t%d\t]\n[\t%d\t%d\t]\n[\t%d\t%d\t]',
+	return string.format('[%12f%12f]\n[%12f%12f]\n[%12f%12f]',
 		mt.xx, mt.yx, mt.xy, mt.yy, mt.x0, mt.y0)
 end
 

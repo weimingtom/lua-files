@@ -19,6 +19,15 @@ for i,operator in ipairs{
 	}
 end
 
+local measuring_box = {type = 'shape', path = {'move',0,0}, stroke = {type = 'color', 1,1,1,1}, line_dashes = {5}}
+local measuring_subject = {type = 'group', x = 900, y = 550, scale = 0.5,
+	{type = 'group', x = 200, angle = 15, scale = 1, skew_x = 0,
+		{type = 'shape', path = {'rect', 0, 0, 100, 100}, fill = {type = 'color', 1,1,1,1}},
+		{type = 'shape', y = 210, path = {'rect', 0, 0, 100, 100}, line_width = 50, stroke = {type = 'color', 1,1,1,1}},
+		{type = 'image', angle = -30, y = 360, x = 100, file = {path = 'media/jpeg/testorig.jpg'}},
+	},
+}
+
 local scene = {
 	type = 'group', y = .5, x = .5,
 
@@ -182,10 +191,19 @@ local scene = {
 
 	--operators
 	operator_palette,
+
+	--measuring
+	measuring_subject,
+	measuring_box,
 }
+
+local function box2rect(x1,y1,x2,y2)
+	return x1,y1,x2-x1,y2-y1
+end
 
 local player = require'sg_cairo_player'
 function player:on_render()
+	measuring_box.path = {'rect', box2rect(self:measure(measuring_subject))}
 	self:render(scene)
 end
 player:play()

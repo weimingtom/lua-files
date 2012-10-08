@@ -21,6 +21,8 @@ function panel:on_render()
 	player:on_render()
 end
 
+panel:settimer(1/60, panel.invalidate)
+
 function player:play()
 	main:show()
 	os.exit(winapi.MessageLoop())
@@ -29,6 +31,10 @@ end
 function player:render(user_scene)
 	scene[1] = user_scene
 	panel.scene_graph:render(scene)
+end
+
+function player:measure(e)
+	return panel.scene_graph:measure(e)
 end
 
 return player
