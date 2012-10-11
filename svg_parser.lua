@@ -524,7 +524,7 @@ local function gradient(t, ct)
 	until not p
 	--parse the gradient
 	local o = {
-		type = 'pattern',
+		type = 'gradient',
 		relative = attrs.gradientUnits ~= 'userSpaceOnUse',
 		extend = spread_methods[attrs.spreadMethod] and attrs.spreadMethod,
 		transforms = transforms(attrs.gradientTransform),

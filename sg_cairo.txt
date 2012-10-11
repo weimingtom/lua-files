@@ -2,7 +2,8 @@ cairo scene graph schema definition
 -----------------------------------
 N is number, S is string, true | false is boolean, enum values, path commands etc. are strings.
 Defaults are on the side in parens. Missing values are replaced with defaults, not inherited,
-so that an object is fully specified independent of its context.
+so that an object's style is context-independent, and only the transformation matrix
+and clipping area are contextual.
 
 
 <object> = {

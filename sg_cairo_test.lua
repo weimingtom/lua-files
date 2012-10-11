@@ -1,3 +1,4 @@
+local glue = require'glue'
 local operator_palette = {
 	type = 'group', y = 380, x = 10,
 }
@@ -7,14 +8,14 @@ for i,operator in ipairs{
 	'lighten', 'color_dodge', 'color_burn', 'hard_light', 'soft_light', 'difference',
 	'exclusion', 'hsl_hue', 'hsl_saturation', 'hsl_color', 'hsl_luminosity',
 } do
-	operator_palette[i] = {
+	operator_palette[#operator_palette+1] = {
 		type = 'group', scale = .5,
 		x = .5 + ((i-1) % 12) * 100,
 		y = math.floor((i-1) / 12) * 80,
 		{type = 'shape', path = {'rect', 0, 0, 130, 130}, fill = {type = 'color', 1,1,1,1}},
 		{type = 'shape', path = {'rect', 0, 0, 100, 100}, fill = {type = 'color', 1,0,0,.7}},
-		{type = 'shape', x = 30, y = 30,
-								path = {'rect', 0, 0, 100, 100}, fill = {type = 'color', 0,0,1,.7, operator = operator}},
+		{type = 'shape', path = {'rect', 0, 0, 100, 100}, fill = {type = 'color', 0,0,1,.7},
+			x = 30, y = 30, operator = operator},
 		{type = 'shape', path = {'text', {size = 16*2}, 0, 0, operator}, fill = {type = 'color', 1,1,1,1}},
 	}
 end
@@ -28,12 +29,15 @@ local measuring_subject = {type = 'group', x = 900, y = 550, scale = 0.5,
 	},
 }
 
+local path = {'rect',0,0,100,100}
+local path1 = {type='shape',path=path,fill={type='color',1,0,0},x=100}
+local path2 = {type='shape',path=path,fill={type='color',1,0,0},x=200}
+
 local scene = {
 	type = 'group', y = .5, x = .5,
 
 	--background
 	{type = 'color', 0, 0, 0, 1},
-
 	--inline transforms
 	{type = 'shape', path = {'move', 0, 0, 'rel_line', 100, 0}, stroke = {type = 'color', 1,1,1,1},
 		x = 10, y = 60, cx = 50, cy = 0, angle = 45, skew_x = 0},
@@ -113,25 +117,25 @@ local scene = {
 	--gradients
 	{type = 'group', y = 620,
 		{type = 'shape', path = {'rect', 0, 0, 100, 20},
-			fill = {type = 'pattern', relative = true, x1 = 0, y1 = 0, x2 = 1, y2 = 0, 0, {1,1,1,0}, 1, {1,1,1,1}}},
+			fill = {type = 'gradient', relative = true, x1 = 0, y1 = 0, x2 = 1, y2 = 0, 0, {1,1,1,0}, 1, {1,1,1,1}}},
 		{type = 'shape', y = 30, path = {'rect', 0, 0, 100, 20},
-			fill = {type = 'pattern', relative = true, x1 = 0, y1 = 0, x2 = 1, y2 = 0,
+			fill = {type = 'gradient', relative = true, x1 = 0, y1 = 0, x2 = 1, y2 = 0,
 				0, {0,0,0,1}, .2, {1,1,0,1}, .8, {1,0,1,1}, 1, {1,1,1,1}}},
 
-		{type = 'shape', x = 110, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'none',
+		{type = 'shape', x = 110, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'none',
 			x1 = .5, y1 = .5, x2 = .5, y2 = .5, r1 = 0, r2 = .5, 0, {1,1,1,0}, 1, {1,1,1,1}}},
-		{type = 'shape', x = 220, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'none',
+		{type = 'shape', x = 220, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'none',
 			x1 = 0, y1 = .5, x2 = .5, y2 = .5, r1 = 0, r2 = .5, 0, {1,1,1,0}, 1, {1,1,1,1}}},
-		{type = 'shape', x = 330, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'none',
+		{type = 'shape', x = 330, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'none',
 			x1 = 0, y1 = 0, x2 = 1, y2 = 1, r1 = .1, r2 = .5, 0, {1,1,1,0}, 1, {1,1,1,1}}},
-		{type = 'shape', x = 440, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'repeat',
+		{type = 'shape', x = 440, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'repeat',
 			x1 = 0, y1 = 0, x2 = .1, y2 = .1, r1 = 0, r2 = .2, 0, {1,1,1,0}, 1, {1,1,1,1}}},
-		{type = 'shape', x = 550, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'repeat',
+		{type = 'shape', x = 550, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'repeat',
 			x1 = 0, y1 = 0, x2 = .2, y2 = .2, 0, {1,1,1,0}, 1, {1,1,1,1}}},
 
-		{type = 'shape', x = 660, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'reflect',
+		{type = 'shape', x = 660, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'reflect',
 			x1 = 0, y1 = 0, x2 = .1, y2 = .1, r1 = 0, r2 = .2, 0, {1,1,1,0}, 1, {1,1,1,1}}},
-		{type = 'shape', x = 770, path = {'rect', 0, 0, 100, 100}, fill = {type = 'pattern', relative = true, extend = 'reflect',
+		{type = 'shape', x = 770, path = {'rect', 0, 0, 100, 100}, fill = {type = 'gradient', relative = true, extend = 'reflect',
 			x1 = 0, y1 = 0, x2 = .2, y2 = .2, 0, {1,1,1,0}, 1, {1,1,1,1}}},
 	},
 
@@ -186,7 +190,7 @@ local scene = {
 			'round_rect', 960+220, 10, 100, 100, 20,
 			'text', {size = 110, family = 'georgia', slant = 'italic'}, 860, 220, 'g@AWmi',
 		},
-		stroke = {type = 'color', 1,1,1,1}
+		stroke = {type = 'color', 1,1,1,1},
 	},
 
 	--operators
@@ -195,6 +199,9 @@ local scene = {
 	--measuring
 	measuring_subject,
 	measuring_box,
+
+	--composition
+	--{type = 'color', 1,1,1,1,alpha=.1},
 }
 
 local function box2rect(x1,y1,x2,y2)

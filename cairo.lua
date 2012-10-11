@@ -1,11 +1,10 @@
---[[ lightweight object interface over cairo ffi binding:
-	- cairo types have metamethods
-	- pointers to objects for which cairo holds no references get a __gc
-	- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
-	- functions accept/return Lua strings
-	- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to,
-		cairo_skew, cairo_matrix_transform, cairo_matrix_skew.
-]]
+--lightweight object interface over cairo ffi binding:
+-- cairo types have metamethods
+-- pointers to objects for which cairo holds no references get a __gc
+-- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
+-- functions accept/return Lua strings
+-- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to,
+--   cairo_skew, cairo_matrix_transform, cairo_matrix_skew, cairo_surface_apply_alpha.
 
 local ffi = require'ffi'
 require'cairo_h'
@@ -350,6 +349,17 @@ function M.cairo_matrix_skew(mt, ax, ay)
 	mt:transform(sm)
 end
 
+-- painting additions
+
+function M.cairo_surface_apply_alpha(surface, alpha)
+	if alpha >= 1 then return end
+	local cr = surface:create_context()
+	cr:set_source_rgba(0,0,0,alpha)
+	cr:set_operator(cairo.CAIRO_OPERATOR_DEST_IN) --alphas are multiplied, dest. color is preserved
+	cr:paint()
+	cr:free()
+end
+
 -- metamethods
 
 local function returns_bool(f)
@@ -505,6 +515,7 @@ ffi.metatype('cairo_surface_t', {__index = {
 	show_page = M.cairo_surface_show_page,
 	has_show_text_glyphs = returns_bool(M.cairo_surface_has_show_text_glyphs),
 	create_pattern = M.cairo_pattern_create_for_surface,
+	apply_alpha = M.cairo_surface_apply_alpha,
 }})
 
 ffi.metatype('cairo_device_t', {__index = {
