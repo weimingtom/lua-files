@@ -309,7 +309,7 @@ local function opposite_point(x, y, cx, cy)
 	return 2*cx-(x or cx), 2*cy-(y or cy)
 end
 
-SG:state_value('path', function(self, path)
+function SG:set_path(path)
 	self.cr:new_path() --no current point after this
 	if type(path[1]) ~= 'string' then
 		self:error'path must start with a command'
@@ -453,7 +453,7 @@ SG:state_value('path', function(self, path)
 			qx, qy = nil
 		end
 	end
-end)
+end
 
 local function clamp01(x)
 	return x < 0 and 0 or x > 1 and 1 or x
@@ -486,7 +486,7 @@ function SG:fill_color(e, alpha, operator)
 	self:set_operator(operator)
 	if unbounded_operators[operator] then
 		self.cr:save()
-		self.cr:clip()
+		self.cr:clip_preserve()
 		self.cr:paint()
 		self.cr:restore()
 	else
@@ -564,7 +564,7 @@ function SG:fill_gradient(e, alpha, operator)
 		self.cr:fill_preserve()
 	else
 		self.cr:save()
-		self.cr:clip()
+		self.cr:clip_preserve()
 		self.cr:paint_with_alpha(alpha)
 		self.cr:restore()
 	end
@@ -655,7 +655,7 @@ function SG:fill_image(e, alpha, operator)
 		self.cr:fill_preserve()
 	else
 		self.cr:save()
-		self.cr:clip()
+		self.cr:clip_preseve()
 		self.cr:paint_with_alpha(alpha)
 		self.cr:restore()
 	end
@@ -854,7 +854,10 @@ function SG:draw_shape(e)
 	if e.stroke_first then
 		if e.stroke then
 			self:stroke(e.stroke)
-			self.cr:set_matrix(mt)
+			if e.fill then
+				self.cr:set_matrix(mt)
+				self:set_path(e.path)
+			end
 		end
 		if e.fill then
 			self:fill(e.fill)
@@ -862,7 +865,10 @@ function SG:draw_shape(e)
 	else
 		if e.fill then
 			self:fill(e.fill)
-			self.cr:set_matrix(mt)
+			if e.stroke then
+				self.cr:set_matrix(mt)
+				self:set_path(e.path)
+			end
 		end
 		if e.stroke then
 			self:stroke(e.stroke)

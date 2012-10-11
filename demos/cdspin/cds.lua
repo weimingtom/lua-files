@@ -13,7 +13,7 @@ function Wheel:new(n, size, radius)
 	self.cds = {}
 	self.cds_zorder = {type = 'group'}
 	self.lights = {}
-	local shadow_fill = {type = 'pattern', x1 = 0, y1 = 0, x2 = 0, y2 = size+4, 0, {0,0,0,0.9}, 1, {0,0,0,1}}
+	local shadow_fill = {type = 'gradient', x1 = 0, y1 = 0, x2 = 0, y2 = size+4, 0, {0,0,0,0.9}, 1, {0,0,0,1}}
 	for i=1,n do
 		self.lights[i] = {type = 'color', 0,0,0}
 		local cd_image = {type = 'shape',
@@ -72,7 +72,7 @@ function Wheel:new(n, size, radius)
 				{
 					type = 'shape',
 					path = {'rect', 0, 0, 50, 50},
-					fill = {type = 'pattern', x1 = 0, y1 = 30, r1 = 0, x2 = 0, y2 = 30, r2 = 26, 0, {1,1,1,0.2}, 1, {0,0,0,0.5}},
+					fill = {type = 'gradient', x1 = 0, y1 = 30, r1 = 0, x2 = 0, y2 = 30, r2 = 26, 0, {1,1,1,0.2}, 1, {0,0,0,0.5}},
 				},
 			},
 			in_fill = function(render, e, inside)
@@ -127,9 +127,9 @@ local panel = CairoSGPanel{
 }
 
 function panel:on_mouse_move(x, y, buttons)
-	self.scene_graph.mouse_x = x
-	self.scene_graph.mouse_y = y
-	self.scene_graph.mouse_buttons = buttons
+	--self.scene_graph.mouse_x = x
+	--self.scene_graph.mouse_y = y
+	--self.scene_graph.mouse_buttons = buttons
 	self:invalidate()
 end
 
