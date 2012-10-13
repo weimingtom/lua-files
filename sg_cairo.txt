@@ -7,15 +7,15 @@ and clipping area are contextual.
 
 
 <object> = {
-	<color> | <pattern> | <image> | <shape> | <svg> | <group> | <extension>,
+	<color> | <gradient> | <image> | <shape> | <group> | <svg> | <extension>,
 
 	absolute = true | false (false),
 	matrix = {a, b, c, d, e, f} (nil),
 	x = translation_x (0),
 	y = translation_y (0),
 	angle = rotation_angle_degrees (0),
-	cx = rotation_center_x (0),
-	cy = rotation_center_y (0),
+	cx = rotation_and_scale_center_x (0),
+	cy = rotation_and_scale_center_y (0),
 	sx = scale_x (1),
 	sy = scale_y (1),
 	scale = scale (1),
@@ -42,26 +42,23 @@ and clipping area are contextual.
 
 	invalid = true | false (false) (*),
 	nocache = true | false (false) (*),
-
-	parent = <object> --set automatically and available only while the object is being rendered
-							--parent objects have their parent property set as well at this point
 }
 
-(*) cache control options apply to path, font.file, image.file, svg.file, and pattern nodes.
+(*) cache control options apply to path, font.file, image.file, svg.file, and gradient nodes.
 
 
 <color> =
 	type = 'color', r, g, b, a (1) --values are clamped to 0..1
 
 
-<pattern> =
-	type = 'pattern',
-	<linear-pattern> | <radial-pattern>
+<gradient> =
+	type = 'gradient',
+	<linear-gradient> | <radial-gradient>
 
-	<linear-pattern> =
+	<linear-gradient> =
 	x1 = N, y1 = N, x2 = N, y2 = N,
 
-	<radial-pattern> =
+	<radial-gradient> =
 	x1 = N, y1 = N, x2 = N, y2 = N, r1 = N, r2 = N,
 
 	relative = true | false (false),

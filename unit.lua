@@ -1,6 +1,4 @@
 glue = require'glue'
-glue.update(_G, glue)
-update(string, glue.glue_string)
 
 local function escape_byte(c)
 	return string.format('\\%03d', c:byte())
@@ -45,5 +43,16 @@ end
 function ptest(t1,t2)
 	print(t1)
 	test(t1,t2,nil,3)
+end
+
+local ffi = require'ffi'
+ffi.cdef'uint32_t GetTickCount();'
+
+local last_time
+function fps()
+	local time = ffi.C.GetTickCount()
+	local d = last_time and (time - last_time)/1000 or 0
+	last_time = time
+	return d
 end
 

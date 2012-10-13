@@ -170,51 +170,37 @@ local function new_matrix(...)
 	return ffi.new('cairo_matrix_t', ...)
 end
 
-local function invertible(mt)
-	local mt2 = ffi.new'cairo_matrix_t'
-	ffi.copy(mt2, mt, ffi.sizeof(mt))
-	return mt2:invert() == 0
-end
-
-local function safe_transform(cr, mt)
-	if invertible(mt) then cr:transform(mt) end
-end
-
-local function transform_matrix(mt, transforms)
-	for _,t in ipairs(transforms) do
-		local op = t[1]
-		if op == 'matrix' then
-			local tmt = new_matrix(unpack(t, 2))
-			if invertible(tmt) then mt:transform(tmt) end
-		elseif op == 'translate' then
-			mt:translate(t[2], t[3] or 0)
-		elseif op == 'rotate' then
-			local cx, cy = t[3], t[4]
-			if cx or cy then mt:translate(cx or 0, cy or 0) end
-			mt:rotate(math.rad(t[2]))
-			if cx or cy then mt:translate(-(cx or 0), -(cy or 0)) end
-		elseif op == 'scale' then
-			mt:scale(t[2], t[3] or t[2])
-		elseif op == 'skew' then
-			mt:skew(math.rad(t[2]), math.rad(t[3]))
+function SG:transform(e)
+	local tr
+	if e.absolute then self.cr:identity_matrix(); tr = true end
+	if e.matrix then self.cr:safe_transform(new_matrix(unpack(e.matrix))); tr = true end
+	if e.x or e.y then self.cr:translate(e.x or 0, e.y or 0); tr = true end
+	if e.cx or e.cy then self.cr:translate(e.cx or 0, e.cy or 0) end
+	if e.angle then self.cr:rotate(math.rad(e.angle)); tr = true end
+	if e.scale then self.cr:scale(e.scale, e.scale); tr = true end
+	if e.sx or e.sy then self.cr:scale(e.sx or 1, e.sy or 1); tr = true end
+	if e.cx or e.cy then self.cr:translate(-(e.cx or 0), -(e.cy or 0)) end
+	if e.skew_x or e.skew_y then self.cr:skew(math.rad(e.skew_x or 0), math.rad(e.skew_y or 0)); tr = true end
+	if e.transforms then
+		for _,t in ipairs(e.transforms) do
+			local op = t[1]
+			if op == 'matrix' then
+				self.cr:safe_transform(new_matrix(unpack(t, 2))); tr = true
+			elseif op == 'translate' then
+				self.cr:translate(t[2], t[3] or 0); tr = true
+			elseif op == 'rotate' then
+				local cx, cy = t[3], t[4]
+				if cx or cy then self.cr:translate(cx or 0, cy or 0) end
+				self.cr:rotate(math.rad(t[2])); tr = true
+				if cx or cy then self.cr:translate(-(cx or 0), -(cy or 0)) end
+			elseif op == 'scale' then
+				self.cr:scale(t[2], t[3] or t[2]); tr = true
+			elseif op == 'skew' then
+				self.cr:skew(math.rad(t[2]), math.rad(t[3])); tr = true
+			end
 		end
 	end
-	return mt
-end
-
-function SG:transform(e)
-	if e.absolute then self.cr:identity_matrix() end
-	if e.matrix then safe_transform(self.cr, new_matrix(unpack(e.matrix))) end
-	if e.x or e.y then self.cr:translate(e.x or 0, e.y or 0) end
-	if e.cx or e.cy then self.cr:translate(e.cx or 0, e.cy or 0) end
-	if e.angle then self.cr:rotate(math.rad(e.angle)) end
-	if e.scale then self.cr:scale(e.scale, e.scale) end
-	if e.sx or e.sy then self.cr:scale(e.sx or 1, e.sy or 1) end
-	if e.cx or e.cy then self.cr:translate(-(e.cx or 0), -(e.cy or 0)) end
-	if e.skew_x or e.skew_y then self.cr:skew(math.rad(e.skew_x or 0), math.rad(e.skew_y or 0)) end
-	if e.transforms then
-		self.cr:set_matrix(transform_matrix(self.cr:get_matrix(), e.transforms))
-	end
+	if tr then self.current_path = nil end --transformations invalidate the current path
 end
 
 function SG:save()
@@ -242,14 +228,14 @@ function SG:pop_group_as_source(state)
 	return self.cr:pop_group_as_source()
 end
 
-function SG:draw_round_rect(x1, y1, w, h, r)
+function draw_round_rect(cr, x1, y1, w, h, r)
 	local x2, y2 = x1+w, y1+h
-	self.cr:new_sub_path()
-	self.cr:arc(x1+r, y1+r, r, -math.pi, -math.pi/2)
-	self.cr:arc(x2-r, y1+r, r, -math.pi/2, 0)
-	self.cr:arc(x2-r, y2-r, r, 0, math.pi/2)
-	self.cr:arc(x1+r, y2-r, r, math.pi/2, math.pi)
-	self.cr:close_path()
+	cr:new_sub_path()
+	cr:arc(x1+r, y1+r, r, -math.pi, -math.pi/2)
+	cr:arc(x2-r, y1+r, r, -math.pi/2, 0)
+	cr:arc(x2-r, y2-r, r, 0, math.pi/2)
+	cr:arc(x1+r, y2-r, r, math.pi/2, math.pi)
+	cr:close_path()
 end
 
 local function rotate(x, y, angle) --from cairosvg/helpers.py, for elliptical_arc
@@ -262,13 +248,13 @@ local function point_angle(cx, cy, px, py) --from cairosvg/helpers.py, for ellip
     return math.atan2(py - cy, px - cx)
 end
 
-function SG:draw_elliptical_arc(x1, y1, rx, ry, rotation, large, sweep, x3, y3) --from cairosvg/path.py
+function draw_elliptical_arc(cr, x1, y1, rx, ry, rotation, large, sweep, x3, y3) --from cairosvg/path.py
 	if x1 == x3 and y1 == y3 then return end
 	rx, ry, rotation, large, sweep = math.abs(rx), math.abs(ry), math.fmod(rotation, 2*math.pi),
 												large ~= 0 and 1 or 0,
 												sweep ~= 0 and 1 or 0
 	if rx==0 or ry==0 then
-		self.cr:line_to(x3, y3)
+		cr:line_to(x3, y3)
 		return
 	end
 	x3 = x3 - x1
@@ -289,7 +275,7 @@ function SG:draw_elliptical_arc(x1, y1, rx, ry, rotation, large, sweep, x3, y3) 
 	-- choose between the two circles according to flags
 	if large + sweep ~= 1 then yc = -yc end
 	-- define the arc sweep
-	local arc = sweep == 1 and self.cr.arc or self.cr.arc_negative
+	local arc = sweep == 1 and cr.arc or cr.arc_negative
 	-- put the second point and the center back to their positions
 	xe, ye = rotate(xe, 0, angle)
 	xc, yc = rotate(xc, yc, angle)
@@ -297,20 +283,21 @@ function SG:draw_elliptical_arc(x1, y1, rx, ry, rotation, large, sweep, x3, y3) 
 	local angle1 = point_angle(xc, yc, 0, 0)
 	local angle2 = point_angle(xc, yc, xe, ye)
 	-- draw the arc
-	local mt = self.cr:get_matrix()
-	self.cr:translate(x1, y1)
-	self.cr:rotate(rotation)
-	self.cr:scale(1, radii_ratio)
-	arc(self.cr, xc, yc, rx, angle1, angle2)
-	self.cr:set_matrix(mt)
+	local mt = cr:get_matrix()
+	cr:translate(x1, y1)
+	cr:rotate(rotation)
+	cr:scale(1, radii_ratio)
+	arc(cr, xc, yc, rx, angle1, angle2)
+	cr:set_matrix(mt)
 end
 
 local function opposite_point(x, y, cx, cy)
 	return 2*cx-(x or cx), 2*cy-(y or cy)
 end
 
-function SG:set_path(path)
-	self.cr:new_path() --no current point after this
+function SG:draw_path(path)
+	local cr = self.cr
+	cr:new_path() --no current point after this
 	if type(path[1]) ~= 'string' then
 		self:error'path must start with a command'
 		return
@@ -334,113 +321,113 @@ function SG:set_path(path)
 			s = path[i]; i = i + 1
 		end
 		if s == 'move' then
-			self.cr:move_to(get(2))
+			cr:move_to(get(2))
 		elseif s == 'rel_move' then
-			self.cr:rel_move_to(get(2))
+			cr:rel_move_to(get(2))
 		elseif s == 'line' then
-			self.cr:line_to(get(2))
+			cr:line_to(get(2))
 		elseif s == 'rel_line' then
-			self.cr:rel_line_to(get(2))
+			cr:rel_line_to(get(2))
 		elseif s == 'hline' then
-			local cpx,cpy = self.cr:get_current_point()
-			self.cr:line_to(get(1), cpy)
+			local cpx,cpy = cr:get_current_point()
+			cr:line_to(get(1), cpy)
 		elseif s == 'rel_hline' then
-			self.cr:rel_line_to(get(1), 0)
+			cr:rel_line_to(get(1), 0)
 		elseif s == 'vline' then
-			local cpx,cpy = self.cr:get_current_point()
-			self.cr:line_to(cpx, get(1))
+			local cpx,cpy = cr:get_current_point()
+			cr:line_to(cpx, get(1))
 		elseif s == 'rel_vline' then
-			self.cr:rel_line_to(0, get(1))
+			cr:rel_line_to(0, get(1))
 		elseif s == 'curve' then
 			local x1,y1,x2,y2,x3,y3 = get(6)
-			self.cr:curve_to(x1,y1,x2,y2,x3,y3)
+			cr:curve_to(x1,y1,x2,y2,x3,y3)
 			bx,by = x2,y2
 		elseif s == 'rel_curve' then
 			local x1,y1,x2,y2,x3,y3 = get(6)
-			local cpx,cpy = self.cr:get_current_point()
-			self.cr:rel_curve_to(x1,y1,x2,y2,x3,y3)
+			local cpx,cpy = cr:get_current_point()
+			cr:rel_curve_to(x1,y1,x2,y2,x3,y3)
 			bx,by = cpx+x2, cpy+y2
 		elseif s == 'smooth_curve' then
 			local x2,y2,x3,y3 = get(4)
-			local x1,y1 = opposite_point(bx, by, self.cr:get_current_point())
-			self.cr:curve_to(x1,y1,x2,y2,x3,y3)
+			local x1,y1 = opposite_point(bx, by, cr:get_current_point())
+			cr:curve_to(x1,y1,x2,y2,x3,y3)
 			bx,by = x2,y2
 		elseif s == 'rel_smooth_curve' then
 			local x2,y2,x3,y3 = get(4)
-			local cpx, cpy = self.cr:get_current_point()
+			local cpx, cpy = cr:get_current_point()
 			local x1, y1 = opposite_point(bx, by, cpx, cpy)
-			self.cr:rel_curve_to(x1-cpx,y1-cpy,x2,y2,x3,y3)
+			cr:rel_curve_to(x1-cpx,y1-cpy,x2,y2,x3,y3)
 			bx,by = cpx+x2, cpy+y2
 		elseif s == 'quad_curve' then
 			local x1,y1,x2,y2 = get(4)
-			self.cr:quad_curve_to(x1,y1,x2,y2)
+			cr:quad_curve_to(x1,y1,x2,y2)
 			qx,qy = x1,y1
 		elseif s == 'rel_quad_curve' then
 			local x1,y1,x2,y2 = get(4)
-			local cpx,cpy = self.cr:get_current_point()
-			self.cr:rel_quad_curve_to(x1,y1,x2,y2)
+			local cpx,cpy = cr:get_current_point()
+			cr:rel_quad_curve_to(x1,y1,x2,y2)
 			qx,qy = cpx+x1, cpy+y1
 		elseif s == 'smooth_quad_curve' then
 			local x2,y2 = get(2)
-			local x1,y1 = opposite_point(qx, qy, self.cr:get_current_point())
-			self.cr:quad_curve_to(x1,y1,x2,y2)
+			local x1,y1 = opposite_point(qx, qy, cr:get_current_point())
+			cr:quad_curve_to(x1,y1,x2,y2)
 			qx,qy = x1,y1
 		elseif s == 'rel_smooth_quad_curve' then
 			local x2,y2 = get(2)
-			local cpx, cpy = self.cr:get_current_point()
+			local cpx, cpy = cr:get_current_point()
 			local x1,y1 = opposite_point(qx, qy, cpx, cpy)
-			self.cr:rel_quad_curve_to(x1-cpx,y1-cpy,x2,y2)
+			cr:rel_quad_curve_to(x1-cpx,y1-cpy,x2,y2)
 			qx,qy = x1,y1
 		elseif s == 'elliptical_arc' then
-			local cpx, cpy = self.cr:get_current_point()
+			local cpx, cpy = cr:get_current_point()
 			local rx, ry, rotation, large, sweep, x3, y3 = get(7)
-			self:draw_elliptical_arc(cpx, cpy, rx, ry, math.rad(rotation), large, sweep, x3, y3)
+			draw_elliptical_arc(cr, cpx, cpy, rx, ry, math.rad(rotation), large, sweep, x3, y3)
 		elseif s == 'rel_elliptical_arc' then
-			local cpx, cpy = self.cr:get_current_point()
+			local cpx, cpy = cr:get_current_point()
 			local rx, ry, rotation, large, sweep, x3, y3 = get(7)
-			self:draw_elliptical_arc(cpx, cpy, rx, ry, math.rad(rotation), large, sweep, cpx+x3, cpy+y3)
+			draw_elliptical_arc(cr, cpx, cpy, rx, ry, math.rad(rotation), large, sweep, cpx+x3, cpy+y3)
 		elseif s == 'close' then
-			self.cr:close_path()
+			cr:close_path()
 		elseif s == 'break' then --only useful for drawing a standalone arc
-			self.cr:new_sub_path() --no current point after this
+			cr:new_sub_path() --no current point after this
 		elseif s == 'arc' then
 			local cx, cy, r, a1, a2 = get(5)
-			self.cr:arc(cx, cy, r, math.rad(a1), math.rad(a2))
+			cr:arc(cx, cy, r, math.rad(a1), math.rad(a2))
 		elseif s == 'negative_arc' then
 			local cx, cy, r, a1, a2 = get(5)
-			self.cr:arc_negative(cx, cy, r, math.rad(a1), math.rad(a2))
+			cr:arc_negative(cx, cy, r, math.rad(a1), math.rad(a2))
 		elseif s == 'rel_arc' then
 			local cx, cy, r, a1, a2 = get(5)
-			local cpx, cpy = self.cr:get_current_point()
-			self.cr:arc(cpx+cx, cpy+cy, r, math.rad(a1), math.rad(a2))
+			local cpx, cpy = cr:get_current_point()
+			cr:arc(cpx+cx, cpy+cy, r, math.rad(a1), math.rad(a2))
 		elseif s == 'rel_negative_arc' then
 			local cx, cy, r, a1, a2 = get(5)
-			local cpx, cpy = self.cr:get_current_point()
-			self.cr:arc_negative(cpx+cx, cpy+cy, r, math.rad(a1), math.rad(a2))
+			local cpx, cpy = cr:get_current_point()
+			cr:arc_negative(cpx+cx, cpy+cy, r, math.rad(a1), math.rad(a2))
 		elseif s == 'ellipse' then
 			local cx, cy, rx, ry = get(4)
-			local mt = self.cr:get_matrix()
-			self.cr:translate(cx, cy)
-			self.cr:scale(rx/ry, 1)
-			self.cr:translate(-cx, -cy)
-			self.cr:new_sub_path()
-			self.cr:arc(cx, cy, ry, 0, 2*math.pi)
-			self.cr:set_matrix(mt)
-			self.cr:close_path()
+			local mt = cr:get_matrix()
+			cr:translate(cx, cy)
+			cr:scale(rx/ry, 1)
+			cr:translate(-cx, -cy)
+			cr:new_sub_path()
+			cr:arc(cx, cy, ry, 0, 2*math.pi)
+			cr:set_matrix(mt)
+			cr:close_path()
 		elseif s == 'circle' then
 			local cx, cy, r = get(3)
-			self.cr:new_sub_path()
-			self.cr:arc(cx, cy, r, 0, 2*math.pi)
-			self.cr:close_path()
+			cr:new_sub_path()
+			cr:arc(cx, cy, r, 0, 2*math.pi)
+			cr:close_path()
 		elseif s == 'rect' then
-			self.cr:rectangle(get(4))
+			cr:rectangle(get(4))
 		elseif s == 'round_rect' then
-			self:draw_round_rect(get(5))
+			draw_round_rect(cr, get(5))
 		elseif s == 'text' then
 			local font,x,y,s = path[i], path[i+1], path[i+2], path[i+3]; i=i+4
 			self:set_font(font)
-			self.cr:move_to(x,y)
-			self.cr:text_path(s)
+			cr:move_to(x,y)
+			cr:text_path(s)
 		else
 			self:error('unknown path command %s', s)
 			return
@@ -453,6 +440,20 @@ function SG:set_path(path)
 			qx, qy = nil
 		end
 	end
+end
+
+function SG:set_path(e)
+	if self.current_path == e then return end --path is global state, not part of the state stack
+	local path = self.cache:get(e)
+	if not path then
+		self:draw_path(e)
+		path = self.cr:copy_path()
+		self.cache:set(e, path)
+	else
+		self.cr:new_path()
+		self.cr:append_path(path)
+	end
+	self.current_path = e
 end
 
 local function clamp01(x)
@@ -468,6 +469,11 @@ local unbounded_operators = glue.index{'in', 'out', 'dest_in', 'dest_atop'}
 
 function SG:set_color_source(e, alpha)
 	self.cr:set_source_rgba(e[1], e[2], e[3], (e[4] or 1) * alpha)
+end
+
+function SG:register_hit(e)
+	if not self.hit_objects then self.hit_objects = {} end
+	self.hit_objects[#self.hit_objects+1] = e
 end
 
 function SG:paint_color(e, alpha, operator)
@@ -601,8 +607,7 @@ function SG:load_image_file(e, alpha)
 		local surface = cairo.cairo_image_surface_create_for_data(img.data,
 									cairo.CAIRO_FORMAT_ARGB32, img.w, img.h, img.w * 4)
 		if surface:status() ~= 0 then
-			local err = surface:status_string()
-			self:error(err)
+			self:error(surface:status_string())
 			surface:free()
 			return
 		end
@@ -655,7 +660,7 @@ function SG:fill_image(e, alpha, operator)
 		self.cr:fill_preserve()
 	else
 		self.cr:save()
-		self.cr:clip_preseve()
+		self.cr:clip_preserve()
 		self.cr:paint_with_alpha(alpha)
 		self.cr:restore()
 	end
@@ -670,132 +675,130 @@ function SG:stroke_image(e, alpha, operator)
 	self.cr:stroke_preserve()
 end
 
-function SG:paint_fill_only_simple_shape(e, alpha)
-	alpha = total_alpha(e, alpha)
-	if alpha == 0 then return end
-	self:transform(e)
-	self:set_fill_rule(e.fill_rule)
-	self:set_path(e.path)
-	if e.fill.type == 'gradient' and e.fill.relative then
-		self.shape_bounding_box = {self.cr:path_extents()}
-	end
-	local operator = e.operator ~= 'over' and e.operator or nil
-	if e.fill.type == 'color' then
-		self:fill_color(e.fill, alpha, operator)
-	elseif e.fill.type == 'gradient' then
-		self:fill_gradient(e.fill, alpha, operator)
-	elseif e.fill.type == 'image' then
-		self:fill_image(e.fill, alpha, operator)
-	end
-end
-
-function SG:paint_stroke_only_simple_shape(e, alpha)
-	alpha = total_alpha(e, alpha)
-	if alpha == 0 then return end
-	self:transform(e)
+function SG:set_stroke_options(e)
+	if not e.stroke then return end
 	self:set_line_width(e.line_width)
 	self:set_line_cap(e.line_cap)
 	self:set_line_join(e.line_join)
 	self:set_miter_limit(e.miter_limit)
 	self:set_line_dashes(e.line_dashes)
-	self:set_path(e.path)
-	local operator = e.operator ~= 'over' and e.operator or nil
-	if e.stroke.type == 'color' then
-		self:stroke_color(e.stroke, alpha, operator)
-	elseif e.stroke.type == 'gradient' then
-		self:stroke_gradient(e.stroke, alpha, operator)
-	elseif e.stroke.type == 'image' then
-		self:stroke_image(e.stroke, alpha, operator)
-	end
 end
 
-local function is_simple_shape(e)
+function SG:is_simple_shape(e)
 	if e.type ~= 'shape' then return end
-	local hasfill = e.fill and not e.fill.hidden
-	local hasstroke = e.stroke and not e.stroke.hidden
+	local ftype = e.fill and not e.fill.hidden and e.fill.type
+	local stype = e.stroke and not e.stroke.hidden and e.stroke.type
+	if not ftype and not stype then return true end
 	return
-		((hasfill and not hasstroke) or (hasstroke and not hasfill)) --stroke + fill means composite
-		and (not hasfill or e.fill.type == 'color' or e.fill.type == 'gradient' or e.fill.type == 'image') --no fill or non-composite fill
-		and (not hasstroke or e.stroke.type == 'color' or e.stroke.type == 'gradient' or e.stroke.type == 'image') --no stroke or non-composite stroke
-		and (not e.operator or e.operator == 'over' or
-				((not hasfill or not e.fill.operator or e.fill.operator == 'over') and
-				(not hasstroke or not e.stroke.operator or e.stroke.operator == 'over'))) --no operator or no sub-operator
+		((ftype and not stype) or (stype and not ftype)) --stroke + fill means composite
+		and (not ftype or ftype == 'color' or ftype == 'gradient' or ftype == 'image') --no fill or non-composite fill
+		and (not stype or stype == 'color' or stype == 'gradient' or stype == 'image') --no stroke or non-composite stroke
+		and ((e.operator or self.defaults.operator) == 'over' or
+				((not ftype or (e.fill.operator or self.defaults.operator) == 'over') and
+				(not stype or (e.stroke.operator or self.defaults.operator) == 'over'))) --no operator or no sub-operator
 end
 
-function SG:paint_simple_shape(e, alpha)
-	if e.fill then self:paint_fill_only_simple_shape(e, alpha) end
-	if e.stroke then self:paint_stroke_only_simple_shape(e, alpha) end
+function SG:paint_simple_shape(e)
+	local alpha = total_alpha(e)
+	if alpha == 0 then return end
+	local operator = e.operator or self.defaults.operator
+	if operator == 'over' then operator = nil end
+	self:transform(e)
+	self:set_path(e.path)
+	if e.fill then
+		self:set_fill_rule(e.fill_rule)
+		if e.fill.type == 'gradient' and e.fill.relative then
+			self.shape_bounding_box = {self.cr:path_extents()}
+		end
+		if e.fill.type == 'color' then
+			self:fill_color(e.fill, alpha, operator)
+		elseif e.fill.type == 'gradient' then
+			self:fill_gradient(e.fill, alpha, operator)
+		elseif e.fill.type == 'image' then
+			self:fill_image(e.fill, alpha, operator)
+		end
+	elseif e.stroke then
+		self:set_stroke_options(e)
+		if e.stroke.type == 'color' then
+			self:stroke_color(e.stroke, alpha, operator)
+		elseif e.stroke.type == 'gradient' then
+			self:stroke_gradient(e.stroke, alpha, operator)
+		elseif e.stroke.type == 'image' then
+			self:stroke_image(e.stroke, alpha, operator)
+		end
+	end
 end
 
 -- time to get recursive: composite objects
 
-function SG:paint(e, alpha)
+function SG:paint(e)
 	if e.type == 'color' then
-		self:paint_color(e, alpha)
+		self:paint_color(e)
 	elseif e.type == 'gradient' then
-		self:paint_gradient(e, alpha)
+		self:paint_gradient(e)
 	elseif e.type == 'image' then
-		self:paint_image(e, alpha)
-	elseif is_simple_shape(e) then
-		self:paint_simple_shape(e, alpha)
+		self:paint_image(e)
+	elseif self:is_simple_shape(e) then
+		self:paint_simple_shape(e)
 	else
-		self:paint_composite(e, alpha)
+		self:paint_composite(e)
 	end
 end
 
-function SG:fill(e, alpha)
+function SG:fill(e)
 	if e.type == 'color' then
-		self:fill_color(e, alpha)
+		self:fill_color(e)
 	elseif e.type == 'gradient' then
-		self:fill_gradient(e, alpha)
+		self:fill_gradient(e)
 	elseif e.type == 'image' then
-		self:fill_image(e, alpha)
+		self:fill_image(e)
 	else
-		self:fill_composite(e, alpha)
+		self:fill_composite(e)
 	end
 end
 
-function SG:stroke(e, alpha)
+function SG:stroke(e)
 	if e.type == 'color' then
-		self:stroke_color(e, alpha)
+		self:stroke_color(e)
 	elseif e.type == 'gradient' then
-		self:stroke_gradient(e, alpha)
+		self:stroke_gradient(e)
 	elseif e.type == 'image' then
-		self:stroke_image(e, alpha)
+		self:stroke_image(e)
 	else
-		self:stroke_composite(e, alpha)
+		self:stroke_composite(e)
 	end
 end
 
-function SG:paint_composite(e, alpha)
-	alpha = total_alpha(e, alpha)
+function SG:paint_composite(e)
+	local alpha = total_alpha(e)
 	if alpha == 0 then return end
 	self:transform(e)
-	if alpha == 1 and (not e.operator or e.operator == 'over') then
+	if alpha == 1 and ((e.operator or self.defaults.operator) == 'over') then
 		self:draw_composite(e)
-	elseif is_simple_shape(e) then
-		self:draw_simple_shape(e)
+	elseif self:is_simple_shape(e) then
+		self:paint_simple_shape(e)
 	else
 		local state = self:push_group()
 		self:draw_composite(e)
 		local source = self:pop_group(state)
 		self.cr:set_source(source)
+		self:set_operator(e.operator)
 		self.cr:paint_with_alpha(alpha)
 		self.cr:set_source_rgb(0,0,0) --release source from cr so we can free it
 		source:free()
 	end
 end
 
-function SG:fill_composite(e, alpha)
-	if total_alpha(e, alpha) == 0 then return end
+function SG:fill_composite(e)
+	if total_alpha(e) == 0 then return end
 	local state = self:save()
 	self.cr:clip_preserve()
-	self:paint_composite(e, alpha)
+	self:paint_composite(e)
 	self:restore(state)
 end
 
-function SG:stroke_composite(e, alpha)
-	alpha = total_alpha(e, alpha)
+function SG:stroke_composite(e)
+	alpha = total_alpha(e)
 	if alpha == 0 then return end
 	self:transform(e)
 	local state = self:push_group()
@@ -832,45 +835,42 @@ function SG:draw_group(e)
 	for i=1,#e do
 		self:paint(e[i])
 		self.cr:set_matrix(mt)
+		self.current_path = nil
 	end
 end
 
 function SG:draw_shape(e)
 	local mt = self.cr:get_matrix()
-	if e.fill then
-		self:set_fill_rule(e.fill_rule)
-	end
-	if e.stroke then
-		self:set_line_width(e.line_width)
-		self:set_line_cap(e.line_cap)
-		self:set_line_join(e.line_join)
-		self:set_miter_limit(e.miter_limit)
-		self:set_line_dashes(e.line_dashes)
-	end
 	self:set_path(e.path)
 	if e.fill and e.fill.type == 'gradient' and e.fill.relative then
 		self.shape_bounding_box = {self.cr:path_extents()}
 	end
 	if e.stroke_first then
 		if e.stroke then
+			self:set_stroke_options(e)
 			self:stroke(e.stroke)
 			if e.fill then
 				self.cr:set_matrix(mt)
+				self.current_path = nil
 				self:set_path(e.path)
 			end
 		end
 		if e.fill then
+			self:set_fill_rule(e.fill_rule)
 			self:fill(e.fill)
 		end
 	else
 		if e.fill then
+			self:set_fill_rule(e.fill_rule)
 			self:fill(e.fill)
 			if e.stroke then
 				self.cr:set_matrix(mt)
+				self.current_path = nil
 				self:set_path(e.path)
 			end
 		end
 		if e.stroke then
+			self:set_stroke_options(e)
 			self:stroke(e.stroke)
 		end
 	end
@@ -893,17 +893,17 @@ end
 --public API
 
 function SG:get_image_size(e)
-	local source = self:load_image_file(e)
+	local source = self:load_image_file(e.file)
 	return source.w, source.h
 end
 
 function SG:get_svg_object(e) --the object can be modified between frames as long as the svg is not invalidated
-	return self:load_svg_file(e)
+	return self:load_svg_file(e.file)
 end
 
 function SG:render(e)
 	self.cr:identity_matrix()
-	self:paint(e, 1)
+	self:paint(e)
 	self.cr:set_source_rgb(0,0,0) --release source, if any
 	self:set_font_file(nil) --release font, if any
 	if self.cr:status() ~= 0 then --see if cairo didn't shutdown
@@ -1004,12 +1004,81 @@ end
 
 function SG:measure(e)
 	self.cr:identity_matrix()
-	local x1,y1,x2,y2 = self:measure_object(e)
-	return x1,y1,x2,y2
+	return self:measure_object(e)
+end
+
+--hit testing API
+
+function SG:hit_test(x, y, e)
+
+	local elements = {} --{e = true}
+
+	local function test(e)
+		local alpha = total_alpha(e)
+		if alpha == 0 then return end
+		self:transform(e)
+
+		local ux, uy = self.cr:device_to_user(x, y)
+		if not self.cr:in_clip(ux, uy) then return end
+
+		local hit
+
+		if e.type == 'group' then
+			local mt = self.cr:get_matrix()
+			for i=#e,1,-1 do
+				hit = test(e[i])
+				if hit then break end --don't look below the topmost element that was hit
+				self.cr:set_matrix(mt)
+				self.current_path = nil
+			end
+		elseif e.type == 'shape' then
+			self:set_path(e.path)
+
+			self:set_fill_rule(e.fill_rule)
+			self:set_stroke_options(e)
+
+			if e.stroke and self.cr:in_stroke(ux, uy)
+				and (not e.stroke_first or (not e.fill or not self.cr:in_fill(ux, uy)))
+			then
+				hit = test(e.stroke)
+			end
+
+			if e.fill and self.cr:in_fill(ux, uy) then
+				self.cr:save()
+				self.cr:clip_preserve()
+				hit = test(e.fill) or hit
+				self.cr:restore()
+			end
+
+		elseif e.type == 'color' then
+			hit = true
+		elseif e.type == 'gradient' then
+			--TODO: if extend is none, compute the real bounds (can be tricky)
+			hit = true
+		elseif e.type == 'image' then
+			if (e.extend or self.defaults.image_extend) == 'none' then
+				local w, h = self:get_image_size(e)
+				hit = ux >= 0 and ux <= w and uy >= 0 and uy <= h
+			else
+				hit = true
+			end
+		elseif e.type == 'svg' then
+			hit = test(self:get_svg_object(e))
+		end
+
+		if hit then
+			elements[e] = true
+			return true
+		end
+	end
+
+	self.cr:identity_matrix()
+	test(e)
+	return elements
 end
 
 --showcase
 
-if not ... then require'sg_cairo_test_measure' end
+if not ... then require'sg_cairo_test' end
 
 return SG

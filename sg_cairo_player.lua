@@ -1,6 +1,7 @@
 local winapi = require'winapi'
 require'winapi.messageloop'
 local SGPanel = require'winapi.cairosgpanel'
+local cairo = require'cairo'
 
 local main = winapi.Window{
 	autoquit = true,
@@ -25,6 +26,32 @@ function panel:on_render()
 	player:on_render()
 end
 
+function panel:on_mouse_move(x, y, buttons)
+	if not self.scene_graph then return end
+	self.scene_graph.mouse_x = x
+	self.scene_graph.mouse_y = y
+	self.scene_graph.mouse_buttons = buttons
+	self:invalidate()
+end
+
+panel.on_mouse_move = panel.on_mouse_move
+panel.on_mouse_over = panel.on_mouse_move
+panel.on_mouse_leave = panel.on_mouse_move
+panel.on_lbutton_double_click = panel.on_mouse_move
+panel.on_lbutton_down = panel.on_mouse_move
+panel.on_lbutton_up = panel.on_mouse_move
+panel.on_mbutton_double_click = panel.on_mouse_move
+panel.on_mbutton_down = panel.on_mouse_move
+panel.on_mbutton_up = panel.on_mouse_move
+panel.on_rbutton_double_click = panel.on_mouse_move
+panel.on_rbutton_down = panel.on_mouse_move
+panel.on_rbutton_up = panel.on_mouse_move
+panel.on_xbutton_double_click = panel.on_mouse_move
+panel.on_xbutton_down = panel.on_mouse_move
+panel.on_xbutton_up = panel.on_mouse_move
+panel.on_mouse_wheel = panel.on_mouse_move
+panel.on_mouse_hwheel = panel.on_mouse_move
+
 panel:settimer(1/60, panel.invalidate)
 
 function player:play()
@@ -32,9 +59,17 @@ function player:play()
 	os.exit(winapi.MessageLoop())
 end
 
+local fps = require'fps_function'(4)
+
 function player:render(user_scene)
 	scene[1] = user_scene
 	panel.scene_graph:render(scene)
+	main.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
+end
+
+function player:hit_test(x, y, user_scene)
+	scene[1] = user_scene
+	return panel.scene_graph:hit_test(x, y, scene)
 end
 
 function player:measure(e)

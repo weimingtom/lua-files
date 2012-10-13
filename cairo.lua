@@ -4,7 +4,8 @@
 -- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
 -- functions accept/return Lua strings
 -- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to,
---   cairo_skew, cairo_matrix_transform, cairo_matrix_skew, cairo_surface_apply_alpha.
+--   cairo_skew, cairo_safe_transform, cairo_matrix_transform, cairo_matrix_invertible, cairo_matrix_safe_transform,
+--   cairo_matrix_skew, cairo_surface_apply_alpha.
 
 local ffi = require'ffi'
 require'cairo_h'
@@ -328,17 +329,19 @@ end
 
 -- matrix additions
 
-function M.cairo_skew(cr, ax, ay)
-	local sm = ffi.new'cairo_matrix_t'
-	sm:init_identity()
-	sm.xy = math.tan(ax)
-	sm.yx = math.tan(ay)
-	cr:transform(sm)
-end
-
 function M.cairo_matrix_transform(dmt, mt)
 	dmt:multiply(mt, dmt)
 	return dmt
+end
+
+function M.cairo_matrix_invertible(mt, tmt)
+	tmt = tmt or ffi.new'cairo_matrix_t'
+	ffi.copy(tmt, mt, ffi.sizeof(mt))
+	return tmt:invert() == 0
+end
+
+function M.cairo_matrix_safe_transform(dmt, mt)
+	if mt:invertible() then dmt:transform(mt) end
 end
 
 function M.cairo_matrix_skew(mt, ax, ay)
@@ -349,7 +352,31 @@ function M.cairo_matrix_skew(mt, ax, ay)
 	mt:transform(sm)
 end
 
--- painting additions
+function M.cairo_matrix_copy(mt)
+	local dmt = ffi.new'cairo_matrix_t'
+	ffi.copy(dmt, mt, ffi.sizeof(mt))
+	return dmt
+end
+
+function M.cairo_matrix_init_matrix(dmt, mt)
+	ffi.copy(dmt, mt, ffi.sizeof(mt))
+end
+
+-- context additions
+
+function M.cairo_safe_transform(cr, mt)
+	if mt:invertible() then cr:transform(mt) end
+end
+
+function M.cairo_skew(cr, ax, ay)
+	local sm = ffi.new'cairo_matrix_t'
+	sm:init_identity()
+	sm.xy = math.tan(ax)
+	sm.yx = math.tan(ay)
+	cr:transform(sm)
+end
+
+-- surface additions
 
 function M.cairo_surface_apply_alpha(surface, alpha)
 	if alpha >= 1 then return end
@@ -398,6 +425,7 @@ ffi.metatype('cairo_t', {__index = {
 	scale = M.cairo_scale,
 	rotate = M.cairo_rotate,
 	transform = M.cairo_transform,
+	safe_transform = M.cairo_safe_transform,
 	set_matrix = M.cairo_set_matrix,
 	identity_matrix = M.cairo_identity_matrix,
 	skew = M.cairo_skew,
@@ -684,8 +712,13 @@ ffi.metatype('cairo_matrix_t', {__index = {
 	multiply = M.cairo_matrix_multiply,
 	transform_distance = M.cairo_matrix_transform_distance,
 	transform_point = M.cairo_matrix_transform_point,
+	--additions
 	transform = M.cairo_matrix_transform,
+	invertible = M.cairo_matrix_invertible,
+	safe_transform = M.cairo_matrix_safe_transform,
 	skew = M.cairo_matrix_skew,
+	copy = M.cairo_matrix_copy,
+	init_matrix = M.cairo_matrix_init_matrix,
 }, __tostring = cairo_matrix_tostring})
 
 ffi.metatype('cairo_rectangle_int_t', {__index = {
