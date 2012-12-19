@@ -47,7 +47,7 @@ local function readbuffer(read, bufsize)
 		end
 	end
 
-	--read chunks until size or eof. flushsize controls bufferng.
+	--read chunks until size or eof. flushsize controls buffering.
 	local function readchunks(size, flushsize)
 		local flushsize = flushsize or bufsize
 		assert(flushsize > 0, 'invalid flushsize')
@@ -87,6 +87,4 @@ end
 
 if not ... then require'readbuffer_test' end
 
-return {
-	readbuffer = readbuffer,
-}
+return readbuffer

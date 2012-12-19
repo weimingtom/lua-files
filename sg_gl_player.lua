@@ -46,28 +46,21 @@ local viewport = {
 	}
 }
 
+local player = {}
 
-local function open(path)
-	local node
-	local filetype = imagefile.detect_type(path)
-	if filetype then
-		node = {type = ''},
-		{type = 'obj_model', scale = 0.01, file = {path = 'media/obj/greek_vase1/greek_vase.obj'}}
-	end
-	return node
-end
-
-local r = 1
 function panel:on_render()
-	r = r + 1
 	viewport.w = self.client_w
 	viewport.h = self.client_h
-
 	--viewport.camera = {eye = {0,0,0}, center = {0,0,-1}, up = {0,1,0}, rz = -2,
 	--							ax = r + self.cursor_pos.y, ay = r, az = 0 + self.cursor_pos.x}
 	self.sg:render(viewport)
 end
 
-main:init()
+function player:play()
+	player.
+	main:init()
+	os.exit(winapi.MessageLoop())
+end
 
-os.exit(winapi.MessageLoop())
+return player
+

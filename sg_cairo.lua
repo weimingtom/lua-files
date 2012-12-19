@@ -447,7 +447,7 @@ function SG:set_path(e)
 	local path = self.cache:get(e)
 	if not path then
 		self:draw_path(e)
-		path = self.cr:copy_path()
+		path = self.cr:copy_path_flat()
 		self.cache:set(e, path)
 	else
 		self.cr:new_path()

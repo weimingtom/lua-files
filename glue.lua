@@ -2,13 +2,6 @@
 
 local glue = {}
 
-function glue.assert(v,err,...)
-	if v then return v,err,... end
-	err = err or 'assertion failed!'
-	if select('#',...) > 0 then err = err:format(...) end
-	error(err, 2)
-end
-
 function glue.index(t)
 	local dt={} for k,v in pairs(t) do dt[v]=k end
 	return dt
@@ -41,8 +34,6 @@ function glue.merge(dt,...)
 	return dt
 end
 
-glue.concat = table.concat
-
 function glue.extend(dt,...)
 	for j=1,select('#',...) do
 		local t=select(j,...)
@@ -70,16 +61,6 @@ function glue.sort(t,...)
 	return t
 end
 
-function glue.sum(t,key)
-	local n=0
-	if key then
-		for i=1,#t do n=n+(t[i][key] or 0) end
-	else
-		for i=1,#t do n=n+(t[i] or 0) end
-	end
-	return n
-end
-
 function glue.min(t,cmp)
 	local n=t[1]
 	if cmp then
@@ -100,6 +81,16 @@ function glue.max(t,cmp)
 	return n
 end
 
+function glue.sum(t,key)
+	local n=0
+	if key then
+		for i=1,#t do n=n+(t[i][key] or 0) end
+	else
+		for i=1,#t do n=n+(t[i] or 0) end
+	end
+	return n
+end
+
 function glue.reverse(t)
 	for i=1,math.floor(#t/2) do
 		t[#t-i+1],t[i]=t[i],t[#t-i+1]
@@ -107,7 +98,7 @@ function glue.reverse(t)
 	return t
 end
 
-local str = {}
+glue.string = {}
 
 getmetatable''.__mod = function(s,v)
 	if type(v) == 'table' then
@@ -117,7 +108,7 @@ getmetatable''.__mod = function(s,v)
 	end
 end
 
-function str.gsplit(s, sep, start, plain)
+function glue.string.gsplit(s, sep, start, plain)
 	start = start or 1
 	plain = plain or false
 	local done = false
@@ -138,7 +129,7 @@ function str.gsplit(s, sep, start, plain)
 	end
 end
 
-function str.trim(s,charset)
+function glue.string.trim(s,charset)
 	charset = charset or '%s'
 	local from = s:match('^['..charset..']*()')
 	return from > #s and '' or s:match('.*[^'..charset..']', from)
@@ -147,25 +138,24 @@ end
 local function format_ci_pat(c)
 	return string.format('[%s%s]', c:lower(), c:upper())
 end
-function str.escape(s,mode)
+function glue.string.escape(s,mode)
 	if mode == '*i' then s = s:gsub('[%a]', format_ci_pat) end
 	return (s:gsub('%%','%%%%'):gsub('%z','%%z')
 				:gsub('([%^%$%(%)%.%[%]%*%+%-%?])', '%%%1'))
 end
 
-glue.P = str.escape
-glue.PI = function(s) return s:escape'*i' end
+glue.string.P = glue.string.escape
+glue.string.PI = function(s) return glue.string.escape'*i' end
 
-function str.starts(s,prefix)
+function glue.string.starts(s,prefix)
 	return s:find(prefix, 1, true) == 1
 end
 
-function str.ends(s,suffix)
+function glue.string.ends(s,suffix)
 	return #suffix==0 or s:find(suffix, 1, true) == #s - #suffix + 1
 end
 
-glue.update(glue, str)
-glue.glue_string = str
+glue.update(glue, glue.string)
 
 local function select_at(i,...)
 	return ...,select(i,...)
@@ -262,6 +252,13 @@ function glue.readfile(name, format)
 	local s = f:read'*a'
 	f:close()
 	return s
+end
+
+function glue.assert(v,err,...)
+	if v then return v,err,... end
+	err = err or 'assertion failed!'
+	if select('#',...) > 0 then err = err:format(...) end
+	error(err, 2)
 end
 
 function glue.unprotect(ok,result,...)

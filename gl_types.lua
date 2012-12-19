@@ -1,4 +1,4 @@
---moved from funcs21.lua
+--moved from gl_funcs21.lua
 local ffi = require'ffi'
 
 ffi.cdef[[

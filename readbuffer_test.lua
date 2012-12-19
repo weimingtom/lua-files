@@ -1,5 +1,5 @@
 require'unit'
-local readbuffer = require'readbuffer'.readbuffer
+local readbuffer = require'readbuffer'
 
 function fakereceive(s, return_sizes)
 	local i = 1

@@ -191,7 +191,7 @@ local shapes = {type = 'group',
 }
 
 local leon = {type = 'svg', x = 1500, file = {path = 'media/svg/leon.svg'}}
-local tiger = {type = 'svg', x = 1300, scale = 1.5, file = {path = 'media/svg/tiger.svg'}}
+local tiger = {type = 'svg', x = 1400, y = 600, scale = 1.5, file = {path = 'media/svg/tiger.svg'}}
 
 local scene = {
 	type = 'group', y = .5, x = .5, scale = .5,
@@ -204,7 +204,7 @@ local scene = {
 	operator_palette,
 	measuring_subject,
 	measuring_box,
-	tiger,
+	--tiger,
 }
 
 local function box2rect(x1,y1,x2,y2)

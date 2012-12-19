@@ -1,5 +1,5 @@
 --lightweight object interface over cairo ffi binding:
--- cairo types have metamethods
+-- cairo types have methods
 -- pointers to objects for which cairo holds no references get a __gc
 -- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
 -- functions accept/return Lua strings

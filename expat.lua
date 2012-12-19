@@ -1,8 +1,7 @@
---parse xml from a string, cdata, file, or reader function, calling a bunch of callbacks or,
---if no callbacks are given, returning a table of nodes, optionally filtered by a list of known tags.
---  parse(spec_t, callbacks) -> ok | nil,err
---  treeparse(spec_t, [known_tags=]) -> root_node | nil,err
---    spec_t = {read= | string= | cdata=,size= | file=}
+--parse xml from a string, cdata, file, or reader function.
+--  parse(spec_t, callbacks)
+--  treeparse(spec_t, [known_tags=]) -> root_node
+--    spec_t = {read= | string= | cdata=,size= | path=}
 --  	root_node = {tag=, attrs={<k>=v}, children={node1,...}, tags={<tag> = node}, cdata=}
 
 local glue = require'glue'
@@ -208,7 +207,7 @@ local function parse_to_tree(t, known_tags)
 	return root
 end
 
-local function children(t,tag) --iterate a node's children with a specific tag
+local function children(t,tag) --iterate a node's children of a specific tag
 	local i=1
 	return function()
 		local v

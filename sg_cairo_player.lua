@@ -15,6 +15,8 @@ local panel = SGPanel{
 local scene = {type = 'group', scale = 1}
 
 function main:on_mouse_wheel(x, y, buttons, delta)
+	scene.cx = panel.client_w / 2
+	scene.cy = panel.client_h / 2
 	scene.scale = scene.scale + delta/120/10
 	panel:invalidate()
 end
@@ -31,6 +33,7 @@ function panel:on_mouse_move(x, y, buttons)
 	self.scene_graph.mouse_x = x
 	self.scene_graph.mouse_y = y
 	self.scene_graph.mouse_buttons = buttons
+	scene.scale = 1 + (x * 10 / 1920)
 	self:invalidate()
 end
 
