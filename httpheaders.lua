@@ -1,22 +1,20 @@
 --http parsing for known headers
-module('httpheaders',package.seeall)
-require'u'
-require'httpclient'
-require'httpdate'
-require'uri'
-require'base64'
 
-function unfold(v) return ipack(v:gsplit' *%, *') end
-function ci(v) return v:asciilower() end
-function cilist(v) return unfold(v:asciilower()) end
-function int(v) v = tonumber(v) return v and math.floor(v) end
-function date(v) return httpdate.date(v) end
-function url(v) return uri.parse(v) end
-function base64(v) return base64.decode(v) end
-function headernames(v) return filter(httpclient.parseheadername, unfold(v)) end
+local glue = require'glue'
+local httpdate = require'httpdate'
+local uri = require'uri'
+local b64 = require'libb64'
+
+local function unfold(v) return glue.collect(v:gsplit' *%, *') end
+local function ci(v) return v:asciilower() end
+local function cilist(v) return unfold(v:asciilower()) end
+local function int(v) v = tonumber(v) return v and math.floor(v) end
+local function url(v) return uri.parse(v) end
+local function base64(v) return base64.decode_string(v) end
+local function headernames(v) return filter(httpclient.parseheadername, unfold(v)) end
 
 --k1=v1,... -> {k1=v1,...}
-function kv(v)
+local function kv(v)
 	local t = {}
 	for i=1,#v do
 		local k,v = v[i]:match'([^=]*)=?(.*)'
@@ -28,7 +26,7 @@ function kv(v)
 end
 
 --name[; k1=v1 ...] -> {name,k1=v1,...}
-function params(known)
+local function params(known)
 	return function(v)
 		local t = {}
 		local value, rest = v[#v]:match'([^;]*);?(.*)'
@@ -43,7 +41,7 @@ function params(known)
 end
 
 --bytes=<from>-<to> -> {from=,to=,size=}
-function request_range(v)
+local function request_range(v)
 	local from,to = v:match'bytes=(%d+)%-(%d+)'
 	local t = {
 		from = tonumber(from),
@@ -54,7 +52,7 @@ function request_range(v)
 end
 
 --bytes <from>-<to>/<total> -> {from=,to=,total=,size=}
-function response_range(v)
+local function response_range(v)
 	local from,to,total = v:match'bytes (%d+)%-(%d+)/(%d+)'
 	local t = {
 		from = tonumber(from),
@@ -66,18 +64,18 @@ function response_range(v)
 end
 
 --cookies
-function cookies(v)
+local function cookies(v)
 	return t
 end
 
-parsers = {
+local parsers = {
 	--general header fields
 	--cache_control = kv, --no_cache
 	connection = ci,
 	content_length = int,
 	content_md5 = base64,
 	content_type = params{charset = ci}, --text/html; charset=iso-8859-1
-	date = date,
+	date = httpdate,
 	pragma = nil, --cilist?
 	trailer = headernames,
 	transfer_encoding = cilist,
@@ -137,7 +135,9 @@ parsers = {
 	x_powered_by = nil, --PHP/5.2.1
 }
 
-function parse(h,v)
-	local pv = headerparsers[h] and headerparsers[h](v) or v
-	return h, assert(pv, 'invalid value "%s" for header "%s"', v, h)
+local function parse(k,v)
+	local pv = headerparsers[k] and headerparsers[k](v) or v
+	return assert(pv, 'invalid value "%s" for header "%s"', v, h)
 end
+
+return parse

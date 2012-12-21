@@ -2,8 +2,9 @@
 setfenv(1, require'winapi.namespace')
 require'winapi.ffi'
 require'winapi.wintypes'
-import(require'glue')
-update(string, glue_string)
+local glue = require'glue'
+import(glue)
+update(string, glue.string)
 
 local function assert_up(level,v,e,...)
 	if v then return v,e,... end

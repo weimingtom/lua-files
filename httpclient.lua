@@ -1,50 +1,57 @@
-require'glue'
-import'uri,httpheaders'
+local glue = require'glue'
+
+local parse_header = require'httpheaders'
 
 --parse response line and headers
 
-function readresponseline(readline)
-	local version, status, message = readline():match'^HTTP/(%d+%.%d+) (%d%d%d) ?(.*)$'
+local function parse_response_line(s)
+	local version, status, message = s:match'^HTTP/(%d+%.%d+) (%d%d%d) ?(.*)$'
 	assert(version, 'malformed response line %s', s)
 	status = tonumber(status)
 	return version, status, message
 end
 
-function parseheadername(s)
+local function parse_header_name(s)
 	s = s:gsub('[\t\r\n% ]+', ' '):trim' ':gsub('%-','_'):lower()
 	assert(s ~= '', 'malformed header %s', s)
 end
 
-function parseheadervalue(s)
+local function parse_header_value(s)
 	return s:gsub('[\t\r\n ]+', ' '):trim' '
 end
 
-function readheaders(readline, h)
-	h = h or {}
+local function read_headers(readline, t)
+	t = t or {}
 	local s = readline()
 	while s ~= '' do --headers section ends with empty line
 		local k,v = s:match'^(.-):(.*)'
 		assert(k, 'malformed header %s', s)
-		k = parseheadername(k)
+		k = parse_header_name(k)
 		s = readline()
 		while s:find'^[\t ]' do --headers can span multiple lines
 			v = v .. s
 			s = readline()
 		end
-		v = parseheadervalue(v)
-		h[k] = (h[k] and ', ' or '') .. v --fold if multiple values
+		v = parse_header_value(v)
+		t[k] = (t[k] and ', ' or '') .. v --fold if multiple values
 	end
-	return map(httpheaders.parse, h)
+	local dt = {}
+	for k,v in pairs(t) do
+		dt[k] = parse_header(k,v)
+	end
+	return dt
 end
 
 --read response body
 
-function readchunked(readline, readchunks)
-	return cowrap(function()
+local function read_chunked(readline, readchunks)
+	return coroutine.wrap(function()
 		repeat
 			local size = tonumber(readline():match'^([^;])', 16)
 			assert(size, 'invalid chunk size')
-			for s in readchunks(size) do yield(s) end
+			for s in readchunks(size) do
+				coroutine.yield(s)
+			end
 			readline()
 		until size == 0
 	end)
@@ -52,11 +59,11 @@ end
 
 --keys are http encoding names; they reflect in the Accept-Encoding header
 --decoders are function(iterator->s) -> iterator->s, so they can be pipelined
-decoders = {
-	identity = identity,
+local decoders = {
+	identity = function(...) return ... end,
 }
 
-function readbody(headers, readline, readchunks, readall)
+local function read_body(headers, readline, readchunks, readall)
 
 	local function pipeline(source, encodings)
 		local d = source
@@ -71,8 +78,8 @@ function readbody(headers, readline, readchunks, readall)
 	local source
 	local te = headers.transfer_encoding
 	if te and te[#te] == 'chunked' then
-		source = readchunked(readline, readchunks)
-		te = slice(te, 1, -1)
+		source = read_chunked(readline, readchunks)
+		te = glue.append({}, select(1, #te-1, te))
 	elseif headers.content_length then
 		source = readchunks(headers.content_length)
 	else
@@ -85,81 +92,90 @@ end
 
 --read response
 
-local function shouldredirect(method, status, location)
+local function should_redirect(method, status, location)
     return (status == 301 or status == 302)
 				and (method == 'GET' or method == 'HEAD')
 				and location
 end
 
-function shouldhavebody(method, status)
+local function should_have_body(method, status)
     return method ~= 'HEAD' and code >= 200 and code ~= 204 and code ~= 304
 end
 
-function readresponse(readline, readchunks, readall)
+local function read_response(readline, readchunks, readall)
 	local t = {}
-	t.http_version, t.status, t.status_message = readresponseline(readline)
-	t.headers = readheaders(readline)
-	t.readbody = readbody(t.headers, readline, readchunks, readall)
+	t.http_version, t.status, t.status_message = parse_response_line(readline())
+	t.headers = read_headers(readline)
+	t.read_body = read_body(t.headers, readline, readchunks, readall)
 	return t
 end
 
 --format request line and headers
 
-function formatrequestline(method, uri)
+local function format_request_line(method, uri)
 	return ('%s %s HTTP/1.1\r\n'):format(method:upper(), uri)
 end
 
-function formatheadername(s)
+local function format_header_name(s)
 	return s:gsub('[\t\r\n_%- ]+', '-'):trim'%-':
 			gsub('([a-zA-Z])([a-zA-Z]*)', function(c,s)
 					return c:upper() .. s:lower()
 				end)
 end
 
-function foldheadervalues(t)
-	return cat(filter(parseheadervalue, tostring, t), ', ')
+local function format_header_value(s)
+	return s:gsub('[\t\r\n ]+', ' '):trim' '
 end
 
-problemheaders = { --headers that it's not safe to send them folded
+local function fold_header_values(t)
+	local dt = {}
+	for i=1,#t do dt[i] = format_header_value(t[i]) end
+	return table.concat(dt, ', ')
+end
+
+local problem_headers = { --headers that it's not safe to send them folded
 	set_cookie = true,
 	cookie = true,
 	www_authenticate = true,
 }
 
-function formatheaders(headers)
-	local t, h = {}, {}
+local function format_headers(headers)
+	local tk = {}
 	for k,v in pairs(headers) do
-		h[formatheadername(k)] = v
+		tk[#tk+1] = k
 	end
-	for k,v in sortedpairs(h) do --order is not significant
+	table.sort(tk)
+	local t = {}
+	for _,k in ipairs(tk) do
+		local v = headers[k]
 		if type(v) == 'table' then
-			if problemheaders[k] then
+			if problem_headers[k] then
 				for i=1,#v do
-					add(t, k .. ': ' .. parseheadervalue(tostring(v[i])))
+					t[#t+1] = format_header_key(k) .. ': ' .. format_header_value(v[i])
 				end
 			else
-				add(t, k .. ': ' .. foldheadervalues(v) .. '\r\n')
+				t[#t+1] = format_header_key(k) .. ': ' .. fold_header_values(v) .. '\r\n'
 			end
 		else
-			add(t, k .. ': ' .. parseheadervalue(v))
+			t[#t+1] = format_header_key(k) .. ': ' .. format_header_value(v)
 		end
 	end
-	return cat(t) .. '\r\n'
+	return table.concat(t) .. '\r\n'
 end
 
 --format request body
 
-function formatchunk(s)
+local function format_chunk(s)
 	return ('%x'):format(#s) .. '\r\n' .. s .. '\r\n'
 end
 
 --format request
 
-default_ports = {http = 80, https = 443}
+local default_ports = {http = 80, https = 443}
 
-function formatrequest(req)
+local function format_request(req)
 	local u = req.url and uri.parse(req.url) or {}
-	update(u, req) --override any url components
+	glue.update(u, req) --override any url components
 	local pathquery = uri.format{
 		path = u.path or '/',
 		segments = u.segments,
@@ -167,10 +183,10 @@ function formatrequest(req)
 		args = u.args,
 	}
 	local method = req.method or (req.body and 'POST' or 'GET')
-	local headers = copy(req.headers)
+	local headers = glue.update({}, req.headers)
 
 	if not headers.accept_encoding then
-		headers.accept_encoding = keys(decoders)
+		headers.accept_encoding = glue.keys(decoders)
 	end
 
 	local bodychunks
@@ -183,9 +199,9 @@ function formatrequest(req)
 	end
 
 	local function getdata(send)
-		local co = coroutine.create(function()
-			yield(formatrequestline(method, pathquery))
-			yield(formatheaders(headers))
+		return coroutine.wrap(function()
+			yield(format_request_line(method, pathquery))
+			yield(format_headers(headers))
 			if bodychunk then
 				repeat
 					local s, more = bodychunk()
@@ -193,9 +209,6 @@ function formatrequest(req)
 				until not more
 			end
 		end)
-		return function()
-			return resume(co)
-		end
 	end
 
 	return {
@@ -205,7 +218,7 @@ function formatrequest(req)
 	}
 end
 
-function request(req, state, connect, send)
+local function request(req, state, connect, send)
 	local t = formatrequestlines(req)
 	if not state or t.host ~= state.host or t.port ~= state.port then
 		connect(t.host, t.port)
@@ -252,7 +265,7 @@ end
 
 ------------------------------------------------------------------------------
 
-function connect(host, port, loop)
+local function connect(host, port, loop)
 	local skt,err = loop.connect(host, port)
 	if skt == nil then return nil,err end
 	return sktloop.wrap(skt, loop)
@@ -287,7 +300,7 @@ local function adjustrequest(reqt)
 end
 
 
-function sendrequest(reqt)
+local function sendrequest(reqt)
 	sendrequestline()
 	sendheaders()
 	sendbody()

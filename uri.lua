@@ -1,3 +1,5 @@
+local glue = require'glue'
+
 --vocabulary
 
 local function sortedpairs(t)
@@ -68,7 +70,7 @@ end
 --[segment[/segment...]]
 local function parsepath(s)
 	local t = {}
-	for s in s:gsplit'/' do
+	for s in glue.gsplit(s, '/') do
 		add(t, unescape(s))
 	end
 	return t
@@ -78,7 +80,7 @@ end
 --argument order is not retained neither are the values of duplicate keys
 local function parsequery(s)
 	local t = {}
-	for s in s:gsplit('[&;]+') do
+	for s in glue.gsplit(s, '[&;]+') do
 		local k,v = s:match'^([^=]*)=?(.*)$'
 		k = unescape(k:gsub('+', ' '))
 		v = unescape(v:gsub('+', ' '))

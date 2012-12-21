@@ -155,6 +155,18 @@ function glue.string.ends(s,suffix)
 	return #suffix==0 or s:find(suffix, 1, true) == #s - #suffix + 1
 end
 
+function glue.string.fromhex(s)
+    return (s:gsub('..', function(cc)
+        return string.char(tonumber(cc, 16))
+    end))
+end
+
+function glue.string.tohex(s)
+	 return (s:gsub('.', function(c)
+        return string.format('%02x', string.byte(c))
+    end))
+end
+
 glue.update(glue, glue.string)
 
 local function select_at(i,...)
