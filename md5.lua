@@ -1,6 +1,5 @@
---md5 sum and digest
+--md5 hash and digest
 local ffi = require "ffi"
-local glue = require'glue'
 local lib = ffi.load'md5'
 
 ffi.cdef[[
@@ -31,12 +30,12 @@ local function digest()
 			end
 		else
 			lib.MD5_Final(result, ctx)
-			return glue.string.tohex(ffi.string(result, 16))
+			return ffi.string(result, 16)
 		end
 	end
 end
 
-local function sum(data, size)
+local function hash(data, size)
 	local d = digest(); d(data, size); return d()
 end
 
@@ -44,7 +43,7 @@ if not ... then require'md5_test' end
 
 return {
 	digest = digest,
-	sum = sum,
+	hash = hash,
 	lib = lib,
 }
 

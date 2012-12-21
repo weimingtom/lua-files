@@ -1,6 +1,5 @@
---sha256/384/512 sum and digest
+--sha256/384/512 hash and digest
 local ffi = require'ffi'
-local glue = require'glue'
 local lib = ffi.load'sha2'
 
 ffi.cdef[[
@@ -53,7 +52,7 @@ local function digest_function(Context, Init, Update, Final, DIGEST_LENGTH)
 				end
 			else
 				Final(result, ctx)
-				return glue.string.tohex(ffi.string(result, ffi.sizeof(result)))
+				return ffi.string(result, ffi.sizeof(result))
 			end
 		end
 	end
@@ -69,7 +68,8 @@ local function digest(digest_size)
 	return digest_functions[digest_size]()
 end
 
-local function sum(digest_size, data, size)
+local function hash(digest_size, data, size)
+	assert(data, 'sha2.hash arg#2 (data) required')
 	local d = digest(digest_size); d(data, size); return d()
 end
 
@@ -77,6 +77,6 @@ if not ... then require'sha2_test' end
 
 return {
 	digest = digest,
-	sum = sum,
+	hash = hash,
 	lib = lib,
 }
