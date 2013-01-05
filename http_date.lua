@@ -1,4 +1,4 @@
---http date parsing to os.date() format except fields yday & isdst
+--http date parsing to os.date() format (except fields yday & isdst)
 local glue = require'glue'
 
 local wdays = glue.index{'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'}
@@ -10,17 +10,16 @@ local function check(w,d,mo,y,h,m,s)
 			and h <= 23 and m <= 59 and s <= 59
 end
 
---wkday "," SP date1 SP 2DIGIT ":" 2DIGIT ":" 2DIGIT SP "GMT"
+--wkday "," SP 2DIGIT-day SP month SP 4DIGIT-year SP 2DIGIT ":" 2DIGIT ":" 2DIGIT SP "GMT"
 --eg. Sun, 06 Nov 1994 08:49:37 GMT
 local function rfc1123date(s)
 	local w,d,mo,y,h,m,s = s:match'([A-Za-z]+), (%d+) ([A-Za-z]+) (%d+) (%d+):(%d+):(%d+) GMT'
 	d,y,h,m,s = tonumber(d),tonumber(y),tonumber(h),tonumber(m),tonumber(s)
 	w = wdays[w]
 	mo = months[mo]
-	if check(w,d,mo,y,h,m,s) then
-		return {wday = w, day = d, year = y, month = mo,
-				hour = h, min = m, sec = s}
-	end
+	if not check(w,d,mo,y,h,m,s) then return end
+	return {wday = w, day = d, year = y, month = mo,
+			hour = h, min = m, sec = s}
 end
 
 --weekday "," SP 2DIGIT "-" month "-" 2DIGIT SP 2DIGIT ":" 2DIGIT ":" 2DIGIT SP "GMT"
@@ -31,10 +30,9 @@ local function rfc850date(s)
 	w = weekdays[w]
 	mo = months[mo]
 	if y then y = y + (y > 50 and 1900 or 2000) end
-	if check(w,d,mo,y,h,m,s) then
-		return {wday = w, day = d, year = y,
-				month = mo, hour = h, min = m, sec = s}
-	end
+	if not check(w,d,mo,y,h,m,s) then return end
+	return {wday = w, day = d, year = y,
+			month = mo, hour = h, min = m, sec = s}
 end
 
 --wkday SP month SP ( 2DIGIT | ( SP 1DIGIT )) SP 2DIGIT ":" 2DIGIT ":" 2DIGIT SP 4DIGIT
@@ -44,10 +42,9 @@ local function asctimedate(s)
 	d,y,h,m,s = tonumber(d),tonumber(y),tonumber(h),tonumber(m),tonumber(s)
 	w = wdays[w]
 	mo = months[mo]
-	if check(w,d,mo,y,h,m,s) then
-		return {wday = w, day = d, year = y, month = mo,
-				hour = h, min = m, sec = s}
-	end
+	if not check(w,d,mo,y,h,m,s) then return end
+	return {wday = w, day = d, year = y, month = mo,
+			hour = h, min = m, sec = s}
 end
 
 local function date(s)
@@ -64,4 +61,6 @@ if not ... then
 	test(date'SundaY, 06-Nov-94 08:49:37 GMT', nil)
 end
 
-return date
+return {
+	parse = date
+}

@@ -2,7 +2,7 @@ local md5 = require'md5'
 local glue = require'glue'
 
 local function sumhex(s)
-	return glue.tohex(md5.hash(s))
+	return glue.tohex(md5.sum(s))
 end
 
 assert(sumhex'your momma is fat' == 'f208dff3c12214035c3e53498275a2cb')

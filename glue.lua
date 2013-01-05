@@ -256,7 +256,7 @@ end
 function glue.fileexists(name)
 	local f = io.open(name, 'rb')
 	if f then f:close() end
-	return f ~= nil
+	return f ~= nil and name or nil
 end
 
 function glue.readfile(name, format)

@@ -35,7 +35,7 @@ local function digest()
 	end
 end
 
-local function hash(data, size)
+local function sum(data, size)
 	local d = digest(); d(data, size); return d()
 end
 
@@ -43,7 +43,7 @@ if not ... then require'md5_test' end
 
 return {
 	digest = digest,
-	hash = hash,
+	sum = sum,
 	lib = lib,
 }
 

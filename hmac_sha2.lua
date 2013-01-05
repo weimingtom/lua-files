@@ -6,8 +6,8 @@
 local hmac = require 'hmac'
 local sha2 = require 'sha2'
 
-hmac.sha256 = hmac.new(function(s) return sha2.hash(256, s) end, 64)
-hmac.sha384 = hmac.new(function(s) return sha2.hash(384, s) end, 128)
-hmac.sha512 = hmac.new(function(s) return sha2.hash(512, s) end, 128)
+hmac.sha256 = hmac.new(sha2.sha256, 64)
+hmac.sha384 = hmac.new(sha2.sha384, 128)
+hmac.sha512 = hmac.new(sha2.sha512, 128)
 
 if not ... then require'hmac_sha2_test' end

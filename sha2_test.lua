@@ -2,9 +2,9 @@ local sha2 = require'sha2'
 local glue = require'glue'
 
 sha = {
-	SHA256 = function(s) return glue.tohex(sha2.hash(256,s)) end,
-	SHA384 = function(s) return glue.tohex(sha2.hash(384,s)) end,
-	SHA512 = function(s) return glue.tohex(sha2.hash(512,s)) end,
+	SHA256 = function(s) return glue.tohex(sha2.sha256(s)) end,
+	SHA384 = function(s) return glue.tohex(sha2.sha384(s)) end,
+	SHA512 = function(s) return glue.tohex(sha2.sha512(s)) end,
 }
 
 for file in io.popen('ls media/sha2/*.dat'):lines() do

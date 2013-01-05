@@ -63,9 +63,11 @@ local function fwrite(file, v, indent, parents, quote, onerror)
 	f:close()
 end
 
-local function pp(v)
-	print(pformat(v, '   ', {}))
-	return v
+local function pp(...)
+	for i=1,select('#',...) do
+		print(pformat(select(i,...), '   ', {}))
+	end
+	return ...
 end
 
 if not ... then require'pp_test' end

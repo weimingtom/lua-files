@@ -8,8 +8,6 @@ local function sortedpairs(t)
 	table.sort(st)
 	return pairs(st)
 end
-local function add(t, e) t[#t+1] = e end
-local cat = table.concat
 
 --formatting
 
@@ -26,22 +24,22 @@ local function escape(s, reserved, unreserved)
 	return s
 end
 
-local function formatargs(t)
+local function format_args(t)
 	local dt = {}
 	for k,v in sortedpairs(t) do --order is not significant
 		k = k:gsub(' ', '+')
 		v = v:gsub(' ', '+')
-		add(dt, escape(k, '&=') .. '=' .. escape(v, '&'))
+		dt[#dt+1] = escape(k, '&=') .. '=' .. escape(v, '&')
 	end
-	return cat(dt, '&')
+	return table.concat(dt, '&')
 end
 
-local function formatsegments(t)
+local function format_segments(t)
 	local dt = {}
 	for i=1,#t do
-		add(dt, escape(t[i], '/'))
+		dt[#dt+1] = escape(t[i], '/')
 	end
-	return cat(dt, '/')
+	return table.concat(dt, '/')
 end
 
 --args override query; segments override path
@@ -51,9 +49,9 @@ local function format(t)
 	local user = t.user and escape(t.user) .. pass .. '@' or ''
 	local port = t.port and ':' .. escape(t.port) or ''
 	local host = t.host and '//' .. user .. escape(t.host) .. port or ''
-	local path = t.segments and formatsegments(t.segments) or
+	local path = t.segments and format_segments(t.segments) or
 						t.path and escape(t.path, '', '/') or ''
-	local query = t.args and '?' .. formatargs(t.args) or
+	local query = t.args and '?' .. format_args(t.args) or
 						t.query and '?' .. escape((t.query:gsub(' ', '+'))) or ''
 	local fragment = t.fragment and '#' .. escape(t.fragment) or ''
 	return scheme .. host .. path .. query .. fragment
@@ -71,7 +69,7 @@ end
 local function parsepath(s)
 	local t = {}
 	for s in glue.gsplit(s, '/') do
-		add(t, unescape(s))
+		t[#t+1] = unescape(s)
 	end
 	return t
 end

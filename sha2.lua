@@ -58,25 +58,21 @@ local function digest_function(Context, Init, Update, Final, DIGEST_LENGTH)
 	end
 end
 
-local digest_functions = {
-	[256] = digest_function(ffi.typeof'SHA256_CTX', lib.SHA256_Init, lib.SHA256_Update, lib.SHA256_Final, lib.SHA256_DIGEST_LENGTH),
-	[384] = digest_function(ffi.typeof'SHA384_CTX', lib.SHA384_Init, lib.SHA384_Update, lib.SHA384_Final, lib.SHA384_DIGEST_LENGTH),
-	[512] = digest_function(ffi.typeof'SHA512_CTX', lib.SHA512_Init, lib.SHA512_Update, lib.SHA512_Final, lib.SHA512_DIGEST_LENGTH),
-}
-
-local function digest(digest_size)
-	return digest_functions[digest_size]()
+local function hash_function(digest_function)
+	return function(data, size)
+		local d = digest_function(); d(data, size); return d()
+	end
 end
 
-local function hash(digest_size, data, size)
-	assert(data, 'sha2.hash arg#2 (data) required')
-	local d = digest(digest_size); d(data, size); return d()
-end
+local M = {lib = lib}
+
+M.sha256_digest = digest_function(ffi.typeof'SHA256_CTX', lib.SHA256_Init, lib.SHA256_Update, lib.SHA256_Final, lib.SHA256_DIGEST_LENGTH)
+M.sha384_digest = digest_function(ffi.typeof'SHA384_CTX', lib.SHA384_Init, lib.SHA384_Update, lib.SHA384_Final, lib.SHA384_DIGEST_LENGTH)
+M.sha512_digest = digest_function(ffi.typeof'SHA512_CTX', lib.SHA512_Init, lib.SHA512_Update, lib.SHA512_Final, lib.SHA512_DIGEST_LENGTH)
+M.sha256 = hash_function(M.sha256_digest)
+M.sha384 = hash_function(M.sha384_digest)
+M.sha512 = hash_function(M.sha512_digest)
 
 if not ... then require'sha2_test' end
 
-return {
-	digest = digest,
-	hash = hash,
-	lib = lib,
-}
+return M
