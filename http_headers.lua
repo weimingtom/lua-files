@@ -1,47 +1,13 @@
---http protocol parsing from rfc-2616
+--http header values parsing
 local glue = require'glue'
-local uri = require'uri'
 local b64 = require'libb64'
 local http_date = require'http_date'
 local re = require'lpeg.re' --for tokens()
 
---request/response line parsers
-
-local function request_line(s)
-	local method, uri, version = s:match'^([^ ]+) ([^ ]+) HTTP/(%d+%.%d+)$'
-	return method, uri, version
-end
-
-local function response_line(s)
-	local version, status, message = s:match'^HTTP/(%d+%.%d+) (%d%d%d) ?(.*)$'
-	status = tonumber(status)
-	return status, message, version
-end
-
---headers parser
-
-local function headers(readline)
-	local t = {}
-	local s = readline()
-	while s and s ~= '' do                           --headers end with an empty line
-		s = s:gsub('[\t ]+', ' ')                     --LWS -> one SP
-		local k,v = s:match'^([^:]+): ?(.-) ?$'       --name: SP? value SP?
-		k = glue.assert(k, 'malformed header %s', s)
-		k = k:gsub('%-','_'):lower()                  --Some-Header -> some_header
-		s = readline()
-		while s and s:find'^[\t ]' do                 --values can span multiple lines
-			s = s:gsub('[\t ]+', ' ')                  --LWS -> one SP
-			v = v .. s:gsub(' $', '')                  --rtrim and concat
-			s = readline()
-		end
-		t[k] = t[k] and t[k]..','..v or v             --combine duplicate headers
-	end
-	return t
-end
-
 --simple value parsers
 
 function name(s) --Some-Name -> some_name
+	if s == '' then return end
 	return (s:gsub('%-','_'):lower())
 end
 
@@ -63,10 +29,15 @@ end
 --simple compound value parsers (no comments or quoted strings involved)
 
 local date = http_date.parse
-local url = uri.parse
+local url = glue.pass --urls are not parsed (replace with uri.parse if you want them parsed)
 
 local function namesplit(s)
-	return glue.gsplit(s,' ?, ?')
+	local split = glue.gsplit(s,' ?, ?')
+	return function()
+		local s = split()
+		while s == '' do s = split() end --empty values don't count
+		return s
+	end
 end
 
 local function nameset(s) --"a,b" -> {a=true, b=true}
@@ -83,27 +54,6 @@ local function namelist(s) --"a,b" -> {'a','b'}
 		t[#t+1] = name(s)
 	end
 	return t
-end
-
-local function etag(s) --[ "W/" ] quoted-string -> {etag = s, weak = true|false}
-	local weak_etag = s:match'^W/(.*)$'
-	return {
-		etag = qstring(weak_etag or s),
-		weak = weak_etag and true or false,
-	}
-end
-
---http://www.ietf.org/rfc/rfc2617.txt
-local function credentials(s) --basic b64<user:password>
-	local scheme,s = s:match'^([^ ]+) (.*)$'
-	if not scheme then return end
-	scheme = name(scheme)
-	if scheme == 'basic' then
-		local user,pass = b64.decode_string(s):match'^([^:]*):(.*)$'
-		return {scheme = scheme, user = user, pass = pass}
-	elseif scheme == 'digest' then
-		--TODO:
-	end
 end
 
 --tokenized compound value parsers
@@ -181,29 +131,18 @@ local function valueparamslist(s, parsers) --value1[;paramlist1],... -> {value1=
 	end
 end
 
---propertylist and valueparamslist value parsers: parse(string | true) -> value | nil
+--parsers for propertylist and valueparamslist: parse(string | true) -> value | nil
 local function no_value(b) return b == true or nil end
-local function opt_int(s) return s == true or int(s) end
+local function must_value(s) return s ~= true and s or nil end
 local function must_int(s) return s ~= true and int(s) or nil end
+local function opt_int(s) return s == true or int(s) end
+local function must_name(s) return s ~= true and name(s) or nil end
+local function must_nameset(s) return s ~= true and nameset(s) or nil end
 local function opt_nameset(s) return s == true or nameset(s) end
 
---header value lazy parser
+--individual value parsers per rfc-2616 section 14
 
-local parse = {} --{header_name = parser(s) -> v}
-
-local function parse_header(k,v)
-	if parse[k] then return parse[k](v) end
-	return v
-end
-
-local function parsed_headers(s) --parsed_headers(s) -> t; t.header_name -> parsed_value
-	local t = headers(s)
-	return glue.cache(function(k)
-		return t[k] and parse_header(k,t[k])
-	end)
-end
-
---header values per http section 14
+local parse = {} --{header_name = parser(s) -> v | nil[,err] }
 
 local accept_parse = {q = tonumber}
 
@@ -211,11 +150,9 @@ function parse.accept(s) --#( type "/" subtype ( ";" token [ "=" ( token | quote
 	local dt = {}
 	for t,i,j, params in valueparamslist(s, accept_parse) do
 		local type_, slash, subtype = unpack(t,i,j)
-		if slash ~= '/' then return end
-		type_ = name(type_)
-		subtype = name(subtype)
-		params = params or {}
-		dt[string.format('%s/%s', type_, subtype)] = params
+		if slash ~= '/' or not subtype then return end
+		type_, subtype = name(type_), name(subtype)
+		dt[string.format('%s/%s', type_, subtype)] = params or true
 	end
 	return dt
 end
@@ -240,7 +177,77 @@ end
 parse.accept_datetime = date
 parse.age = int --seconds
 parse.allow = nameset --#method
+
+local credentials_parsers = {
+	--TODO
+}
+
+local function credentials(s) --scheme ...
+	local scheme,s = s:match'^([^ ]+) (.*)$'
+	if not scheme then return end
+	scheme = name(scheme)
+	if scheme == 'basic' then --basic b64<user:password>
+		local user,pass = b64.decode_string(s):match'^([^:]*):(.*)$'
+		return {scheme = scheme, user = user, pass = pass}
+	elseif scheme == 'digest' then --digest ...
+		local dt = propertylist(s, credentials_parsers)
+		dt.scheme = scheme
+		--[[
+		Authorization: Digest username="Mufasa",
+                     realm="testrealm@host.com",
+                     nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",
+                     uri="/dir/index.html",
+                     qop=auth,
+                     nc=00000001,
+                     cnonce="0a4f113b",
+                     response="6629fae49393a05397450978507c4ef1",
+                     opaque="5ccc069c403ebaf9f0171e9517f40e41"
+		]]
+		return dt
+	else
+		return {scheme = scheme, rest = s}
+	end
+end
+
+local function must_urllist(s)
+	if s == true then return end
+	local dt = {}
+	for s in glue.gsplit(s, ' ') do
+		dt[#dt+1] = url(s)
+	end
+	return #dt > 0 and dt or nil
+end
+
+local function must_bool(s)
+	if s == true then return end
+	s = s:lower()
+	if s ~= 'true' and s ~= 'false' then return end
+	return s == 'true'
+end
+
+local challenge_parsers = {
+	realm = must_value,          --"realm" "=" quoted-string
+	domain = must_urllist,       --"domain" "=" <"> URI ( 1*SP URI ) <">
+	nonce = must_value,          --"nonce" "=" quoted-string
+	opaque = must_value,         --"opaque" "=" quoted-string
+	stale = must_bool,           --"stale" "=" ( "true" | "false" )
+	algorithm = must_name,       --"algorithm" "=" ( "MD5" | "MD5-sess" | token )
+	qop_options = must_nameset,  --"qop" "=" <"> 1# ( "auth" | "auth-int" | token ) <">
+}
+
+local function challenges(s) --scheme [propertylist]
+	local scheme,s = s:match'^([^ ]+) ?(.*)$'
+	if not scheme then return end
+	scheme = name(scheme)
+	local dt = propertylist(s, challenge_parsers)
+	dt.scheme = scheme
+	return dt
+end
+
+parse.www_authenticate = challenges
 parse.authorization = credentials
+parse.proxy_authenticate = challenges
+parse.proxy_authorization = credentials
 
 local cc_parse = {
 	no_cache = no_value,          --"no-cache"
@@ -295,6 +302,14 @@ function parse.content_type(s) --type "/" subtype *( ";" name "=" value )
 end
 
 parse.date = date
+
+local function etag(s) --[ "W/" ] quoted-string -> {etag = s, weak = true|false}
+	local weak_etag = s:match'^W/(.*)$'
+	local etag = qstring(weak_etag or s)
+	if not etag then return end
+	return {etag = etag, weak = weak_etag ~= nil}
+end
+
 parse.etag = etag
 
 local expect_parse = {['100_continue'] = no_value}
@@ -304,7 +319,7 @@ function parse.expect(s) --1#( "100-continue" | ( token "=" ( token | quoted-str
 end
 
 parse.expires = date
-parse.from = nil --email-address
+parse.from = glue.pass --email-address
 
 function parse.host(s) --host [ ":" port ]
 	local host, port = s:match'^(.-) ?: ?(.*)$'
@@ -350,11 +365,6 @@ function parse.pragma(s) -- 1#( "no-cache" | token [ "=" ( token | quoted-string
 	return propertylist(s, pragma_parse)
 end
 
-local challenges = nameset --TODO
-
-parse.proxy_authenticate = challenges
-parse.proxy_authorization = credentials
-
 function parse.range(s) --bytes=<from>-<to> -> {from=,to=,size=}
 	local from,to = s:match'bytes=(%d+)%-(%d+)'
 	local t = {}
@@ -381,7 +391,7 @@ function parse.server(s) --1*( ( token ["/" version] ) | comment )
 	return dt
 end
 
-local te_parse = {trailers = no_value, q = int}
+local te_parse = {trailers = no_value, q = must_int}
 
 function parse.te(s) --#( "trailers" | ( transfer-extension [ accept-params ] ) )
 	local dt = {}
@@ -421,16 +431,26 @@ function parse.vary(s) --( "*" | 1#field-name )
 	return nameset(s)
 end
 
---[[ TODO:
-      Via =  "Via" ":" 1#( received-protocol received-by [ comment ] )
-      received-protocol = [ protocol-name "/" ] protocol-version
-      protocol-name     = token
-      protocol-version  = token
-      received-by       = ( host [ ":" port ] ) | pseudonym
-      pseudonym         = token
-]]
-function parse.via(t) --1.0 fred 1.1 nowhere.com (apache/1.1)
-	return t
+function parse.via(s) --1#( [ protocol-name "/" ] protocol-version host [ ":" port ] [ comment ] )
+	local dt = {}
+	for t,i,j in tsplit(tokens(s), ',') do
+		local proto = t[i+1] == '/' and t[i] or nil
+		local o = proto and 2 or 0
+		if o+j-i+1 < 2 then return end
+		local ver, host = t[o+i], t[o+i+1]
+		local port = t[o+i+2] ==':' and t[o+i+3] or nil
+		local comment = t[o+i+2+(port and 2 or 0)]
+		if comment == ',' then comment = nil end
+		if ver and host then
+			dt[#dt+1] = {
+				protocol = proto and name(proto),
+				version = ver:lower(),
+				host = host:lower(),
+				comment = comment
+			}
+		end
+	end
+	return dt
 end
 
 function parse.warning(s) --1#(code ( ( host [ ":" port ] ) | pseudonym ) text [date])
@@ -447,84 +467,70 @@ function parse.warning(s) --1#(code ( ( host [ ":" port ] ) | pseudonym ) text [
 	return dt
 end
 
-parse.www_authenticate = challenges
-
-
-
-parse.cookie = nil --TODO: kv';'
-
-
---non-standard request headers
-
-parse.x_requested_with = nil --xmlhttprequest
 function parse.dnt(s) return s == '1' end --means "do not track"
-parse.x_forwarded_for = nil --client1 proxy1 proxy2
-parse.link = nil --?
-parse.p3p = nil
-parse.refresh = nil --TODO: seconds; ... (not standard but supported)
-parse.set_cookie = nil
-parse.strict_transport_security = nil --eg. max_age=16070400; includesubdomains
-parse.x_Forwarded_proto = nil --https|http
-parse.x_powered_by = nil --PHP/5.2.1
-parse.content_disposition = nil --http extension; TODO
 
+function parse.link(s) --</feed>; rel="alternate"
+	return s --TODO
+end
 
+function parse.refresh(s) --seconds; url=<url> (not standard but supported)
+	local n, url = s:match'^(%d+) ?; ?url ?= ?'
+	n = tonumber(n)
+	return n and {url = url, pause = n}
+end
 
---body parsing
+function parse.set_cookie(s) --TODO
+	return s
+end
 
-local function body_chunks(readline, readchunks)
-	return coroutine.wrap(function()
-		repeat
-			local size = tonumber(readline():match'^([^;])', 16)
-			assert(size, 'invalid chunk size')
-			for s in readchunks(size) do
-				coroutine.yield(s)
-			end
-			readline()
-		until size == 0
+function parse.cookie(s) --TODO
+
+end
+
+function parse.strict_transport_security(s)
+	return s --TODO: eg. max_age=16070400; includesubdomains
+end
+
+function parse.content_disposition(s)
+	return s --TODO
+end
+
+parse.x_requested_with = name   --"XMLHttpRequest"
+parse.x_forwarded_for = nameset --client1, proxy1, proxy2
+parse.x_forwarded_proto = name  --"https" | "http"
+parse.x_powered_by = glue.pass  --PHP/5.2.1
+
+--the parser function
+
+local function parse_value(k,v)
+	if parse[k] then return parse[k](v) end
+	return v --unknown header, return unparsed
+end
+
+local function parse_values(t)
+	local dt, errt = {}, {}
+	for k,v in pairs(t) do
+		local pv,err = parse_value(k,v)
+      dt[k] = pv
+		if pv == nil then
+			errt[k] = err or string.format('invalid value "%s"', v)
+		end
+	end
+	return dt, errt
+end
+
+local function lazy_parse(t) --lazy_parse(s) -> t; t.header_name -> parsed_value
+	return glue.cache(function(k)
+		return t[k] and parse_value(k, t[k])
 	end)
 end
 
---keys are http encoding names; they reflect in the Accept-Encoding header
---decoders are function(iterator->s) -> iterator->s, so they can be pipelined
-local decoders = {
-	identity = glue.pass,
-}
-
-local function pipeline(source, encodings, decoders)
-	if encodings then
-		for i=#encodings,1,-1 do --order is significant
-			local decoder = decoders[encodings[i]]
-			assert(decoder, 'unsupported encoding %s', encodings[i])
-			source = decoder(source)
-		end
-	end
-	return source
-end
-
-local function body(headers, readline, readchunks, readall)
-	local decoders = glue.update({}, decoders)
-	decoders.chunked = body_chunks(readline, readchunks)
-	local source
-	if headers.content_length then
-		source = readchunks(headers.content_length)
-	else
-		source = readall()
-	end
-	source = pipeline(source, headers.transfer_encoding)
-	source = pipeline(source, headers.content_encoding)
-	return source
-end
-
-
-if not ... then require'http_parse_test' end
+if not ... then require'http_headers_test' end
 
 return {
-	reqwest_line = request_line,
-	response_line = response_line,
-	headers = headers,
-	parsed_headers = parsed_headers,
-	header_parsers = parse,
-	body = body,
+	parse = parse,
+	parse_value = parse_value,
+	parse_values = parse_values,
+	lazy_parse = lazy_parse,
 }
 

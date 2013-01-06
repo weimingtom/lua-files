@@ -1,10 +1,15 @@
-local headers = require'http_parse'.parsed_headers
+local hparse = require'http_parser'.headers
+local vparse = require'http_headers'.parse_values
 
 local function readlines(s)
 	return s:gmatch'(.-)\r?\n'
 end
 
-request_headers = [[
+local function dump(s)
+	pp(vparse(hparse(readlines(s))))
+end
+
+dump[[
 Accept: text/plain; q=0.5, text/html,
 				text/x-dvi; q=0.8, text/x-c
 Accept-Charset: utf-8
@@ -36,7 +41,7 @@ Referer: http://en.wikipedia.org/wiki/Main_Page
 TE: trailers, deflate
 Upgrade: HTTP/2.0, SHTTP/1.3, IRC/6.9, RTA/x11
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:12.0) Gecko/20100101 Firefox/12.0
-Via: 1.0 fred, 1.1 example.com (Apache/1.1)
+Via: 1.0 fred, https/1.1 example.com (Apache/1.1)
 Warning: 199 Miscellaneous warning
 X-Requested-With: XMLHttpRequest
 DNT: 1 (Do Not Track Enabled)
@@ -49,7 +54,7 @@ x-wap-profile: http://wap.samsungmobile.com/uaprof/SGH-I777.xml
 Proxy-Connection: keep-alive
 ]]
 
-response_headers = [[
+dump[[
 Access-Control-Allow-Origin: *
 Accept-Ranges: bytes
 Age: 12
@@ -94,6 +99,14 @@ X-UA-Compatible: Chrome=1
 
 ]]
 
-pp(headers(readlines(request_headers)))
-pp(headers(readlines(response_headers)))
-
+dump[[
+Authorization: Digest username="Mufasa",
+                     realm="testrealm@host.com",
+                     nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",
+                     uri="/dir/index.html",
+                     qop=auth,
+                     nc=00000001,
+                     cnonce="0a4f113b",
+                     response="6629fae49393a05397450978507c4ef1",
+                     opaque="5ccc069c403ebaf9f0171e9517f40e41"
+]]
