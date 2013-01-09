@@ -1,6 +1,6 @@
 --sha256/384/512 hash and digest
 local ffi = require'ffi'
-local lib = ffi.load'sha2'
+local C = ffi.load'sha2'
 
 ffi.cdef[[
 enum {
@@ -64,11 +64,11 @@ local function hash_function(digest_function)
 	end
 end
 
-local M = {lib = lib}
+local M = {C = C}
 
-M.sha256_digest = digest_function(ffi.typeof'SHA256_CTX', lib.SHA256_Init, lib.SHA256_Update, lib.SHA256_Final, lib.SHA256_DIGEST_LENGTH)
-M.sha384_digest = digest_function(ffi.typeof'SHA384_CTX', lib.SHA384_Init, lib.SHA384_Update, lib.SHA384_Final, lib.SHA384_DIGEST_LENGTH)
-M.sha512_digest = digest_function(ffi.typeof'SHA512_CTX', lib.SHA512_Init, lib.SHA512_Update, lib.SHA512_Final, lib.SHA512_DIGEST_LENGTH)
+M.sha256_digest = digest_function(ffi.typeof'SHA256_CTX', C.SHA256_Init, C.SHA256_Update, C.SHA256_Final, C.SHA256_DIGEST_LENGTH)
+M.sha384_digest = digest_function(ffi.typeof'SHA384_CTX', C.SHA384_Init, C.SHA384_Update, C.SHA384_Final, C.SHA384_DIGEST_LENGTH)
+M.sha512_digest = digest_function(ffi.typeof'SHA512_CTX', C.SHA512_Init, C.SHA512_Update, C.SHA512_Final, C.SHA512_DIGEST_LENGTH)
 M.sha256 = hash_function(M.sha256_digest)
 M.sha384 = hash_function(M.sha384_digest)
 M.sha512 = hash_function(M.sha512_digest)

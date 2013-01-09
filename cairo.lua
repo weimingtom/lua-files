@@ -10,8 +10,7 @@
 local ffi = require'ffi'
 require'cairo_h'
 local C = ffi.load'cairo'
-local M = setmetatable({}, {__index = C})
-M.lib = C
+local M = setmetatable({C = C}, {__index = C})
 
 -- garbage collector integration
 -- note: it's important for free() and destroy() to not return anything so you can use self.obj = self.obj:free().

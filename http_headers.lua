@@ -178,36 +178,43 @@ parse.accept_datetime = date
 parse.age = int --seconds
 parse.allow = nameset --#method
 
+local function must_hex(len)
+	return function(s)
+		return s ~= true and #s == len and s:match'^[%x]+$' or nil
+	end
+end
+
 local credentials_parsers = {
-	--TODO
+	realm = must_value,       --"realm" "=" quoted-string
+	username = must_value,    --"username" "=" quoted-string
+	uri = must_value,         --"uri" "=" request-uri   ; As specified by HTTP/1.1
+	qop = must_name,          --"qop" "=" ( "auth" | "auth-int" | token )
+	nonce = must_value,       --"nonce" "=" quoted-string
+	cnonce = must_value,      --"cnonce" "=" quoted-string
+	nc = must_hex(8),         --"nc" "=" 8LHEX
+	response = must_hex(32),  --"response" "=" <"> 32LHEX <">
+	opaque = must_value,      --"opaque" "=" quoted-string
+	algorithm = must_name,    --"algorithm" "=" ( "MD5" | "MD5-sess" | token )
 }
 
-local function credentials(s) --scheme ...
+local function credentials(s) --basic base64-string | digest k=v,... per http://tools.ietf.org/html/rfc2617
 	local scheme,s = s:match'^([^ ]+) (.*)$'
 	if not scheme then return end
 	scheme = name(scheme)
-	if scheme == 'basic' then --basic b64<user:password>
+	if scheme == 'basic' then --basic base64("user:password")
 		local user,pass = b64.decode_string(s):match'^([^:]*):(.*)$'
 		return {scheme = scheme, user = user, pass = pass}
-	elseif scheme == 'digest' then --digest ...
+	elseif scheme == 'digest' then
 		local dt = propertylist(s, credentials_parsers)
 		dt.scheme = scheme
-		--[[
-		Authorization: Digest username="Mufasa",
-                     realm="testrealm@host.com",
-                     nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",
-                     uri="/dir/index.html",
-                     qop=auth,
-                     nc=00000001,
-                     cnonce="0a4f113b",
-                     response="6629fae49393a05397450978507c4ef1",
-                     opaque="5ccc069c403ebaf9f0171e9517f40e41"
-		]]
 		return dt
 	else
 		return {scheme = scheme, rest = s}
 	end
 end
+
+parse.authorization = credentials
+parse.proxy_authorization = credentials
 
 local function must_urllist(s)
 	if s == true then return end
@@ -232,10 +239,10 @@ local challenge_parsers = {
 	opaque = must_value,         --"opaque" "=" quoted-string
 	stale = must_bool,           --"stale" "=" ( "true" | "false" )
 	algorithm = must_name,       --"algorithm" "=" ( "MD5" | "MD5-sess" | token )
-	qop_options = must_nameset,  --"qop" "=" <"> 1# ( "auth" | "auth-int" | token ) <">
+	qop = must_nameset,          --"qop" "=" <"> 1# ( "auth" | "auth-int" | token ) <">
 }
 
-local function challenges(s) --scheme [propertylist]
+local function challenges(s) --scheme k=v,... per http://tools.ietf.org/html/rfc2617
 	local scheme,s = s:match'^([^ ]+) ?(.*)$'
 	if not scheme then return end
 	scheme = name(scheme)
@@ -245,9 +252,7 @@ local function challenges(s) --scheme [propertylist]
 end
 
 parse.www_authenticate = challenges
-parse.authorization = credentials
 parse.proxy_authenticate = challenges
-parse.proxy_authorization = credentials
 
 local cc_parse = {
 	no_cache = no_value,          --"no-cache"
@@ -469,8 +474,39 @@ end
 
 function parse.dnt(s) return s == '1' end --means "do not track"
 
-function parse.link(s) --</feed>; rel="alternate"
-	return s --TODO
+function parse.link(s) --</feed>; rel="alternate" (http://tools.ietf.org/html/rfc5988)
+	--[[ --TODO
+	Link           = "Link" ":" #link-value
+	link-value     = "<" URI-Reference ">" *( ";" link-param )
+	link-param     = ( ( "rel" "=" relation-types )
+					  | ( "anchor" "=" <"> URI-Reference <"> )
+					  | ( "rev" "=" relation-types )
+					  | ( "hreflang" "=" Language-Tag )
+					  | ( "media" "=" ( MediaDesc | ( <"> MediaDesc <"> ) ) )
+					  | ( "title" "=" quoted-string )
+					  | ( "title*" "=" ext-value )
+					  | ( "type" "=" ( media-type | quoted-mt ) )
+					  | ( link-extension ) )
+	link-extension = ( parmname [ "=" ( ptoken | quoted-string ) ] )
+					  | ( ext-name-star "=" ext-value )
+	ext-name-star  = parmname "*" ; reserved for RFC2231-profiled
+										  ; extensions.  Whitespace NOT
+										  ; allowed in between.
+	ptoken         = 1*ptokenchar
+	ptokenchar     = "!" | "#" | "$" | "%" | "&" | "'" | "("
+					  | ")" | "*" | "+" | "-" | "." | "/" | DIGIT
+					  | ":" | "<" | "=" | ">" | "?" | "@" | ALPHA
+					  | "[" | "]" | "^" | "_" | "`" | "{" | "|"
+					  | "}" | "~"
+	media-type     = type-name "/" subtype-name
+	quoted-mt      = <"> media-type <">
+	relation-types = relation-type
+					  | <"> relation-type *( 1*SP relation-type ) <">
+	relation-type  = reg-rel-type | ext-rel-type
+	reg-rel-type   = LOALPHA *( LOALPHA | DIGIT | "." | "-" )
+	ext-rel-type   = URI
+	]]
+	return s
 end
 
 function parse.refresh(s) --seconds; url=<url> (not standard but supported)
@@ -487,12 +523,29 @@ function parse.cookie(s) --TODO
 
 end
 
-function parse.strict_transport_security(s)
-	return s --TODO: eg. max_age=16070400; includesubdomains
+function parse.strict_transport_security(s) --http://tools.ietf.org/html/rfc6797
+	--[[ --TODO
+	  Strict-Transport-Security = "Strict-Transport-Security" ":"
+                                 [ directive ]  *( ";" [ directive ] )
+
+     directive                 = directive-name [ "=" directive-value ]
+     directive-name            = token
+     directive-value           = token | quoted-string
+	]]
+	return s
 end
 
 function parse.content_disposition(s)
-	return s --TODO
+	--[[ --TODO
+	 content-disposition = "Content-Disposition" ":"
+                              disposition-type *( ";" disposition-parm )
+        disposition-type = "attachment" | disp-extension-token
+        disposition-parm = filename-parm | disp-extension-parm
+        filename-parm = "filename" "=" quoted-string
+        disp-extension-token = token
+        disp-extension-parm = token "=" ( token | quoted-string )
+	]]
+	return s
 end
 
 parse.x_requested_with = name   --"XMLHttpRequest"
@@ -500,7 +553,7 @@ parse.x_forwarded_for = nameset --client1, proxy1, proxy2
 parse.x_forwarded_proto = name  --"https" | "http"
 parse.x_powered_by = glue.pass  --PHP/5.2.1
 
---the parser function
+--parsing API
 
 local function parse_value(k,v)
 	if parse[k] then return parse[k](v) end
@@ -528,7 +581,7 @@ end
 if not ... then require'http_headers_test' end
 
 return {
-	parse = parse,
+	parsers = parse,
 	parse_value = parse_value,
 	parse_values = parse_values,
 	lazy_parse = lazy_parse,

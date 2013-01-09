@@ -3,7 +3,7 @@ local ffi = require'ffi'
 require'giflib_h'
 local bmpconv = require'bmpconv'
 
-local gif = ffi.load'giflib5'
+local C = ffi.load'giflib5'
 
 local function ptr(p) --convert NULL to nil
 	if p == nil then return nil end
@@ -38,30 +38,30 @@ local function reader_callback(reader)
 end
 
 local function open_callback(cb, err)
-	return gif.DGifOpen(nil, cb, err)
+	return C.DGifOpen(nil, cb, err)
 end
 
 local function open_fileno(fileno, err)
-	return gif.DGifOpenFileHandle(fileno, err)
+	return C.DGifOpenFileHandle(fileno, err)
 end
 
 local function open_file(filename, err)
-	return gif.DGifOpenFileName(filename, err)
+	return C.DGifOpenFileName(filename, err)
 end
 
 local function open(opener, arg)
 	local err = ffi.new'int[1]'
 	local ft = ptr(opener(arg, err))
-	if not ft then error(ffi.string(gif.GifErrorString(err[0]))) end
+	if not ft then error(ffi.string(C.GifErrorString(err[0]))) end
 	return ft
 end
 
 local function check(res, ft)
-	if res == 0 then error(ffi.string(gif.GifErrorString(ft.Error))) end
+	if res == 0 then error(ffi.string(C.GifErrorString(ft.Error))) end
 end
 
 local function close(ft) --fugget about why it couldn't close, geez
-	if gif.DGifCloseFile(ft) == 0 then ffi.C.free(ft) end
+	if C.DGifCloseFile(ft) == 0 then ffi.C.free(ft) end
 end
 
 local function parse(datatype, data, size, handle) --callback-based parser
@@ -83,7 +83,7 @@ local function parse(datatype, data, size, handle) --callback-based parser
 			error(string.format('Unknown data source type %s', tostring(datatype)))
 		end
 		finally(function() close(ft) end)
-		check(gif.DGifSlurp(ft), ft)
+		check(C.DGifSlurp(ft), ft)
 		return handle(ft)
 	end)
 end
@@ -100,7 +100,7 @@ local function load_(datatype, data, size, accept, mode)
 
 			--find delay and transparent color index, if any
 			local delay, tcolor_idx
-			if gif.DGifSavedExtensionToGCB(ft, i, gcb) == 1 then
+			if C.DGifSavedExtensionToGCB(ft, i, gcb) == 1 then
 				delay = gcb.DelayTime * 10 --make it milliseconds
 				tcolor_idx = gcb.TransparentColor
 			end
@@ -160,8 +160,9 @@ local function load(t, opt)
 	end
 end
 
+if not ... then require'giflib_test' end
+
 return {
 	load = load,
-	lib = gif,
+	C = C,
 }
-

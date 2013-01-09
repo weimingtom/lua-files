@@ -7,31 +7,31 @@
 local glue = require'glue'
 local ffi = require'ffi'
 require'expat_h'
-local expat = ffi.load'expat'
+local C = ffi.load'expat'
 
 local cbsetters = {
-	'element',        expat.XML_SetElementDeclHandler,            'XML_ElementDeclHandler',
-	'attlist',        expat.XML_SetAttlistDeclHandler,            'XML_AttlistDeclHandler',
-	'xml',            expat.XML_SetXmlDeclHandler,                'XML_XmlDeclHandler',
-	'entity',         expat.XML_SetEntityDeclHandler,             'XML_EntityDeclHandler',
-	'start_tag',      expat.XML_SetStartElementHandler,           'XML_StartElementHandler',
-	'end_tag',        expat.XML_SetEndElementHandler,             'XML_EndElementHandler',
-	'cdata',          expat.XML_SetCharacterDataHandler,          'XML_CharacterDataHandler',
-	'pi',             expat.XML_SetProcessingInstructionHandler,  'XML_ProcessingInstructionHandler',
-	'comment',        expat.XML_SetCommentHandler,                'XML_CommentHandler',
-	'start_cdata',    expat.XML_SetStartCdataSectionHandler,      'XML_StartCdataSectionHandler',
-	'end_cdata',      expat.XML_SetEndCdataSectionHandler,        'XML_EndCdataSectionHandler',
-	'default',        expat.XML_SetDefaultHandler,                'XML_DefaultHandler',
-	'default_expand', expat.XML_SetDefaultHandlerExpand,          'XML_DefaultHandler',
-	'start_doctype',  expat.XML_SetStartDoctypeDeclHandler,       'XML_StartDoctypeDeclHandler',
-	'end_doctype',    expat.XML_SetEndDoctypeDeclHandler,         'XML_EndDoctypeDeclHandler',
-	'unparsed',       expat.XML_SetUnparsedEntityDeclHandler,     'XML_UnparsedEntityDeclHandler',
-	'notation',       expat.XML_SetNotationDeclHandler,           'XML_NotationDeclHandler',
-	'start_namespace',expat.XML_SetStartNamespaceDeclHandler,     'XML_StartNamespaceDeclHandler',
-	'end_namespace',  expat.XML_SetEndNamespaceDeclHandler,       'XML_EndNamespaceDeclHandler',
-	'not_standalone', expat.XML_SetNotStandaloneHandler,          'XML_NotStandaloneHandler',
-	'ref',            expat.XML_SetExternalEntityRefHandler,      'XML_ExternalEntityRefHandler',
-	'skipped',        expat.XML_SetSkippedEntityHandler,          'XML_SkippedEntityHandler',
+	'element',        C.XML_SetElementDeclHandler,            'XML_ElementDeclHandler',
+	'attlist',        C.XML_SetAttlistDeclHandler,            'XML_AttlistDeclHandler',
+	'xml',            C.XML_SetXmlDeclHandler,                'XML_XmlDeclHandler',
+	'entity',         C.XML_SetEntityDeclHandler,             'XML_EntityDeclHandler',
+	'start_tag',      C.XML_SetStartElementHandler,           'XML_StartElementHandler',
+	'end_tag',        C.XML_SetEndElementHandler,             'XML_EndElementHandler',
+	'cdata',          C.XML_SetCharacterDataHandler,          'XML_CharacterDataHandler',
+	'pi',             C.XML_SetProcessingInstructionHandler,  'XML_ProcessingInstructionHandler',
+	'comment',        C.XML_SetCommentHandler,                'XML_CommentHandler',
+	'start_cdata',    C.XML_SetStartCdataSectionHandler,      'XML_StartCdataSectionHandler',
+	'end_cdata',      C.XML_SetEndCdataSectionHandler,        'XML_EndCdataSectionHandler',
+	'default',        C.XML_SetDefaultHandler,                'XML_DefaultHandler',
+	'default_expand', C.XML_SetDefaultHandlerExpand,          'XML_DefaultHandler',
+	'start_doctype',  C.XML_SetStartDoctypeDeclHandler,       'XML_StartDoctypeDeclHandler',
+	'end_doctype',    C.XML_SetEndDoctypeDeclHandler,         'XML_EndDoctypeDeclHandler',
+	'unparsed',       C.XML_SetUnparsedEntityDeclHandler,     'XML_UnparsedEntityDeclHandler',
+	'notation',       C.XML_SetNotationDeclHandler,           'XML_NotationDeclHandler',
+	'start_namespace',C.XML_SetStartNamespaceDeclHandler,     'XML_StartNamespaceDeclHandler',
+	'end_namespace',  C.XML_SetEndNamespaceDeclHandler,       'XML_EndNamespaceDeclHandler',
+	'not_standalone', C.XML_SetNotStandaloneHandler,          'XML_NotStandaloneHandler',
+	'ref',            C.XML_SetExternalEntityRefHandler,      'XML_ExternalEntityRefHandler',
+	'skipped',        C.XML_SetSkippedEntityHandler,          'XML_SkippedEntityHandler',
 }
 
 local function decode_attrs(attrs) --char** {k1,v1,...,NULL}
@@ -104,8 +104,8 @@ function parse.read(read, callbacks)
 	glue.fcall(function(finally)
 		finally(free_callbacks)
 
-		local parser = expat.XML_ParserCreate(nil)
-		finally(function() expat.XML_ParserFree(parser) end)
+		local parser = C.XML_ParserCreate(nil)
+		finally(function() C.XML_ParserFree(parser) end)
 
 		for i=1,#cbsetters,3 do
 			local k, setter, cbtype = cbsetters[i], cbsetters[i+1], cbsetters[i+2]
@@ -114,17 +114,17 @@ function parse.read(read, callbacks)
 			end
 		end
 		if callbacks.unknown then
-			expat.XML_SetUnknownEncodingHandler(parser,
+			C.XML_SetUnknownEncodingHandler(parser,
 				cb('XML_UnknownEncodingHandler', callbacks.unknown, cbdecoders.unknown), nil)
 		end
 
 		repeat
 			local data, size, more = read()
-			if expat.XML_Parse(parser, data, size, more and 0 or 1) == 0 then
+			if C.XML_Parse(parser, data, size, more and 0 or 1) == 0 then
 				error(string.format('XML parser error at line %d, col %d: "%s"',
-						expat.XML_GetCurrentLineNumber(parser),
-						expat.XML_GetCurrentColumnNumber(parser),
-						ffi.string(expat.XML_ErrorString(expat.XML_GetErrorCode(parser)))))
+						C.XML_GetCurrentLineNumber(parser),
+						C.XML_GetCurrentColumnNumber(parser),
+						ffi.string(C.XML_ErrorString(C.XML_GetErrorCode(parser)))))
 			end
 		until not more
 	end)
@@ -223,5 +223,5 @@ return {
 	parse = parse_to_callbacks,
 	treeparse = parse_to_tree,
 	children = children,
-	lib = expat,
+	C = C,
 }

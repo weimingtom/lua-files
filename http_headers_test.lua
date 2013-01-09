@@ -1,12 +1,12 @@
 local hparse = require'http_parser'.headers
 local vparse = require'http_headers'.parse_values
 
-local function readlines(s)
-	return s:gmatch'(.-)\r?\n'
+local function readbuffer(s)
+	return {readline = s:gmatch'(.-)\r?\n'}
 end
 
 local function dump(s)
-	pp(vparse(hparse(readlines(s))))
+	pp(vparse(hparse(readbuffer(s))))
 end
 
 dump[[

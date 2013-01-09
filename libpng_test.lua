@@ -17,7 +17,7 @@ end
 local pp=require'pp'.pp
 local readfile=require'glue'.readfile
 
-for _,filename in ipairs(dir('media/png/*.png')) do
+for _,filename in ipairs(dir('media/png/pngsuite/*.png')) do
 	print(filename,'----------------------------')
 	local s = readfile(filename)
 	local cdata = ffi.new('unsigned char[?]', #s+1, s)

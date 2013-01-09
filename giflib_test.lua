@@ -9,7 +9,6 @@ local function dir(d)
 	return glue.collect(f:lines())
 end
 
-if not ... then
 local pp=require'pp'.pp
 local readfile=require'glue'.readfile
 for _,filename in ipairs(dir('media/gif/*.gif')) do
@@ -28,5 +27,4 @@ for _,filename in ipairs(dir('media/gif/*.gif')) do
 
 	pp(assert(giflib.load{cdata = cdata, size = #s}))
 	pp(assert(giflib.load{string = s}))
-end
 end

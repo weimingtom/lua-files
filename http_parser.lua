@@ -16,19 +16,19 @@ end
 
 --headers
 
-local function headers(readline)
+local function headers(reader)
 	local t = {}
-	local s = readline()
+	local s = reader:readline()
 	while s and s ~= '' do                           --headers end with an empty line
 		s = s:gsub('[\t ]+', ' ')                     --LWS -> one SP
 		local k,v = s:match'^([^:]+): ?(.-) ?$'       --name: SP? value SP?
 		k = glue.assert(k, 'malformed header %s', s)
 		k = k:gsub('%-','_'):lower()                  --Some-Header -> some_header
-		s = readline()
+		s = reader:readline()
 		while s and s:find'^[\t ]' do                 --values can span multiple lines
 			s = s:gsub('[\t ]+', ' ')                  --LWS -> one SP
 			v = v .. s:gsub(' $', '')                  --rtrim and concat
-			s = readline()
+			s = reader:readline()
 		end
 		t[k] = t[k] and t[k]..','..v or v             --combine duplicate headers
 	end
@@ -37,15 +37,15 @@ end
 
 --body
 
-local function body_chunks(readline, readchunks)
+local function body_chunks(reader)
 	return coroutine.wrap(function()
 		repeat
-			local size = tonumber(readline():match'^([^;])', 16)
+			local size = tonumber(reader:readline():match'^([^;])', 16)
 			assert(size, 'invalid chunk size')
-			for s in readchunks(size) do
+			for s in reader:readchunks(size) do
 				coroutine.yield(s)
 			end
-			readline()
+			reader:readline()
 		until size == 0
 	end)
 end
@@ -67,15 +67,15 @@ local function pipeline(source, encodings, decoders)
 	return source
 end
 
-local function body(readline, readchunks, readall, headers)
+local function body(reader, headers)
 	local decoders = glue.update({}, decoders)
-	decoders.chunked = body_chunks(readline, readchunks)
+	decoders.chunked = body_chunks(reader)
 	local source
 	local sz = tonumber(headers.content_length)
 	if sz then
-		source = readchunks(sz)
+		source = reader:readchunks(sz)
 	else
-		source = readall()
+		source = reader:readall()
 	end
 	local function parse_encodings(s)
 		return glue.collect(glue.gsplit(s, ' ?, ?'))

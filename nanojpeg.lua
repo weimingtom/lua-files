@@ -1,8 +1,9 @@
 --nanojpeg binding, see: http://keyj.emphy.de/nanojpeg/
 local ffi = require'ffi'
-local nj = ffi.load'nanojpeg'
 local glue = require'glue'
 local bmpconv = require'bmpconv'
+
+local C = ffi.load'nanojpeg'
 
 ffi.cdef[[
 typedef enum _nj_result {
@@ -26,28 +27,28 @@ void njDone(void);
 ]]
 
 local error_messages = {
-	[nj.NJ_NO_JPEG] = 'Not a JPEG file',
-	[nj.NJ_UNSUPPORTED] = 'Unsupported format',
-	[nj.NJ_OUT_OF_MEM] = 'Out of memory',
-	[nj.NJ_INTERNAL_ERR] = 'Internal error',
-	[nj.NJ_SYNTAX_ERROR] = 'Syntax error',
+	[C.NJ_NO_JPEG] = 'Not a JPEG file',
+	[C.NJ_UNSUPPORTED] = 'Unsupported format',
+	[C.NJ_OUT_OF_MEM] = 'Out of memory',
+	[C.NJ_INTERNAL_ERR] = 'Internal error',
+	[C.NJ_SYNTAX_ERROR] = 'Syntax error',
 }
 
 local function load_(data, sz, accept)
 	return glue.fcall(function(finally)
-		nj.njInit()
-		finally(nj.njDone)
+		C.njInit()
+		finally(C.njDone)
 
-		local res = nj.njDecode(data, sz)
-		if res ~= nj.NJ_OK then
+		local res = C.njDecode(data, sz)
+		if res ~= C.NJ_OK then
 			error(error_messages[res])
 		end
 
-		local data = nj.njGetImage() --pointer to RGB888[] or G8[]
-		local sz = nj.njGetImageSize()
-		local w = nj.njGetWidth()
-		local h = nj.njGetHeight()
-		local iscolor = nj.njIsColor() == 1
+		local data = C.njGetImage() --pointer to RGB888[] or G8[]
+		local sz = C.njGetImageSize()
+		local w = C.njGetWidth()
+		local h = C.njGetHeight()
+		local iscolor = C.njIsColor() == 1
 		local pixel_format = iscolor and 'rgb' or 'g'
 		local rowsize = w * (iscolor and 3 or 1)
 		local format = {pixel = pixel_format, rows = 'top_down', rowsize = rowsize}
@@ -76,8 +77,10 @@ local function load(t, opt)
 	end
 end
 
+if not ... then require'nanojpeg_test' end
+
 return {
 	load = load,
-	lib = nj,
+	C = C,
 }
 

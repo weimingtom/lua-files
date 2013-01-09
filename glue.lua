@@ -156,15 +156,18 @@ function glue.string.ends(s,suffix)
 end
 
 function glue.string.fromhex(s)
-    return (s:gsub('..', function(cc)
-        return string.char(tonumber(cc, 16))
-    end))
+	return (s:gsub('..', function(cc)
+	  return string.char(tonumber(cc, 16))
+	end))
 end
 
 function glue.string.tohex(s)
-	 return (s:gsub('.', function(c)
-        return string.format('%02x', string.byte(c))
-    end))
+	if type(s) == 'number' then
+		return string.format('%08.8x', s)
+	end
+	return (s:gsub('.', function(c)
+	  return string.format('%02x', string.byte(c))
+	end))
 end
 
 glue.update(glue, glue.string)

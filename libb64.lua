@@ -1,6 +1,6 @@
 --libb64 ffi binding
 local ffi = require'ffi'
-local b64 = ffi.load'b64'
+local C = ffi.load'b64'
 
 ffi.cdef[[
 typedef struct
@@ -29,9 +29,9 @@ int base64_encode_blockend(char* code_out, base64_encodestate* state_in);
 local function decode_cdata(data, size, buf, state_in)
 	if size == 0 then return '' end
 	state_in = state_in or ffi.new'base64_decodestate'
-	b64.base64_init_decodestate(state_in)
+	C.base64_init_decodestate(state_in)
 	buf = buf or ffi.new('uint8_t[?]', math.floor(size * 3 / 4))
-	local sz = b64.base64_decode_block(data, size, buf, state_in)
+	local sz = C.base64_decode_block(data, size, buf, state_in)
 	return buf, sz
 end
 
@@ -42,10 +42,10 @@ end
 local function encode_cdata(data, size, buf, state_in)
 	if size == 0 then return '' end
 	state_in = state_in or ffi.new'base64_encodestate'
-	b64.base64_init_encodestate(state_in)
+	C.base64_init_encodestate(state_in)
 	buf = buf or ffi.new('uint8_t[?]', size * 2)
-	local sz = b64.base64_encode_block(data, size, buf, state_in)
-	sz = sz + b64.base64_encode_blockend(buf + sz, state_in)
+	local sz = C.base64_encode_block(data, size, buf, state_in)
+	sz = sz + C.base64_encode_blockend(buf + sz, state_in)
 	buf[sz-1] = 0 --replace \n
 	return buf, sz-1
 end
@@ -61,5 +61,5 @@ return {
 	encode_cdata = encode_cdata,
 	decode_string = decode_string,
 	encode_string = encode_string,
-	lib = b64,
+	C = C,
 }

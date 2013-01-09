@@ -1,6 +1,6 @@
 --md5 hash and digest
 local ffi = require "ffi"
-local lib = ffi.load'md5'
+local C = ffi.load'md5'
 
 ffi.cdef[[
 typedef struct {
@@ -18,18 +18,18 @@ void MD5_Final(unsigned char *result, MD5_CTX *ctx);
 local function digest()
 	local ctx = ffi.new'MD5_CTX'
 	local result = ffi.new'uint8_t[16]'
-	lib.MD5_Init(ctx)
+	C.MD5_Init(ctx)
 	return function(data, size)
 		if data then
 			if type(data) == 'string' then
-				lib.MD5_Update(ctx,
+				C.MD5_Update(ctx,
 					ffi.cast('void*', data),
 					math.min(size or #data, #data))
 			else
-				lib.MD5_Update(ctx, data, size)
+				C.MD5_Update(ctx, data, size)
 			end
 		else
-			lib.MD5_Final(result, ctx)
+			C.MD5_Final(result, ctx)
 			return ffi.string(result, 16)
 		end
 	end
@@ -44,6 +44,6 @@ if not ... then require'md5_test' end
 return {
 	digest = digest,
 	sum = sum,
-	lib = lib,
+	C = C,
 }
 
