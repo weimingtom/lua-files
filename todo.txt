@@ -1,5 +1,15 @@
+todo
+----
 - readbuffer
--
+- turbojpeg
+
+uncharted
+---------
+- event polling libraries
+- curl?
+- date/time?
+- re2 / lrexlib?
+- lpack/vstruct?
 
 http
 ----
@@ -12,16 +22,17 @@ http
 	- keep-alive
 	- fast-cgi interface?
 
-uncharted
----------
-- event polling libraries
-- libjpeg-turbo
-
-
 quality
 -------
 - separate cdata and string APIs with consistent naming
 - unit testing for all input variations:
 	string, cdata, filename, file descriptor, file stream, read function
 - expat tests
+
+other
+-----
+- LuaProfiler
+- LuaUnit
+- LuaZip
+-
 

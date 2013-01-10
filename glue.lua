@@ -56,7 +56,7 @@ function glue.pluck(t,key)
 	return dt
 end
 
-function glue.sort(t,...)
+function glue.stringort(t,...)
 	table.sort(t,...)
 	return t
 end
@@ -81,7 +81,7 @@ function glue.max(t,cmp)
 	return n
 end
 
-function glue.sum(t,key)
+function glue.stringum(t,key)
 	local n=0
 	if key then
 		for i=1,#t do n=n+(t[i][key] or 0) end
