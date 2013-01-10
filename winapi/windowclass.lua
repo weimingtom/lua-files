@@ -51,7 +51,7 @@ Window = subclass({
 		background = COLOR_WINDOW,
 		cursor = LoadCursor(IDC_ARROW),
 		--window properties
-		titlw = 'Untitled',
+		title = 'Untitled',
 		x = CW_USEDEFAULT,
 		y = CW_USEDEFAULT,
 		w = CW_USEDEFAULT,
