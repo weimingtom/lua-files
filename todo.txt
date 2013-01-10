@@ -1,18 +1,27 @@
+- readbuffer
+-
 
-- important: blur, shadow, 2d projection, perspective projection, contrast, gamma, brightness, saturation, grayscale
+http
+----
+- http_headers tests
+- http gzip/deflate filters
+- http formatter
+- http client:
+	- keep-alive
+- http server:
+	- keep-alive
+	- fast-cgi interface?
 
-- bitmaps: vflip, hflip, crop, tile
-- downsampling: dithering, quantization, grayscale
-- projection:
-	- scale up/down (linear, bilinear, bicubic, spline, lanczos), rotate (wrap, smooth), stretch, skew
-	- perspective
-- distortions: mesh-based warp (envelope tool, lens), wave, twist, shake, ripple
-- effects: blur (split, gaussian), sharpen, antialias, solorize, posterize, emboss
-- blending: porter-duff modes
-- color: brightness, contrast, gamma, hue, stauration, invert
+uncharted
+---------
+- event polling libraries
+- libjpeg-turbo
 
-- antialiasing gamma adjustment at primitive level
-- rendering modes: full, solid, outline, wireframe
 
-rasterizer:
-- gradients: linear, radial, radial focus, conic, conic angle, diamond, xy, sqrt xy, contour, auto contour, gouraud shading
+quality
+-------
+- separate cdata and string APIs with consistent naming
+- unit testing for all input variations:
+	string, cdata, filename, file descriptor, file stream, read function
+- expat tests
+
