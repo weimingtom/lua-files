@@ -1,6 +1,6 @@
 local glue = require'glue'
 local ffi = require'ffi'
-require'libpng_h_15'
+require'libpng_h'
 local bmpconv = require'bmpconv'
 
 local C = ffi.load'png'
@@ -43,7 +43,7 @@ local function load_(datatype, data, size, accept)
 
 		--setup error handling
 		local error_cb = ffi.cast('png_error_ptr', function(png_ptr, err)
-			error(string.format('png error %s', ffi.string(err[0])))
+			error(string.format('libpng error %s', ffi.string(err[0])))
 		end)
 		finally(function() error_cb:free() end)
 		C.png_set_error_fn(png_ptr, nil, error_cb, nil)

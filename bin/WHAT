@@ -1,1 +1,31 @@
-jpeg.dll	libjpeg-turbo 1.2.1-for-gcc
+b64.dll         csrc/libb64
+cairo.dll       ufo (opengl, pixman)
+bz2.dll         ufo
+cjson.dll       csrc/lua-cjson
+clipper.dll     csrc/clipper
+expat.dll       expat-2.1.0 (static multi-threaded build)
+freetype2.dll   ufo
+giflib5.dll     csrc/giflib
+glut32.dll      ???
+lanes/core.dll  csrc/lanes
+lfs.dll         csrc/lfs
+libAmanithVG.dllamanithvg 4.0.0.679-eval
+amanithvg.ini   amanithvg 4.0.0.679-eval
+libEGL.dll      ufo
+libGLESv2.dll   ufo
+libjpeg-62.dll  libjpeg-turbo 1.2.1-for-gcc
+lpeg.dll        csrc/lpeg
+lua51.dll       ufo
+md5.dll         csrc/md5
+nanojpeg        csrc/nanojpeg
+pixman          ufo
+png.dll         ufo
+regal.dll       ufo
+sha2.dll        csrc/sha2
+socket_core.dll csrc/luasocket
+turbojpeg.dll   csrc/turbojpeg
+vararg.dll      csrc/vararg
+z.dll           ufo
+zlib.dll        csrc/zlib
+luajit.exe      ufo
+luajit.exe.manifest (for winapi: enable comctl 6)

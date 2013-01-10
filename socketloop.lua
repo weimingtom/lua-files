@@ -1,6 +1,8 @@
 local socket = require'socket'
 local glue = require'glue'
 
+if not ... then require'socketloop_test' end
+
 return function()
 	local loop = {}
 	local read, write = {}, {} --{skt: thread}

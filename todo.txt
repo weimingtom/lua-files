@@ -1,15 +1,24 @@
 todo
 ----
-- readbuffer
 - turbojpeg
+- readbuffer
+- clipper
+- openvg
 
 uncharted
 ---------
+- bzip2
+- an image library:
+	- IM: http://www.tecgraf.puc-rio.br/im/
+	- OpenCV, DevIL etc.
 - event polling libraries
-- curl?
-- date/time?
-- re2 / lrexlib?
-- lpack/vstruct?
+- curl? http://luacurl.luaforge.net/
+- date/time? (see _todo/date)
+- re2 ?
+- lrexlib http://math2.org/luasearch/rex.html ?
+- .NET - luainterface: http://code.google.com/p/luainterface/
+- wxlua again? http://wxlua.sourceforge.net/screenshots.php
+- CLucene
 
 http
 ----
@@ -20,7 +29,7 @@ http
 	- keep-alive
 - http server:
 	- keep-alive
-	- fast-cgi interface?
+	- FastCGI interface?
 
 quality
 -------
@@ -32,7 +41,7 @@ quality
 other
 -----
 - LuaProfiler
-- LuaUnit
-- LuaZip
+- LuaUnit https://github.com/luaforge/luaunit
+- LuaZip (uses zzip which is GPL)
 -
 

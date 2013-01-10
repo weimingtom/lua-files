@@ -1,23 +1,23 @@
---stolen from: https://raw.github.com/malkia/ufo/master/ffi/expat.lua
+--result of cpp expat.h from expat 2.1.0
 local ffi = require'ffi'
 
 ffi.cdef[[
+typedef char XML_Char;
+typedef char XML_LChar;
+typedef long XML_Index;
+typedef unsigned long XML_Size;
+typedef unsigned char XML_Bool;
+
 struct XML_ParserStruct;
 typedef struct XML_ParserStruct *XML_Parser;
 
-enum {
-  XML_MAJOR_VERSION = 2,
-  XML_MINOR_VERSION = 0,
-  XML_MICRO_VERSION = 1
+enum XML_Status {
+  XML_STATUS_ERROR = 0,
+  XML_STATUS_OK = 1,
+  XML_STATUS_SUSPENDED = 2
 };
 
-typedef enum XML_Status {
-  XML_STATUS_ERROR     = 0,
-  XML_STATUS_OK        = 1,
-  XML_STATUS_SUSPENDED = 2,
-} XML_Status;
-
-typedef enum XML_Error {
+enum XML_Error {
   XML_ERROR_NONE,
   XML_ERROR_NO_MEMORY,
   XML_ERROR_SYNTAX,
@@ -59,33 +59,237 @@ typedef enum XML_Error {
   XML_ERROR_RESERVED_PREFIX_XML,
   XML_ERROR_RESERVED_PREFIX_XMLNS,
   XML_ERROR_RESERVED_NAMESPACE_URI
-} XML_Error;
+};
 
-typedef enum XML_Content_Type {
+enum XML_Content_Type {
   XML_CTYPE_EMPTY = 1,
   XML_CTYPE_ANY,
   XML_CTYPE_MIXED,
   XML_CTYPE_NAME,
   XML_CTYPE_CHOICE,
   XML_CTYPE_SEQ
-} XML_Content_Type;
+};
 
-typedef enum XML_Content_Quant {
+enum XML_Content_Quant {
   XML_CQUANT_NONE,
   XML_CQUANT_OPT,
   XML_CQUANT_REP,
   XML_CQUANT_PLUS
-} XML_Content_Quant;
+};
 
-typedef enum XML_Parsing{
+typedef struct XML_cp XML_Content;
+
+struct XML_cp {
+  enum XML_Content_Type type;
+  enum XML_Content_Quant quant;
+  XML_Char * name;
+  unsigned int numchildren;
+  XML_Content * children;
+};
+
+typedef void (*XML_ElementDeclHandler) (void *userData, const XML_Char *name, XML_Content *model);
+
+void XML_SetElementDeclHandler(XML_Parser parser, XML_ElementDeclHandler eldecl);
+
+typedef void (*XML_AttlistDeclHandler) (
+                                    void *userData,
+                                    const XML_Char *elname,
+                                    const XML_Char *attname,
+                                    const XML_Char *att_type,
+                                    const XML_Char *dflt,
+                                    int isrequired);
+
+void XML_SetAttlistDeclHandler(XML_Parser parser, XML_AttlistDeclHandler attdecl);
+
+typedef void (*XML_XmlDeclHandler) (void *userData, const XML_Char *version, const XML_Char *encoding, int standalone);
+
+void XML_SetXmlDeclHandler(XML_Parser parser, XML_XmlDeclHandler xmldecl);
+
+typedef struct {
+  void *(*malloc_fcn)(size_t size);
+  void *(*realloc_fcn)(void *ptr, size_t size);
+  void (*free_fcn)(void *ptr);
+} XML_Memory_Handling_Suite;
+
+XML_Parser XML_ParserCreate(const XML_Char *encoding);
+XML_Parser XML_ParserCreateNS(const XML_Char *encoding, XML_Char namespaceSeparator);
+XML_Parser XML_ParserCreate_MM(const XML_Char *encoding, const XML_Memory_Handling_Suite *memsuite,
+											const XML_Char *namespaceSeparator);
+XML_Bool XML_ParserReset(XML_Parser parser, const XML_Char *encoding);
+
+typedef void (*XML_StartElementHandler) (void *userData, const XML_Char *name, const XML_Char **atts);
+
+typedef void (*XML_EndElementHandler) (void *userData, const XML_Char *name);
+
+typedef void (*XML_CharacterDataHandler) (void *userData, const XML_Char *s, int len);
+
+typedef void (*XML_ProcessingInstructionHandler) (void *userData, const XML_Char *target, const XML_Char *data);
+
+typedef void (*XML_CommentHandler) (void *userData, const XML_Char *data);
+
+typedef void (*XML_StartCdataSectionHandler) (void *userData);
+
+typedef void (*XML_EndCdataSectionHandler) (void *userData);
+
+typedef void (*XML_DefaultHandler) (void *userData, const XML_Char *s, int len);
+
+typedef void (*XML_StartDoctypeDeclHandler) (
+                                            void *userData,
+                                            const XML_Char *doctypeName,
+                                            const XML_Char *sysid,
+                                            const XML_Char *pubid,
+                                            int has_internal_subset);
+
+typedef void (*XML_EndDoctypeDeclHandler)(void *userData);
+
+typedef void (*XML_EntityDeclHandler) (
+                              void *userData,
+                              const XML_Char *entityName,
+                              int is_parameter_entity,
+                              const XML_Char *value,
+                              int value_length,
+                              const XML_Char *base,
+                              const XML_Char *systemId,
+                              const XML_Char *publicId,
+                              const XML_Char *notationName);
+
+void XML_SetEntityDeclHandler(XML_Parser parser, XML_EntityDeclHandler handler);
+
+typedef void (*XML_UnparsedEntityDeclHandler) (
+                                    void *userData,
+                                    const XML_Char *entityName,
+                                    const XML_Char *base,
+                                    const XML_Char *systemId,
+                                    const XML_Char *publicId,
+                                    const XML_Char *notationName);
+
+typedef void (*XML_NotationDeclHandler) (
+                                    void *userData,
+                                    const XML_Char *notationName,
+                                    const XML_Char *base,
+                                    const XML_Char *systemId,
+                                    const XML_Char *publicId);
+
+typedef void (*XML_StartNamespaceDeclHandler) (
+                                    void *userData,
+                                    const XML_Char *prefix,
+                                    const XML_Char *uri);
+
+typedef void (*XML_EndNamespaceDeclHandler) (
+                                    void *userData,
+                                    const XML_Char *prefix);
+
+typedef int (*XML_NotStandaloneHandler) (void *userData);
+
+typedef int (*XML_ExternalEntityRefHandler) (
+                                    XML_Parser parser,
+                                    const XML_Char *context,
+                                    const XML_Char *base,
+                                    const XML_Char *systemId,
+                                    const XML_Char *publicId);
+
+typedef void (*XML_SkippedEntityHandler) (
+                                    void *userData,
+                                    const XML_Char *entityName,
+                                    int is_parameter_entity);
+
+typedef struct {
+  int map[256];
+  void *data;
+  int (*convert)(void *data, const char *s);
+  void (*release)(void *data);
+} XML_Encoding;
+
+typedef int (*XML_UnknownEncodingHandler) (void *encodingHandlerData, const XML_Char *name, XML_Encoding *info);
+
+void XML_SetElementHandler(XML_Parser parser, XML_StartElementHandler start, XML_EndElementHandler end);
+void XML_SetStartElementHandler(XML_Parser parser, XML_StartElementHandler handler);
+void XML_SetEndElementHandler(XML_Parser parser, XML_EndElementHandler handler);
+void XML_SetCharacterDataHandler(XML_Parser parser, XML_CharacterDataHandler handler);
+void XML_SetProcessingInstructionHandler(XML_Parser parser, XML_ProcessingInstructionHandler handler);
+void XML_SetCommentHandler(XML_Parser parser, XML_CommentHandler handler);
+void XML_SetCdataSectionHandler(XML_Parser parser, XML_StartCdataSectionHandler start, XML_EndCdataSectionHandler end);
+void XML_SetStartCdataSectionHandler(XML_Parser parser, XML_StartCdataSectionHandler start);
+void XML_SetEndCdataSectionHandler(XML_Parser parser, XML_EndCdataSectionHandler end);
+void XML_SetDefaultHandler(XML_Parser parser, XML_DefaultHandler handler);
+void XML_SetDefaultHandlerExpand(XML_Parser parser, XML_DefaultHandler handler);
+void XML_SetDoctypeDeclHandler(XML_Parser parser, XML_StartDoctypeDeclHandler start, XML_EndDoctypeDeclHandler end);
+void XML_SetStartDoctypeDeclHandler(XML_Parser parser, XML_StartDoctypeDeclHandler start);
+void XML_SetEndDoctypeDeclHandler(XML_Parser parser, XML_EndDoctypeDeclHandler end);
+void XML_SetUnparsedEntityDeclHandler(XML_Parser parser, XML_UnparsedEntityDeclHandler handler);
+void XML_SetNotationDeclHandler(XML_Parser parser, XML_NotationDeclHandler handler);
+void XML_SetNamespaceDeclHandler(XML_Parser parser, XML_StartNamespaceDeclHandler start, XML_EndNamespaceDeclHandler end);
+void XML_SetStartNamespaceDeclHandler(XML_Parser parser, XML_StartNamespaceDeclHandler start);
+void XML_SetEndNamespaceDeclHandler(XML_Parser parser, XML_EndNamespaceDeclHandler end);
+void XML_SetNotStandaloneHandler(XML_Parser parser, XML_NotStandaloneHandler handler);
+void XML_SetExternalEntityRefHandler(XML_Parser parser, XML_ExternalEntityRefHandler handler);
+void XML_SetExternalEntityRefHandlerArg(XML_Parser parser, void *arg);
+void XML_SetSkippedEntityHandler(XML_Parser parser, XML_SkippedEntityHandler handler);
+void XML_SetUnknownEncodingHandler(XML_Parser parser, XML_UnknownEncodingHandler handler, void *encodingHandlerData);
+void XML_DefaultCurrent(XML_Parser parser);
+void XML_SetReturnNSTriplet(XML_Parser parser, int do_nst);
+void XML_SetUserData(XML_Parser parser, void *userData);
+enum XML_Status XML_SetEncoding(XML_Parser parser, const XML_Char *encoding);
+void XML_UseParserAsHandlerArg(XML_Parser parser);
+enum XML_Error XML_UseForeignDTD(XML_Parser parser, XML_Bool useDTD);
+enum XML_Status XML_SetBase(XML_Parser parser, const XML_Char *base);
+const XML_Char * XML_GetBase(XML_Parser parser);
+int XML_GetSpecifiedAttributeCount(XML_Parser parser);
+int XML_GetIdAttributeIndex(XML_Parser parser);
+enum XML_Status XML_Parse(XML_Parser parser, const char *s, int len, int isFinal);
+void* XML_GetBuffer(XML_Parser parser, int len);
+enum XML_Status XML_ParseBuffer(XML_Parser parser, int len, int isFinal);
+enum XML_Status XML_StopParser(XML_Parser parser, XML_Bool resumable);
+enum XML_Status XML_ResumeParser(XML_Parser parser);
+
+enum XML_Parsing {
   XML_INITIALIZED,
   XML_PARSING,
   XML_FINISHED,
   XML_SUSPENDED
-} XML_Parsing;
+};
 
-typedef enum XML_FeatureEnum {
-  XML_FEATURE_END,
+typedef struct {
+  enum XML_Parsing parsing;
+  XML_Bool finalBuffer;
+} XML_ParsingStatus;
+
+void XML_GetParsingStatus(XML_Parser parser, XML_ParsingStatus *status);
+
+XML_Parser XML_ExternalEntityParserCreate(XML_Parser parser, const XML_Char *context, const XML_Char *encoding);
+
+enum XML_ParamEntityParsing {
+  XML_PARAM_ENTITY_PARSING_NEVER,
+  XML_PARAM_ENTITY_PARSING_UNLESS_STANDALONE,
+  XML_PARAM_ENTITY_PARSING_ALWAYS
+};
+
+int XML_SetParamEntityParsing(XML_Parser parser, enum XML_ParamEntityParsing parsing);
+int XML_SetHashSalt(XML_Parser parser, unsigned long hash_salt);
+enum XML_Error XML_GetErrorCode(XML_Parser parser);
+XML_Size XML_GetCurrentLineNumber(XML_Parser parser);
+XML_Size XML_GetCurrentColumnNumber(XML_Parser parser);
+XML_Index XML_GetCurrentByteIndex(XML_Parser parser);
+int XML_GetCurrentByteCount(XML_Parser parser);
+const char * XML_GetInputContext(XML_Parser parser, int *offset, int *size);
+void XML_FreeContentModel(XML_Parser parser, XML_Content *model);
+void * XML_MemMalloc(XML_Parser parser, size_t size);
+void * XML_MemRealloc(XML_Parser parser, void *ptr, size_t size);
+void XML_MemFree(XML_Parser parser, void *ptr);
+void XML_ParserFree(XML_Parser parser);
+const XML_LChar* XML_ErrorString(enum XML_Error code);
+const XML_LChar* XML_ExpatVersion(void);
+
+typedef struct {
+  int major;
+  int minor;
+  int micro;
+} XML_Expat_Version;
+
+XML_Expat_Version XML_ExpatVersionInfo(void);
+
+enum XML_FeatureEnum {
+  XML_FEATURE_END = 0,
   XML_FEATURE_UNICODE,
   XML_FEATURE_UNICODE_WCHAR_T,
   XML_FEATURE_DTD,
@@ -94,142 +298,16 @@ typedef enum XML_FeatureEnum {
   XML_FEATURE_SIZEOF_XML_CHAR,
   XML_FEATURE_SIZEOF_XML_LCHAR,
   XML_FEATURE_NS,
-  XML_FEATURE_LARGE_SIZE
-} XML_FeatureEnum;
-
-typedef enum {
-  XML_PARAM_ENTITY_PARSING_NEVER,
-  XML_PARAM_ENTITY_PARSING_UNLESS_STANDALONE,
-  XML_PARAM_ENTITY_PARSING_ALWAYS
-} XML_ParamEntityParsing;
-
-typedef struct XML_Memory_Handling_Suite {
-  void *(*malloc_fcn)(size_t size);
-  void *(*realloc_fcn)(void *ptr, size_t size);
-  void (*free_fcn)(void *ptr);
-} XML_Memory_Handling_Suite;
-
-typedef struct XML_Content {
-  XML_Content_Type    type;
-  XML_Content_Quant   quant;
-  char*               name;
-  unsigned int        numchildren;
-  struct XML_Content* children;
-} XML_Content;
-
-typedef struct XML_Encoding {
-  int     map[ 256 ];
-  void*   data;
-  int  (* convert )( void *data, const char *s );
-  void (* release )( void *data );
-} XML_Encoding;
-
-typedef struct XML_ParsingStatus {
-  XML_Parsing   parsing;
-  unsigned char finalBuffer;
-} XML_ParsingStatus;
-
-typedef struct XML_Expat_Version {
-  int major;
-  int minor;
-  int micro;
-} XML_Expat_Version;
+  XML_FEATURE_LARGE_SIZE,
+  XML_FEATURE_ATTR_INFO
+};
 
 typedef struct {
   enum XML_FeatureEnum feature;
-  const char*          name;
-  long int             value;
+  const XML_LChar *name;
+  long int value;
 } XML_Feature;
 
-typedef void    (* XML_ElementDeclHandler            )( void *udata, const char* name, XML_Content *model);
-typedef void    (* XML_AttlistDeclHandler            )( void *udata, const char* elname, const char  *attname, const char  *att_type, const char  *dflt, int isrequired );
-typedef void    (* XML_XmlDeclHandler                )( void *udata, const char* version, const char *encoding, int standalone );
-typedef void    (* XML_StartElementHandler           )( void *udata, const char* name, const char **atts);
-typedef void    (* XML_EndElementHandler             )( void *udata, const char* name);
-typedef void    (* XML_CharacterDataHandler          )( void *udata, const char* s, int len );
-typedef void    (* XML_ProcessingInstructionHandler  )( void *udata, const char* target, const char *data );
-typedef void    (* XML_CommentHandler                )( void *udata, const char* data );
-typedef void    (* XML_StartCdataSectionHandler      )( void *udata  );
-typedef void    (* XML_EndCdataSectionHandler        )( void *udata  );
-typedef void    (* XML_DefaultHandler                )( void *udata, const char *s,      int len);
-typedef void    (* XML_StartDoctypeDeclHandler       )( void *udata, const char *doctypeName, const char *sysid, const char *pubid, int has_internal_subset );
-typedef void    (* XML_EndDoctypeDeclHandler         )( void *udata  );
-typedef void    (* XML_EntityDeclHandler             )( void *udata, const char *entName, int is_param_entity, const char *val, int val_len, const char *base, const char *sysId, const char *pubId, const char *notationName);
-typedef void    (* XML_UnparsedEntityDeclHandler     )( void *udata, const char *entityName, const char *base, const char *systemId, const char *publicId, const char *notationName );
-typedef void    (* XML_NotationDeclHandler           )( void *udata, const char *notationName, const char *base, const char *systemId, const char *publicId);
-typedef void    (* XML_StartNamespaceDeclHandler     )( void *udata, const char *prefix, const char *uri );
-typedef void    (* XML_EndNamespaceDeclHandler       )( void *udata, const char *prefix);
-typedef int     (* XML_NotStandaloneHandler          )( void *udata  );
-typedef void    (* XML_SkippedEntityHandler          )( void *udata, const char *entityName, int is_parameter_entity );
-typedef int     (* XML_UnknownEncodingHandler        )( void *encodingHandlerData, const char *name, XML_Encoding *info );
-typedef int     (* XML_ExternalEntityRefHandler      )( XML_Parser, const char *context, const char *base, const char *systemId, const char *publicId );
-
-XML_Parser         XML_ParserCreate(                    const char *encoding);
-XML_Parser         XML_ParserCreateNS(                  const char *encoding, char namespaceSeparator );
-XML_Parser         XML_ParserCreate_MM(                 const char *encoding, const XML_Memory_Handling_Suite*, const char* namespaceSeparator );
-
-unsigned char      XML_ParserReset(                     XML_Parser, const char *encoding );
-
-void               XML_SetElementDeclHandler(           XML_Parser, XML_ElementDeclHandler );
-void               XML_SetAttlistDeclHandler(           XML_Parser, XML_AttlistDeclHandler );
-void               XML_SetXmlDeclHandler(               XML_Parser, XML_XmlDeclHandler );
-void               XML_SetEntityDeclHandler(            XML_Parser, XML_EntityDeclHandler );
-void               XML_SetElementHandler(               XML_Parser, XML_StartElementHandler, XML_EndElementHandler );
-void               XML_SetStartElementHandler(          XML_Parser, XML_StartElementHandler );
-void               XML_SetEndElementHandler(            XML_Parser, XML_EndElementHandler );
-void               XML_SetCharacterDataHandler(         XML_Parser, XML_CharacterDataHandler );
-void               XML_SetProcessingInstructionHandler( XML_Parser, XML_ProcessingInstructionHandler );
-void               XML_SetCommentHandler(               XML_Parser, XML_CommentHandler );
-void               XML_SetCdataSectionHandler(          XML_Parser, XML_StartCdataSectionHandler, XML_EndCdataSectionHandler end);
-void               XML_SetStartCdataSectionHandler(     XML_Parser, XML_StartCdataSectionHandler );
-void               XML_SetEndCdataSectionHandler(       XML_Parser, XML_EndCdataSectionHandler );
-void               XML_SetDefaultHandler(               XML_Parser, XML_DefaultHandler );
-void               XML_SetDefaultHandlerExpand(         XML_Parser, XML_DefaultHandler );
-void               XML_SetDoctypeDeclHandler(           XML_Parser, XML_StartDoctypeDeclHandler, XML_EndDoctypeDeclHandler end);
-void               XML_SetStartDoctypeDeclHandler(      XML_Parser, XML_StartDoctypeDeclHandler );
-void               XML_SetEndDoctypeDeclHandler(        XML_Parser, XML_EndDoctypeDeclHandler );
-void               XML_SetUnparsedEntityDeclHandler(    XML_Parser, XML_UnparsedEntityDeclHandler handler);
-void               XML_SetNotationDeclHandler(          XML_Parser, XML_NotationDeclHandler );
-void               XML_SetNamespaceDeclHandler(         XML_Parser, XML_StartNamespaceDeclHandler, XML_EndNamespaceDeclHandler );
-void               XML_SetStartNamespaceDeclHandler(    XML_Parser, XML_StartNamespaceDeclHandler );
-void               XML_SetEndNamespaceDeclHandler(      XML_Parser, XML_EndNamespaceDeclHandler );
-void               XML_SetNotStandaloneHandler(         XML_Parser, XML_NotStandaloneHandler );
-void               XML_SetExternalEntityRefHandler(     XML_Parser, XML_ExternalEntityRefHandler );
-void               XML_SetExternalEntityRefHandlerArg(  XML_Parser, void *arg );
-void               XML_SetSkippedEntityHandler(         XML_Parser, XML_SkippedEntityHandler );
-void               XML_SetUnknownEncodingHandler(       XML_Parser, XML_UnknownEncodingHandler, void *data );
-void               XML_SetUserData(                     XML_Parser, void *userData );
-XML_Status         XML_SetEncoding(                     XML_Parser, const char *encoding );
-XML_Status         XML_SetBase(                         XML_Parser, const char *base );
-const char*        XML_GetBase(                         XML_Parser  );
-
-void               XML_DefaultCurrent(                  XML_Parser  );
-void               XML_SetReturnNSTriplet(              XML_Parser, int do_nst );
-void               XML_UseParserAsHandlerArg(           XML_Parser  );
-XML_Error          XML_UseForeignDTD(                   XML_Parser, unsigned char useDTD );
-int                XML_GetSpecifiedAttributeCount(      XML_Parser  );
-int                XML_GetIdAttributeIndex(             XML_Parser  );
-XML_Status         XML_Parse(                           XML_Parser, const char *s, int len, int isFinal );
-void*              XML_GetBuffer(                       XML_Parser, int len  );
-XML_Status         XML_ParseBuffer(                     XML_Parser, int len, int isFinal    );
-XML_Status         XML_StopParser(                      XML_Parser, unsigned char resumable );
-XML_Status         XML_ResumeParser(                    XML_Parser  );
-void               XML_GetParsingStatus(                XML_Parser, XML_ParsingStatus *status);
-XML_Parser         XML_ExternalEntityParserCreate(      XML_Parser, const char *context, const char *encoding );
-int                XML_SetParamEntityParsing(           XML_Parser, XML_ParamEntityParsing );
-XML_Error          XML_GetErrorCode(                    XML_Parser  );
-int                XML_GetCurrentLineNumber(            XML_Parser  );
-int                XML_GetCurrentColumnNumber(          XML_Parser  );
-long               XML_GetCurrentByteIndex(             XML_Parser  );
-int                XML_GetCurrentByteCount(             XML_Parser  );
-const char*        XML_GetInputContext(                 XML_Parser, int *offset, int *size );
-void               XML_FreeContentModel(                XML_Parser, XML_Content *model );
-void*              XML_MemMalloc(                       XML_Parser, size_t size );
-void*              XML_MemRealloc(                      XML_Parser, void *ptr, size_t size );
-void               XML_MemFree(                         XML_Parser, void *ptr );
-void               XML_ParserFree(                      XML_Parser );
-const char*        XML_ErrorString(                     XML_Error );
-const char*        XML_ExpatVersion(                    );
-XML_Expat_Version  XML_ExpatVersionInfo(                );
-const XML_Feature* XML_GetFeatureList(                  );
+const XML_Feature* XML_GetFeatureList(void);
 ]]
+

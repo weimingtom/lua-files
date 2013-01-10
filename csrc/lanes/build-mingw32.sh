@@ -1,1 +1,2 @@
-gcc *.c -o ../../bin/lanes_core.dll -shared -llua51 -L../../bin -I. -I../lua -O2 -DNDEBUG
+mkdir -p ../../bin/lanes
+gcc *.c -o ../../bin/lanes/core.dll -shared -llua51 -L../../bin -I. -I../lua -O2 -DNDEBUG

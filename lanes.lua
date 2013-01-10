@@ -113,7 +113,7 @@ lanes.configure = function( _params)
 
 	_params = params_checker( _params)
 
-	local core = require "lanes_core"
+	local core = require "lanes.core"
 	assert( type( core)=="table")
 
 	-- configure() is available only the first time lanes.core is required process-wide, and we *must* call it to have the other functions in the interface

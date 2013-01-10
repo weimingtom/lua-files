@@ -1,3 +1,4 @@
+--giflib.h from giflib 5.0
 local ffi = require'ffi'
 
 ffi.cdef[[

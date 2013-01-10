@@ -219,6 +219,8 @@ local function children(t,tag) --iterate a node's children of a specific tag
 	end
 end
 
+if not ... then require'expat_test' end
+
 return {
 	parse = parse_to_callbacks,
 	treeparse = parse_to_tree,
