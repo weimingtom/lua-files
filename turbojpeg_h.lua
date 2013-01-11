@@ -153,10 +153,5 @@ local tjMCUHeight = {8, 8, 16, 8, 16}
 local tjRedOffset = {0, 2, 0, 2, 3, 1, 0, 0, 2, 3, 1}
 local tjGreenOffset = {1, 1, 1, 1, 2, 2, 0, 1, 1, 2, 2}
 local tjBlueOffset = {2, 0, 2, 0, 1, 3, 0, 2, 0, 1, 3}
-local tjPixelSize = {3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4}
 
-local function TJPAD(width) return bit.band(width+3,bit.bnot(3)) end
-local function TJSCALED(dimension, scalingFactor)
-	return (dimension + scalingFactor.denom - 1) / scalingFactor.denom
-end
 ]]

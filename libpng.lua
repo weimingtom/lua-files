@@ -1,7 +1,7 @@
-local glue = require'glue'
 local ffi = require'ffi'
-require'libpng_h'
+local glue = require'glue'
 local bmpconv = require'bmpconv'
+require'libpng_h'
 
 local C = ffi.load'png'
 
