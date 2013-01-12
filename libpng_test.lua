@@ -20,7 +20,7 @@ for _,filename in ipairs(dir('media/png/pngsuite/*.png')) do
 	for _,row_format in ipairs{'top_down', 'bottom_up'} do
 		for _,padded in ipairs{true, false} do
 			for _,pixel_format in ipairs{'g', 'ga', 'ag', 'rgb', 'bgr', 'rgba', 'argb', 'bgra', 'abgr'} do
-				if pixel_format == 'g' and row_format == 'top_down' and not padded then
+				if true or pixel_format == 'g' and row_format == 'top_down' and not padded then
 					print('>', pixel_format, row_format, padded)
 					pp(libpng.load(
 							{string = readfile(filename)},

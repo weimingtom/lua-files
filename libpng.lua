@@ -35,7 +35,7 @@ local pixel_formats = {
 	[C.PNG_COLOR_TYPE_GRAY_ALPHA] = 'ga',
 }
 
-local function load_(datatype, data, size, accept)
+local function load_(datatype, data, size, opt)
 	return glue.fcall(function(finally)
 
 		--create the state objects
@@ -102,178 +102,175 @@ local function load_(datatype, data, size, accept)
 		local pixel_format = assert(pixel_formats[color_type])
 		local dest_pixel_format = pixel_format
 
-		--request more conversions depending on pixel_format and the accept table
-		if accept then
-			local function strip_alpha(png_ptr)
-				local my_background = ffi.new('png_color_16', 0, 0xff, 0xff, 0xff, 0xff)
-				local image_background = ffi.new'png_color_16'
-				local image_background_p = ffi.new('png_color_16p[1]', image_background)
-				if C.png_get_bKGD(png_ptr, info_ptr, image_background_p) then
-					C.png_set_background(png_ptr, image_background, C.PNG_BACKGROUND_GAMMA_FILE, 1, 1.0)
-				else
-					C.png_set_background(png_ptr, my_background, PNG_BACKGROUND_GAMMA_SCREEN, 0, 1.0)
-				end
-			end
-			local function set_alpha(png_ptr)
-				C.png_set_alpha_mode(png_ptr, C.PNG_ALPHA_OPTIMIZED, 2.2) --> premultiply alpha
-			end
-			if pixel_format == 'g' then
-				if accept.g then
-					--we're good
-				elseif accept.ga then
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'ga'
-				elseif accept.ag then
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'ag'
-				elseif accept.rgb then
-					C.png_set_gray_to_rgb(png_ptr)
-					dest_pixel_format = 'rgb'
-				elseif accept.bgr then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_bgr(png_ptr)
-					dest_pixel_format = 'bgr'
-				elseif accept.rgba then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'rgba'
-				elseif accept.argb then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'argb'
-				elseif accept.bgra then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_bgr(png_ptr)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'bgra'
-				elseif accept.abgr then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_bgr(png_ptr)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'abgr'
-				end
-			elseif pixel_format == 'ga' then
-				if accept.ga then
-					set_alpha(png_ptr)
-				elseif accept.ag then
-					C.png_set_swap_alpha(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'ag'
-				elseif accept.rgba then
-					C.png_set_gray_to_rgb(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'rgba'
-				elseif accept.argb then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_swap_alpha(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'argb'
-				elseif accept.bgra then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_bgr(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'bgra'
-				elseif accept.abgr then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_bgr(png_ptr)
-					C.png_set_swap_alpha(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'abgr'
-				elseif accept.g then
-					strip_alpha(png_ptr)
-					dest_pixel_format = 'g'
-				elseif accept.rgb then
-					C.png_set_gray_to_rgb(png_ptr)
-					strip_alpha(png_ptr)
-					dest_pixel_format = 'rgb'
-				elseif accept.bgr then
-					C.png_set_gray_to_rgb(png_ptr)
-					C.png_set_bgr(png_ptr)
-					strip_alpha(png_ptr)
-					dest_pixel_format = 'bgr'
-				end
-			elseif pixel_format == 'rgb' then
-				if accept.rgb then
-					--we're good
-				elseif accept.bgr then
-					C.png_set_bgr(png_ptr)
-					dest_pixel_format = 'bgr'
-				elseif accept.rgba then
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'rgba'
-				elseif accept.argb then
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'argb'
-				elseif accept.bgra then
-					C.png_set_bgr(png_ptr)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'bgra'
-				elseif accept.abgr then
-					C.png_set_bgr(png_ptr)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'abgr'
-				elseif accept.g then
-					C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
-					dest_pixel_format = 'g'
-				elseif accept.ga then
-					C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
-					dest_pixel_format = 'ga'
-				elseif accept.ag then
-					C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
-					C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
-					dest_pixel_format = 'ag'
-				end
-			elseif pixel_format == 'rgba' then
-				if accept.rgba then
-					set_alpha(png_ptr)
-				elseif accept.argb then
-					C.png_set_swap_alpha(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'argb'
-				elseif accept.bgra then
-					C.png_set_bgr(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'bgra'
-				elseif accept.abgr then
-					C.png_set_bgr(png_ptr)
-					C.png_set_swap_alpha(png_ptr)
-					set_alpha(png_ptr)
-					dest_pixel_format = 'abgr'
-				elseif accept.rgb then
-					strip_alpha(png_ptr)
-					dest_pixel_format = 'rgb'
-				elseif accept.bgr then
-					C.png_set_bgr(png_ptr)
-					strip_alpha(png_ptr)
-					dest_pixel_format = 'bgr'
-				elseif accept.ga then
-					C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
-					dest_pixel_format = 'ga'
-				elseif accept.ag then
-					C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
-					C.png_set_swap_alpha(png_ptr)
-					dest_pixel_format = 'ag'
-				elseif accept.g then
-					C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
-					strip_alpha(png_ptr)
-					dest_pixel_format = 'g'
-				end
-			else
-				assert(false)
-			end
-			C.png_read_update_info(png_ptr, info_ptr) --calling this twice is libpng 1.5.6+
+		local gamma = opt and opt.gamma or 2.2
+		local function set_alpha(png_ptr)
+			C.png_set_alpha_mode(png_ptr, C.PNG_ALPHA_OPTIMIZED, gamma) --> premultiply alpha
 		end
+
+		--request more conversions depending on pixel_format and the accept table
+		local accept = opt and opt.accept or {}
+
+		local function strip_alpha(png_ptr)
+			local my_background = ffi.new('png_color_16', 0, 0xff, 0xff, 0xff, 0xff)
+			local image_background = ffi.new'png_color_16'
+			local image_background_p = ffi.new('png_color_16p[1]', image_background)
+			if C.png_get_bKGD(png_ptr, info_ptr, image_background_p) then
+				C.png_set_background(png_ptr, image_background, C.PNG_BACKGROUND_GAMMA_FILE, 1, 1.0)
+			else
+				C.png_set_background(png_ptr, my_background, PNG_BACKGROUND_GAMMA_SCREEN, 0, 1.0)
+			end
+		end
+
+		if pixel_format == 'g' then
+			if accept.g then
+				--we're good
+			elseif accept.ga then
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
+				dest_pixel_format = 'ga'
+			elseif accept.ag then
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
+				dest_pixel_format = 'ag'
+			elseif accept.rgb then
+				C.png_set_gray_to_rgb(png_ptr)
+				dest_pixel_format = 'rgb'
+			elseif accept.bgr then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_bgr(png_ptr)
+				dest_pixel_format = 'bgr'
+			elseif accept.rgba then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
+				dest_pixel_format = 'rgba'
+			elseif accept.argb then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
+				dest_pixel_format = 'argb'
+			elseif accept.bgra then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_bgr(png_ptr)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
+				dest_pixel_format = 'bgra'
+			elseif accept.abgr then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_bgr(png_ptr)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
+				dest_pixel_format = 'abgr'
+			end
+		elseif pixel_format == 'ga' then
+			if accept.ga then
+				set_alpha(png_ptr)
+			elseif accept.ag then
+				C.png_set_swap_alpha(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'ag'
+			elseif accept.rgba then
+				C.png_set_gray_to_rgb(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'rgba'
+			elseif accept.argb then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_swap_alpha(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'argb'
+			elseif accept.bgra then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_bgr(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'bgra'
+			elseif accept.abgr then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_bgr(png_ptr)
+				C.png_set_swap_alpha(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'abgr'
+			elseif accept.g then
+				strip_alpha(png_ptr)
+				dest_pixel_format = 'g'
+			elseif accept.rgb then
+				C.png_set_gray_to_rgb(png_ptr)
+				strip_alpha(png_ptr)
+				dest_pixel_format = 'rgb'
+			elseif accept.bgr then
+				C.png_set_gray_to_rgb(png_ptr)
+				C.png_set_bgr(png_ptr)
+				strip_alpha(png_ptr)
+				dest_pixel_format = 'bgr'
+			else
+				set_alpha(png_ptr)
+			end
+		elseif pixel_format == 'rgb' then
+			if accept.rgb then
+				--we're good
+			elseif accept.bgr then
+				C.png_set_bgr(png_ptr)
+				dest_pixel_format = 'bgr'
+			elseif accept.rgba then
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
+				dest_pixel_format = 'rgba'
+			elseif accept.argb then
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
+				dest_pixel_format = 'argb'
+			elseif accept.bgra then
+				C.png_set_bgr(png_ptr)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
+				dest_pixel_format = 'bgra'
+			elseif accept.abgr then
+				C.png_set_bgr(png_ptr)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
+				dest_pixel_format = 'abgr'
+			elseif accept.g then
+				C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
+				dest_pixel_format = 'g'
+			elseif accept.ga then
+				C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_AFTER)
+				dest_pixel_format = 'ga'
+			elseif accept.ag then
+				C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
+				C.png_set_add_alpha(png_ptr, 0xff, C.PNG_FILLER_BEFORE)
+				dest_pixel_format = 'ag'
+			end
+		elseif pixel_format == 'rgba' then
+			if accept.rgba then
+				set_alpha(png_ptr)
+			elseif accept.argb then
+				C.png_set_swap_alpha(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'argb'
+			elseif accept.bgra then
+				C.png_set_bgr(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'bgra'
+			elseif accept.abgr then
+				C.png_set_bgr(png_ptr)
+				C.png_set_swap_alpha(png_ptr)
+				set_alpha(png_ptr)
+				dest_pixel_format = 'abgr'
+			elseif accept.rgb then
+				strip_alpha(png_ptr)
+				dest_pixel_format = 'rgb'
+			elseif accept.bgr then
+				C.png_set_bgr(png_ptr)
+				strip_alpha(png_ptr)
+				dest_pixel_format = 'bgr'
+			elseif accept.ga then
+				C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
+				dest_pixel_format = 'ga'
+			elseif accept.ag then
+				C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
+				C.png_set_swap_alpha(png_ptr)
+				dest_pixel_format = 'ag'
+			elseif accept.g then
+				C.png_set_rgb_to_gray_fixed(png_ptr, 1, -1, -1)
+				strip_alpha(png_ptr)
+				dest_pixel_format = 'g'
+			else
+				set_alpha(png_ptr)
+			end
+		else
+			assert(false)
+		end
+		C.png_read_update_info(png_ptr, info_ptr) --calling this twice is libpng 1.5.6+
 
 		--check if conversion options had the desired effect
 		assert(C.png_get_bit_depth(png_ptr, info_ptr) == 8)
@@ -287,14 +284,12 @@ local function load_(datatype, data, size, accept)
 
 		local rowsize = w * channels
 		assert(C.png_get_rowbytes(png_ptr, info_ptr) == rowsize)
-		if accept and accept.padded then
+		if accept.padded then
 			rowsize = bit.band(rowsize + 3, bit.bnot(3))
 		end
 
-		local row_format = 'top_down'
-		if accept and accept.bottom_up and not accept.top_down then
-			row_format = 'bottom_up'
-		end
+		local row_format = accept.bottom_up and not accept.top_down
+									and 'bottom_up' or 'top_down'
 
 		--get the data bits
 		local size = rowsize * h
@@ -329,13 +324,12 @@ local function load_(datatype, data, size, accept)
 end
 
 local function load(t, opt)
-	local accept = opt and opt.accept
 	if t.string then
-		return load_('string', t.string, nil, accept)
+		return load_('string', t.string, nil, opt)
 	elseif t.cdata then
-		return load_('cdata', t.cdata, t.size, accept)
+		return load_('cdata', t.cdata, t.size, opt)
 	elseif t.path then
-		return load_('path', t.path, nil, accept)
+		return load_('path', t.path, nil, opt)
 	else
 		error'unspecified data source: path, string or cdata expected'
 	end
