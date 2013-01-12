@@ -17,7 +17,7 @@ for _,filename in ipairs(dir('media/gif/*.gif')) do
 	local s = assert(readfile(filename))
 	local cdata = ffi.new('unsigned char[?]', #s+1, s)
 
-	pp(assert(giflib.load({path = filename}, {accept = {top_down = true, argb = true}})))
+	pp(assert(giflib.load({path = filename})))
 
 	local f = assert(io.open(filename, 'rb'))
 	local fn = ffi.C._fileno(f)

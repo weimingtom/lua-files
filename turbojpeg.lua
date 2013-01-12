@@ -22,11 +22,11 @@ local function compress(...)
 end
 
 local function TJPAD(width)
-	return bit.band(width+3, bit.bnot(3))
+	return bit.band(width + 3, bit.bnot(3))
 end
 
 local function TJSCALED(d, factor)
-	return (d * factor.num + factor.denom - 1) / factor.denom
+	return math.floor((d * factor.num + factor.denom - 1) / factor.denom)
 end
 
 local function tjGetScalingFactors()
@@ -48,6 +48,7 @@ local function getScalingFactor(num, denom)
 end
 
 local tjPixelSize = {[0] = 3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4}
+
 local TJPF = {
 	rgb  = C.TJPF_RGB,
 	bgr  = C.TJPF_BGR,
@@ -62,9 +63,30 @@ local TJPF = {
 	argb = C.TJPF_ARGB,
 }
 
+local TJSAMP = {
+  [C.TJSAMP_444]  = '4:4:4',
+  [C.TJSAMP_422]  = '4:2:2',
+  [C.TJSAMP_420]  = '4:2:0',
+  [C.TJSAMP_GRAY] = 'gray',
+  [C.TJSAMP_440]  = '4:4:0',
+}
+
+local best_pixel_formats = {'rgba', 'bgra', 'abgr', 'argb', 'rgb', 'bgr',
+								'rgbx', 'bgrx', 'xbgr', 'xrgb', 'g'}
+local best_row_formats = {'top_down', 'bottom_up'}
+
+local function first_format(format_list, accept)
+	if accept then
+		for _,format in ipairs(format_list) do
+			if accept[format] then return format end
+		end
+	end
+	return format_list[1]
+end
+
 --[[
 	opt = {
-		prefer = {
+		accept = {
 			pixel_format = one of TJPF keys above ('rgb'),
 			top_down = true | false (true),
 			bottom_up = true | false (false),
@@ -84,19 +106,11 @@ local TJPF = {
 ]]
 local function decompress(data, size, opt)
 	opt = opt or {}
-	local prefer = opt.prefer or {}
 
-	--look for a preferred pixel and row format
-	local pixel_format = 'rgb'
-	for format in pairs(prefer) do
-		if TJPF[format] then
-			pixel_format = format
-			break
-		end
-	end
-	local row_format = prefer.top_down and 'top_down'
-								or prefer.bottom_up and 'bottom_up' or 'top_down'
-	local padded = prefer.padded == true
+	--look for the best accepted combination of pixel and row format
+	local pixel_format = first_format(best_pixel_formats, opt.accept)
+	local row_format = first_format(best_row_formats, opt.accept)
+	local padded = opt.accept and opt.accept.padded or false
 
 	return glue.fcall(function(finally)
 		local tj = checkh(C.tjInitDecompress())
@@ -104,13 +118,13 @@ local function decompress(data, size, opt)
 
 		local w = ffi.new'int32_t[1]'
 		local h = ffi.new'int32_t[1]'
-		local subsample = ffi.new'int32_t[1]'
-		checkz(C.tjDecompressHeader2(tj, data, size, w, h, subsample))
-		w, h, subsample = w[0], h[0], subsample[0]
+		local subsampling = ffi.new'int32_t[1]'
+		checkz(C.tjDecompressHeader2(tj, data, size, w, h, subsampling))
+		w, h, subsampling = w[0], h[0], TJSAMP[subsampling[0]]
 
 		local pixelFormat = TJPF[pixel_format]
 		local scalingFactor = getScalingFactor(opt.scaling_numerator, opt.scaling_denominator)
-		assert(scalingFactor, 'invalid scaling factor numerator and/or denominator')
+		assert(scalingFactor, 'invalid scaling numerator and/or denominator')
 		local scaledWidth = TJSCALED(w, scalingFactor)
 		local scaledHeight = TJSCALED(h, scalingFactor)
 		local pitch = scaledWidth * tjPixelSize[pixelFormat]
@@ -132,7 +146,8 @@ local function decompress(data, size, opt)
 
 		local sz = pitch * scaledHeight
 		local buf = ffi.new('uint8_t[?]', sz)
-		checkz(C.tjDecompress2(tj, data, size, buf, opt.fit_w or w, pitch, opt.fit_h or h, pixelFormat, flags))
+		checkz(C.tjDecompress2(tj, data, size, buf, opt.fit_w or w, pitch,
+										opt.fit_h or h, pixelFormat, flags))
 
 		return {
 			w = w, h = h,
@@ -143,6 +158,7 @@ local function decompress(data, size, opt)
 				rows = row_format,
 				rowsize = pitch,
 			},
+			subsampling = subsampling,
 		}
 	end)
 end

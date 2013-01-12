@@ -1,1 +1,1 @@
-gcc nanojpeg.c -o ../../bin/nanojpeg.dll -shared -O2 -DNJ_USE_WIN32
+gcc nanojpeg2.c -shared -o ../../bin/nanojpeg2.dll -DNJ_USE_LIBC -O3 -std=c99 -Wall -Wextra -pedantic -Werror

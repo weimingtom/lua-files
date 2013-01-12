@@ -1,6 +1,5 @@
 todo
 ----
-- turbojpeg
 - readbuffer
 - clipper
 - openvg

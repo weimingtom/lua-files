@@ -1,5 +1,5 @@
 local ffi = require'ffi'
-local nanojpeg = require'nanojpeg'
+local nanojpeg2 = require'nanojpeg'
 local glue = require'glue'
 
 local function dir(d)
@@ -17,8 +17,8 @@ for _,filename in ipairs(dir('media/jpeg/*.jpg')) do
 		local s = readfile(filename)
 		local cdata = ffi.new('unsigned char[?]', #s+1, s)
 
-		pp(nanojpeg.load({cdata = cdata, size = #s}))
-		pp(nanojpeg.load({string = s}))
-		pp(nanojpeg.load({path = filename}))
+		pp(nanojpeg2.load({cdata = cdata, size = #s}))
+		pp(nanojpeg2.load({string = s}))
+		pp(nanojpeg2.load({path = filename}))
 	end
 end

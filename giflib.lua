@@ -1,7 +1,6 @@
-local glue = require'glue'
+alocal glue = require'glue'
 local ffi = require'ffi'
 require'giflib_h'
-local bmpconv = require'bmpconv'
 
 local C = ffi.load'giflib5'
 
@@ -88,7 +87,7 @@ local function parse(datatype, data, size, handle) --callback-based parser
 	end)
 end
 
-local function load_(datatype, data, size, accept, mode)
+local function load_(datatype, data, size, mode)
 	return parse(datatype, data, size, function(ft)
 		local t = {frames = {}}
 		t.w, t.h = ft.SWidth, ft.SHeight
@@ -128,16 +127,17 @@ local function load_(datatype, data, size, accept, mode)
 				di = di+4
 			end
 
-			local format = {pixel = 'rgba', rows = 'top_down', rowsize = w * 4}
-			local data, sz, format = bmpconv.convert_best(data, sz, format, accept, false)
-
 			t.frames[#t.frames + 1] = {
-				x = si.ImageDesc.Left,
-				y = si.ImageDesc.Top,
 				w = w, h = h,
 				data = data,
 				size = sz,
-				format = format,
+				format = {
+					pixel = 'rgba',
+					rows = 'top_down',
+					rowsize = w * 4,
+				},
+				x = si.ImageDesc.Left,
+				y = si.ImageDesc.Top,
 				delay_ms = delay,
 			}
 		end
@@ -146,15 +146,15 @@ local function load_(datatype, data, size, accept, mode)
 end
 
 local function load(t, opt)
-	local accept, mode = opt and opt.accept, opt and opt.mode
+	local mode = opt and opt.mode
 	if t.string then
-		return load_('string', t.string, nil, accept, mode)
+		return load_('string', t.string, nil, mode)
 	elseif t.cdata then
-		return load_('cdata', t.cdata, t.size, accept, mode)
+		return load_('cdata', t.cdata, t.size, mode)
 	elseif t.path then
-		return load_('path', t.path, nil, accept, mode)
+		return load_('path', t.path, nil, mode)
 	elseif t.fileno then
-		return load_('fileno', t.fileno, nil, accept, mode)
+		return load_('fileno', t.fileno, nil, mode)
 	else
 		error'unspecified data source: path, string, cdata or fileno expected'
 	end

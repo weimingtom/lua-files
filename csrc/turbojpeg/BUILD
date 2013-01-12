@@ -1,7 +1,7 @@
 need: mingw, cmake, nasm (all in PATH)
 
 > cd srcdir
-> cmake "MINGW " .
+> cmake "MINGW something" .
 > make
 
-now copy libturbojpeg.dll to bin.
+copy libturbojpeg.dll to bin/turbojpeg.dll
