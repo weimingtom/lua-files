@@ -1,4 +1,5 @@
 --cpp of turbojpeg.h from libjpeg-turbo 1.2.1
+--added JPEGBUF type defined as const so we can pass Lua strings (hope tj doesn't write to it)
 local ffi = require'ffi'
 ffi.cdef[[
 enum TJSAMP
@@ -81,11 +82,12 @@ typedef struct tjtransform
 } tjtransform;
 
 typedef void* tjhandle;
+typedef const unsigned char* JPEGBUF;
 
 tjhandle tjInitCompress(void);
 
-int tjCompress2(tjhandle handle, unsigned char *srcBuf,
-  int width, int pitch, int height, int pixelFormat, unsigned char **jpegBuf,
+int tjCompress2(tjhandle handle, JPEGBUF srcBuf,
+  int width, int pitch, int height, int pixelFormat, JPEGBUF* jpegBuf,
   unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags);
 
 unsigned long tjBufSize(int width, int height, int jpegSubsamp);
@@ -93,28 +95,28 @@ unsigned long tjBufSize(int width, int height, int jpegSubsamp);
 unsigned long tjBufSizeYUV(int width, int height, int subsamp);
 
 int tjEncodeYUV2(tjhandle handle,
-  unsigned char *srcBuf, int width, int pitch, int height, int pixelFormat,
+  JPEGBUF srcBuf, int width, int pitch, int height, int pixelFormat,
   unsigned char *dstBuf, int subsamp, int flags);
 
 tjhandle tjInitDecompress(void);
 
 int tjDecompressHeader2(tjhandle handle,
-  unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height,
+  JPEGBUF jpegBuf, unsigned long jpegSize, int *width, int *height,
   int *jpegSubsamp);
 
 tjscalingfactor* tjGetScalingFactors(int *numscalingfactors);
 
 int tjDecompress2(tjhandle handle,
-  unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
+  JPEGBUF jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
   int width, int pitch, int height, int pixelFormat, int flags);
 
 int tjDecompressToYUV(tjhandle handle,
-  unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
+  JPEGBUF jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
   int flags);
 
 tjhandle tjInitTransform(void);
 
-int tjTransform(tjhandle handle, unsigned char *jpegBuf,
+int tjTransform(tjhandle handle, JPEGBUF jpegBuf,
   unsigned long jpegSize, int n, unsigned char **dstBufs,
   unsigned long *dstSizes, tjtransform *transforms, int flags);
 
@@ -130,19 +132,19 @@ unsigned long TJBUFSIZE(int width, int height);
 
 unsigned long TJBUFSIZEYUV(int width, int height, int jpegSubsamp);
 
-int tjCompress(tjhandle handle, unsigned char *srcBuf,
+int tjCompress(tjhandle handle, JPEGBUF srcBuf,
   int width, int pitch, int height, int pixelSize, unsigned char *dstBuf,
   unsigned long *compressedSize, int jpegSubsamp, int jpegQual, int flags);
 
 int tjEncodeYUV(tjhandle handle,
-  unsigned char *srcBuf, int width, int pitch, int height, int pixelSize,
+  JPEGBUF srcBuf, int width, int pitch, int height, int pixelSize,
   unsigned char *dstBuf, int subsamp, int flags);
 
 int tjDecompressHeader(tjhandle handle,
-  unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height);
+  JPEGBUF jpegBuf, unsigned long jpegSize, int *width, int *height);
 
 int tjDecompress(tjhandle handle,
-  unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
+  JPEGBUF jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
   int width, int pitch, int height, int pixelSize, int flags);
 
 ]]
@@ -153,5 +155,4 @@ local tjMCUHeight = {8, 8, 16, 8, 16}
 local tjRedOffset = {0, 2, 0, 2, 3, 1, 0, 0, 2, 3, 1}
 local tjGreenOffset = {1, 1, 1, 1, 2, 2, 0, 1, 1, 2, 2}
 local tjBlueOffset = {2, 0, 2, 0, 1, 3, 0, 2, 0, 1, 3}
-
 ]]

@@ -1,329 +1,172 @@
 --pixel format upsampling, resampling and downsampling in luajit.
---it supports all pixel layout conversions so you don't have to think which ones you need.
+--supports all conversions between 8bit gray and rgb pixel formats with or without an alpha channel.
+--supports different input/output orientations, namely top-down and bottom-up, and different strides.
 local ffi = require'ffi'
 local bit = require'bit'
 
-local bswap, brol, bror = bit.bswap, bit.rol, bit.ror
-if ffi.abi'le' then brol,bror = bror,brol end --beware of how we interpret rolls!
-
 local matrix = {
 	g = {},
-	ga = {},
-	ag = {},
-	rgb = {},
-	bgr = {},
-	rgba = {},
-	bgra = {},
-	argb = {},
-	abgr = {},
+	ga = {}, ag = {},
+	rgb = {}, bgr = {},
+	rgba = {}, bgra = {}, argb = {}, abgr = {},
 }
 
--- 2 -> 2
+local function sign(x) return x >= 0 and 1 or -1 end
 
-local function invert2(data, sz) -- ga -> ag and back
-	for i=0,sz-2,2 do
-		data[i],data[i+1] = data[i+1],data[i]
+local function normalize_strides(sz, stride, dstride)
+	local dj = 0
+	local flip = sign(stride) ~= sign(dstride)
+	stride = math.abs(stride)
+	dstride = math.abs(dstride)
+	if flip then
+		dj = (sz/stride - 1) * dstride --first pixel of the last row
+		dstride = -dstride --...and stepping backwards
 	end
-	return data, sz
+	return dj, stride, dstride
 end
 
-matrix.ga.ag = invert2
-matrix.ag.ga = invert2
-
--- 3 -> 3
-
-local function invert3(data, sz) -- rgb -> bgr and back
-	for i=0,sz-3,3 do
-		data[i],data[i+2] = data[i+2],data[i]
-	end
-	return data, sz
-end
-
-matrix.rgb.bgr = invert3
-matrix.bgr.rgb = invert3
-
--- 4 -> 4
-
-local function invert4(data, sz) -- argb -> bgra and back
-	local p, isz = ffi.cast('uint32_t*', data), sz/4
-	assert(math.floor(isz) == isz)
-	for i=0,isz-1 do
-		p[i] = bswap(p[i])
-	end
-	return data, sz
-end
-
-matrix.rgba.abgr = invert4
-matrix.bgra.argb = invert4
-matrix.argb.bgra = invert4
-matrix.abgr.rgba = invert4
-
-local function a3to3a(data, sz) -- argb -> rgba on big-endian
-	local p, isz = ffi.cast('uint32_t*', data), sz/4
-	assert(math.floor(isz) == isz)
-	for i=0,isz-1 do
-		p[i] = brol(p[i], 8)
-	end
-	return data, sz
-end
-
-matrix.argb.rgba = a3to3a
-matrix.abgr.bgra = a3to3a
-
-local function _3atoa3(data, sz) -- rgba -> argb on big-endian
-	local p, isz = ffi.cast('uint32_t*', data), sz/4
-	assert(math.floor(isz) == isz)
-	for i=0,isz-1 do
-		p[i] = bror(p[i], 8)
-	end
-	return data, sz
-end
-
-matrix.rgba.argb = _3atoa3
-matrix.bgra.abgr = _3atoa3
-
-local function _3atoi3a(data, sz) -- rgba -> bgra on big-endian
-	local p, isz = ffi.cast('uint32_t*', data), sz/4
-	assert(math.floor(isz) == isz)
-	for i=0,isz-1 do
-		p[i] = bswap(bror(p[i], 8))
-	end
-	return data, sz
-end
-
-matrix.rgba.bgra = _3atoi3a
-matrix.bgra.rgba = _3atoi3a
-
-local function a3toai3(data, sz) -- argb -> abgr on big-endian
-	local p, isz = ffi.cast('uint32_t*', data), sz/4
-	assert(math.floor(sz) == sz)
-	for i=0,isz-1 do
-		p[i] = bswap(brol(p[i], 8))
-	end
-	return data, sz
-end
-
-matrix.argb.abgr = a3toai3
-matrix.abgr.argb = a3toai3
-
--- 1 -> 2
-
-local function _1toa1(data, sz) -- gray to ag
-	local buf = ffi.new('uint8_t[?]', sz*2)
-	for i=0,sz-1 do
-		buf[i*2] = 0xff
-		buf[i*2+1] = data[i]
-	end
-	return buf,sz*2
-end
-
-matrix.g.ag = _1toa1
-
-local function _1to1a(data, sz) -- gray to ga
-	local buf = ffi.new('uint8_t[?]', sz*2)
-	for i=0,sz-1 do
-		buf[i*2] = data[i]
-		buf[i*2+1] = 0xff
-	end
-	return buf,sz*2
-end
-
-matrix.g.ga = _1to1a
-
--- 1 -> 3
-
-local function _1to3(data, sz) -- gray to ggg
-	local buf = ffi.new('uint8_t[?]', sz*3)
-	for i=0,sz-1 do
-		buf[i*3]   = data[i]
-		buf[i*3+1] = data[i]
-		buf[i*3+2] = data[i]
-	end
-	return buf, sz*3
-end
-
-matrix.g.rgb = _1to3
-matrix.g.bgr = _1to3
-
--- 1 -> 4
-
-local function _1toa3(data, sz) --gray to aggg on big-endian
-	local buf = ffi.new('uint8_t[?]', sz*4)
-	local p = ffi.cast('uint32_t*', buf)
-	for i=0,sz-1 do
-		p[i] = data[i] * 0x010101 + 0xff000000
-	end
-	return buf, sz*4
-end
-
-local function _1to3a(data, sz) --gray to ggga on big-endian
-	local buf = ffi.new('uint8_t[?]', sz*4)
-	local p = ffi.cast('uint32_t*', buf)
-	for i=0,sz-1 do
-		p[i] = data[i] * 0x01010100 + 0xff
-	end
-	return buf, sz*4
-end
-
-if ffi.abi'le' then _1to3a, _1toa3 = _1toa3, _1to3a end
-
-matrix.g.rgba = _1to3a
-matrix.g.bgra = _1to3a
-matrix.g.argb = _1toa3
-matrix.g.abgr = _1toa3
-
--- 2 -> 4
-
-local function _1ato3a(data, sz) --ga to ggga
-	sz = sz/2
-	assert(math.floor(sz) == sz)
-	local buf = ffi.new('uint8_t[?]', sz*4)
-	for i=0,sz-1 do
-		buf[i*4]   = data[sz*2]
-		buf[i*4+1] = data[sz*2]
-		buf[i*4+2] = data[sz*2]
-		buf[i*4+3] = data[sz*2+1]
-	end
-	return buf, sz*4
-end
-
-matrix.ga.rgba = _1ato3a
-matrix.ga.bgra = _1ato3a
-
-local function _1atoa3(data, sz) --ga to aggg
-	return invert4(_1ato3a(data, sz))
-end
-
-matrix.ga.argb = _1atoa3
-matrix.ga.abgr = _1atoa3
-
--- 3 -> 4
-
-local function _3toa3(data, sz)
-	sz = sz/3
-	assert(math.floor(sz) == sz)
-	local buf = ffi.new('uint8_t[?]', sz*4)
-	for i=0,sz-1 do
-		buf[i*4]   = 0xff
-		buf[i*4+1] = data[i*3]
-		buf[i*4+2] = data[i*3+1]
-		buf[i*4+3] = data[i*3+2]
-	end
-	return buf, sz*4
-end
-
-matrix.rgb.argb = _3toa3
-matrix.bgr.abgr = _3toa3
-
-local function _3to3a(data, sz)
-	sz = sz/3
-	assert(math.floor(sz) == sz)
-	local buf = ffi.new('uint8_t[?]', sz*4)
-	for i=0,sz-1 do
-		buf[i*4]   = data[i*3]
-		buf[i*4+1] = data[i*3+1]
-		buf[i*4+2] = data[i*3+2]
-		buf[i*4+3] = 0xff
-	end
-	return buf, sz*4
-end
-
-matrix.rgb.rgba = _3to3a
-matrix.bgr.bgra = _3to3a
-
-local function _3toai3(data, sz)
-	return invert4(_3to3a(data, sz))
-end
-
-matrix.rgb.abgr = _3toai3
-matrix.bgr.argb = _3toai3
-
-local function _3toi3a(data, sz)
-	return invert4(_3toa3(data, sz))
-end
-
-matrix.rgb.bgra = _3toi3a
-matrix.bgr.rgba = _3toi3a
-
--- 3 -> 1
-
-function matrix.rgb.g(data, sz) --Photometric/digital ITU-R
-	sz = sz/3
-	assert(math.floor(sz) == sz)
-	local buf = ffi.new('uint8_t[?]', sz)
-	for i=0,sz-1 do
-		buf[i] = 0.2126 * data[i*3] + 0.7152 * data[i*3+1] + 0.0722 * data[i*3+2]
+local function eachrow(convert)
+	return function(src, sz, stride, dst, dstride)
+		local dj, stride, dstride = normalize_strides(sz, stride, dstride)
+		for sj=0,sz-1,stride do
+			convert(dst, dj, src, sj, stride)
+			dj = dj+dstride
+		end
 	end
 end
 
-function matrix.bgr.g(data, sz) --Photometric/digital ITU-R
-	sz = sz/3
-	assert(math.floor(sz) == sz)
-	local buf = ffi.new('uint8_t[?]', sz)
-	for i=0,sz-1 do
-		buf[i] = 0.2126 * data[i*3+2] + 0.7152 * data[i*3+1] + 0.0722 * data[i*3]
+local copy_rows = eachrow(function(d, i, s, j, stride) ffi.copy(d+i, s+j, stride) end)
+
+local function eachpixel(pixelsize, dpixelsize, convert)
+	return function(src, sz, stride, dst, dstride)
+		local dj, stride, dstride = normalize_strides(sz, stride, dstride)
+		for sj=0,sz-1,stride do
+			local di = dj
+			for si=0,stride-1,pixelsize do
+				convert(dst, di, src, sj+si)
+				di = di+dpixelsize
+			end
+			dj = dj+dstride
+		end
 	end
 end
 
---TODO:
--- 4 -> 3 (remove alpha)
--- 4 -> 2 (remove color, preseve alpha)
--- 4 -> 1 (remove color and alpha)
--- 3 -> 2 (remove color, set 0xff alpha)
--- 2 -> 1 (remove alpha)
--- 2 -> 3 (remove alpha)
+matrix.ga.ag = eachpixel(2, 2, function(d, i, s, j) d[i], d[i+1] = s[j+1], s[j] end)
+matrix.ag.ga = matrix.ga.ag
+
+matrix.bgr.rgb = eachpixel(3, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+2], s[j+1], s[j] end)
+matrix.rgb.bgr = matrix.bgr.rgb
+
+matrix.rgba.abgr = eachpixel(4, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+3], s[j+2], s[j+1], s[j+0] end)
+matrix.bgra.argb = matrix.rgba.abgr
+matrix.argb.bgra = matrix.rgba.abgr
+matrix.abgr.rgba = matrix.rgba.abgr
+matrix.argb.rgba = eachpixel(4, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+1], s[j+2], s[j+3], s[j+0] end)
+matrix.abgr.bgra = matrix.argb.rgba
+matrix.rgba.argb = eachpixel(4, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+3], s[j+0], s[j+1], s[j+2] end)
+matrix.bgra.abgr = matrix.rgba.argb
+matrix.rgba.bgra = eachpixel(4, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+2], s[j+1], s[j+0], s[j+3] end)
+matrix.bgra.rgba = matrix.rgba.bgra
+matrix.argb.abgr = eachpixel(4, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+0], s[j+3], s[j+2], s[j+1] end)
+matrix.abgr.argb = matrix.argb.abgr
+
+matrix.g.ag = eachpixel(1, 2, function(d, i, s, j) d[i+1], d[i+0] = s[j], 0xff end)
+matrix.g.ga = eachpixel(1, 2, function(d, i, s, j) d[i+0], d[i+1] = s[j], 0xff end)
+
+matrix.g.rgb = eachpixel(1, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j], s[j], s[j] end)
+matrix.g.bgr = matrix.g.rgb
+
+matrix.g.argb = eachpixel(1, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = 0xff, s[j], s[j], s[j] end)
+matrix.g.abgr = matrix.g.argb
+matrix.g.rgba = eachpixel(1, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j], s[j], s[j], 0xff end)
+matrix.g.bgra = matrix.g.rgba
+
+matrix.ga.rgba = eachpixel(2, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+0], s[j+0], s[j+0], s[j+1] end)
+matrix.ga.bgra = matrix.ga.rgba
+matrix.ga.argb = eachpixel(2, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+1], s[j+0], s[j+0], s[j+0] end)
+matrix.ga.abgr = matrix.ga.argb
+matrix.ag.rgba = eachpixel(2, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+1], s[j+1], s[j+1], s[j+0] end)
+matrix.ag.bgra = matrix.ag.rgba
+matrix.ag.argb = eachpixel(2, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+0], s[j+1], s[j+1], s[j+1] end)
+matrix.ag.abgr = matrix.ag.argb
+
+matrix.rgb.argb = eachpixel(3, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = 0xff, s[j], s[j+1], s[j+2] end)
+matrix.bgr.abgr = matrix.rgb.argb
+matrix.rgb.rgba = eachpixel(3, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j], s[j+1], s[j+2], 0xff end)
+matrix.bgr.bgra = matrix.rgb.rgba
+matrix.rgb.abgr = eachpixel(3, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = 0xff, s[j+2], s[j+1], s[j] end)
+matrix.bgr.argb = matrix.rgb.abgr
+matrix.rgb.bgra = eachpixel(3, 4, function(d, i, s, j) d[i], d[i+1], d[i+2], d[i+3] = s[j+2], s[j+1], s[j], 0xff end)
+matrix.bgr.rgba = matrix.rgb.bgra
+
+local function rgb2g(r,g,b) return 0.2126 * r + 0.7152 * g + 0.0722 * b end --photometric/digital ITU-R formula
+
+matrix.rgb.g = eachpixel(3, 1, function(d, i, s, j) d[i] = rgb2g(s[j+0], s[j+1], s[j+2]) end)
+matrix.bgr.g = eachpixel(3, 1, function(d, i, s, j) d[i] = rgb2g(s[j+2], s[j+1], s[j+0]) end)
+
+matrix.rgba.rgb = eachpixel(4, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+0], s[j+1], s[j+2] end)
+matrix.bgra.bgr = matrix.rgba.rgb
+matrix.argb.rgb = eachpixel(4, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+1], s[j+2], s[j+3] end)
+matrix.abgr.bgr = matrix.argb.rgb
+matrix.rgba.bgr = eachpixel(4, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+2], s[j+1], s[j+0] end)
+matrix.bgra.rgb = matrix.rgba.bgr
+matrix.argb.bgr = eachpixel(4, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+3], s[j+2], s[j+1] end)
+matrix.abgr.rgb = matrix.argb.bgr
+
+matrix.rgba.ga = eachpixel(4, 2, function(d, i, s, j) d[i+0], d[i+1] = rgb2g(s[j+0], s[j+1], s[j+2]), s[j+3] end)
+matrix.rgba.ag = eachpixel(4, 2, function(d, i, s, j) d[i+1], d[i+0] = rgb2g(s[j+0], s[j+1], s[j+2]), s[j+3] end)
+matrix.bgra.ga = eachpixel(4, 2, function(d, i, s, j) d[i+0], d[i+1] = rgb2g(s[j+2], s[j+1], s[j+0]), s[j+3] end)
+matrix.bgra.ag = eachpixel(4, 2, function(d, i, s, j) d[i+1], d[i+0] = rgb2g(s[j+2], s[j+1], s[j+0]), s[j+3] end)
+matrix.argb.ga = eachpixel(4, 2, function(d, i, s, j) d[i+0], d[i+1] = rgb2g(s[j+1], s[j+2], s[j+3]), s[j+0] end)
+matrix.argb.ag = eachpixel(4, 2, function(d, i, s, j) d[i+1], d[i+0] = rgb2g(s[j+1], s[j+2], s[j+3]), s[j+0] end)
+matrix.abgr.ga = eachpixel(4, 2, function(d, i, s, j) d[i+0], d[i+1] = rgb2g(s[j+3], s[j+2], s[j+1]), s[j+0] end)
+matrix.abgr.ag = eachpixel(4, 2, function(d, i, s, j) d[i+1], d[i+0] = rgb2g(s[j+3], s[j+2], s[j+1]), s[j+0] end)
+
+matrix.rgba.g = eachpixel(4, 1, function(d, i, s, j) d[i] = rgb2g(s[j+0], s[j+1], s[j+2]) end)
+matrix.bgra.g = eachpixel(4, 1, function(d, i, s, j) d[i] = rgb2g(s[j+2], s[j+1], s[j+0]) end)
+matrix.argb.g = eachpixel(4, 1, function(d, i, s, j) d[i] = rgb2g(s[j+1], s[j+2], s[j+3]) end)
+matrix.abgr.g = eachpixel(4, 1, function(d, i, s, j) d[i] = rgb2g(s[j+3], s[j+2], s[j+1]) end)
+
+matrix.rgb.ga = eachpixel(3, 2, function(d, i, s, j) d[i+0], d[i+1] = rgb2g(s[j+0], s[j+1], s[j+2]), 0xff end)
+matrix.rgb.ag = eachpixel(3, 2, function(d, i, s, j) d[i+1], d[i+0] = rgb2g(s[j+0], s[j+1], s[j+2]), 0xff end)
+matrix.bgr.ga = eachpixel(3, 2, function(d, i, s, j) d[i+0], d[i+1] = rgb2g(s[j+2], s[j+1], s[j+0]), 0xff end)
+matrix.bgr.ag = eachpixel(3, 2, function(d, i, s, j) d[i+1], d[i+0] = rgb2g(s[j+2], s[j+1], s[j+0]), 0xff end)
+
+matrix.ga.g = eachpixel(2, 1, function(d, i, s, j) d[i] = s[j+0] end)
+matrix.ag.g = eachpixel(2, 1, function(d, i, s, j) d[i] = s[j+1] end)
+
+matrix.ga.rgb = eachpixel(2, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+0], s[j+0], s[j+0] end)
+matrix.ga.bgr = matrix.ga.rgb
+matrix.ag.rgb = eachpixel(2, 3, function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+1], s[j+1], s[j+1] end)
+matrix.ag.bgr = matrix.ag.rgb
 
 --frontend
 
-local function copy(data, sz)
-	local buf = ffi.new('uint8_t[?]', sz)
-	ffi.copy(buf, data, sz)
-	return buf, sz
+local function pad_stride(stride)
+	return sign(stride) * bit.band(math.abs(stride) + 3, bit.bnot(3))
 end
 
-local function copy_flipped(data, sz, rowsize)
-	assert(rowsize, 'bmpconv: rowsize missing')
-	local buf = ffi.new('uint8_t[?]', sz)
-	local h = sz/rowsize
-	assert(math.floor(h) == h)
-	local pbuf, pdata = ffi.cast('uint8_t*', buf), ffi.cast('uint8_t*', data)
-	for i=0,h-1 do
-		ffi.copy(pbuf+(i*rowsize), pdata+((h-i-1)*rowsize), rowsize)
+local function convert(data, size, source_format, dest_format, force_copy)
+	if source_format.pixel == dest_format.pixel and source_format.stride == dest_format.stride then
+		return data, size
 	end
-	return buf, sz
-end
-
-local inplace_converters = {
-	invert2 = true, invert3 = true, invert4 = true,
-	a3to3a = true, _3atoa3 = true, _3atoi3a = true, a3toai3 = true,
-}
-
-local row_formats = {top_down = true, bottom_up = true}
-
-local function convert(data, sz, source_format, dest_format, force_copy)
-	assert(matrix[source_format.pixel], 'bmpconv: unsupported source.pixel format')
-	assert(row_formats[source_format.rows], 'bmpconv: invalid source.rows format')
-	assert(row_formats[dest_format.rows], 'bmpconv: invalid dest.rows format')
-	if source_format.pixel == dest_format.pixel then
-		if source_format.rows ~= dest_format.rows then
-			data, sz = copy_flipped(data, sz, source_format.rowsize)
-		elseif force_copy then
-			data, sz = copy(data, sz)
-		end
-		return data, sz
+	local new_buffer = force_copy
+						or source_format.stride ~= dest_format.stride --diff. row size or needs flippin'
+						or #dest_format.pixel > #source_format.pixel --bigger pixel, even if same row size
+	local operation
+	if source_format.pixel == dest_format.pixel then --we can copy rows of unknown pixel formats as long as they match
+		operation = copy_rows
 	else
-		local converter = assert(matrix[source_format.pixel][dest_format.pixel],
-											'bmpconv: unsupported pixel format conversion')
-		if source_format.rows ~= dest_format.rows then
-			data, sz = copy_flipped(data, sz, source_format.rowsize)
-		elseif force_copy and inplace_converters[converter] then
-			data, sz = copy(data, sz)
-		end
-		return converter(data, sz)
+		operation = matrix[source_format.pixel] and matrix[source_format.pixel][dest_format.pixel]
+		assert(operation, string.format('cannot convert from %s to %s', source_format.pixel, dest_format.pixel))
 	end
+	local sz = size/math.abs(source_format.stride) * math.abs(dest_format.stride)
+	local buf = new_buffer and ffi.new('uint8_t[?]', sz) or data
+	operation(data, size, source_format.stride, buf, dest_format.stride)
+	return buf, sz
 end
 
-local conv_pref = {
+local preferred_formats = {
 	g = {'ga', 'ag', 'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr'},
 	ga = {'ag', 'rgba', 'bgra', 'argb', 'abgr', 'rgb', 'bgr', 'g'},
 	ag = {'ga', 'rgba', 'bgra', 'argb', 'abgr', 'rgb', 'bgr', 'g'},
@@ -335,20 +178,46 @@ local conv_pref = {
 	abgr = {'rgba', 'bgra', 'argb', 'rgb', 'bgr', 'ga', 'ag', 'g'},
 }
 
+local function accept_orientation(stride, accept)
+	return (accept.top_down == nil and accept.bottom_up == nil) --no preference
+				or (accept.top_down and stride >= 0) or (accept.bottom_up and stride < 0) --right stride
+end
+
+local function accept_padding(stride, accept)
+	return not accept.padded or stride % 4 == 0
+end
+
+local function accept_source_format(source_format, accept)
+	return not accept
+				or accept[source_format.pixel]
+				and accept_orientation(source_format.stride, accept)
+				and accept_padding(source_format.stride, accept)
+end
+
 local function best_format(source_format, accept)
-	if not accept then return source_format end
-	if accept[source_format.pixel] and accept[source_format.rows] then
+	if not accept or accept_source_format(source_format, accept) then
 		return source_format
 	end
-	local pixel_pref = assert(conv_pref[source_format.pixel], 'bmpconv: unsupported source.pixel format')
-	for _,dest_pixel_format in ipairs(pixel_pref) do
-		if accept[dest_pixel_format] and matrix[source_format.pixel][dest_pixel_format] then
+
+	local pref_formats = preferred_formats[source_format.pixel]
+	if not pref_formats then return end
+
+	local stride = source_format.stride
+	if accept.top_down or accept.bottom_up then
+		if accept.top_down then
+			stride = math.abs(stride)
+		elseif accept.bottom_up then
+			stride = -math.abs(stride)
+		end
+	end
+	if accept.padded then
+		stride = pad_stride(stride)
+	end
+	for _,pixel_format in ipairs(pref_formats) do
+		if accept[pixel_format] and matrix[source_format.pixel][pixel_format] then
 			return {
-				pixel = dest_pixel_format,
-				rows = assert((accept[source_format.rows] and source_format.rows)
-									or (accept.top_down and 'top_down')
-									or (accept.bottom_up and 'bottom_up'),
-									'bmpconv: accept.top_down or accept.bottom_up expected'),
+				pixel = pixel_format,
+				stride = stride,
 			}
 		end
 	end
@@ -356,13 +225,25 @@ end
 
 local function convert_best(data, sz, source_format, accept, force_copy)
 	local dest_format = best_format(source_format, accept)
+
+	if not dest_format then
+		local t = {}; for k in pairs(accept) do t[#t+1] = k end
+		error(string.format('cannot convert from (%s, stride=%d) to (%s)',
+									source_format.pixel, source_format.stride, table.concat(t, ', ')))
+	end
+
 	local data, sz = convert(data, sz, source_format, dest_format, force_copy)
 	return data, sz, dest_format
 end
 
+if not ... then require'bmpconv_test' end
+
 return {
+	pad_stride = pad_stride,
 	convert = convert,
 	best_format = best_format,
 	convert_best = convert_best,
+	converters = matrix,
+	preferred_formats = preferred_formats,
 }
 

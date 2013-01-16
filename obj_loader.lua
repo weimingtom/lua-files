@@ -5,27 +5,9 @@ local glue = require'glue'
 local tuple = require'tuple'
 
 --begin caching
-require'stdio'
+local stdio = require'stdio'
 local pp = require'pp'
 local ffi = require'ffi'
-
-local function read_binary_file(file)
-	local f = ffi.C.fopen(file, 'rb')
-	ffi.C.fseek(f, 0, ffi.C.SEEK_END)
-	local sz = ffi.C.ftell(f)
-	ffi.C.fseek(f, 0, ffi.C.SEEK_SET)
-	local buf = ffi.new('uint8_t[?]', sz)
-	ffi.C.fread(buf, 1, sz, f)
-	ffi.C.fclose(f)
-	return buf, sz
-end
-
-local function write_binary_file(file, data, sz)
-	require'stdio'
-	local f = ffi.C.fopen(file, 'wb')
-	ffi.C.fwrite(data, 1, sz, f)
-	ffi.C.fclose(f)
-end
 --end caching
 
 local function ibo_ctype(count)
@@ -35,7 +17,7 @@ end
 local function load(file, use_file_cache)
 
 	if use_file_cache and glue.fileexists(file..'.vbo') then
-		local buf, sz = read_binary_file(file..'.vbo.tmp')
+		local buf, sz = stdio.readfile(file..'.vbo.tmp')
 		local vbo = {layout = 'vnt', data = buf, size = sz}
 		local buf, sz = read_binary_file(file..'.ibo.tmp')
 		local ibo = {data = buf, size = sz}
@@ -154,19 +136,19 @@ local function load(file, use_file_cache)
 		}
 		glue.extend(ibo.values, indices)
 	end
-	print('vertices:', #vbo.values/8)
-	print('indices:', #ibo.values)
-	pp.pp(ibo_partitions)
+	--print('vertices:', #vbo.values/8)
+	--print('indices:', #ibo.values)
+	--pp.pp(ibo_partitions)
 
 	if use_file_cache then
 		--write vbo
 		local data = ffi.new('float[?]', #vbo.values, vbo.values)
 		local sz = ffi.sizeof(data)
-		write_binary_file(file..'.vbo.tmp', data, sz)
+		stdio.writefile(file..'.vbo.tmp', data, sz)
 		--write ibo
 		local data = ffi.new(ibo_ctype(#ibo.values), #ibo.values, ibo.values)
 		local sz = ffi.sizeof(data)
-		write_binary_file(file..'.ibo.tmp', data, sz)
+		stdio.writefile(file..'.ibo.tmp', data, sz)
 		--write partitions
 		pp.fwrite(file..'.ibop.tmp', ibo_partitions)
 	end

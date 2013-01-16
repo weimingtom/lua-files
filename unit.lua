@@ -56,3 +56,7 @@ function fps()
 	return d
 end
 
+function dir(d)
+	local f = io.popen('ls -1 '..d)
+	return glue.collect(f:lines())
+end

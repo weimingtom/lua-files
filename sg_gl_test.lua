@@ -115,10 +115,10 @@ function panel:on_render()
 							ax = ry, ay = rx, az = 0}
 	view4.camera = {eye = {2,2,2}, center = {0,0,-1}, up = {0,1,0}, az = 0}
 	self.sg:render(scenes)
-	print('render', timediff())
+	--print('render', timediff())
 end
 
-print('start', timediff())
+--print('start', timediff())
 main:init()
 
 os.exit(winapi.MessageLoop())

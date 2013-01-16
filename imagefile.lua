@@ -2,7 +2,7 @@
 
 local libs = {
 	png = 'libpng',
-	jpeg = 'nanojpeg',
+	jpeg = 'turbojpeg', --alternative: 'nanojpeg'
 	gif = 'giflib',
 	bmp = 'bmp',
 }
@@ -15,15 +15,15 @@ local function detect_type(path)
 end
 
 local function load(t, opt)
-	local ttype = t.type
-	if not ttype then
+	local itype = t.type
+	if not itype then
 		assert(t.path, 'image: missing type')
-		ttype = assert(detect_type(t.path), 'image: unknown file type')
+		itype = assert(detect_type(t.path), 'image: unknown file type')
 	end
-	local lib = assert(libs[ttype], string.format('image: unsupported type %s', ttype))
+	local lib = assert(libs[itype], string.format('image: unsupported type %s', itype))
 	local lib = require(lib)
 	local img = lib.load(t, opt)
-	if ttype == 'gif' then
+	if itype == 'gif' then
 		img = img.frames[1]
 	end
 	return img

@@ -1,7 +1,10 @@
+--libpng binding for libpng 1.5.6+
 local ffi = require'ffi'
+local bit = require'bit'
 local glue = require'glue'
+local bmpconv = require'bmpconv'
 require'libpng_h'
-
+require'stdio_h'
 local C = ffi.load'png'
 
 local PNG_LIBPNG_VER_STRING = '1.5.10'
@@ -9,7 +12,7 @@ local PNG_LIBPNG_VER_STRING = '1.5.10'
 local function string_reader(data)
 	local i = 1
 	return function(_, buf, sz)
-		if sz < 1 or #data < i then error'Reading past EOF' end
+		if sz < 1 or #data < i then error'reading past eof' end
 		local s = data:sub(i, i+sz-1)
 		ffi.copy(buf, s, #s)
 		i = i + #s
@@ -19,7 +22,7 @@ end
 local function cdata_reader(data, size)
 	data = ffi.cast('unsigned char*', data)
 	return function(_, buf, sz)
-		if sz < 1 or size < 1 then error'Reading past EOF' end
+		if sz < 1 or size < 1 then error'reading past eof' end
 		sz = math.min(size, sz)
 		ffi.copy(buf, data, sz)
 		data = data + sz
@@ -35,8 +38,9 @@ local pixel_formats = {
 	[C.PNG_COLOR_TYPE_GRAY_ALPHA] = 'ga',
 }
 
-local function load_(datatype, data, size, opt)
+local function decompress(datatype, data, size, opt)
 	return glue.fcall(function(finally)
+		opt = opt or {}
 
 		--create the state objects
 		local png_ptr = assert(C.png_create_read_struct(PNG_LIBPNG_VER_STRING, nil, nil, nil))
@@ -72,9 +76,8 @@ local function load_(datatype, data, size, opt)
 			end)
 			C.png_set_read_fn(png_ptr, nil, read_cb)
 		elseif datatype == 'path' then
-			require'stdio' --because using Lua file handles crashes libpng
 			local f = ffi.C.fopen(data, 'rb')
-			assert(f ~= nil, string.format('Could not open file %s', data))
+			assert(f ~= nil, string.format('could not open file %s', data))
 			finally(function()
 				C.png_init_io(png_ptr, nil)
 				ffi.C.fclose(f)
@@ -100,15 +103,14 @@ local function load_(datatype, data, size, opt)
 		color_type = bit.band(color_type, bit.bnot(C.PNG_COLOR_MASK_PALETTE))
 		local paletted = bit.band(color_type, C.PNG_COLOR_MASK_PALETTE) == C.PNG_COLOR_MASK_PALETTE
 		local pixel_format = assert(pixel_formats[color_type])
-		local dest_pixel_format = pixel_format
 
-		local gamma = opt and opt.gamma or 2.2
+		local gamma = opt.gamma or 2.2
 		local function set_alpha(png_ptr)
 			C.png_set_alpha_mode(png_ptr, C.PNG_ALPHA_OPTIMIZED, gamma) --> premultiply alpha
 		end
 
 		--request more conversions depending on pixel_format and the accept table
-		local accept = opt and opt.accept or {}
+		local accept = opt.accept or {}
 
 		local function strip_alpha(png_ptr)
 			local my_background = ffi.new('png_color_16', 0, 0xff, 0xff, 0xff, 0xff)
@@ -121,6 +123,7 @@ local function load_(datatype, data, size, opt)
 			end
 		end
 
+		local dest_pixel_format = pixel_format
 		if pixel_format == 'g' then
 			if accept.g then
 				--we're good
@@ -282,40 +285,39 @@ local function load_(datatype, data, size, opt)
 		local channels = C.png_get_channels(png_ptr, info_ptr)
 		assert(channels == #actual_pixel_format) --each letter a channel
 
-		local rowsize = w * channels
-		assert(C.png_get_rowbytes(png_ptr, info_ptr) == rowsize)
-		if accept.padded then
-			rowsize = bit.band(rowsize + 3, bit.bnot(3))
-		end
+		local stride = w * channels
+		assert(C.png_get_rowbytes(png_ptr, info_ptr) == stride)
+		if accept.padded then stride = bmpconv.pad_stride(stride) end
 
-		local row_format = accept.bottom_up and not accept.top_down
-									and 'bottom_up' or 'top_down'
+		local bottom_up = accept.bottom_up and not accept.top_down
 
 		--get the data bits
-		local size = rowsize * h
+		local size = stride * h
 		local data = ffi.new('uint8_t[?]', size)
 		local rows_ptr = ffi.new('uint8_t*[?]', h)
-		if row_format == 'bottom_up' then
+		if bottom_up then
 			for i=0,h-1 do
-				rows_ptr[h-1-i] = data + (rowsize * i)
+				rows_ptr[h-1-i] = data + (stride * i)
 			end
 		else
 			for i=0,h-1 do
-				rows_ptr[i] = data + (rowsize * i)
+				rows_ptr[i] = data + (stride * i)
 			end
 		end
 		C.png_read_image(png_ptr, rows_ptr)
 		C.png_read_end(png_ptr, info_ptr)
 
+		local format = {
+			pixel = dest_pixel_format,
+			stride = stride * (bottom_up and -1 or 1),
+		}
+		data, size, format = bmpconv.convert_best(data, size, format, opt.accept)
+
 		return {
 			w = w, h = h,
 			data = data,
 			size = size,
-			format = {
-				pixel = dest_pixel_format,
-				rows = row_format,
-				rowsize = rowsize,
-			},
+			format = format,
 			warnings = warnings,
 			file_format = pixel_format,
 			paletted = paletted,
@@ -325,11 +327,11 @@ end
 
 local function load(t, opt)
 	if t.string then
-		return load_('string', t.string, nil, opt)
+		return decompress('string', t.string, nil, opt)
 	elseif t.cdata then
-		return load_('cdata', t.cdata, t.size, opt)
+		return decompress('cdata', t.cdata, t.size, opt)
 	elseif t.path then
-		return load_('path', t.path, nil, opt)
+		return decompress('path', t.path, nil, opt)
 	else
 		error'unspecified data source: path, string or cdata expected'
 	end

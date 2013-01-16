@@ -1,13 +1,9 @@
 local glue = require'glue'
 local ffi = require'ffi'
-local libpng = require'libpng'
 local pp = require'pp'.pp
 local readfile = glue.readfile
-
-local function dir(d)
-	local f = io.popen('ls -1 '..d)
-	return glue.collect(f:lines())
-end
+require'unit'
+local libpng = require'libpng'
 
 for _,filename in ipairs(dir('media/png/pngsuite/*.png')) do
 	print(filename,'----------------------------')

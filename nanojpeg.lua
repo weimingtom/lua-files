@@ -1,6 +1,8 @@
 --nanojpeg2 binding, see csrc/nanojpeg2.c
 local ffi = require'ffi'
 local glue = require'glue'
+local stdio = require'stdio'
+local bmpconv = require'bmpconv'
 local C = ffi.load'nanojpeg2'
 
 ffi.cdef[[
@@ -23,7 +25,7 @@ local error_messages = {
 	'Syntax error',
 }
 
-local function load_(data, sz)
+local function decompress(data, sz, opt)
 	return glue.fcall(function(finally)
 		local nj = C.njInit()
 		finally(function() C.njDone(nj) end)
@@ -33,32 +35,30 @@ local function load_(data, sz)
 		local h = C.njGetHeight(nj)
 		local iscolor = C.njIsColor(nj) == 1
 		local pixel_format = iscolor and 'rgb' or 'g'
-		local rowsize = w * (iscolor and 3 or 1)
+		local stride = w * (iscolor and 3 or 1)
 		local sz = C.njGetImageSize(nj)
-		local tmpdata = C.njGetImage(nj) --pointer to RGB888[] or G8[]
-		local data = ffi.new('uint8_t[?]', sz)
-		ffi.copy(data, tmpdata, sz)
+		local data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
+		local format = {
+			pixel = pixel_format,
+			stride = stride,
+		}
+		data, sz, format = bmpconv.convert_best(data, sz, format, opt and opt.accept, true)
 		return {
 			w = w, h = h,
-			data = data,
-			size = sz,
-			format = {
-				pixel = pixel_format,
-				rows = 'top_down',
-				rowsize = rowsize,
-			},
+			data = data, size = sz,
+			format = format,
 		}
 	end)
 end
 
-local function load(t)
+local function load(t, opt)
 	if t.string then
-		return load_(t.string, #t.string)
+		return decompress(t.string, #t.string, opt)
 	elseif t.cdata then
-		return load_(t.cdata, t.size)
+		return decompress(t.cdata, t.size, opt)
 	elseif t.path then
-		local data = assert(glue.readfile(t.path))
-		return load_(data, #data)
+		local data, sz = stdio.readfile(t.path)
+		return decompress(data, sz, opt)
 	else
 		error'unspecified data source: path, string or cdata expected'
 	end

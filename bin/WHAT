@@ -15,7 +15,9 @@ libEGL.dll      ufo
 libGLESv2.dll   ufo
 libjpeg-62.dll  libjpeg-turbo 1.2.1-for-gcc
 lpeg.dll        csrc/lpeg
-lua51.dll       ufo
+lua51.dll       csrc/luajit
+luajit.exe      csrc/luajit
+luajit.exe.manifest (for winapi: enable comctl 6)
 md5.dll         csrc/md5
 nanojpeg        csrc/nanojpeg
 pixman          ufo
@@ -27,5 +29,3 @@ turbojpeg.dll   csrc/turbojpeg
 vararg.dll      csrc/vararg
 z.dll           ufo
 zlib.dll        csrc/zlib
-luajit.exe      ufo
-luajit.exe.manifest (for winapi: enable comctl 6)

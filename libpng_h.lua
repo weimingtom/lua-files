@@ -1,6 +1,6 @@
 --result of cpp png.h from libpng 1.5.12 (and no longjmp stuff)
 local ffi = require'ffi'
-require'stdiotypes'
+require'stdio_h_types'
 
 ffi.cdef[[
 enum {

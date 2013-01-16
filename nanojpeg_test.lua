@@ -1,24 +1,32 @@
-local ffi = require'ffi'
-local nanojpeg2 = require'nanojpeg'
 local glue = require'glue'
+local ffi = require'ffi'
+local pp = require'pp'.pp
+local readfile = glue.readfile
+require'unit'
+local nanojpeg = require'nanojpeg'
 
-local function dir(d)
-	local f = io.popen('ls -1 '..d)
-	return glue.collect(f:lines())
-end
-
-local readfile=require'glue'.readfile
-local pp=require'pp'.pp
 for _,filename in ipairs(dir('media/jpeg/*.jpg')) do
 	print(filename,'------------------------')
-	if not filename:match'testimgari.jpg' --arithmetic coding not supported
-		and not filename:match'testimgp.jpg' --progressive jpeg not supported
-	then
-		local s = readfile(filename)
-		local cdata = ffi.new('unsigned char[?]', #s+1, s)
+	local s = readfile(filename)
+	local cdata = ffi.new('unsigned char[?]', #s+1, s)
 
-		pp(nanojpeg2.load({cdata = cdata, size = #s}))
-		pp(nanojpeg2.load({string = s}))
-		pp(nanojpeg2.load({path = filename}))
+	if filename:match'testimgari.jpg' then
+		print'arithmetic coding not supported'
+	elseif filename:match'testimgp.jpg' then
+		print'progressive jpeg not supported'
+	else
+		pp(nanojpeg.load({path = filename}))
+		pp(nanojpeg.load({cdata = cdata, size = #s}))
+
+		for _,row_format in ipairs{'top_down', 'bottom_up'} do
+			for _,padded in ipairs{true, false} do
+				for _,pixel_format in ipairs{'g', 'ga', 'ag', 'rgb', 'bgr', 'rgba', 'argb', 'bgra', 'abgr'} do
+					print('>', pixel_format, row_format, padded)
+					pp(nanojpeg.load({string = s},
+						{accept = {[row_format] = true, [pixel_format] = true, padded = padded}}
+					))
+				end
+			end
+		end
 	end
 end

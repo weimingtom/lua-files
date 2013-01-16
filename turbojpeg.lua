@@ -2,6 +2,8 @@
 local ffi = require'ffi'
 local bit = require'bit'
 local glue = require'glue'
+local stdio = require'stdio'
+local bmpconv = require'bmpconv'
 require'turbojpeg_h'
 local C = ffi.load'turbojpeg'
 
@@ -13,6 +15,7 @@ end
 local function checkh(h) if h == nil then err() end; return h end
 local function checkz(i) if i ~= 0 then err() end; end
 
+--[[TODO:
 local function compress(...)
 	return glue.fcall(function(finally)
 		local tj = checkh(C.tjInitCompress())
@@ -20,10 +23,7 @@ local function compress(...)
 		finally(function() checkz(C.tjDestroy(tj)) end)
 	end)
 end
-
-local function TJPAD(width)
-	return bit.band(width + 3, bit.bnot(3))
-end
+]]
 
 local function TJSCALED(d, factor)
 	return math.floor((d * factor.num + factor.denom - 1) / factor.denom)
@@ -49,7 +49,7 @@ end
 
 local tjPixelSize = {[0] = 3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4}
 
-local TJPF = {
+local TJPF = { --note that ga and ag are not supported
 	rgb  = C.TJPF_RGB,
 	bgr  = C.TJPF_BGR,
 	rgbx = C.TJPF_RGBX,
@@ -71,25 +71,23 @@ local TJSAMP = {
   [C.TJSAMP_440]  = '4:4:0',
 }
 
-local best_pixel_formats = {'rgba', 'bgra', 'abgr', 'argb', 'rgb', 'bgr',
-								'rgbx', 'bgrx', 'xbgr', 'xrgb', 'g'}
-local best_row_formats = {'top_down', 'bottom_up'}
+local pixel_format_pref_list = {'rgba', 'bgra', 'abgr', 'argb', 'rgb', 'bgr',
+											'rgbx', 'bgrx', 'xbgr', 'xrgb', 'g'} --renounce alpha first, then color
 
-local function first_format(format_list, accept)
+local function best_pixel_format(accept)
 	if accept then
-		for _,format in ipairs(format_list) do
+		for _,format in ipairs(pixel_format_pref_list) do
 			if accept[format] then return format end
 		end
 	end
-	return format_list[1]
+	return pixel_format_pref_list[1]
 end
 
 --[[
 	opt = {
 		accept = {
-			pixel_format = one of TJPF keys above ('rgb'),
-			top_down = true | false (true),
-			bottom_up = true | false (false),
+			[pixel_format] = true (rgba = true),
+			[row_format] = true (top_down = true),
 			padded = true | false (false),
 		}
 		fit_w = N (image's width),
@@ -108,8 +106,8 @@ local function decompress(data, size, opt)
 	opt = opt or {}
 
 	--look for the best accepted combination of pixel and row format
-	local pixel_format = first_format(best_pixel_formats, opt.accept)
-	local row_format = first_format(best_row_formats, opt.accept)
+	local pixel_format = best_pixel_format(opt.accept)
+	local bottom_up = opt.accept and opt.accept.bottom_up and not opt.accept.top_down
 	local padded = opt.accept and opt.accept.padded or false
 
 	return glue.fcall(function(finally)
@@ -127,11 +125,11 @@ local function decompress(data, size, opt)
 		assert(scalingFactor, 'invalid scaling numerator and/or denominator')
 		local scaledWidth = TJSCALED(w, scalingFactor)
 		local scaledHeight = TJSCALED(h, scalingFactor)
-		local pitch = scaledWidth * tjPixelSize[pixelFormat]
-		if padded then pitch = TJPAD(pitch) end
+		local stride = scaledWidth * tjPixelSize[pixelFormat]
+		if padded then stride = bmpconv.pad_stride(stride) end
 
 		local flags = bit.bor(
-			row_format == 'bottom_up' and C.TJFLAG_BOTTOMUP or 0,
+			bottom_up and C.TJFLAG_BOTTOMUP or 0,
 			opt.upsample == 'fast' and C.TJFLAG_FASTUPSAMPLE
 				or opt.upsample == 'smooth' and 0
 				or (glue.assert(not opt.upsample, 'invalid upsample option %s', opt.upsample) and 0),
@@ -144,29 +142,44 @@ local function decompress(data, size, opt)
 			opt.force_sse3 and C.TJFLAG_FORCESSE3 or 0
 		)
 
-		local sz = pitch * scaledHeight
+		local sz = stride * scaledHeight
 		local buf = ffi.new('uint8_t[?]', sz)
-		checkz(C.tjDecompress2(tj, data, size, buf, opt.fit_w or w, pitch,
+		checkz(C.tjDecompress2(tj, data, size, buf, opt.fit_w or w, stride,
 										opt.fit_h or h, pixelFormat, flags))
+
+		local format = {
+			pixel = pixel_format,
+			stride = stride * (bottom_up and -1 or 1),
+		}
+		buf, sz, format = bmpconv.convert_best(buf, sz, format, opt.accept)
 
 		return {
 			w = w, h = h,
 			data = buf,
 			size = sz,
-			format = {
-				pixel = pixel_format,
-				rows = row_format,
-				rowsize = pitch,
-			},
+			format = format,
 			subsampling = subsampling,
 		}
 	end)
 end
 
+local function load(t, opt)
+	if t.string then
+		return decompress(t.string, #t.string, opt)
+	elseif t.cdata then
+		return decompress(t.cdata, t.size, opt)
+	elseif t.path then
+		local buf, sz = stdio.readfile(t.path)
+		return decompress(buf, sz, opt)
+	else
+		error'unspecified data source: path, string or cdata expected'
+	end
+end
+
 if not ... then require'turbojpeg_test' end
 
 return {
-	compress = compress,
-	decompress = decompress,
+	load = load,
+	C = C,
 }
 
