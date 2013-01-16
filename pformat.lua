@@ -10,10 +10,14 @@ local escapes = { --don't add unpopular escapes here
 local function escape_byte(c)
 	return string.format('\\%03d', c:byte())
 end
+local function escape_byte_short(c)
+	return string.format('\\%d', c:byte())
+end
 local function quote_string(s, quote)
 	s = s:gsub('.', escapes)
 	s = s:gsub(quote, '\\%1')
-	s = s:gsub('[^\32-\126]', escape_byte)
+	s = s:gsub('[^\32-\126][0-9]', escape_byte)
+	s = s:gsub('[^\32-\126]', escape_byte_short)
 	return s
 end
 
@@ -68,6 +72,7 @@ local function write_function(f, write, quote)
 end
 
 local function pformat(v, quote)
+	quote = quote or "'"
 	if v == nil or type(v) == 'boolean' then
 		return tostring(v)
 	elseif type(v) == 'number' then
@@ -86,6 +91,7 @@ local function is_serializable(v)
 end
 
 local function pwrite(v, write, quote)
+	quote = quote or "'"
 	if v == nil or type(v) == 'boolean' then
 		write(tostring(v))
 	elseif type(v) == 'number' then

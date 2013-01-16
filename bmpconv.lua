@@ -42,7 +42,8 @@ local function eachpixel(pixelsize, dpixelsize, convert)
 		local dj, stride, dstride = normalize_strides(sz, stride, dstride)
 		for sj=0,sz-1,stride do
 			local di = dj
-			for si=0,stride-1,pixelsize do
+			for si=0,stride-pixelsize,pixelsize do
+				--print(sj,sj+si,'',sz,stride,pixelsize)
 				convert(dst, di, src, sj+si)
 				di = di+dpixelsize
 			end
@@ -142,7 +143,7 @@ matrix.ag.bgr = matrix.ag.rgb
 
 --frontend
 
-local function pad_stride(stride)
+local function pad_stride(stride) --increase stride to the next number divisible by 4
 	return sign(stride) * bit.band(math.abs(stride) + 3, bit.bnot(3))
 end
 

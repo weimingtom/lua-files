@@ -1,15 +1,8 @@
 glue = require'glue'
+local pf = require'pformat'
 
-local function escape_byte(c)
-	return string.format('\\%03d', c:byte())
-end
-local escapes = { --don't add unpopular escapes here
-	['\t'] = '\\t',
-	['\n'] = '\\n',
-	['\r'] = '\\r',
-}
 local function tostr(s)
-	return tostring(s):gsub('.', escapes):gsub('[^\32-\126]', escape_byte)
+	return pf.pformat(tostring(s))
 end
 
 function _test(t1, t2, prefix, level)
@@ -24,8 +17,8 @@ function _test(t1, t2, prefix, level)
 		end
 	else
 		if (t1 == t1 and t1 ~= t2) or (t1 ~= t1 and t2 == t2) then
-			error("'" .. tostr(t1) .. "' ~= '" .. tostr(t2) ..
-								"' [" .. prefix .. "]", level)
+			error(tostr(t1) .. " ~= " .. tostr(t2) ..
+								" [" .. prefix .. "]", level)
 		end
 	end
 end

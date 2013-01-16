@@ -18,7 +18,7 @@ local function write_value(v, write, indent, parents, quote, onerror, depth, wwr
 			parents[v] = true
 		end
 		write'{'
-		local maxn = 0; while v[maxn+1] do maxn = maxn+1 end
+		local maxn = 0; while v[maxn+1] ~= nil do maxn = maxn+1 end
 		local first = true
 		for k,v in pairs(v) do
 			if not (maxn > 0 and type(k) == 'number' and k == math.floor(k) and k >= 1 and k <= maxn) then
@@ -47,26 +47,28 @@ local function write_value(v, write, indent, parents, quote, onerror, depth, wwr
 end
 
 local function pwrite(v, write, indent, parents, quote, onerror)
-	return write_value(v, write, indent, parents, quote or "'", onerror, 1)
+	return write_value(v, write, indent, parents, quote, onerror, 1)
 end
 
 local function pformat(v, indent, parents, quote, onerror)
 	local buf = {}
-	write_value(v, function(s) buf[#buf+1] = s end, indent, parents, quote or "'", onerror, 1)
+	write_value(v, function(s) buf[#buf+1] = s end, indent, parents, quote, onerror, 1)
 	return table.concat(buf)
 end
 
 local function fwrite(file, v, indent, parents, quote, onerror)
 	local f = assert(io.open(file, 'wb'))
 	f:write'return '
-	write_value(v, function(s) f:write(s) end, indent, parents, quote or "'", onerror, 1)
+	write_value(v, function(s) f:write(s) end, indent, parents, quote, onerror, 1)
 	f:close()
 end
 
 local function pp(...)
+	local t = {}
 	for i=1,select('#',...) do
-		print(pformat(select(i,...), '   ', {}))
+		t[i] = pformat(select(i,...), '   ', {})
 	end
+	print(unpack(t))
 	return ...
 end
 
