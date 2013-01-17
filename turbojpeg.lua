@@ -8,8 +8,7 @@ require'turbojpeg_h'
 local C = ffi.load'turbojpeg'
 
 local function err()
-	error(string.format('TurboJPEG Error: %s',
-			ffi.string(C.tjGetErrorStr())), 3)
+	error(string.format('turbojpeg error: %s', ffi.string(C.tjGetErrorStr())), 3)
 end
 
 local function checkh(h) if h == nil then err() end; return h end
@@ -169,8 +168,17 @@ local function load(t, opt)
 	elseif t.path then
 		local buf, sz = stdio.readfile(t.path)
 		return decompress(buf, sz, opt)
+	elseif t.stream then
+		--TODO: read stream
+		error'NYI'
+	elseif t.cdata_source then
+		--TODO: read entire cdata source
+		error'NYI'
+	elseif t.string_source then
+		--TODO: read entire string_source
+		error'NYI'
 	else
-		error'unspecified data source: path, string or cdata expected'
+		error'invalid data source (path, string, cdata/size, stream, cdata_source, string_source accepted)'
 	end
 end
 

@@ -4,4 +4,4 @@ need: mingw, cmake, nasm (all in PATH)
 > cmake -G "MSYS Makefiles" .
 > make
 
-copy libturbojpeg.dll to bin/turbojpeg.dll
+copy libjpeg.dll to bin/libjpeg.dll

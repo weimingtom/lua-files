@@ -2,7 +2,6 @@ local ffi = require'ffi'
 local glue = require'glue'
 local bmpconv = require'bmpconv'
 require'giflib_h'
-
 local C = ffi.load'giflib5'
 
 local function ptr(p) --convert NULL to nil

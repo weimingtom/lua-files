@@ -1,9 +1,7 @@
---result of cpp stdio.h from mingw
+--result of cpp stdio.h from mingw (FILE made opaque)
 local ffi = require'ffi'
-require'systypes'
 
-ffi.cdef[[
-typedef struct _iobuf
+--[[
 {
 	char* _ptr;
 	int _cnt;
@@ -13,6 +11,9 @@ typedef struct _iobuf
 	int _charbuf;
 	int _bufsiz;
 	char* _tmpfname;
-} FILE;
+}
+]]
+ffi.cdef[[
+typedef struct _iobuf FILE;
 typedef long long fpos_t;
 ]]

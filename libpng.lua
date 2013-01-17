@@ -31,6 +31,14 @@ local function cdata_reader(data, size)
 	end
 end
 
+local function cdata_source_reader(read)
+	error'NYI'
+end
+
+local function string_source_reader(read)
+	error'NYI'
+end
+
 local pixel_formats = {
 	[C.PNG_COLOR_TYPE_GRAY] = 'g',
 	[C.PNG_COLOR_TYPE_RGB] = 'rgb',
@@ -38,7 +46,7 @@ local pixel_formats = {
 	[C.PNG_COLOR_TYPE_GRAY_ALPHA] = 'ga',
 }
 
-local function decompress(datatype, data, size, opt)
+local function load(src, opt)
 	return glue.fcall(function(finally)
 		opt = opt or {}
 
@@ -67,24 +75,30 @@ local function decompress(datatype, data, size, opt)
 		C.png_set_error_fn(png_ptr, nil, error_cb, warning_cb)
 
 		--setup input source
-		if datatype == 'string' or datatype == 'cdata' then
-			local reader = datatype == 'string' and string_reader(data) or cdata_reader(data, size)
+		if src.string or src.cdata or src.string_source or src.cdata_source then
+			local reader =
+				src.string and string_reader(src.string)
+				or src.cdata and cdata_reader(src.cdata, src.size)
+				or src.cdata_source and cdata_source_reader(src.cdata_source)
+				or src.string_source and string_source_reader(src.string_source)
 			local read_cb = ffi.cast('png_rw_ptr', reader)
 			finally(function()
 				C.png_set_read_fn(png_ptr, nil, nil)
 				read_cb:free()
 			end)
 			C.png_set_read_fn(png_ptr, nil, read_cb)
-		elseif datatype == 'path' then
-			local f = ffi.C.fopen(data, 'rb')
-			assert(f ~= nil, string.format('could not open file %s', data))
+		elseif src.path then
+			local f = ffi.C.fopen(src.path, 'rb')
+			glue.assert(f ~= nil, 'could not open file %s', src.path)
 			finally(function()
 				C.png_init_io(png_ptr, nil)
 				ffi.C.fclose(f)
 			end)
 			C.png_init_io(png_ptr, f)
+		elseif src.stream then
+			C.png_init_io(png_ptr, src.stream)
 		else
-			error'missing data source'
+			error'invalid data source (string, cdata/size, path, stream, cdata_source, string_source accepted)'
 		end
 
 		--read header
@@ -321,18 +335,6 @@ local function decompress(datatype, data, size, opt)
 		}
 		return bmpconv.convert_best(img, opt.accept)
 	end)
-end
-
-local function load(t, opt)
-	if t.string then
-		return decompress('string', t.string, nil, opt)
-	elseif t.cdata then
-		return decompress('cdata', t.cdata, t.size, opt)
-	elseif t.path then
-		return decompress('path', t.path, nil, opt)
-	else
-		error'unspecified data source: path, string or cdata expected'
-	end
 end
 
 if not ... then require'libpng_test' end
