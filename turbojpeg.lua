@@ -147,19 +147,17 @@ local function decompress(data, size, opt)
 		checkz(C.tjDecompress2(tj, data, size, buf, opt.fit_w or w, stride,
 										opt.fit_h or h, pixelFormat, flags))
 
-		local format = {
-			pixel = pixel_format,
-			stride = stride * (bottom_up and -1 or 1),
-		}
-		buf, sz, format = bmpconv.convert_best(buf, sz, format, opt.accept)
-
-		return {
-			w = w, h = h,
+		local img = {
 			data = buf,
 			size = sz,
-			format = format,
+			pixel = pixel_format,
+			stride = stride,
+			orientation = bottom_up and 'bottom_up' or 'top_down',
+			w = w,
+			h = h,
 			subsampling = subsampling,
 		}
+		return bmpconv.convert_best(img, opt.accept)
 	end)
 end
 

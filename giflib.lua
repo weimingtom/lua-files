@@ -1,18 +1,18 @@
-alocal glue = require'glue'
 local ffi = require'ffi'
+local glue = require'glue'
+local bmpconv = require'bmpconv'
 require'giflib_h'
 
 local C = ffi.load'giflib5'
 
 local function ptr(p) --convert NULL to nil
-	if p == nil then return nil end
-	return p
+	return p ~= nil and p or nil
 end
 
 local function string_reader(data)
 	local i = 1
 	return function(_, buf, sz)
-		if sz < 1 or #data < i then error'Reading pass EOF' end
+		if sz < 1 or #data < i then error'reading pass eof' end
 		local s = data:sub(i, i+sz-1)
 		ffi.copy(buf, s, #s)
 		i = i + #s
@@ -23,7 +23,7 @@ end
 local function cdata_reader(data, size)
 	data = ffi.cast('unsigned char*', data)
 	return function(_, buf, sz)
-		if sz < 1 or size < 1 then error'Reading pass EOF' end
+		if sz < 1 or size < 1 then error'reading pass eof' end
 		sz = math.min(size, sz)
 		ffi.copy(buf, data, sz)
 		data = data + sz
@@ -87,7 +87,8 @@ local function parse(datatype, data, size, handle) --callback-based parser
 	end)
 end
 
-local function load_(datatype, data, size, mode)
+local function decompress(datatype, data, size, opt)
+	local mode = opt and opt.mode
 	return parse(datatype, data, size, function(ft)
 		local t = {frames = {}}
 		t.w, t.h = ft.SWidth, ft.SHeight
@@ -127,34 +128,34 @@ local function load_(datatype, data, size, mode)
 				di = di+4
 			end
 
-			t.frames[#t.frames + 1] = {
-				w = w, h = h,
+			local img = {
 				data = data,
 				size = sz,
-				format = {
-					pixel = 'rgba',
-					rows = 'top_down',
-					rowsize = w * 4,
-				},
+				pixel = 'rgba',
+				stride = w * 4,
+				orientation = 'top_down',
+				w = w,
+				h = h,
 				x = si.ImageDesc.Left,
 				y = si.ImageDesc.Top,
 				delay_ms = delay,
 			}
+			img = bmpconv.convert_best(img, opt and opt.accept)
+			t.frames[#t.frames + 1] = img
 		end
 		return t
 	end)
 end
 
 local function load(t, opt)
-	local mode = opt and opt.mode
 	if t.string then
-		return load_('string', t.string, nil, mode)
+		return decompress('string', t.string, nil, opt)
 	elseif t.cdata then
-		return load_('cdata', t.cdata, t.size, mode)
+		return decompress('cdata', t.cdata, t.size, opt)
 	elseif t.path then
-		return load_('path', t.path, nil, mode)
+		return decompress('path', t.path, nil, opt)
 	elseif t.fileno then
-		return load_('fileno', t.fileno, nil, mode)
+		return decompress('fileno', t.fileno, nil, opt)
 	else
 		error'unspecified data source: path, string, cdata or fileno expected'
 	end

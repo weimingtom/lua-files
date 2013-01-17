@@ -21,13 +21,17 @@ end
 
 --test pixel format conversions, including flipping and diff. output stride
 
-local function test_pix(s1, s2, pix1, pix2, stride1, stride2)
+local function test_pix(s1, s2, pix1, pix2, stride1, stride2, w, h, flip)
 	local data, sz = ffi.new('uint8_t[?]', #s1+1, s1), #s1
-	local data, sz = bmpconv.convert(data, sz,
-										{pixel = pix1, stride = stride1},
-										{pixel = pix2, stride = stride2})
-	local s = ffi.string(data, sz)
-	test(s, s2)
+	local dst = bmpconv.convert(
+		{pixel = pix1, stride = stride1, orientation = 'top_down', w = w, h = h, data = data, size = sz},
+		{pixel = pix2, stride = stride2, orientation = flip and 'bottom_up' or 'top_down'})
+	local s = ffi.string(dst.data, dst.size)
+	--we test row by row so we can ignore the garbage bytes between rowsize and the end of the stride
+	local rowsize = w*#pix2
+	for i=0,h*stride2-1,stride2 do
+		test(s:sub(i,i+rowsize), s2:sub(i,i+rowsize))
+	end
 end
 
 local function shift_chars(s,x) --'aa1122' -> 'bb2233'; 'dog' -> 'eph'
@@ -38,19 +42,22 @@ end
 
 local function test_conv(s1, s2, pix1, pix2)
 	local stride1, stride2 = #s1, #s2
+	local width = #s1/#pix1
+	assert(width == 1)
 	pp(s1, s2, stride1, stride2)
-	test_pix(s1, s2, pix1, pix2, stride1, stride2)
+	test_pix(s1, s2, pix1, pix2, stride1, stride2, width, 1)
 
-	local s1  = s1..shift_chars(s1,1) --two s1 rows using stride1
-	local p   = '\0\0\0\0' --4 bytes padding
-	local s3  = shift_chars(s2,1)..p..s2..p --two s2 flipped rows using stride2+4
-	local s2  = s2..p..shift_chars(s2,1)..p --two s2 rows using stride2+4
-	stride1 = stride1
-	stride2 = stride2 + 4
-	pp(s1, s2, stride1, stride2)
-	test_pix(s1, s2, pix1, pix2, stride1, stride2)  --convert 2 rows
+	local p1 = '\0\0\0' --3 bytes padding
+	local p2 = '\0\0\0\0' --4 bytes padding
+	local s1 = s1..p1..shift_chars(s1,1)..p1 --two s1 rows using stride1+2
+	local s3 = shift_chars(s2,1)..p2..s2..p2 --two s2 flipped rows using stride2+4
+	local s2 = s2..p2..shift_chars(s2,1)..p2 --two s2 rows using stride2+4
+	stride1 = stride1 + #p1
+	stride2 = stride2 + #p2
+	pp(s1, s2, pix1, stride1, pix2, stride2)
+	test_pix(s1, s2, pix1, pix2, stride1, stride2, width, 2) --convert 2 rows
 	pp(s1, s3, stride1, stride2)
-	test_pix(s1, s3, pix1, pix2, stride1, -stride2) --flip two rows
+	test_pix(s1, s3, pix1, pix2, stride1, stride2, width, 2, true) --flip two rows
 end
 
 test_conv('ag', 'ga', 'ag', 'ga')

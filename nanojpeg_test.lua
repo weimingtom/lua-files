@@ -22,9 +22,11 @@ for _,filename in ipairs(dir('media/jpeg/*.jpg')) do
 			for _,padded in ipairs{true, false} do
 				for _,pixel_format in ipairs{'g', 'ga', 'ag', 'rgb', 'bgr', 'rgba', 'argb', 'bgra', 'abgr'} do
 					print('>', pixel_format, row_format, padded)
-					pp(nanojpeg.load({string = s},
-						{accept = {[row_format] = true, [pixel_format] = true, padded = padded}}
-					))
+					local t = nanojpeg.load({string = s},
+							{accept = {[row_format] = true, [pixel_format] = true, padded = padded}})
+					pp(t)
+					assert(t.stride == padded and bmpconv.pad_stride(#t.pixel * t.w) or #t.pixel * t.w)
+					assert(t.size == t.stride * t.h)
 				end
 			end
 		end

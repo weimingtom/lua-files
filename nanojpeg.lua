@@ -31,23 +31,15 @@ local function decompress(data, sz, opt)
 		finally(function() C.njDone(nj) end)
 		local res = C.njDecode(nj, data, sz)
 		assert(res == 0, error_messages[res])
-		local w = C.njGetWidth(nj)
-		local h = C.njGetHeight(nj)
-		local iscolor = C.njIsColor(nj) == 1
-		local pixel_format = iscolor and 'rgb' or 'g'
-		local stride = w * (iscolor and 3 or 1)
-		local sz = C.njGetImageSize(nj)
-		local data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
-		local format = {
-			pixel = pixel_format,
-			stride = stride,
-		}
-		data, sz, format = bmpconv.convert_best(data, sz, format, opt and opt.accept, true)
-		return {
-			w = w, h = h,
-			data = data, size = sz,
-			format = format,
-		}
+		local img = {}
+		img.w = C.njGetWidth(nj)
+		img.h = C.njGetHeight(nj)
+		img.pixel = C.njIsColor(nj) == 1 and 'rgb' or 'g'
+		img.stride = img.w * #img.pixel
+		img.orientation = 'top_down'
+		img.size = C.njGetImageSize(nj)
+		img.data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
+		return bmpconv.convert_best(img, opt and opt.accept, true)
 	end)
 end
 

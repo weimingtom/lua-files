@@ -307,21 +307,19 @@ local function decompress(datatype, data, size, opt)
 		C.png_read_image(png_ptr, rows_ptr)
 		C.png_read_end(png_ptr, info_ptr)
 
-		local format = {
-			pixel = dest_pixel_format,
-			stride = stride * (bottom_up and -1 or 1),
-		}
-		data, size, format = bmpconv.convert_best(data, size, format, opt.accept)
-
-		return {
-			w = w, h = h,
+		local img = {
 			data = data,
 			size = size,
-			format = format,
+			pixel = dest_pixel_format,
+			stride = stride,
+			orientation = bottom_up and 'bottom_up' or 'top_down',
+			w = w,
+			h = h,
 			warnings = warnings,
 			file_format = pixel_format,
 			paletted = paletted,
 		}
+		return bmpconv.convert_best(img, opt.accept)
 	end)
 end
 
