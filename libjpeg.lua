@@ -208,7 +208,7 @@ local function load(src, opt)
 		setopt('dct', 'dct_method', dct_methods)
 		setopt('upsampling', 'do_fancy_upsampling', upsample_methods)
 		setopt('smoothing', 'do_block_smoothing', smoothing_methods)
-		cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and opt.render_pass and 1 or 0
+		cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and opt.render_scan and 1 or 0
 		C.jpeg_start_decompress(cinfo)
 
 		--get info about the output image
