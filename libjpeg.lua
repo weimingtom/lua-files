@@ -54,7 +54,7 @@ local dct_methods = {
 local upsample_methods = {fast = 0, smooth = 1}
 local smoothing_methods = {fuzzy = 1, blocky = 0}
 
-local function callback_manager(mgr_ctype, callbacks)
+local function callback_manager(mgr_ctype, callbacks) --create a callback manager and its destructor
 	local mgr = ffi.new(mgr_ctype)
 	local cbt = {}
 	for k,f in pairs(callbacks) do
@@ -75,7 +75,7 @@ local function callback_manager(mgr_ctype, callbacks)
 	return mgr, free_mgr
 end
 
-local function set_source(cinfo, finally, callbacks)
+local function set_source(cinfo, finally, callbacks) --create a source manager and set it up
 	local mgr, free_mgr = callback_manager('jpeg_source_mgr', callbacks)
 	cinfo.src = mgr
 	finally(function() --the finalizer needs to pin mgr or it gets collected
@@ -109,28 +109,35 @@ local function set_cdata_reader_source(cinfo, finally, read)
 	cb.init_source = glue.pass
 	cb.term_source = glue.pass
 	cb.resync_to_restart = C.jpeg_resync_to_restart
+	local buf, sz --pin it so it doesn't get collected till next read
 	function cb.fill_input_buffer(cinfo)
-		local buf, sz = read()
+		buf, sz = read()
 		assert(buf, 'eof')
 		cinfo.src.bytes_in_buffer = sz
 		cinfo.src.next_input_byte = buf
 		return true
 	end
 	function cb.skip_input_data(cinfo, sz)
-		local to_read = sz - cinfo.src.bytes_in_buffer
-		cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
-		cinfo.src.bytes_in_buffer = math.max(0, cinfo.src.bytes_in_buffer - sz)
-		while to_read > 0 do
-			local buf, newsz = read()
-			assert(buf, 'eof')
-			to_read = to_read - newsz
-			cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
-			cinfo.src.bytes_in_buffer = cinfo.src.bytes_in_buffer - sz
+		if sz <= 0 then return end
+		while sz > cinfo.src.bytes_in_buffer do
+			sz = sz - cinfo.src.bytes_in_buffer
+			cb.fill_input_buffer(cinfo)
 		end
+		cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
+		cinfo.src.bytes_in_buffer = cinfo.src.bytes_in_buffer - sz
 	end
 	set_source(cinfo, finally, cb)
 	cinfo.src.bytes_in_buffer = 0
 	cinfo.src.next_input_byte = nil
+end
+
+local function set_string_reader_source(cinfo, finally, read)
+	local s --pin it so it doesn't get collected till next read
+	local function read_wrapper()
+		s = read()
+		return ffi.cast('const uint8_t*', s), #s --const prevents string copy
+	end
+	return set_cdata_reader_source(cinfo, finally, read_wrapper)
 end
 
 local function load(src, opt)
@@ -175,7 +182,9 @@ local function load(src, opt)
 		elseif src.cdata_source then
 			set_cdata_reader_source(cinfo, finally, src.cdata_source)
 		elseif src.string_source then
-			error'NYI'
+			set_string_reader_source(cinfo, finally, src.string_source)
+		else
+			error'invalid source: stream, path, string, cdata/size, cdata_source, string_source accepted'
 		end
 
 		--read header and get info
@@ -246,15 +255,18 @@ local function load(src, opt)
 				local actual = C.jpeg_read_scanlines(cinfo, rows + i, n)
 				assert(actual == n)
 				assert(cinfo.output_scanline == i + actual)
+				if opt.update_lines then opt.update_lines(img) end
 			end
 		end
 
 		if cinfo.buffered_image == 1 then --multiscan reading
 			while C.jpeg_input_complete(cinfo) == 0 do
-				while opt.have_data() do
-					local ret = C.jpeg_consume_input(cinfo)
-					assert(ret ~= C.JPEG_SUSPENDED)
-					if ret == C.JPEG_REACHED_EOI then break end
+				if opt.have_data then
+					while opt.have_data() do
+						local ret = C.jpeg_consume_input(cinfo)
+						assert(ret ~= C.JPEG_SUSPENDED)
+						if ret == C.JPEG_REACHED_EOI then break end
+					end
 				end
 				C.jpeg_start_output(cinfo, cinfo.input_scan_number)
 				read_scanlines()
