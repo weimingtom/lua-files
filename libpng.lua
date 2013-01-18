@@ -9,18 +9,8 @@ local C = ffi.load'png'
 
 local PNG_LIBPNG_VER_STRING = '1.5.10'
 
-local function string_reader(data)
-	local i = 1
-	return function(_, buf, sz)
-		if sz < 1 or #data < i then error'reading past eof' end
-		local s = data:sub(i, i+sz-1)
-		ffi.copy(buf, s, #s)
-		i = i + #s
-	end
-end
-
 local function cdata_reader(data, size)
-	data = ffi.cast('unsigned char*', data)
+	data = ffi.cast('uint8_t*', data) --ensure byte type
 	return function(_, buf, sz)
 		if sz < 1 or size < 1 then error'reading past eof' end
 		sz = math.min(size, sz)
@@ -29,6 +19,10 @@ local function cdata_reader(data, size)
 		size = size - sz
 		return sz
 	end
+end
+
+local function string_reader(s)
+	return cdata_reader(ffi.cast('const uint8_t*', s), #s) --const ensures no copying
 end
 
 local function cdata_source_reader(read)

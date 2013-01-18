@@ -1,7 +1,15 @@
 --result of `cpp jpeglib.h` from libjpeg-turbo 1.2.1 (JPEG_LIB_VERSION = 62 in jconfig.h)
+--made a few typedefs for useful structs and callbacks
 local ffi = require'ffi'
 require'stdio_h_types'
 ffi.cdef[[
+enum {
+	JPEG_SUSPENDED,     /* Suspended due to lack of input data */
+	JPEG_REACHED_SOS,   /* Reached start of new scan */
+	JPEG_REACHED_EOI,   /* Reached end of image */
+	JPEG_ROW_COMPLETED, /* Completed one iMCU row */
+	JPEG_SCAN_COMPLETED /* Completed last iMCU row of a scan */
+};
 typedef unsigned char boolean;
 typedef short INT16;
 typedef signed int INT32;
@@ -119,6 +127,7 @@ struct jpeg_compress_struct {
   double input_gamma;
   int data_precision;
   int num_components;
+  J_COLOR_SPACE jpeg_color_space;
   J_COLOR_SPACE jpeg_color_space;
   jpeg_component_info * comp_info;
   JQUANT_TBL * quant_tbl_ptrs[4];
@@ -254,9 +263,9 @@ typedef struct jpeg_decompress_struct {
   struct jpeg_color_deconverter * cconvert;
   struct jpeg_color_quantizer * cquantize;
 } jpeg_decompress_struct;
-typedef void (*jpeg_error_exit) (j_common_ptr cinfo);
+typedef void (*jpeg_error_exit_callback) (j_common_ptr cinfo);
 typedef struct jpeg_error_mgr {
-  jpeg_error_exit error_exit;
+  jpeg_error_exit_callback error_exit;
   void (*emit_message) (j_common_ptr cinfo, int msg_level);
   void (*output_message) (j_common_ptr cinfo);
   void (*format_message) (j_common_ptr cinfo, char * buffer);
@@ -288,15 +297,20 @@ struct jpeg_destination_mgr {
   boolean (*empty_output_buffer) (j_compress_ptr cinfo);
   void (*term_destination) (j_compress_ptr cinfo);
 };
-struct jpeg_source_mgr {
+typedef void (*jpeg_init_source_callback) (j_decompress_ptr cinfo);
+typedef boolean (*jpeg_fill_input_buffer_callback) (j_decompress_ptr cinfo);
+typedef void (*jpeg_skip_input_data_callback) (j_decompress_ptr cinfo, long num_bytes);
+typedef boolean (*jpeg_resync_to_restart_callback) (j_decompress_ptr cinfo, int desired);
+typedef void (*jpeg_term_source_callback) (j_decompress_ptr cinfo);
+typedef struct jpeg_source_mgr {
   const JOCTET * next_input_byte;
   size_t bytes_in_buffer;
-  void (*init_source) (j_decompress_ptr cinfo);
-  boolean (*fill_input_buffer) (j_decompress_ptr cinfo);
-  void (*skip_input_data) (j_decompress_ptr cinfo, long num_bytes);
-  boolean (*resync_to_restart) (j_decompress_ptr cinfo, int desired);
-  void (*term_source) (j_decompress_ptr cinfo);
-};
+  jpeg_init_source_callback init_source;
+  jpeg_fill_input_buffer_callback fill_input_buffer;
+  jpeg_skip_input_data_callback skip_input_data;
+  jpeg_resync_to_restart_callback resync_to_restart;
+  jpeg_term_source_callback term_source;
+} jpeg_source_mgr;
 typedef struct jvirt_sarray_control * jvirt_sarray_ptr;
 typedef struct jvirt_barray_control * jvirt_barray_ptr;
 struct jpeg_memory_mgr {
@@ -315,53 +329,52 @@ struct jpeg_memory_mgr {
   long max_alloc_chunk;
 };
 typedef boolean (*jpeg_marker_parser_method) (j_decompress_ptr cinfo);
-extern struct jpeg_error_mgr * jpeg_std_error
- (struct jpeg_error_mgr * err);
-extern void jpeg_CreateCompress (j_compress_ptr cinfo, int version, size_t structsize);
-extern void jpeg_CreateDecompress (j_decompress_ptr cinfo, int version, size_t structsize);
-extern void jpeg_destroy_compress (j_compress_ptr cinfo);
-extern void jpeg_destroy_decompress (j_decompress_ptr cinfo);
-extern void jpeg_stdio_dest (j_compress_ptr cinfo, FILE * outfile);
-extern void jpeg_stdio_src (j_decompress_ptr cinfo, FILE * infile);
-extern void jpeg_set_defaults (j_compress_ptr cinfo);
-extern void jpeg_set_colorspace (j_compress_ptr cinfo, J_COLOR_SPACE colorspace);
-extern void jpeg_default_colorspace (j_compress_ptr cinfo);
-extern void jpeg_set_quality (j_compress_ptr cinfo, int quality, boolean force_baseline);
-extern void jpeg_set_linear_quality (j_compress_ptr cinfo, int scale_factor, boolean force_baseline);
-extern void jpeg_add_quant_table (j_compress_ptr cinfo, int which_tbl, const unsigned int *basic_table, int scale_factor, boolean force_baseline);
-extern int jpeg_quality_scaling (int quality);
-extern void jpeg_simple_progression (j_compress_ptr cinfo);
-extern void jpeg_suppress_tables (j_compress_ptr cinfo, boolean suppress);
-extern JQUANT_TBL * jpeg_alloc_quant_table (j_common_ptr cinfo);
-extern JHUFF_TBL * jpeg_alloc_huff_table (j_common_ptr cinfo);
-extern void jpeg_start_compress (j_compress_ptr cinfo, boolean write_all_tables);
-extern JDIMENSION jpeg_write_scanlines (j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines);
-extern void jpeg_finish_compress (j_compress_ptr cinfo);
-extern JDIMENSION jpeg_write_raw_data (j_compress_ptr cinfo, JSAMPIMAGE data, JDIMENSION num_lines);
-extern void jpeg_write_marker (j_compress_ptr cinfo, int marker, const JOCTET * dataptr, unsigned int datalen);
-extern void jpeg_write_m_header (j_compress_ptr cinfo, int marker, unsigned int datalen);
-extern void jpeg_write_m_byte (j_compress_ptr cinfo, int val);
-extern void jpeg_write_tables (j_compress_ptr cinfo);
-extern int jpeg_read_header (j_decompress_ptr cinfo, boolean require_image);
-extern boolean jpeg_start_decompress (j_decompress_ptr cinfo);
-extern JDIMENSION jpeg_read_scanlines (j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines);
-extern boolean jpeg_finish_decompress (j_decompress_ptr cinfo);
-extern JDIMENSION jpeg_read_raw_data (j_decompress_ptr cinfo, JSAMPIMAGE data, JDIMENSION max_lines);
-extern boolean jpeg_has_multiple_scans (j_decompress_ptr cinfo);
-extern boolean jpeg_start_output (j_decompress_ptr cinfo, int scan_number);
-extern boolean jpeg_finish_output (j_decompress_ptr cinfo);
-extern boolean jpeg_input_complete (j_decompress_ptr cinfo);
-extern void jpeg_new_colormap (j_decompress_ptr cinfo);
-extern int jpeg_consume_input (j_decompress_ptr cinfo);
-extern void jpeg_calc_output_dimensions (j_decompress_ptr cinfo);
-extern void jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit);
-extern void jpeg_set_marker_processor (j_decompress_ptr cinfo, int marker_code, jpeg_marker_parser_method routine);
-extern jvirt_barray_ptr * jpeg_read_coefficients (j_decompress_ptr cinfo);
-extern void jpeg_write_coefficients (j_compress_ptr cinfo, jvirt_barray_ptr * coef_arrays);
-extern void jpeg_copy_critical_parameters (j_decompress_ptr srcinfo, j_compress_ptr dstinfo);
-extern void jpeg_abort_compress (j_compress_ptr cinfo);
-extern void jpeg_abort_decompress (j_decompress_ptr cinfo);
-extern void jpeg_abort (j_common_ptr cinfo);
-extern void jpeg_destroy (j_common_ptr cinfo);
-extern boolean jpeg_resync_to_restart (j_decompress_ptr cinfo, int desired);
+struct jpeg_error_mgr * jpeg_std_error (struct jpeg_error_mgr * err);
+void jpeg_CreateCompress (j_compress_ptr cinfo, int version, size_t structsize);
+void jpeg_CreateDecompress (j_decompress_ptr cinfo, int version, size_t structsize);
+void jpeg_destroy_compress (j_compress_ptr cinfo);
+void jpeg_destroy_decompress (j_decompress_ptr cinfo);
+void jpeg_stdio_dest (j_compress_ptr cinfo, FILE * outfile);
+void jpeg_stdio_src (j_decompress_ptr cinfo, FILE * infile);
+void jpeg_set_defaults (j_compress_ptr cinfo);
+void jpeg_set_colorspace (j_compress_ptr cinfo, J_COLOR_SPACE colorspace);
+void jpeg_default_colorspace (j_compress_ptr cinfo);
+void jpeg_set_quality (j_compress_ptr cinfo, int quality, boolean force_baseline);
+void jpeg_set_linear_quality (j_compress_ptr cinfo, int scale_factor, boolean force_baseline);
+void jpeg_add_quant_table (j_compress_ptr cinfo, int which_tbl, const unsigned int *basic_table, int scale_factor, boolean force_baseline);
+int jpeg_quality_scaling (int quality);
+void jpeg_simple_progression (j_compress_ptr cinfo);
+void jpeg_suppress_tables (j_compress_ptr cinfo, boolean suppress);
+JQUANT_TBL * jpeg_alloc_quant_table (j_common_ptr cinfo);
+JHUFF_TBL * jpeg_alloc_huff_table (j_common_ptr cinfo);
+void jpeg_start_compress (j_compress_ptr cinfo, boolean write_all_tables);
+JDIMENSION jpeg_write_scanlines (j_compress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION num_lines);
+void jpeg_finish_compress (j_compress_ptr cinfo);
+JDIMENSION jpeg_write_raw_data (j_compress_ptr cinfo, JSAMPIMAGE data, JDIMENSION num_lines);
+void jpeg_write_marker (j_compress_ptr cinfo, int marker, const JOCTET * dataptr, unsigned int datalen);
+void jpeg_write_m_header (j_compress_ptr cinfo, int marker, unsigned int datalen);
+void jpeg_write_m_byte (j_compress_ptr cinfo, int val);
+void jpeg_write_tables (j_compress_ptr cinfo);
+int jpeg_read_header (j_decompress_ptr cinfo, boolean require_image);
+boolean jpeg_start_decompress (j_decompress_ptr cinfo);
+JDIMENSION jpeg_read_scanlines (j_decompress_ptr cinfo, JSAMPARRAY scanlines, JDIMENSION max_lines);
+boolean jpeg_finish_decompress (j_decompress_ptr cinfo);
+JDIMENSION jpeg_read_raw_data (j_decompress_ptr cinfo, JSAMPIMAGE data, JDIMENSION max_lines);
+boolean jpeg_has_multiple_scans (j_decompress_ptr cinfo);
+boolean jpeg_start_output (j_decompress_ptr cinfo, int scan_number);
+boolean jpeg_finish_output (j_decompress_ptr cinfo);
+boolean jpeg_input_complete (j_decompress_ptr cinfo);
+void jpeg_new_colormap (j_decompress_ptr cinfo);
+int jpeg_consume_input (j_decompress_ptr cinfo);
+void jpeg_calc_output_dimensions (j_decompress_ptr cinfo);
+void jpeg_save_markers (j_decompress_ptr cinfo, int marker_code, unsigned int length_limit);
+void jpeg_set_marker_processor (j_decompress_ptr cinfo, int marker_code, jpeg_marker_parser_method routine);
+jvirt_barray_ptr * jpeg_read_coefficients (j_decompress_ptr cinfo);
+void jpeg_write_coefficients (j_compress_ptr cinfo, jvirt_barray_ptr * coef_arrays);
+void jpeg_copy_critical_parameters (j_decompress_ptr srcinfo, j_compress_ptr dstinfo);
+void jpeg_abort_compress (j_compress_ptr cinfo);
+void jpeg_abort_decompress (j_decompress_ptr cinfo);
+void jpeg_abort (j_common_ptr cinfo);
+void jpeg_destroy (j_common_ptr cinfo);
+boolean jpeg_resync_to_restart (j_decompress_ptr cinfo, int desired);
 ]]

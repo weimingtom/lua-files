@@ -1,5 +1,6 @@
 --result of cpp png.h from libpng 1.5.12 (and no longjmp stuff)
 local ffi = require'ffi'
+require'systypes_h'
 require'stdio_h_types'
 
 ffi.cdef[[

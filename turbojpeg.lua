@@ -91,9 +91,9 @@ end
 		}
 		fit_w = N (image's width),
 		fit_h = N (image's height),
-		scaling_numerator = N (1),
-		scaling_denominator = N (1),
-		upsample = 'fast' | 'smooth' ('smooth'),
+		scale_num = N (1),
+		scale_denom = N (1),
+		upsampling = 'fast' | 'smooth' ('smooth'),
 		dct = 'accurate' | 'fast' (impl. specific default),
 		force_mmx = true (false),
 		force_sse = true (false),
@@ -120,7 +120,7 @@ local function decompress(data, size, opt)
 		w, h, subsampling = w[0], h[0], TJSAMP[subsampling[0]]
 
 		local pixelFormat = TJPF[pixel_format]
-		local scalingFactor = getScalingFactor(opt.scaling_numerator, opt.scaling_denominator)
+		local scalingFactor = getScalingFactor(opt.scale_num, opt.scale_denom)
 		assert(scalingFactor, 'invalid scaling numerator and/or denominator')
 		local scaledWidth = TJSCALED(w, scalingFactor)
 		local scaledHeight = TJSCALED(h, scalingFactor)
@@ -129,9 +129,9 @@ local function decompress(data, size, opt)
 
 		local flags = bit.bor(
 			bottom_up and C.TJFLAG_BOTTOMUP or 0,
-			opt.upsample == 'fast' and C.TJFLAG_FASTUPSAMPLE
-				or opt.upsample == 'smooth' and 0
-				or (glue.assert(not opt.upsample, 'invalid upsample option %s', opt.upsample) and 0),
+			opt.upsampling == 'fast' and C.TJFLAG_FASTUPSAMPLE
+				or opt.upsampling == 'smooth' and 0
+				or (glue.assert(not opt.upsampling, 'invalid upsampling option %s', opt.upsampling) and 0),
 			opt.dct == 'accurate' and C.TJFLAG_ACCURATEDCT
 				or opt.dct == 'fast' and C.TJFLAG_FASTDCT
 				or (glue.assert(not opt.dct, 'invalid dct option %s', opt.dct) and 0),

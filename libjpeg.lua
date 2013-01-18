@@ -10,23 +10,41 @@ local C = ffi.load'libjpeg'
 local LIBJPEG_VERSION = 62
 
 local pixel_formats = {
-	[C.JCS_UNKNOWN]  = false,
 	[C.JCS_GRAYSCALE]= 'g',
-	[C.JCS_RGB]      = 'rgb',
-	[C.JCS_YCbCr]    = 'ycbcr', --TODO: planar
+	[C.JCS_YCbCr]    = 'ycc',
 	[C.JCS_CMYK]     = 'cmyk',
 	[C.JCS_YCCK]     = 'ycck',
+	[C.JCS_RGB]      = 'rgb',
 	[C.JCS_EXT_RGB]  = 'rgb',
-	[C.JCS_EXT_RGBX] = 'rgbx',
 	[C.JCS_EXT_BGR]  = 'bgr',
+	[C.JCS_EXT_RGBX] = 'rgbx',
 	[C.JCS_EXT_BGRX] = 'bgrx',
-	[C.JCS_EXT_XBGR] = 'xbgr',
 	[C.JCS_EXT_XRGB] = 'xrgb',
+	[C.JCS_EXT_XBGR] = 'xbgr',
 	[C.JCS_EXT_RGBA] = 'rgba',
 	[C.JCS_EXT_BGRA] = 'bgra',
-	[C.JCS_EXT_ABGR] = 'abgr',
 	[C.JCS_EXT_ARGB] = 'argb',
+	[C.JCS_EXT_ABGR] = 'abgr',
 }
+
+local color_spaces = glue.index(pixel_formats)
+
+local conversions = { --all conversions that libjpeg implements (source = {dest1, ...}}
+	ycc = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr', 'g'},
+	g = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr'},
+	ycck = {'cmyk'},
+}
+
+local function best_pixel_format(pixel, accept)
+	if not accept or accept[pixel] then return pixel end --no preference or source accepted
+	if conversions[pixel] then
+		for _,pixel in ipairs(conversions[pixel]) do
+			if accept[pixel] then return pixel end --convertible to the best accepted format
+		end
+		return conversions[pixel][1] --convertible to a format that bmpconv can use as input
+	end
+	return pixel --not convertible
+end
 
 local dct_methods = {
 	accurate = C.JDCT_ISLOW,
@@ -36,6 +54,85 @@ local dct_methods = {
 local upsample_methods = {fast = 0, smooth = 1}
 local smoothing_methods = {fuzzy = 1, blocky = 0}
 
+local function callback_manager(mgr_ctype, callbacks)
+	local mgr = ffi.new(mgr_ctype)
+	local cbt = {}
+	for k,f in pairs(callbacks) do
+		if type(f) == 'function' then
+			cbt[k] = ffi.cast(string.format('jpeg_%s_callback', k), f)
+			mgr[k] = cbt[k]
+		else
+			mgr[k] = f
+		end
+	end
+	local function free_mgr()
+		for k,cb in pairs(cbt) do
+			mgr[k] = nil
+			cb:free()
+		end
+	end
+	ffi.gc(mgr, free_mgr)
+	return mgr, free_mgr
+end
+
+local function set_source(cinfo, finally, callbacks)
+	local mgr, free_mgr = callback_manager('jpeg_source_mgr', callbacks)
+	cinfo.src = mgr
+	finally(function() --the finalizer needs to pin mgr or it gets collected
+		cinfo.src = nil
+		ffi.gc(mgr, nil)
+		free_mgr()
+	end)
+end
+
+local function set_cdata_source(cinfo, finally, data, size)
+	local cb = {}
+	cb.init_source = glue.pass
+	cb.term_source = glue.pass
+	cb.resync_to_restart = C.jpeg_resync_to_restart
+	function cb.fill_input_buffer(cinfo) error'eof' end
+	function cb.skip_input_data(cinfo, sz)
+		cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
+		cinfo.src.bytes_in_buffer = cinfo.src.bytes_in_buffer - sz
+	end
+	set_source(cinfo, finally, cb)
+	cinfo.src.bytes_in_buffer = size
+	cinfo.src.next_input_byte = data
+end
+
+local function set_string_source(cinfo, finally, s)
+	set_cdata_source(cinfo, finally, ffi.cast('const uint8_t*', s), #s) --const prevents copying
+end
+
+local function set_cdata_reader_source(cinfo, finally, read)
+	local cb = {}
+	cb.init_source = glue.pass
+	cb.term_source = glue.pass
+	cb.resync_to_restart = C.jpeg_resync_to_restart
+	function cb.fill_input_buffer(cinfo)
+		local buf, sz = read()
+		assert(buf, 'eof')
+		cinfo.src.bytes_in_buffer = sz
+		cinfo.src.next_input_byte = buf
+		return true
+	end
+	function cb.skip_input_data(cinfo, sz)
+		local to_read = sz - cinfo.src.bytes_in_buffer
+		cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
+		cinfo.src.bytes_in_buffer = math.max(0, cinfo.src.bytes_in_buffer - sz)
+		while to_read > 0 do
+			local buf, newsz = read()
+			assert(buf, 'eof')
+			to_read = to_read - newsz
+			cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
+			cinfo.src.bytes_in_buffer = cinfo.src.bytes_in_buffer - sz
+		end
+	end
+	set_source(cinfo, finally, cb)
+	cinfo.src.bytes_in_buffer = 0
+	cinfo.src.next_input_byte = nil
+end
+
 local function load(src, opt)
 	return glue.fcall(function(finally)
 		opt = opt or {}
@@ -43,7 +140,7 @@ local function load(src, opt)
 
 		--setup error handling
 		local jerr = ffi.new'jpeg_error_mgr'
-		local err_cb = ffi.cast('jpeg_error_exit', function(cinfo)
+		local err_cb = ffi.cast('jpeg_error_exit_callback', function(cinfo)
 			local buf = ffi.new'uint8_t[512]'
 			cinfo.err.format_message(cinfo, buf)
 			error(string.format('libjpeg error: %s', ffi.string(buf)))
@@ -56,7 +153,7 @@ local function load(src, opt)
 		jerr.error_exit = err_cb
 		cinfo.err = C.jpeg_std_error(jerr)
 
-		--init library
+		--init state
 		C.jpeg_CreateDecompress(cinfo, LIBJPEG_VERSION, ffi.sizeof(cinfo))
 		finally(function() C.jpeg_destroy_decompress(cinfo) end)
 
@@ -70,23 +167,24 @@ local function load(src, opt)
 				C.jpeg_stdio_src(cinfo, nil)
 				ffi.C.fclose(f)
 			end)
-			C.jpeg_stdio_src(cinfo, src.stream)
+			C.jpeg_stdio_src(cinfo, f)
 		elseif src.string then
+			set_string_source(cinfo, finally, src.string)
 		elseif src.cdata then
+			set_cdata_source(cinfo, finally, src.cdata, src.size)
 		elseif src.cdata_source then
+			set_cdata_reader_source(cinfo, finally, src.cdata_source)
 		elseif src.string_source then
+			error'NYI'
 		end
 
 		--read header and get info
 		C.jpeg_read_header(cinfo, 1)
-
 		local img = {}
 		img.image_w = cinfo.image_width
 		img.image_h = cinfo.image_height
-
-		local channels = cinfo.num_components
-		img.image_pixel = assert(pixel_formats[tonumber(cinfo.jpeg_color_space)], 'unknown pixel format')
-
+		img.image_pixel = assert(pixel_formats[tonumber(cinfo.jpeg_color_space)])
+		assert(cinfo.num_components == #img.image_pixel)
 		img.jfif = cinfo.saw_JFIF_marker == 1 and {
 			maj_ver = cinfo.JFIF_major_version,
 			min_ver = cinfo.JFIF_minor_version,
@@ -99,58 +197,78 @@ local function load(src, opt)
 		} or nil
 
 		--set decompression options
-		--TODO: find out which conversions are supported by libjpeg
-		cinfo.out_color_space = C.JCS_EXT_RGBA
-
-		cinfo.scale_num = opt.scaling_numerator or 1
-		cinfo.scale_denom = opt.scaling_denominator or 1
-
+		img.pixel = best_pixel_format(img.image_pixel, opt.accept)
+		cinfo.out_color_space = assert(color_spaces[img.pixel])
+		cinfo.output_components = #img.pixel
+		cinfo.scale_num = opt.scale_num or 1
+		cinfo.scale_denom = opt.scale_denom or 1
 		local function setopt(k, dk, enum)
 			if opt[k] then cinfo[dk] = glue.assert(enum[opt[k]], 'invalid %s %s', k, opt[k]) end
 		end
 		setopt('dct', 'dct_method', dct_methods)
-		setopt('upsample', 'do_fancy_upsampling', upsample_methods)
+		setopt('upsampling', 'do_fancy_upsampling', upsample_methods)
 		setopt('smoothing', 'do_block_smoothing', smoothing_methods)
-
-		--set the options and get info about the output
+		cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and opt.render_pass and 1 or 0
 		C.jpeg_start_decompress(cinfo)
+
+		--get info about the output image
 		img.w = cinfo.output_width
 		img.h = cinfo.output_height
-		img.pixel = assert(pixel_formats[tonumber(cinfo.out_color_space)])
 		img.stride = cinfo.output_width * cinfo.output_components
 		if opt.accept and opt.accept.padded then
 			img.stride = bmpconv.pad_stride(img.stride)
 		end
 
-		print(img.pixel, cinfo.output_components)
-
-		--allocate a scanline buffer: if writeline is given, only allocate the recommended height
-		local buf_h = opt.writeline and cinfo.rec_outbuf_height or img.h
-		img.size = buf_h * img.stride
+		--allocate image and rows buffers
+		img.size = img.h * img.stride
 		img.data = ffi.new('uint8_t[?]', img.size)
-		local rows_ptr = ffi.new('uint8_t*[?]', buf_h)
+		local rows = ffi.new('uint8_t*[?]', img.h)
+
+		--arrange row pointers according to accepted orientation
 		local bottom_up = opt.accept and opt.accept.bottom_up and not opt.accept.top_down
 		if bottom_up then
-			assert(buf_h == img.h) --bottom_up only works with a full buffer
-			for i=0,buf_h-1 do
-				rows_ptr[h-1-i] = img.data + (img.stride * i)
+			for i=0,img.h-1 do
+				rows[img.h-1-i] = img.data + (i * img.stride)
 			end
 			img.orientation = 'bottom_up'
 		else
-			for i=0,buf_h-1 do
-				rows_ptr[i] = img.data + (img.stride * i)
+			for i=0,img.h-1 do
+				rows[i] = img.data + (i * img.stride)
 			end
 			img.orientation = 'top_down'
 		end
 
-		--read the scanlines
-		while cinfo.output_scanline < cinfo.output_height do
-			C.jpeg_read_scanlines(cinfo, rows_ptr, buf_h)
-			if opt.writeline then opt.writeline(buf, sz) end
+		local function read_scanlines()
+			img.scan = cinfo.output_scan_number
+			while cinfo.output_scanline < img.h do
+				local i = cinfo.output_scanline
+				local n = math.min(img.h - i, cinfo.rec_outbuf_height)
+				local actual = C.jpeg_read_scanlines(cinfo, rows + i, n)
+				assert(actual == n)
+				assert(cinfo.output_scanline == i + actual)
+			end
+		end
+
+		if cinfo.buffered_image == 1 then --multiscan reading
+			while C.jpeg_input_complete(cinfo) == 0 do
+				while opt.have_data() do
+					local ret = C.jpeg_consume_input(cinfo)
+					assert(ret ~= C.JPEG_SUSPENDED)
+					if ret == C.JPEG_REACHED_EOI then break end
+				end
+				C.jpeg_start_output(cinfo, cinfo.input_scan_number)
+				read_scanlines()
+				img = bmpconv.convert_best(img, opt.accept)
+				opt.render_scan(img)
+				C.jpeg_finish_output(cinfo)
+			end
+		else
+			read_scanlines()
+			img = bmpconv.convert_best(img, opt.accept)
 		end
 
 		C.jpeg_finish_decompress(cinfo)
-		return bmpconv.convert_best(img, opt.accept)
+		return img --last scan
 	end)
 end
 

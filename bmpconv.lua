@@ -25,8 +25,10 @@ local function eachrow(convert) --width is in pixels, stride is in bytes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local rowsize = src.w * pixelsize
+		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type
+		local dst_data = ffi.cast('uint8_t*', dst.data) --ensure byte type
 		for sj=0,src.size-1,src.stride do
-			convert(dst.data, dj, src.data, sj, rowsize)
+			convert(dst_data, dj, src_data, sj, rowsize)
 			dj = dj+dstride
 		end
 	end
@@ -40,10 +42,12 @@ local function eachpixel(convert) --width is in pixels, stride is in bytes
 		local pixelsize = #src.pixel
 		local dpixelsize = #dst.pixel
 		local rowsize = src.w * pixelsize
+		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type
+		local dst_data = ffi.cast('uint8_t*', dst.data) --ensure byte type
 		for sj=0,src.size-1,src.stride do
 			local di = dj
 			for si=0,rowsize-1,pixelsize do
-				convert(dst.data, di, src.data, sj+si)
+				convert(dst_data, di, src_data, sj+si)
 				di = di+dpixelsize
 			end
 			dj = dj+dstride
@@ -162,11 +166,13 @@ local function convert(src, fmt, force_copy)
 	end
 
 	--check consistency of the input
+	--NOTE: we support unknow pixel formats as long as #pixel == pixel size in bytes
 	assert(src.size == src.h * src.stride)
 	assert(src.stride >= src.w * #src.pixel)
 	assert(fmt.stride >= src.w * #fmt.pixel)
 	assert(src.orientation == 'top_down' or src.orientation == 'bottom_up')
 	assert(fmt.orientation == 'top_down' or fmt.orientation == 'bottom_up')
+	assert(src.pixel == fmt.pixel or (matrix[src.pixel] and matrix[src.pixel][fmt.pixel]))
 
 	--see if we need to allocate a new destination buffer or we can write over the source one
 	if force_copy
@@ -179,14 +185,7 @@ local function convert(src, fmt, force_copy)
 	end
 
 	--see if we need a pixel conversion or just flipping and/or changing stride
-	local operation
-	if src.pixel == fmt.pixel then --we can copy rows of unknown pixel formats as long as they match
-		operation = copy_rows
-	else
-		operation = matrix[src.pixel] and matrix[src.pixel][fmt.pixel]
-		assert(operation, string.format('cannot convert from %s to %s', src.pixel, fmt.pixel))
-	end
-
+	local operation = src.pixel == fmt.pixel and copy_rows or matrix[src.pixel][fmt.pixel]
 	operation(src, dst)
 	return dst
 end

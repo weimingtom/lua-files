@@ -1,11 +1,10 @@
---go@ x:\work\lua-files\bin\luajit.exe -bl test.lua
-local function invert2(data, sz, stride, dstride) -- ga -> ag and back
-	local dj = 0
-	for j=0,sz-1,stride do
-		for i=0,0+stride-1,2 do
-			data[dj+i],data[dj+i+1] = data[j+i+1],data[j+i]
-		end
-		dj = dj+dstride
-	end
-	return data, sz
-end
+local ffi=require'ffi'
+
+local data = ffi.new('uint8_t[?]', 6, '\1\2\3\4\5\6')
+local rows = ffi.new('uint8_t*[?]', 3)
+rows[0] = data
+rows[1] = data+2
+rows[2] = data+4
+
+rows2 = rows+1
+print(rows2[0][0])
