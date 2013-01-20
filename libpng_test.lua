@@ -6,7 +6,7 @@ local readfile = glue.readfile
 require'unit'
 local libpng = require'libpng'
 
-for _,filename in ipairs(dir('media/png/pngsuite/*.png')) do
+for _,filename in ipairs(dir('media/png/good/*.png')) do
 	print(filename,'----------------------------')
 	local s = readfile(filename)
 	local cdata = ffi.new('unsigned char[?]', #s+1, s)

@@ -1,15 +1,9 @@
---pixel format upsampling, resampling and downsampling in luajit.
---supports all conversions between 8bit gray and rgb pixel formats with or without an alpha channel.
+--pixel format upsampling, resampling and downsampling for luajit.
+--supports all conversions between packed 8 bit-per-channel gray and rgb pixel formats + cmyk to all.
 --supports different input/output orientations, namely top-down and bottom-up, and different strides.
-local ffi = require'ffi'
-local bit = require'bit'
+--can split up the conversion to multiple threads taking advantage of multiple cpu cores.
 
-local matrix = {
-	g = {},
-	ga = {}, ag = {},
-	rgb = {}, bgr = {},
-	rgba = {}, bgra = {}, argb = {}, abgr = {},
-}
+--conversion functions: these must run in lanes, so don't drag any upvalues with them
 
 local function dstride(src, dst)
 	local dj, dstride = 0, dst.stride
@@ -20,40 +14,55 @@ local function dstride(src, dst)
 	return dj, dstride
 end
 
-local function eachrow(convert) --width is in pixels, stride is in bytes
-	return function(src, dst)
+local function eachrow(convert)
+	return function(src, dst, h1, h2)
+		local ffi = require'ffi' --for lanes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local rowsize = src.w * pixelsize
-		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type
-		local dst_data = ffi.cast('uint8_t*', dst.data) --ensure byte type
-		for sj=0,src.size-1,src.stride do
+		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type (also src.data is a number when in lanes)
+		local dst_data = ffi.cast('uint8_t*', dst.data)
+		for sj=h1,h2*src.stride-1,src.stride do
 			convert(dst_data, dj, src_data, sj, rowsize)
 			dj = dj+dstride
 		end
 	end
 end
 
-local copy_rows = eachrow(function(d, i, s, j, rowsize) ffi.copy(d+i, s+j, rowsize) end)
+local copy_rows = eachrow(function(d, i, s, j, rowsize)
+	local ffi = require'ffi' --for lanes
+	ffi.copy(d+i, s+j, rowsize)
+end)
 
-local function eachpixel(convert) --width is in pixels, stride is in bytes
-	return function(src, dst)
+local function eachpixel(convert)
+	return function(src, dst, h1, h2)
+		local ffi = require'ffi' --for lanes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local dpixelsize = #dst.pixel
 		local rowsize = src.w * pixelsize
-		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type
-		local dst_data = ffi.cast('uint8_t*', dst.data) --ensure byte type
-		for sj=0,src.size-1,src.stride do
+		local src_data = ffi.cast('uint8_t*', src.data)
+		local dst_data = ffi.cast('uint8_t*', dst.data)
+		for sj=h1,h2*src.stride-1,src.stride do
 			local di = dj
-			for si=0,rowsize-1,pixelsize do
-				convert(dst_data, di, src_data, sj+si)
+			for si=sj,sj+rowsize-1,pixelsize do --keep this loop tight!
+				convert(dst_data, di, src_data, si)
 				di = di+dpixelsize
 			end
 			dj = dj+dstride
 		end
 	end
 end
+
+--pixel conversion functions: these must also run in lanes
+
+local matrix = {
+	g = {},
+	ga = {}, ag = {},
+	rgb = {}, bgr = {},
+	rgba = {}, bgra = {}, argb = {}, abgr = {},
+	cmyk = {},
+}
 
 matrix.ga.ag = eachpixel(function(d, i, s, j) d[i], d[i+1] = s[j+1], s[j] end)
 matrix.ag.ga = matrix.ga.ag
@@ -144,13 +153,63 @@ matrix.ga.bgr = matrix.ga.rgb
 matrix.ag.rgb = eachpixel(function(d, i, s, j) d[i], d[i+1], d[i+2] = s[j+1], s[j+1], s[j+1] end)
 matrix.ag.bgr = matrix.ag.rgb
 
+local function inv_cmyk2rgb(c, m, y, k) return c * k / 255, m * k / 255, y * k / 255 end --from webkit
+
+matrix.cmyk.rgb  = eachpixel(function(d, i, s, j) d[i+0], d[i+1], d[i+2] = inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3]) end)
+matrix.cmyk.bgr  = eachpixel(function(d, i, s, j) d[i+2], d[i+1], d[i+0] = inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3]) end)
+matrix.cmyk.rgba = eachpixel(function(d, i, s, j) d[i+0], d[i+1], d[i+2] = inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3]); d[i+3] = 0xff end)
+matrix.cmyk.bgra = eachpixel(function(d, i, s, j) d[i+2], d[i+1], d[i+0] = inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3]); d[i+3] = 0xff end)
+matrix.cmyk.argb = eachpixel(function(d, i, s, j) d[i+1], d[i+2], d[i+3] = inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3]); d[i+0] = 0xff end)
+matrix.cmyk.abgr = eachpixel(function(d, i, s, j) d[i+3], d[i+2], d[i+1] = inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3]); d[i+0] = 0xff end)
+matrix.cmyk.g = eachpixel(function(d, i, s, j) d[i] = rgb2g(inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3])) end)
+matrix.cmyk.ga = eachpixel(function(d, i, s, j) d[i+0], d[i+1] = rgb2g(inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3])), 0xff end)
+matrix.cmyk.ag = eachpixel(function(d, i, s, j) d[i+1], d[i+0] = rgb2g(inv_cmyk2rgb(s[j], s[j+1], s[j+2], s[j+3])), 0xff end)
+
 --frontend
+
+local ffi = require'ffi'
+local bit = require'bit'
 
 local function pad_stride(stride) --increase stride to the next number divisible by 4
 	return bit.band(stride + 3, bit.bnot(3))
 end
 
-local function convert(src, fmt, force_copy)
+local function supported(src, dst)
+	return src == dst or (matrix[src] and matrix[src][dst] and true or false)
+end
+
+local function split_range(x1, x2, n) --split a numeric range in N equal ranges
+	--
+end
+
+local function split_work(src, dst, operation, threads) --split operation to multiple lanes
+	threads = math.min(threads, src.h)
+	local lanes = require'lanes'.configure()
+
+	local src_data = src.data
+	local dst_data = dst.data
+	src.data = tonumber(ffi.cast('uint32_t', ffi.cast('void*', src.data))) --pointers can only reach lanes as numbers
+	dst.data = tonumber(ffi.cast('uint32_t', ffi.cast('void*', dst.data)))
+
+	local linda = lanes.linda()
+	local op_thread = lanes.gen(operation)
+	local tt = {}
+	local next_range = split_range(0, src.h-1, threads)
+	for i=1,threads do
+		local h1, h2 = next_range()
+		tt[#tt+1] = op_thread(src, dst, h1, h2) --each thread will work on a separate section of the buffer
+	end
+	for _,thread in ipairs(tt) do --TODO: wait for threads
+		local _ = thread[1]
+	end
+
+	src.data = src_data
+	dst.data = dst_data
+end
+
+local MIN_SIZE_PER_THREAD = 1024 * 1024 --1MB/thread to make it worth to create one
+
+local function convert(src, fmt, opt)
 	local dst = {}
 	for k,v in pairs(src) do dst[k] = v end --all image info gets copied
 	dst.pixel = fmt.pixel
@@ -166,16 +225,16 @@ local function convert(src, fmt, force_copy)
 	end
 
 	--check consistency of the input
-	--NOTE: we support unknow pixel formats as long as #pixel == pixel size in bytes
+	--NOTE: we support unknown pixel formats as long as #pixel == pixel size in bytes
 	assert(src.size == src.h * src.stride)
 	assert(src.stride >= src.w * #src.pixel)
 	assert(fmt.stride >= src.w * #fmt.pixel)
 	assert(src.orientation == 'top_down' or src.orientation == 'bottom_up')
 	assert(fmt.orientation == 'top_down' or fmt.orientation == 'bottom_up')
-	assert(src.pixel == fmt.pixel or (matrix[src.pixel] and matrix[src.pixel][fmt.pixel]))
+	assert(supported(src.pixel, fmt.pixel))
 
 	--see if we need to allocate a new destination buffer or we can write over the source one
-	if force_copy
+	if (opt and opt.force_copy)
 		or src.stride ~= fmt.stride --diff. buffer size
 		or src.orientation ~= fmt.orientation --needs flippin'
 		or #fmt.pixel > #src.pixel --bigger pixel, even if same row size
@@ -186,7 +245,18 @@ local function convert(src, fmt, force_copy)
 
 	--see if we need a pixel conversion or just flipping and/or changing stride
 	local operation = src.pixel == fmt.pixel and copy_rows or matrix[src.pixel][fmt.pixel]
-	operation(src, dst)
+
+	--[[
+	if opt and opt.threads and opt.threads > 1 then
+		local threads = math.min(opt.threads, math.floor(src.size / MIN_SIZE_PER_THREAD))
+		and src.h > opt.threads
+		and src.size > MIN_SIZE_PER_THREAD * 2 --it's worth the overhead of creating threads
+	then
+		split_work(src, dst, operation, math.min(opt.threads - 1))
+	else
+	]]
+	operation(src, dst, 0, src.h)
+	--end
 	return dst
 end
 
@@ -200,6 +270,7 @@ local preferred_formats = {
 	bgra = {'rgba', 'argb', 'abgr', 'rgb', 'bgr', 'ga', 'ag', 'g'},
 	argb = {'rgba', 'bgra', 'abgr', 'rgb', 'bgr', 'ga', 'ag', 'g'},
 	abgr = {'rgba', 'bgra', 'argb', 'rgb', 'bgr', 'ga', 'ag', 'g'},
+	cmyk = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'g', 'ga', 'ag'},
 }
 
 local function best_format(src, accept)
@@ -228,7 +299,7 @@ local function best_format(src, accept)
 	end
 end
 
-local function convert_best(src, accept, force_copy)
+local function convert_best(src, accept, opt)
 	local fmt = best_format(src, accept)
 
 	if not fmt then
@@ -237,7 +308,7 @@ local function convert_best(src, accept, force_copy)
 									src.pixel, src.orientation, table.concat(t, ', ')))
 	end
 
-	return convert(src, fmt, force_copy)
+	return convert(src, fmt, opt)
 end
 
 if not ... then require'bmpconv_test' end
@@ -247,7 +318,7 @@ return {
 	convert = convert,
 	best_format = best_format,
 	convert_best = convert_best,
-	converters = matrix,
+	supported = supported,
 	preferred_formats = preferred_formats,
 }
 

@@ -42,7 +42,7 @@ local ffi = require'ffi'
 ffi.cdef'uint32_t GetTickCount();'
 
 local last_time
-function fps()
+function timediff()
 	local time = ffi.C.GetTickCount()
 	local d = last_time and (time - last_time)/1000 or 0
 	last_time = time

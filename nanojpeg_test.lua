@@ -12,7 +12,7 @@ for _,filename in ipairs(dir('media/jpeg/*.jpg')) do
 
 	if filename:match'testimgari.jpg' then
 		print'arithmetic coding not supported'
-	elseif filename:match'testimgp.jpg' then
+	elseif filename:match'testimgp.jpg' or filename:match'progressive' then
 		print'progressive jpeg not supported'
 	else
 		pp(nanojpeg.load({path = filename}))

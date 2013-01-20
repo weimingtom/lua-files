@@ -39,7 +39,7 @@ local function decompress(data, sz, opt)
 		img.orientation = 'top_down'
 		img.size = C.njGetImageSize(nj)
 		img.data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
-		return bmpconv.convert_best(img, opt and opt.accept, true)
+		return bmpconv.convert_best(img, opt and opt.accept, {force_copy = true})
 	end)
 end
 
