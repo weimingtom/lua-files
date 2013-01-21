@@ -1,3 +1,4 @@
+--xgo@ luajit.exe bmpconv_test.lua
 local ffi = require'ffi'
 local bmpconv = require'bmpconv'
 local glue = require'glue'
@@ -6,11 +7,11 @@ local unit = require'unit'
 
 --test that all pixel format combinations are implemented
 
-local pixel_formats = glue.index{'g', 'ga', 'ag', 'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'cmyk'}
+local pixel_formats = {'g', 'ga', 'ag', 'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'cmyk'}
 
 local function test_nyi()
-	for src in pairs(pixel_formats) do
-		for dst in pairs(pixel_formats) do
+	for _,src in ipairs(pixel_formats) do
+		for _,dst in ipairs(pixel_formats) do
 			if not bmpconv.supported(src, dst) then
 				print('not implemented', src, dst)
 			end
@@ -150,35 +151,47 @@ end
 
 --performance test
 
+--convert a 4Mbytes 1000x1000 rgba picture and check the fps
 local function benchmark()
-	local w, h = 1000, 1000
-	local src = ffi.new('uint8_t[?]', w * h * 4)
-	local dst = ffi.new('uint8_t[?]', w * h * 4)
 
-	timediff()
-	print('#', 'src', 'dst', 'flip', 'time')
 	local t = {}
-	for spix in pairs(pixel_formats) do
-		for dpix in pairs(pixel_formats) do
-			for orientation in pairs{top_down = true, bottom_up = true} do
+	local maxpix = 0
+	for _,spix in ipairs(pixel_formats) do
+		for _,dpix in ipairs(pixel_formats) do
+			for _,orientation in ipairs{'top_down', 'bottom_up'} do
 				t[#t+1] = {spix, dpix, orientation}
+				maxpix = math.max(maxpix, #spix)
 			end
 		end
 	end
 
-	local from = 1
+	local w, h = 1000, 1000
+	local stride = w * maxpix
+	local size = h * stride
+	local src = ffi.new('uint8_t[?]', size)
 
+	io.stdout:setvbuf'no'
+
+	print('#', 'src', 'dst', 'flip', 'src(M)', 'dst(M)', 'fps')
 	for i=1,#t do
 		local spix, dpix, orientation = unpack(t[i])
-		if i >= from and bmpconv.supported(spix, dpix) then
-			for i=1,100 do --convert a 4Mbytes 1000x1000 rgba picture 100 times (jit on: 1-2s; jit off: 87s; CPU: E5200)
-				bmpconv.convert(
-					{pixel = spix, w = w, h = h, stride = w * 4, data = src, size = w * h * 4, orientation = orientation},
-					{pixel = dpix, w = w, h = h, stride = w * 4, data = dst, size = w * h * 4, orientation = 'bottom_up'},
-					{force_copy = true, threads = 2}
-				)
+		if bmpconv.supported(spix, dpix) then
+			local dstride = w * #dpix
+			local dsize = h * dstride
+			local dst = ffi.new('uint8_t[?]', dsize)
+			local frames = 300
+			local src = {pixel = spix, stride = stride, orientation = orientation,
+														w = w, h = h, data = src, size = size}
+			local fmt = {pixel = dpix, stride = dstride, orientation = 'bottom_up'}
+			local opt = {force_copy = true, threads = 2, data = dst, size = dsize}
+			timediff()
+			for i=1,frames do
+				bmpconv.convert(src, fmt, opt)
 			end
-			print(i, spix, dpix, orientation == 'top_down', timediff())
+			local fpsnow = fps(frames)
+			print(i, spix, dpix, orientation == 'top_down',
+				string.format('%0.2f', size/1024/1024),
+				string.format('%0.2f', dsize/1024/1024), fpsnow)
 		end
 	end
 end

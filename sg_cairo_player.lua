@@ -6,7 +6,7 @@ local cairo = require'cairo'
 local main = winapi.Window{
 	autoquit = true,
 	visible = false,
-	state = 'maximized',
+	--state = 'maximized',
 }
 local panel = SGPanel{
 	parent = main, w = main.client_w, h = main.client_h,
@@ -33,7 +33,7 @@ function panel:on_mouse_move(x, y, buttons)
 	self.scene_graph.mouse_x = x
 	self.scene_graph.mouse_y = y
 	self.scene_graph.mouse_buttons = buttons
-	scene.scale = 1 + (x * 10 / 1920)
+	--scene.scale = 1 + (x * 10 / 1920)
 	self:invalidate()
 end
 

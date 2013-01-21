@@ -5,6 +5,8 @@
 
 --conversion functions: these must run in lanes, so don't drag any upvalues with them
 
+local ffi = require'ffi' --for lanes
+
 local function dstride(src, dst)
 	local dj, dstride = 0, dst.stride
 	if src.orientation ~= dst.orientation then
@@ -16,40 +18,38 @@ end
 
 local function eachrow(convert)
 	return function(src, dst, h1, h2)
-		local ffi = require'ffi' --for lanes
+		--local ffi = require'ffi' --for lanes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local rowsize = src.w * pixelsize
 		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type (also src.data is a number when in lanes)
 		local dst_data = ffi.cast('uint8_t*', dst.data)
-		for sj=h1,h2*src.stride-1,src.stride do
+		for sj = h1 * src.stride, h2 * src.stride - 1, src.stride do
 			convert(dst_data, dj, src_data, sj, rowsize)
-			dj = dj+dstride
+			dj = dj + dstride
 		end
 	end
 end
 
 local copy_rows = eachrow(function(d, i, s, j, rowsize)
-	local ffi = require'ffi' --for lanes
+	--local ffi = require'ffi' --for lanes
 	ffi.copy(d+i, s+j, rowsize)
 end)
 
 local function eachpixel(convert)
 	return function(src, dst, h1, h2)
-		local ffi = require'ffi' --for lanes
+		--local ffi = require'ffi' --for lanes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local dpixelsize = #dst.pixel
 		local rowsize = src.w * pixelsize
 		local src_data = ffi.cast('uint8_t*', src.data)
 		local dst_data = ffi.cast('uint8_t*', dst.data)
-		for sj=h1,h2*src.stride-1,src.stride do
-			local di = dj
-			for si=sj,sj+rowsize-1,pixelsize do --keep this loop tight!
-				convert(dst_data, di, src_data, si)
-				di = di+dpixelsize
+		for sj = h1 * src.stride, h2 * src.stride - 1, src.stride do
+			for si = 0, rowsize - 1, pixelsize do
+				convert(dst_data, dj + si * dpixelsize, src_data, sj + si)
 			end
-			dj = dj+dstride
+			dj = dj + dstride
 		end
 	end
 end
@@ -233,8 +233,12 @@ local function convert(src, fmt, opt)
 	assert(fmt.orientation == 'top_down' or fmt.orientation == 'bottom_up')
 	assert(supported(src.pixel, fmt.pixel))
 
-	--see if we need to allocate a new destination buffer or we can write over the source one
-	if (opt and opt.force_copy)
+	--see if there's a dest. buffer, or we can overwrite src. or we need to alloc. one
+	if opt.data then
+		assert(opt.size >= src.h * fmt.stride)
+		dst.size = opt.size
+		dst.data = opt.data
+	elseif (opt and opt.force_copy)
 		or src.stride ~= fmt.stride --diff. buffer size
 		or src.orientation ~= fmt.orientation --needs flippin'
 		or #fmt.pixel > #src.pixel --bigger pixel, even if same row size
@@ -320,5 +324,6 @@ return {
 	convert_best = convert_best,
 	supported = supported,
 	preferred_formats = preferred_formats,
+	matrix = matrix,
 }
 

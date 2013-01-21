@@ -49,6 +49,10 @@ function timediff()
 	return d
 end
 
+function fps(n)
+	return last_time and (n / (ffi.C.GetTickCount() - last_time) * 1000) or 0
+end
+
 function dir(d)
 	local f = io.popen('ls -1 '..d)
 	return glue.collect(f:lines())
