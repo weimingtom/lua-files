@@ -1,3 +1,6 @@
 luajit's jit directory containing scripts for luajit -jdump etc.
 
 vmdef.lua comes from a mingw32 compilation of luajit, so this directory is not platform-independent.
+
+annotate.lua is from https://github.com/geoffleyland/luatrace
+

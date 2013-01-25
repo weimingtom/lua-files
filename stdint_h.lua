@@ -2,7 +2,7 @@
 --the following types are ffi built-ins:
 --int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, uint64_t, intptr_t, uintptr_t
 local ffi = require'ffi'
-require'clib.stddef'
+require'stddef_h'
 ffi.cdef[[
 typedef signed char int_least8_t;
 typedef unsigned char uint_least8_t;

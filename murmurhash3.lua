@@ -1,4 +1,3 @@
---go@ luajit *
 --MurmurHash3_x86_32 from http://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp
 local ffi = require'ffi'
 local bit = require'bit'
@@ -7,7 +6,7 @@ local C1 = 0xcc9e2d51
 local C2 = 0x1b873593
 local rotl, xor, band, shl, shr = bit.rol, bit.bxor, bit.band, bit.lshift, bit.rshift
 
-local function mmul(x1, x2)
+local function mmul(x1, x2) --multiplication with modulo2 semantics
 	return tonumber(ffi.cast('uint32_t', ffi.cast('uint32_t', x1) * ffi.cast('uint32_t', x2)))
 end
 
@@ -40,45 +39,7 @@ local function hash(data, len, seed)
 	return h1
 end
 
-if not ... then
-require'unit'
-
-local function sanity_test() --from their tests
-	local key = ffi.new'uint8_t[256]'
-	local hashes = ffi.new'uint32_t[256]'
-	for i=0,255 do
-		key[i] = i
-		hashes[i] = hash(key,i,256-i)
-	end
-	local final = hash(ffi.cast('uint8_t*', hashes), 1024, 0)
-  	assert(final == bit.tobit(0xB0F57EE3))
-	print'hash verified'
-end
-
-ffi.cdef[[
-uint32_t PMurHash32(uint32_t seed, const void *key, int len);
-]]
-
-local pmurhash = ffi.load'pmurhash'
-
-local function benchmark() --250M/s on E5200
-	timediff()
-	local sz = 1024^2
-	local iter = 1024
-	local key = ffi.new('uint8_t[?]', sz)
-	for i=0,sz-1 do key[i] = i%256 end
-	local h = 0
-	for i=1,iter do
-		--pmurhash.PMurHash32(h, key, sz)
-		h = hash(key, sz, h)
-	end
-	print(string.format('%f MB/s', fps(sz*iter)/sz))
-end
-
-sanity_test()
-benchmark()
-
-end
+if not ... then require'murmurhash3_test' end
 
 return hash
 

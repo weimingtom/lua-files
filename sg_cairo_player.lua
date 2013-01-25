@@ -16,7 +16,7 @@ local scene = {type = 'group', scale = 1}
 
 function main:on_mouse_wheel(x, y, buttons, delta)
 	scene.cx = panel.client_w / 2
-	scene.cy = panel.client_h / 2
+	scene.cy = panel.client_h / 2 - 500
 	scene.scale = scene.scale + delta/120/10
 	panel:invalidate()
 end

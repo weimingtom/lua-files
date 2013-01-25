@@ -1,4 +1,4 @@
-//go@ gcc pmurhash_test.c -O5 -o pmurhash.exe -I../../csrc/pmurhash -L../../bin -lpmurhash
+//go@ gcc pmurhash_test.c -O3 -o pmurhash.exe -I../../csrc/pmurhash -L../../bin -lpmurhash
 
 #include <windows.h>
 #include <stdio.h>

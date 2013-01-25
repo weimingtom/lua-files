@@ -1,1 +1,1 @@
-gcc *.c -shared -o ../../bin/pmurhash.dll
+gcc PMurHash.c -O3 -shared -o ../../bin/pmurhash.dll

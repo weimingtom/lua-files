@@ -11,8 +11,8 @@ typedef struct {
 } MD5_CTX;
 
 void MD5_Init(MD5_CTX *ctx);
-void MD5_Update(MD5_CTX *ctx, void *data, uint32_t size);
-void MD5_Final(unsigned char *result, MD5_CTX *ctx);
+void MD5_Update(MD5_CTX *ctx, const uint8_t *data, uint32_t size);
+void MD5_Final(const uint8_t *result, MD5_CTX *ctx);
 ]]
 
 local function digest()
@@ -23,7 +23,7 @@ local function digest()
 		if data then
 			if type(data) == 'string' then
 				C.MD5_Update(ctx,
-					ffi.cast('void*', data),
+					ffi.cast('const char*', data),
 					math.min(size or #data, #data))
 			else
 				C.MD5_Update(ctx, data, size)
