@@ -1,3 +1,10 @@
 LuaLanes v3.4.1 from https://github.com/LuaLanes/lanes
 
-lanes.lua moved to root dir
+lanes.lua moved to root dir.
+
+failing tests:
+  tests\finalizer.lua
+  tests\parallel_os_calls.lua
+  tests\protectproxy.lua
+  tests\require.lua
+  tests\rupval.lua

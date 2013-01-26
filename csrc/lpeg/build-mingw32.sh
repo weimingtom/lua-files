@@ -1,4 +1,4 @@
-gcc lpeg.c -o ../../bin/lpeg.dll -shared -ansi -llua51 -L../../bin -I. -I../lua -O2 -DNDEBUG \
+gcc lpeg.c -O3 -o ../../bin/lpeg.dll -shared -ansi -llua51 -L../../bin -I. -I../lua -DNDEBUG \
 	-Wall -Wextra -pedantic \
    -Waggregate-return \
 	-Wbad-function-cast \
@@ -14,4 +14,4 @@ gcc lpeg.c -o ../../bin/lpeg.dll -shared -ansi -llua51 -L../../bin -I. -I../lua 
 	-Wstrict-prototypes \
 	-Wundef \
    -Wwrite-strings \
-	#  -Wunreachable-code \
+	-Wunreachable-code

@@ -1,5 +1,3 @@
-//go@ gcc nanojpeg2.c -shared -o ../../bin/nanojpeg2.dll -DNJ_USE_LIBC -O3 -std=c99 -Wall -Wextra -pedantic -Werror
-
 // NanoJPEG -- KeyJ's Tiny Baseline JPEG Decoder
 // version 1.3 (2012-03-05)
 // by Martin J. Fiedler <martin.fiedler@gmx.net>

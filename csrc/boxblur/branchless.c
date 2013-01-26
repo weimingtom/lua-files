@@ -1,4 +1,4 @@
-//branchless funcs from http://hbfs.wordpress.com/2008/08/05/branchless-equivalents-of-simple-functions/
+//branchless min & max from http://hbfs.wordpress.com/2008/08/05/branchless-equivalents-of-simple-functions/
 
 inline int32_t sex(int32_t x) {
 	union {
