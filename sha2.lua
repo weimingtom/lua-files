@@ -44,12 +44,9 @@ local function digest_function(Context, Init, Update, Final, DIGEST_LENGTH)
 		return function(data, size)
 			if data then
 				if type(data) == 'string' then
-					Update(ctx,
-						ffi.cast('uint8_t*', data),
-						math.min(size or #data, #data))
-				else
-					Update(ctx, data, size)
+					size = math.min(size or #data, #data)
 				end
+				Update(ctx, data, size)
 			else
 				Final(result, ctx)
 				return ffi.string(result, ffi.sizeof(result))

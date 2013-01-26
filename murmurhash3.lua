@@ -13,7 +13,7 @@ end
 local function hash(data, len, seed)
 	seed = seed or 0
 	if type(data) == 'string' then
-		data, len = ffi.cast('const uint8_t*', data), #data
+		data, len = ffi.cast('const uint8_t*', data), math.min(len or #data, #data)
 	end
 
 	local nblocks = math.floor(len / 4)
@@ -41,5 +41,7 @@ end
 
 if not ... then require'murmurhash3_test' end
 
-return hash
+return {
+	hash = hash
+}
 

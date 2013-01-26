@@ -1,36 +1,22 @@
-local hash = require'murmurhash3'
-local chash = require'pmurhash'
-local md5 = require'md5'
 local ffi = require'ffi'
 require'unit'
 
-local function sanity_test() --from their tests
+local function sanity_test(hashmod)
+	local hash = require(hashmod).hash
+	assert(hash'hey' == 318325784)
+	assert(hash'dude' == -284915725)
+
+	--this code is from their tests
 	local key = ffi.new'uint8_t[256]'
 	local hashes = ffi.new'uint32_t[256]'
 	for i=0,255 do
 		key[i] = i
-		hashes[i] = hash(key,i,256-i)
+		hashes[i] = hash(key, i, 256-i)
 	end
 	local final = hash(ffi.cast('uint8_t*', hashes), 1024, 0)
-  	assert(final == bit.tobit(0xB0F57EE3))
-	print'hash verified'
+  	test(final, bit.tobit(0xB0F57EE3))
+	print(hashmod, 'ok')
 end
 
-local function benchmark(s, hash) --250M/s on E5200
-	timediff()
-	local sz = 1024^2
-	local iter = 1024
-	local key = ffi.new('uint8_t[?]', sz)
-	for i=0,sz-1 do key[i] = i%256 end
-	local h = 0
-	for i=1,iter do
-		h = hash(key, sz, h)
-	end
-	print(string.format('%s: %f MB/s', s, fps(sz*iter)/sz))
-end
-
-sanity_test()
-benchmark('murmurhash3 Lua', hash)
-benchmark('murmurhash3 C', chash)
-benchmark('md5 C', require'md5'.digest())
-benchmark('crc32b C', require'zlib'.crc32b)
+sanity_test'murmurhash3'
+sanity_test'pmurhash'

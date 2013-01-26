@@ -197,7 +197,7 @@ ffi.metatype('gzFile_', {__index = {
 function M.adler32(data, sz, adler)
 	adler = adler or C.adler32(0, nil, 0)
 	if type(data) == 'string' then
-		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or 1/0, #data)
+		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or #data, #data)
 	end
 	return tonumber(C.adler32(adler, data, sz))
 end
@@ -205,7 +205,7 @@ end
 function M.crc32b(data, sz, crc)
 	crc = crc or C.crc32(0, nil, 0)
 	if type(data) == 'string' then
-		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or 1/0, #data)
+		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or #data, #data)
 	end
 	return tonumber(C.crc32(crc, data, sz))
 end

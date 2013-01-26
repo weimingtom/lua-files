@@ -22,12 +22,9 @@ local function digest()
 	return function(data, size)
 		if data then
 			if type(data) == 'string' then
-				C.MD5_Update(ctx,
-					ffi.cast('const char*', data),
-					math.min(size or #data, #data))
-			else
-				C.MD5_Update(ctx, data, size)
+				size = math.min(size or #data, #data)
 			end
+			C.MD5_Update(ctx, data, size)
 		else
 			C.MD5_Final(result, ctx)
 			return ffi.string(result, 16)
