@@ -46,7 +46,6 @@ local function writer()
 	local t = {}
 	return function(data, sz)
 		if not data then return table.concat(t) end
-		--print('w', ffi.string(data, sz))
 		t[#t+1] = ffi.string(data, sz)
 	end
 end

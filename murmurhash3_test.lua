@@ -32,4 +32,5 @@ end
 sanity_test()
 benchmark('murmurhash3 Lua', hash)
 benchmark('murmurhash3 C', chash)
-benchmark('md5', require'md5'.digest())
+benchmark('md5 C', require'md5'.digest())
+benchmark('crc32b C', require'zlib'.crc32b)

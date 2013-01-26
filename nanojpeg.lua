@@ -1,4 +1,4 @@
---nanojpeg2 binding, see csrc/nanojpeg2.c
+--nanojpeg2 binding, see csrc/nanojpeg
 local ffi = require'ffi'
 local glue = require'glue'
 local stdio = require'stdio'

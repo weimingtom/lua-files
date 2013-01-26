@@ -1,4 +1,4 @@
---pmurhash binding
+--pmurhash binding, see csrc/pmurhash
 local ffi = require'ffi'
 local pmurhash = ffi.load'pmurhash'
 

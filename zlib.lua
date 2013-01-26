@@ -194,14 +194,20 @@ ffi.metatype('gzFile_', {__index = {
 
 --checksum functions
 
-function M.adler32(s, adler)
+function M.adler32(data, sz, adler)
 	adler = adler or C.adler32(0, nil, 0)
-	return tonumber(C.adler32(adler, s, #s))
+	if type(data) == 'string' then
+		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or 1/0, #data)
+	end
+	return tonumber(C.adler32(adler, data, sz))
 end
 
-function M.crc32b(s, crc)
+function M.crc32b(data, sz, crc)
 	crc = crc or C.crc32(0, nil, 0)
-	return tonumber(C.crc32(crc, s, #s))
+	if type(data) == 'string' then
+		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or 1/0, #data)
+	end
+	return tonumber(C.crc32(crc, data, sz))
 end
 
 if not ... then require'zlib_test' end
