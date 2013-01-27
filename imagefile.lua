@@ -2,7 +2,7 @@
 
 local libs = {
 	png = 'libpng',
-	jpeg = 'turbojpeg', --alternative: 'nanojpeg'
+	jpeg = 'libjpeg', --alternatives: 'nanojpeg', 'turbojpeg'
 	gif = 'giflib',
 	bmp = 'bmp',
 }

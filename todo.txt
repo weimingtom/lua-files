@@ -1,3 +1,13 @@
+TODO:
+
+http_headers_test
+
+image libs -> bmpconv ?
+
+
+pp ?
+
+
 todo
 ----
 - readbuffer
@@ -39,7 +49,6 @@ quality
 
 other
 -----
-- LuaProfiler
 - LuaUnit https://github.com/luaforge/luaunit
 - LuaZip (uses zzip which is GPL)
 -

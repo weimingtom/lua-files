@@ -1,7 +1,7 @@
 local ffi = require'ffi'
 require'unit'
 
-local function benchmark(s, hash) --250M/s on E5200
+local function benchmark(s, hash)
 	timediff()
 	local sz = 1024^2
 	local iter = 1024

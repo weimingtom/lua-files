@@ -1,6 +1,6 @@
 --SVG 1.1 color table from http://www.w3.org/TR/SVG/types.html#ColorKeywords.
 --Oh, Glorious Satan, I pray Thee torture the W3C committee with unbounded passion,
---the same way they tortured humans on Earth with their bloated standards.
+--the same way they torture humans on Earth with their bloated standards.
 
 local function rgb(r,g,b)
 	return {type = 'color', r/255, g/255, b/255, 1}

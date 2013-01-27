@@ -42,12 +42,10 @@ local shg_table = ffi.new('int32_t[257]', {
 	24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24
 })
 
-local function blur(src, radius)
+local function stackblur(data, w, h, radius)
 	if radius < 1 or radius > 256 then return end
 
-	local pix = ffi.cast('uint32_t*', src.data)
-	local w = src.w
-	local h = src.h
+	local pix = ffi.cast('uint32_t*', data)
 
 	local r = ffi.new('uint8_t[?]', w*h)
 	local g = ffi.new('uint8_t[?]', w*h)
@@ -216,4 +214,4 @@ end
 
 if not ... then require'im_blur_test' end
 
-return blur
+return stackblur
