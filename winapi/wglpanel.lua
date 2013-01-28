@@ -1,3 +1,4 @@
+--oo/wglpanel: opengl-enabled panel.
 setfenv(1, require'winapi')
 require'winapi.panelclass'
 require'winapi.gl11'
@@ -33,6 +34,7 @@ end
 
 function WGLPanel:on_render() end --stub
 function WGLPanel:set_viewport() end --stub
+function WGLPanel:__after_gl_context() end --stub
 
 function WGLPanel:on_paint(window_hdc)
 	if not self.hrc then
@@ -50,6 +52,7 @@ function WGLPanel:on_paint(window_hdc)
 		if gl.wglSwapIntervalEXT then --enable vsync
 			gl.wglSwapIntervalEXT(1)
 		end
+		self:__after_gl_context()
 		--TODO: use wglChoosePixelFormatARB to enable FSAA
 		self:set_viewport()
 	end
@@ -57,4 +60,4 @@ function WGLPanel:on_paint(window_hdc)
 	SwapBuffers(window_hdc)
 end
 
-if not ... then require'winapi.wglpanel_test' end
+if not ... then require'winapi.wglpanel_demo' end
