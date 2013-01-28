@@ -5,7 +5,7 @@ local function benchmark(blurmod, w, h, n)
 	local size = w * h * 4
 	local img = ffi.new('uint8_t[?]', size)
 	local imgcopy = ffi.new('uint8_t[?]', size)
-	local blur = require(blurmod:gsub(' ', ''))
+	local blur = require(blurmod:gsub(' ', '')).blur_8888
 	timediff()
 	for i=1,n do
 		ffi.copy(img, imgcopy, size)

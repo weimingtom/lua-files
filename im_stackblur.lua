@@ -42,11 +42,12 @@ local shg_table = ffi.new('int32_t[257]', {
 	24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24
 })
 
-local function stackblur(data, w, h, radius)
+local function stackblur_8888(data, w, h, radius)
 	if radius < 1 or radius > 256 then return end
 
 	local pix = ffi.cast('uint32_t*', data)
 
+	local a = ffi.new('uint8_t[?]', w*h)
 	local r = ffi.new('uint8_t[?]', w*h)
 	local g = ffi.new('uint8_t[?]', w*h)
 	local b = ffi.new('uint8_t[?]', w*h)
@@ -54,8 +55,8 @@ local function stackblur(data, w, h, radius)
 
 	local div=2*radius+1
 	local stack = ffi.new('uint8_t*[?]', div)
-	local stack_buf = ffi.new('uint8_t[?]', div * 3)
-	for i=0,div-1 do stack[i] = stack_buf + (i*3) end
+	local stack_buf = ffi.new('uint8_t[?]', div * 4)
+	for i=0,div-1 do stack[i] = stack_buf + (i * 4) end
 
 	local mul_sum = mul_table[radius]
 	local shg_sum = shg_table[radius]
@@ -65,53 +66,64 @@ local function stackblur(data, w, h, radius)
 	end
 
 	for y=0,h-1 do
-		local rinsum, ginsum, binsum, routsum, goutsum, boutsum, rsum, gsum, bsum = 0, 0, 0, 0, 0, 0, 0, 0, 0
+		local ainsum, rinsum, ginsum, binsum, aoutsum, routsum, goutsum, boutsum, asum, rsum, gsum, bsum =
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		for i=-radius,radius do
 			local p=pix[y*w+min(w-1,max(i,0))]
 			local sir = stack[i+radius]
-			sir[0] = shr(band(p, 0xff0000), 16)
-			sir[1] = shr(band(p, 0x00ff00), 8)
-			sir[2] = band(p, 0x0000ff)
+			sir[0] = shr(band(p, 0xff000000), 24)
+			sir[1] = shr(band(p, 0x00ff0000), 16)
+			sir[2] = shr(band(p, 0x0000ff00), 8)
+			sir[3] =     band(p, 0x000000ff)
 			local rbs = radius+1-abs(i)
-			rsum = rsum+sir[0]*rbs
-			gsum = gsum+sir[1]*rbs
-			bsum = bsum+sir[2]*rbs
+			asum = asum+sir[0]*rbs
+			rsum = rsum+sir[1]*rbs
+			gsum = gsum+sir[2]*rbs
+			bsum = bsum+sir[3]*rbs
 			if i > 0 then
-				rinsum=rinsum+sir[0]
-				ginsum=ginsum+sir[1]
-				binsum=binsum+sir[2]
+				ainsum=ainsum+sir[0]
+				rinsum=rinsum+sir[1]
+				ginsum=ginsum+sir[2]
+				binsum=binsum+sir[3]
 			else
-				routsum=routsum+sir[0]
-				goutsum=goutsum+sir[1]
-				boutsum=boutsum+sir[2]
+				aoutsum=aoutsum+sir[0]
+				routsum=routsum+sir[1]
+				goutsum=goutsum+sir[2]
+				boutsum=boutsum+sir[3]
 			end
 		end
 		local stackpointer = radius
 
 		for x=0,w-1 do
+			a[y*w+x]=shr(asum * mul_sum, shg_sum)
 			r[y*w+x]=shr(rsum * mul_sum, shg_sum)
 			g[y*w+x]=shr(gsum * mul_sum, shg_sum)
 			b[y*w+x]=shr(bsum * mul_sum, shg_sum)
 
+			asum=asum-aoutsum
 			rsum=rsum-routsum
 			gsum=gsum-goutsum
 			bsum=bsum-boutsum
 
 			local sir = stack[(stackpointer - radius + div) % div]
 
-			routsum=routsum-sir[0]
-			goutsum=goutsum-sir[1]
-			boutsum=boutsum-sir[2]
+			aoutsum=aoutsum-sir[0]
+			routsum=routsum-sir[1]
+			goutsum=goutsum-sir[2]
+			boutsum=boutsum-sir[3]
 
 			local p = pix[y*w+vmin[x]]
-			sir[0] = shr(band(p, 0xff0000), 16)
-			sir[1] = shr(band(p, 0x00ff00), 8)
-			sir[2] = band(p, 0x0000ff)
+			sir[0] = shr(band(p, 0xff000000), 24)
+			sir[1] = shr(band(p, 0x00ff0000), 16)
+			sir[2] = shr(band(p, 0x0000ff00), 8)
+			sir[3] =     band(p, 0x000000ff)
 
-			rinsum=rinsum+sir[0]
-			ginsum=ginsum+sir[1]
-			binsum=binsum+sir[2]
+			ainsum=ainsum+sir[0]
+			rinsum=rinsum+sir[1]
+			ginsum=ginsum+sir[2]
+			binsum=binsum+sir[3]
 
+			asum=asum+ainsum
 			rsum=rsum+rinsum
 			gsum=gsum+ginsum
 			bsum=bsum+binsum
@@ -119,13 +131,15 @@ local function stackblur(data, w, h, radius)
 			stackpointer = (stackpointer+1) % div
 			local sir = stack[stackpointer % div]
 
-			routsum=routsum+sir[0]
-			goutsum=goutsum+sir[1]
-			boutsum=boutsum+sir[2]
+			aoutsum=aoutsum+sir[0]
+			routsum=routsum+sir[1]
+			goutsum=goutsum+sir[2]
+			boutsum=boutsum+sir[3]
 
-			rinsum=rinsum-sir[0]
-			ginsum=ginsum-sir[1]
-			binsum=binsum-sir[2]
+			ainsum=ainsum-sir[0]
+			rinsum=rinsum-sir[1]
+			ginsum=ginsum-sir[2]
+			binsum=binsum-sir[3]
 		end
 	end
 
@@ -134,32 +148,37 @@ local function stackblur(data, w, h, radius)
 	end
 
 	for x=0,w-1 do
-		local rinsum, ginsum, binsum, routsum, goutsum, boutsum, rsum, gsum, bsum = 0, 0, 0, 0, 0, 0, 0, 0, 0
+		local ainsum, rinsum, ginsum, binsum, aoutsum, routsum, goutsum, boutsum, asum, rsum, gsum, bsum =
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		local yp = -radius * w
 		for i=-radius,radius do
 			local yi = max(0,yp)+x
 
 			local sir = stack[i+radius]
 
-			sir[0]=r[yi]
-			sir[1]=g[yi]
-			sir[2]=b[yi]
+			sir[0]=a[yi]
+			sir[1]=r[yi]
+			sir[2]=g[yi]
+			sir[3]=b[yi]
 
 			do
 				local rbs=radius+1-abs(i)
+				asum=asum+a[yi]*rbs
 				rsum=rsum+r[yi]*rbs
 				gsum=gsum+g[yi]*rbs
 				bsum=bsum+b[yi]*rbs
 			end
 
 			if i>0 then
-			  rinsum=rinsum+sir[0]
-			  ginsum=ginsum+sir[1]
-			  binsum=binsum+sir[2]
+			  ainsum=ainsum+sir[0]
+			  rinsum=rinsum+sir[1]
+			  ginsum=ginsum+sir[2]
+			  binsum=binsum+sir[3]
 			else
-			  routsum=routsum+sir[0]
-			  goutsum=goutsum+sir[1]
-			  boutsum=boutsum+sir[2]
+			  aoutsum=aoutsum+sir[0]
+			  routsum=routsum+sir[1]
+			  goutsum=goutsum+sir[2]
+			  boutsum=boutsum+sir[3]
 			end
 
 			if i<h-1 then
@@ -170,30 +189,36 @@ local function stackblur(data, w, h, radius)
 		local stackpointer = radius
 		for y=0,h-1 do
 			pix[x+y*w] = bor(0xff000000,
-				shl(shr(rsum * mul_sum, shg_sum),16),
-				shl(shr(gsum * mul_sum, shg_sum),8),
-				shr(bsum * mul_sum, shg_sum))
+				shl(shr(asum * mul_sum, shg_sum), 24),
+				shl(shr(rsum * mul_sum, shg_sum), 16),
+				shl(shr(gsum * mul_sum, shg_sum), 8),
+				    shr(bsum * mul_sum, shg_sum))
 
+			asum=asum-aoutsum
 			rsum=rsum-routsum
 			gsum=gsum-goutsum
 			bsum=bsum-boutsum
 
 			local sir = stack[(stackpointer - radius + div) % div]
 
-			routsum=routsum-sir[0]
-			goutsum=goutsum-sir[1]
-			boutsum=boutsum-sir[2]
+			aoutsum=aoutsum-sir[0]
+			routsum=routsum-sir[1]
+			goutsum=goutsum-sir[2]
+			boutsum=boutsum-sir[3]
 
 			local p=x+vmin[y]
 
-			sir[0]=r[p]
-			sir[1]=g[p]
-			sir[2]=b[p]
+			sir[0]=a[p]
+			sir[1]=r[p]
+			sir[2]=g[p]
+			sir[3]=b[p]
 
-			rinsum=rinsum+sir[0]
-			ginsum=ginsum+sir[1]
-			binsum=binsum+sir[2]
+			ainsum=ainsum+sir[0]
+			rinsum=rinsum+sir[1]
+			ginsum=ginsum+sir[2]
+			binsum=binsum+sir[3]
 
+			asum=asum+ainsum
 			rsum=rsum+rinsum
 			gsum=gsum+ginsum
 			bsum=bsum+binsum
@@ -201,17 +226,21 @@ local function stackblur(data, w, h, radius)
 			stackpointer = (stackpointer+1) % div
 			local sir = stack[stackpointer]
 
-			routsum=routsum+sir[0]
-			goutsum=goutsum+sir[1]
-			boutsum=boutsum+sir[2]
+			aoutsum=aoutsum+sir[0]
+			routsum=routsum+sir[1]
+			goutsum=goutsum+sir[2]
+			boutsum=boutsum+sir[3]
 
-			rinsum=rinsum-sir[0]
-			ginsum=ginsum-sir[1]
-			binsum=binsum-sir[2]
+			ainsum=ainsum-sir[0]
+			rinsum=rinsum-sir[1]
+			ginsum=ginsum-sir[2]
+			binsum=binsum-sir[3]
 		end
 	end
 end
 
 if not ... then require'im_blur_test' end
 
-return stackblur
+return {
+	blur_8888 = stackblur_8888,
+}
