@@ -56,7 +56,7 @@ function glue.pluck(t,key)
 	return dt
 end
 
-function glue.stringort(t,...)
+function glue.sort(t,...)
 	table.sort(t,...)
 	return t
 end
@@ -81,7 +81,7 @@ function glue.max(t,cmp)
 	return n
 end
 
-function glue.stringum(t,key)
+function glue.sum(t,key)
 	local n=0
 	if key then
 		for i=1,#t do n=n+(t[i][key] or 0) end
@@ -144,9 +144,6 @@ function glue.string.escape(s,mode)
 				:gsub('([%^%$%(%)%.%[%]%*%+%-%?])', '%%%1'))
 end
 
-glue.string.P = glue.string.escape
-glue.string.PI = function(s) return glue.string.escape'*i' end
-
 function glue.string.starts(s,prefix)
 	return s:find(prefix, 1, true) == 1
 end
@@ -155,18 +152,18 @@ function glue.string.ends(s,suffix)
 	return #suffix==0 or s:find(suffix, 1, true) == #s - #suffix + 1
 end
 
-function glue.string.fromhex(s)
-	return (s:gsub('..', function(cc)
-	  return string.char(tonumber(cc, 16))
-	end))
-end
-
 function glue.string.tohex(s)
 	if type(s) == 'number' then
 		return string.format('%08.8x', s)
 	end
 	return (s:gsub('.', function(c)
 	  return string.format('%02x', string.byte(c))
+	end))
+end
+
+function glue.string.fromhex(s)
+	return (s:gsub('..', function(cc)
+	  return string.char(tonumber(cc, 16))
 	end))
 end
 
