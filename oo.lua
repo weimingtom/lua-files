@@ -1,38 +1,13 @@
---object system with the following characteristics:
---
---single inheritance: class creation is done with class([<superclass>]) or superclass:subclass().
---inheritance is dynamic: changing the superclass reflects on all subclasses and instances.
---a class' superclass, or an instance's class is accessible as self.super.
---subclassing is different than instantiation: instantiation calls self:init(...), subclassing doesn't.
---instantiation is done with myclass:create(...) or simply myclass(...).
---virtual properties: reading self.<property> calls self:get_<property>() to retrieve the value.
---  writing self.<property> calls self:set_<property>(value).
---stored properties, or virtual properties with a setter but no getter: writing self.<property> creates the table
---  self.state and the value is stored in self.state.<property> only after calling self:set_<property>(value).
---  reading self.<property> reads back the value from self.state. you can initialize self.state with defaults.
---before/after hooks: method overriding can be done by defining self:before_<method> and self:after_<method> functions.
---  setting self:before_<method> overrides self:<method> such as it will call the hook before calling the method.
---  the hook receives the method's args and must return the final args to pass to the method.
---  setting self:after_<method> overrides self:<method> such as it will call the hook after calling the method.
---  the hook receives the method's return values and must return the final return values.
---classes are assigned the metatable of their superclass, instances get the metatable of their class.
---
---free stuff:
---
---subclassing from an instance: instance:subclass().
---instantiation from an instance: instance:create(...). note that instance() does not work.
---customizing subclassing: override self:subclass().
---class properties get inherited and behave like default values.
---
+--object system, see http://code.google.com/p/lua-files/wiki/oo
 
 local object = {classname = 'object'}
 
-local function class(super, classname)
-	return (super or object):subclass(classname)
+local function class(super,...)
+	return (super or object):subclass(...)
 end
 
-function object:subclass(classname)
-	return setmetatable({super = self, classname = classname}, getmetatable(self))
+function object:subclass()
+	return setmetatable({super = self, classname = ''}, getmetatable(self))
 end
 
 function object:init(...) end
@@ -50,17 +25,17 @@ function meta.__call(o,...)
 end
 
 function meta.__index(o,k)
-	if k == 'get_property' then --'get_property' is not virtualizable to avoid infinite recursion
-		return rawget(o, 'super').get_property --...but it is inheritable
+	if k == 'getproperty' then --'getproperty' is not virtualizable to avoid infinite recursion
+		return rawget(o, 'super').getproperty --...but it is inheritable
 	end
-	return o:get_property(k)
+	return o:getproperty(k)
 end
 
 function meta.__newindex(o,k,v)
-	o:set_property(k,v)
+	o:setproperty(k,v)
 end
 
-function object:before_hook(method_name, hook)
+function object:beforehook(method_name, hook)
 	local method = self[method_name]
 	if not method then error(string.format('method missing for %s hook', k)) end
 	rawset(self, method_name, function(self, ...)
@@ -68,7 +43,7 @@ function object:before_hook(method_name, hook)
 	end)
 end
 
-function object:after_hook(method_name, hook)
+function object:afterhook(method_name, hook)
 	local method = self[method_name]
 	if not method then error(string.format('method missing for %s hook', k)) end
 	rawset(self, method_name, function(self, ...)
@@ -76,7 +51,7 @@ function object:after_hook(method_name, hook)
 	end)
 end
 
-function object:get_property(k)
+function object:getproperty(k)
 	if type(k) == 'string' and rawget(self, 'get_'..k) then --virtual property
 		return rawget(self, 'get_'..k)(self, k)
 	elseif rawget(self, 'set_'..k) then --stored property
@@ -88,7 +63,7 @@ function object:get_property(k)
 	end
 end
 
-function object:set_property(k,v)
+function object:setproperty(k,v)
 	if type(k) == 'string' then
 		if rawget(self, 'get_'..k) then --virtual property
 			if rawget(self, 'set_'..k) then --r/w property
@@ -102,10 +77,10 @@ function object:set_property(k,v)
 			self.state[k] = v
 		elseif k:match'^before_' then --install before hook
 			local method_name = k:match'^before_(.*)'
-			self:before_hook(method_name, v)
+			self:beforehook(method_name, v)
 		elseif k:match'^after_' then --install after hook
 			local method_name = k:match'^after_(.*)'
-			self:after_hook(method_name, v)
+			self:afterhook(method_name, v)
 		else
 			rawset(self, k, v)
 		end
@@ -113,37 +88,6 @@ function object:set_property(k,v)
 		rawset(self, k, v)
 	end
 end
-
-function object:own_meta()
-	local meta = {}
-	for k,v in pairs(getmetatable(self)) do meta[k] = v end
-	setmetatable(self, meta)
-	return meta
-end
-
-function object:freeze()
-	for k,v in self:pairs() do
-		self[k] = v
-	end
-	local meta = self:own_meta()
-	local get_property = self.get_property
-	local set_property = self.set_property
-	meta.__index = function(self, k) return get_property(self, k) end
-	meta.__newindex = function(self, k, v) return set_property(self, k, v) end
-end
-
-function object:gen_properties(names, getter, setter)
-	for k in pairs(names) do
-		if getter then
-			self['get_'..k] = function(self) return getter(self, k) end
-		end
-		if setter then
-			self['set_'..k] = function(self, v) return setter(self, k, v) end
-		end
-	end
-end
-
---introspection
 
 function object:allpairs() --returns iterator<k,v,source>; iterates from bottom up
 	local source = self
@@ -159,49 +103,106 @@ function object:allpairs() --returns iterator<k,v,source>; iterates from bottom 
 	end
 end
 
-function object:pairs()
-	local t = {}
-	for k,v in self:allpairs() do
-		if t[k] == nil then t[k] = v end
+function object:properties() --returns all properties including the inherited ones and their current values
+	local values = {}
+	for k,v,source in self:allpairs() do
+		if values[k] == nil then
+			values[k] = v
+		end
 	end
-	return pairs(t)
+	return values
+end
+
+function object:inherit(other, override)
+	local properties = other:properties()
+	for k,v in pairs(properties) do
+		if (override or rawget(self, k) == nil)
+			and k ~= 'classname' --we keep our classname (we don't change our identity)
+			and k ~= 'super' --we keep our super (we don't change the dynamic inheritance)
+		then
+			rawset(self, k, v)
+		end
+	end
+	--copy metafields if metatables are different
+	local src_meta = getmetatable(other)
+	local dst_meta = getmetatable(self)
+	if src_meta ~= dst_meta then
+		for k,v in pairs(src_meta) do
+			if override or rawget(dst_meta, k) == nil then
+				rawset(dst_meta, k, v)
+			end
+		end
+	end
+end
+
+function object:detach()
+	self:inherit(self.super)
+	self.classname = self.classname --if we're an instance, we would have no classname
+	self.super = nil
+end
+
+function object:gen_properties(names, getter, setter)
+	for k in pairs(names) do
+		if getter then
+			self['get_'..k] = function(self) return getter(self, k) end
+		end
+		if setter then
+			self['set_'..k] = function(self, v) return setter(self, k, v) end
+		end
+	end
 end
 
 local function pad(s, n) return s..(' '):rep(n - #s) end
 
+local function sorted_keys(t)
+	local dt = {}
+	for k in pairs(t) do dt[#dt+1] = k end
+	table.sort(dt)
+	return dt
+end
+
+local props_conv = {g = 'r', s = 'w', gs = 'rw', sg = 'rw'}
+
 function object:inspect()
-	local pp = require'pp'
 	--collect data
-	local supers = {}
-	local keys = {}
-	local keys_t = {}
-	local props = {}
-	local source
+	local supers = {} --{super1,...}
+	local keys = {} --{super = {key1 = true,...}}
+	local props = {} --{super = {prop1 = true,...}}
+	local sources = {} --{key = source}
+	local source, keys_t, props_t
 	for k,v,src in self:allpairs() do
-		keys[#keys+1] = k
+		if sources[k] == nil then sources[k] = src end
 		if src ~= source then
-			table.sort(keys)
 			source = src
-			keys = {}
-			keys_t[source] = keys
+			keys_t = {}
+			props_t = {}
+			keys[source] = keys_t
+			props[source] = props_t
 			supers[#supers+1] = source
 		end
-		if type(k) == 'string' and k:match'^[gs]et_' then
-			local prop = k:match'^[gs]et_(.*)'
-			props[prop] = (props[prop] or '')..(k:match'^.' == 's' and 'w' or 'r')
+		if sources[k] == src then
+			if type(k) == 'string' and k:match'^[gs]et_' then
+				local what, prop = k:match'^([gs])et_(.*)'
+				props_t[prop] = (props_t[prop] or '')..what
+			else
+				keys_t[k] = true
+			end
 		end
 	end
-
 	--print values
 	for i,super in ipairs(supers) do
 		print('from '..(
-					rawget(super, 'classname') and super.classname
-					or super == self and 'self'
-					or '#'..tostring(i)
+					super == self and ('self'..(super.classname ~= '' and ' ('..super.classname..')' or ''))
+					or 'super #'..tostring(i-1)..(super.classname ~= '' and ' ('..super.classname..')' or '')
 				)..':')
-		for _,k in ipairs(keys_t[super]) do
-			if k ~= 'super' and k ~= 'state' then
-				print('', pad(k, 16), tostring(super[k]))
+		local t = sorted_keys(props[super])
+		for _,k in ipairs(t) do
+			print('   '..pad(k..' ('..props_conv[props[super][k]]..')', 16), tostring(super[k]))
+		end
+		local t = sorted_keys(keys[super])
+		for _,k in ipairs(t) do
+			if k ~= 'super' and k ~= 'state' and k ~= 'classname' then
+				print('   '..pad(k, 16), tostring(super[k]))
 			end
 		end
 	end
@@ -213,5 +214,6 @@ if not ... then require'oo_test' end
 
 return {
 	class = class,
+	object = object,
 }
 
