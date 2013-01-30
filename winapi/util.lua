@@ -8,15 +8,6 @@ import(glue)
 _M.string = string --put string module back
 update(string, glue.string)
 
-local function assert_up(level,v,e,...)
-	if v then return v,e,... end
-	e = e ~= nil and e or 'assertion failed'
-	if select('#',...) > 0 then e = e:format(...) end
-	error(e, level)
-end
-
-function assert2(...) return assert_up(3,...) end
-
 ffi.cdef[[
 DWORD GetLastError(void);
 

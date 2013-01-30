@@ -53,7 +53,7 @@ CommDlgExtendedError = comdlg.CommDlgExtendedError
 function checkcomdlg(ret)
 	if ret == 0 then
 		local err = CommDlgExtendedError()
-		assert2(err == 0, 'comdlg32 error: %s' % COMMDLG_ERROR_NAMES[err])
+		assert(err == 0, 'comdlg32 error: %s', COMMDLG_ERROR_NAMES[err])
 		return false --user canceled
 	end
 	return true

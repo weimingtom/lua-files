@@ -69,7 +69,7 @@ end
 function VObject:__vproperties() --returns {property = {get = source, set = source}}
 	local t = {}
 	for k,v,source in VObject.__index.__allpairs(self) do
-		if type(k) == 'string' and k:starts'get_' or k:starts'set_' then
+		if type(k) == 'string' and k:match'^get_' or k:match'^set_' then
 			local k,what = k:sub(5), k:sub(1,3)
 			local t = t[k] or {}; t[k] = t[k] or t
 			if what == 'get' and t.get == nil then t.get = source end

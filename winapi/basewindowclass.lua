@@ -552,7 +552,7 @@ function BaseWindow:batch_update(f,...) --can't change self.updating inside f
 	local ok,err = pcall(f,...)
 	self.updating = nil
 	self:redraw()
-	assert2(ok, err)
+	assert(ok, err)
 end
 
 function BaseWindow:redraw()

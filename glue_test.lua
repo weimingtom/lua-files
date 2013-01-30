@@ -6,7 +6,6 @@ test(select(2,pcall(glue.assert,false,'bad dog %s')), 'bad dog %s')
 test({pcall(glue.assert,1,2,3)}, {true,1,2,3})
 
 test(glue.index{a=5,b=7,c=3}, {[5]='a',[7]='b',[3]='c'})
-test(glue.sort(glue.keys{apple=15,banana=23}), {'apple','banana'})
 test(glue.update({a=1,b=2,c=3}, {d='add',b='overwrite'}, {b='over2'}), {a=1,b='over2',c=3,d='add'})
 test(glue.merge({a=1,b=2,c=3}, {d='add',b='overwrite'}, {b='over2'}), {a=1,b=2,c=3,d='add'})
 test(glue.extend({5,6,8}, {1,2}, {'b','x'}), {5,6,8,1,2,'b','x'})
@@ -44,22 +43,10 @@ t = {} for s,n in glue.gsplit('a 12,b 15x,c 20', '%s*(%d*),') do t[#t+1]={s,n} e
 test(t, {{'a','12'},{'b 15x',''},{'c 20',nil}})
 --TODO: use case with () capture
 
-test(glue.trim(',  a , x  ,, d ,', '%s,'), 'a , x  ,, d')
+test(glue.trim('  a  d '), 'a  d')
 
 test(glue.escape'^{(.-)}$', '%^{%(%.%-%)}%$')
 test(glue.escape'%\0%', '%%%z%%')
-
-test(glue.starts('abc', 'x'),false)
-test(glue.starts('abc', ''),true)
-test(glue.starts('abc', 'ab'),true)
-test(glue.starts('abc', 'abc'),true)
-test(glue.starts('abc', 'abcd'),false)
-
-test(glue.ends('abc', 'x'),false)
-test(glue.ends('abc', ''),true)
-test(glue.ends('abc', 'bc'),true)
-test(glue.ends('abc', 'abc'),true)
-test(glue.ends('abc', 'abcd'),false)
 
 test(glue.collect(('abc'):gmatch('.')), {'a','b','c'})
 test(glue.collect(2,ipairs{5,7,2}), {5,7,2})

@@ -89,7 +89,8 @@ function object:setproperty(k,v)
 	end
 end
 
-function object:allpairs() --returns iterator<k,v,source>; iterates from bottom up
+--returns iterator<k,v,source>; iterates bottom-up in the inheritance chain
+function object:allpairs()
 	local source = self
 	local k,v
 	return function()
@@ -103,7 +104,8 @@ function object:allpairs() --returns iterator<k,v,source>; iterates from bottom 
 	end
 end
 
-function object:properties() --returns all properties including the inherited ones and their current values
+--returns all properties including the inherited ones and their current values
+function object:properties()
 	local values = {}
 	for k,v,source in self:allpairs() do
 		if values[k] == nil then
@@ -154,14 +156,9 @@ end
 
 local function pad(s, n) return s..(' '):rep(n - #s) end
 
-local function sorted_keys(t)
-	local dt = {}
-	for k in pairs(t) do dt[#dt+1] = k end
-	table.sort(dt)
-	return dt
-end
-
 local props_conv = {g = 'r', s = 'w', gs = 'rw', sg = 'rw'}
+
+local glue = require'glue'
 
 function object:inspect()
 	--collect data
@@ -195,12 +192,10 @@ function object:inspect()
 					super == self and ('self'..(super.classname ~= '' and ' ('..super.classname..')' or ''))
 					or 'super #'..tostring(i-1)..(super.classname ~= '' and ' ('..super.classname..')' or '')
 				)..':')
-		local t = sorted_keys(props[super])
-		for _,k in ipairs(t) do
-			print('   '..pad(k..' ('..props_conv[props[super][k]]..')', 16), tostring(super[k]))
+		for k,v in glue.sortedpairs(props[super]) do
+			print('   '..pad(k..' ('..props_conv[v]..')', 16), tostring(super[k]))
 		end
-		local t = sorted_keys(keys[super])
-		for _,k in ipairs(t) do
+		for k in glue.sortedpairs(keys[super]) do
 			if k ~= 'super' and k ~= 'state' and k ~= 'classname' then
 				print('   '..pad(k, 16), tostring(super[k]))
 			end

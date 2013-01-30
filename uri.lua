@@ -1,14 +1,5 @@
 local glue = require'glue'
 
---vocabulary
-
-local function sortedpairs(t)
-	local st = {}
-	for k,v in pairs(t) do st[k] = v end
-	table.sort(st)
-	return pairs(st)
-end
-
 --formatting
 
 --escape all characters except `unreserved`, `sub-delims` and the characters
@@ -26,7 +17,7 @@ end
 
 local function format_args(t)
 	local dt = {}
-	for k,v in sortedpairs(t) do --order is not significant
+	for k,v in glue.sortedpairs(t) do --order is not significant
 		k = k:gsub(' ', '+')
 		v = v:gsub(' ', '+')
 		dt[#dt+1] = escape(k, '&=') .. '=' .. escape(v, '&')

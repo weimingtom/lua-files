@@ -1,4 +1,4 @@
---formatting of non-structured types for pretty printing
+--pretty-printing of non-structured types
 local glue = require'glue' --index
 
 local escapes = { --don't add unpopular escapes here

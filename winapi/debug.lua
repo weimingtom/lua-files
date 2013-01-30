@@ -28,7 +28,7 @@ end
 --utility to search the name of a constant in the winapi namespace
 function findname(prefix, value)
 	for k,v in pairs(_M) do
-		if k:starts(prefix) and type(v) ~= 'cdata' and type(value) ~= 'cdata' and v == value then return k end
+		if k:match('^'..prefix) and type(v) ~= 'cdata' and type(value) ~= 'cdata' and v == value then return k end
 	end
 	return tonumber(value) ~= nil and '%x' % value or value
 end

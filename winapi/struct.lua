@@ -162,14 +162,14 @@ local valid_struct_keys =
 	index{'ctype', 'size', 'mask', 'fields', 'defaults', 'bitfields'}
 
 local function checkdefs(s) --typecheck a struct definition
-	assert2(s.ctype ~= nil, 'ctype missing')
+	assert(s.ctype ~= nil, 'ctype missing')
 	for k,v in pairs(s) do	--check for typos in struct definition
-		assert2(valid_struct_keys[k], 'invalid struct key "%s"', k)
+		assert(valid_struct_keys[k], 'invalid struct key "%s"', k)
 	end
 	if s.fields then --check for accidentaly hidden fields
 		for k,v in pairs(s.fields) do
 			local vname, sname, mask, cast = unpack(v, 1, 4)
-			assert2(vname ~= sname, 'virtual field "%s" not visible', v[1])
+			assert(vname ~= sname, 'virtual field "%s" not visible', v[1])
 		end
 	end
 end
@@ -193,8 +193,8 @@ end
 function sfields(t) --sugar constructor for defining non-masked struct fields
 	local dt = {}
 	for i=1,#t,4 do
-		assert2(type(t[i]) == 'string', 'invalid sfields spec')
-		assert2(type(t[i+1]) == 'string', 'invalid sfields spec')
+		assert(type(t[i]) == 'string', 'invalid sfields spec')
+		assert(type(t[i+1]) == 'string', 'invalid sfields spec')
 		dt[t[i]] = {
 			t[i+1] ~= '' and t[i+1] or nil,
 			nil,
@@ -208,9 +208,9 @@ end
 function mfields(t) --sugar constructor for defining masked struct fields
 	local dt = {}
 	for i=1,#t,5 do
-		assert2(type(t[i]) == 'string', 'invalid mfields spec')
-		assert2(type(t[i+1]) == 'string', 'invalid mfields spec')
-		assert2(type(t[i+2]) == 'number', 'invalid mfields spec')
+		assert(type(t[i]) == 'string', 'invalid mfields spec')
+		assert(type(t[i+1]) == 'string', 'invalid mfields spec')
+		assert(type(t[i+2]) == 'number', 'invalid mfields spec')
 		dt[t[i]] = {
 			t[i+1] ~= '' and t[i+1] or nil,
 			t[i+2] ~= 0 and t[i+2] or nil,

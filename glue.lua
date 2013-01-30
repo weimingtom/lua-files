@@ -34,6 +34,17 @@ function glue.merge(dt,...)
 	return dt
 end
 
+--TODO: document and test this if it stands
+function glue.sortedpairs(t, cmp)
+	local kt = glue.keys(t)
+	table.sort(kt, cmp)
+	local i = 0
+	return function()
+		i = i + 1
+		return kt[i], t[kt[i]]
+	end
+end
+
 function glue.extend(dt,...)
 	for j=1,select('#',...) do
 		local t=select(j,...)
@@ -54,11 +65,6 @@ function glue.pluck(t,key)
 	local dt={}
 	for i=1,#t do dt[#dt+1]=t[i][key] end
 	return dt
-end
-
-function glue.sort(t,...)
-	table.sort(t,...)
-	return t
 end
 
 function glue.min(t,cmp)
@@ -129,27 +135,18 @@ function glue.string.gsplit(s, sep, start, plain)
 	end
 end
 
-function glue.string.trim(s,charset)
-	charset = charset or '%s'
-	local from = s:match('^['..charset..']*()')
-	return from > #s and '' or s:match('.*[^'..charset..']', from)
+function glue.string.trim(s)
+	local from = s:match('^[%s]*()')
+	return from > #s and '' or s:match('.*[^%s]', from)
 end
 
 local function format_ci_pat(c)
 	return string.format('[%s%s]', c:lower(), c:upper())
 end
-function glue.string.escape(s,mode)
+function glue.string.escape(s, mode)
 	if mode == '*i' then s = s:gsub('[%a]', format_ci_pat) end
 	return (s:gsub('%%','%%%%'):gsub('%z','%%z')
 				:gsub('([%^%$%(%)%.%[%]%*%+%-%?])', '%%%1'))
-end
-
-function glue.string.starts(s,prefix)
-	return s:find(prefix, 1, true) == 1
-end
-
-function glue.string.ends(s,suffix)
-	return #suffix==0 or s:find(suffix, 1, true) == #s - #suffix + 1
 end
 
 function glue.string.tohex(s)

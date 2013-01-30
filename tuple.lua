@@ -65,4 +65,12 @@ end
 
 meta.__call = unpack
 
+meta.__pwrite = function(t, write, write_value)
+	write'tuple('; write_value(t[1])
+	for i=2,#t do
+		write','; write_value(t[i])
+	end
+	write')'
+end
+
 return tuple

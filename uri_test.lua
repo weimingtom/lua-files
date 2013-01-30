@@ -5,7 +5,7 @@ test(uri.escape('some&some=other', '&='), 'some%26some%3dother')
 test(uri.format{scheme = 'http', host = 'dude.com', path = '/', fragment = 'top'}, 'http://dude.com/#top')
 test(uri.format{scheme = 'http', host = 'dude.com', path = '//../.'}, 'http://dude.com//../.')
 test(uri.format{scheme = 'http', host = 'dude.com', query = 'a=1&b=2 3'}, 'http://dude.com?a=1&b=2+3')
-test(uri.format{scheme = 'http', host = 'dude.com', args = {a='1',b='2 3'}}, 'http://dude.com?a=1&b=2+3')
+test(uri.format{scheme = 'http', host = 'dude.com', args = {b='2 3',a='1'}}, 'http://dude.com?a=1&b=2+3')
 test(uri.format{scheme = 'http', host = 'dude.com', path = '/redirect',
 		args={a='1',url='http://dude.com/redirect?a=1&url=http://dude.com/redirect?a=1&url=https://dude.com/'}},
 	'http://dude.com/redirect?a=1&url=http%3a%2f%2fdude.com%2fredirect%3fa=1%26url=http%3a%2f%2fdude.com%2fredirect%3fa=1%26url=https%3a%2f%2fdude.com%2f')
