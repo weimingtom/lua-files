@@ -1,6 +1,14 @@
 --object system, see http://code.google.com/p/lua-files/wiki/oo
+local glue = require'glue'
 
 local object = {classname = 'object'}
+
+--[[ TODO: find a nice way to provide a classname on the same line
+local Window = oo.class.Window(BaseWindow)
+local Window = BaseWindow:subclass'Window'
+local Window = oo.class(BaseWindow, 'Window')
+]]
+
 
 local function class(super,...)
 	return (super or object):subclass(...)
@@ -157,8 +165,6 @@ end
 local function pad(s, n) return s..(' '):rep(n - #s) end
 
 local props_conv = {g = 'r', s = 'w', gs = 'rw', sg = 'rw'}
-
-local glue = require'glue'
 
 function object:inspect()
 	--collect data
