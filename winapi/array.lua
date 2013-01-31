@@ -3,22 +3,23 @@ setfenv(1, require'winapi.namespace')
 require'winapi.ffi'
 require'winapi.types'
 
-arrays = {}
-setmetatable(arrays, arrays)
-
-function arrays:__index(type_str)
+--we're changing the VLA initializer a bit: if we get a table as arg#1,
+--we're creating a #t array initialized with the elements from the table.
+--we're also returning the number of elements as the second argument since APIs usually need that.
+arrays = glue.cache(function(type_str)
 	local ctype = ffi.typeof(type_str..'[?]')
 	local itemsize = ffi.sizeof(type_str)
-	self[type_str] = function(t)
-		if not ffi.istype(ctype, t) then
-			if type(t) == 'table' then
-				t = ctype(#t, t)
-			else
-				t = ctype(t)
-			end
+	return function(t,...)
+		local n
+		if type(t) == 'table' then
+			n = #t
+			t = ctype(n, t)
+		else
+			n = t
+			t = ctype(t,...)
 		end
-		return t, ffi.sizeof(t) / itemsize
+		return t, n
 	end
-	return self[type_str]
-end
+end)
 
+if not ... then require'array_test' end

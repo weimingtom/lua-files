@@ -2,6 +2,7 @@
 --we don't define time_t as it's 64 in windows but 32bit in mingw: use explicit types.
 local ffi = require'ffi'
 require'systypes_h'
+
 ffi.cdef[[
 typedef size_t          rsize_t;
 typedef unsigned short  wctype_t;

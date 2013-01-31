@@ -2,11 +2,15 @@
 setfenv(1, require'winapi.namespace')
 require'winapi.ffi'
 require'winapi.wintypes'
-local glue = require'glue'
+
+glue = require'glue'
+
+--TODO: don't do this
 local string = string
 import(glue)
 _M.string = string --put string module back
 update(string, glue.string)
+
 
 ffi.cdef[[
 DWORD GetLastError(void);
