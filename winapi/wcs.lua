@@ -46,7 +46,7 @@ ERROR_INSUFFICIENT_BUFFER = 122
 
 local checknz = checknz
 local WCS_ctype = ffi.typeof'WCHAR[?]'
-local MB2WC = ffi.C.MultiByteToWideChar
+local MB2WC = C.MultiByteToWideChar
 local CP = CP_UTF8
 local MB = 0
 
@@ -91,7 +91,7 @@ WC_NO_BEST_FIT_CHARS      = 0x00000400  -- do not use best fit chars
 
 local MBS_ctype = ffi.typeof'CHAR[?]'
 local PWCS_ctype = ffi.typeof'WCHAR*'
-local WC2MB = ffi.C.WideCharToMultiByte
+local WC2MB = C.WideCharToMultiByte
 local WC = 0
 
 function mbs(ws) --accept and convert a wcs or pwcs buffer to a lua string
@@ -105,10 +105,10 @@ function mbs(ws) --accept and convert a wcs or pwcs buffer to a lua string
 	end
 end
 
-wcslen = ffi.C.wcslen
+wcslen = C.wcslen
 
 function wcsncpy(dest, src, count) --wcsncpy variant that null-terminates even on truncation
-	ffi.C.wcsncpy(dest, src, count)
+	C.wcsncpy(dest, src, count)
 	dest[count-1] = 0
 end
 

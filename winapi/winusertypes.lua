@@ -3,6 +3,7 @@
 --note: RECT has x1, y1, x2, y2 in addition to left, right, top, bottom and these are the ones used.
 local ffi = require'ffi'
 require'winapi.wintypes'
+
 ffi.cdef[[
 typedef UINT_PTR            WPARAM;
 typedef LONG_PTR            LPARAM;

@@ -33,21 +33,21 @@ end
 
 function CreateAcceleratorTable(accel)
 	local accel, sz = arrays.ACCEL(accel)
-	return own(checkh(ffi.C.CreateAcceleratorTableW(accel, sz)), DestroyAcceleratorTable)
+	return own(checkh(C.CreateAcceleratorTableW(accel, sz)), DestroyAcceleratorTable)
 end
 
 function DestroyAcceleratorTable(haccel)
-	checknz(ffi.C.DestroyAcceleratorTable(haccel))
+	checknz(C.DestroyAcceleratorTable(haccel))
 	disown(haccel)
 end
 
 function AcceleratorTableSize(haccel)
-	return ffi.C.CopyAcceleratorTableW(haccel, nil, 0)
+	return C.CopyAcceleratorTableW(haccel, nil, 0)
 end
 
 function CopyAcceleratorTable(haccel, buf)
 	local buf, sz = arrays.ACCEL(buf or AcceleratorTableSize(haccel))
-	ffi.C.CopyAcceleratorTableW(haccel, buf, sz)
+	C.CopyAcceleratorTableW(haccel, buf, sz)
 	return buf
 end
 

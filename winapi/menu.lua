@@ -71,31 +71,31 @@ BOOL TrackPopupMenuEx(HMENU, UINT, int, int, HWND, LPTPMPARAMS);
 ]]
 
 function CreateMenuBar()
-	return own(checkh(ffi.C.CreateMenu()), DestroyMenu)
+	return own(checkh(C.CreateMenu()), DestroyMenu)
 end
 
 function CreateMenu()
-	return own(checkh(ffi.C.CreatePopupMenu()), DestroyMenu)
+	return own(checkh(C.CreatePopupMenu()), DestroyMenu)
 end
 
 function DestroyMenu(menu)
-	checknz(ffi.C.DestroyMenu(menu))
+	checknz(C.DestroyMenu(menu))
 	disown(menu)
 end
 
 function GetMenu(hwnd)
-	return ptr(ffi.C.GetMenu(hwnd))
+	return ptr(C.GetMenu(hwnd))
 end
 
 function SetMenu(hwnd, menu)
 	local oldmenu = own(GetMenu(hwnd), DestroyMenu)
-	checknz(ffi.C.SetMenu(hwnd, menu))
+	checknz(C.SetMenu(hwnd, menu))
 	disown(menu)
 	return oldmenu
 end
 
 function DrawMenuBar(hwnd)
-	checknz(ffi.C.DrawMenuBar(hwnd))
+	checknz(C.DrawMenuBar(hwnd))
 end
 
 MF_INSERT            = 0x00000000
@@ -182,25 +182,25 @@ MENUITEMINFO = struct{
 }
 
 function GetSubMenu(menu, i)
-	return ptr(ffi.C.GetSubMenu(menu, countfrom0(i)))
+	return ptr(C.GetSubMenu(menu, countfrom0(i)))
 end
 
 function InsertMenuItem(menu, i, info, byposition)
 	if not info then i,info = nil,i end --i is optional
-	checknz(ffi.C.InsertMenuItemW(menu, countfrom0(i), byposition, MENUITEMINFO(info)))
+	checknz(C.InsertMenuItemW(menu, countfrom0(i), byposition, MENUITEMINFO(info)))
 	disown(info.submenu)
 end
 
 function SetMenuItem(menu, i, info, byposition)
 	local oldsubmenu = GetSubMenu(menu, i)
-	checknz(ffi.C.SetMenuItemInfoW(menu, countfrom0(i), byposition, MENUITEMINFO(info)))
+	checknz(C.SetMenuItemInfoW(menu, countfrom0(i), byposition, MENUITEMINFO(info)))
 	disown(info.submenu)
 	own(oldsubmenu, DestroyMenu)
 end
 
 function GetMenuItem(menu, i, byposition, info)
 	info = MENUITEMINFO:setmask(info)
-	checknz(ffi.C.GetMenuItemInfoW(menu, countfrom0(i), byposition, info))
+	checknz(C.GetMenuItemInfoW(menu, countfrom0(i), byposition, info))
 	return info
 end
 
@@ -209,12 +209,12 @@ MF_BYPOSITION = 0x00000400
 
 function RemoveMenuItem(menu, i, byposition)
 	local oldsubmenu = GetSubMenu(menu, i)
-	checknz(ffi.C.RemoveMenu(menu, countfrom0(i), byposition and MF_BYPOSITION or MF_BYCOMMAND))
+	checknz(C.RemoveMenu(menu, countfrom0(i), byposition and MF_BYPOSITION or MF_BYCOMMAND))
 	return own(oldsubmenu, DestroyMenu)
 end
 
 function GetMenuItemCount(menu)
-	return checkpoz(ffi.C.GetMenuItemCount(menu))
+	return checkpoz(C.GetMenuItemCount(menu))
 end
 
 TPM_LEFTBUTTON      = 0x0000
@@ -244,7 +244,7 @@ TPMPARAMS = struct{
 
 function TrackPopupMenu(menu, hwnd, x, y, TPM, tpmp)
 	if tpmp then tpmp = TPMPARAMS(tpmp) end
-	return ffi.C.TrackPopupMenuEx(menu, flags(TPM), x, y, hwnd, tpmp)
+	return C.TrackPopupMenuEx(menu, flags(TPM), x, y, hwnd, tpmp)
 end
 
 --get/set menu info
@@ -294,11 +294,11 @@ MENUINFO = struct{
 
 function GetMenuInfo(menu, info)
 	info = MENUINFO:setmask(info)
-	checknz(ffi.C.GetMenuInfo(menu, info))
+	checknz(C.GetMenuInfo(menu, info))
 	return info
 end
 
 function SetMenuInfo(menu, info)
-	checknz(ffi.C.SetMenuInfo(menu, MENUINFO(info)))
+	checknz(C.SetMenuInfo(menu, MENUINFO(info)))
 end
 

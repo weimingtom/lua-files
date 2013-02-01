@@ -121,10 +121,10 @@ end
 
 local function wcs32(s)
 	if type(s) ~= 'string' then return s end
-	local sz = checknz(ffi.C.MultiByteToWideChar(CP_UTF8, 0, s, #s + 1, nil, 0))
+	local sz = checknz(C.MultiByteToWideChar(CP_UTF8, 0, s, #s + 1, nil, 0))
 	assert(sz <= 32, 'font facename must not exceed 31 characters')
 	local ws = ffi.new'WCHAR[32]'
-	checknz(ffi.C.MultiByteToWideChar(CP_UTF8, 0, s, #s + 1, ws, 32))
+	checknz(C.MultiByteToWideChar(CP_UTF8, 0, s, #s + 1, ws, 32))
 	return ws
 end
 
@@ -143,7 +143,7 @@ LOGFONT = struct{
 }
 
 function CreateFont(lf)
-	return own(checkh(ffi.C.CreateFontIndirectW(LOGFONT(lf))), DeleteObject)
+	return own(checkh(C.CreateFontIndirectW(LOGFONT(lf))), DeleteObject)
 end
 
 if not ... then

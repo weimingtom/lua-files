@@ -66,11 +66,11 @@ IDCONTINUE           = 11
 IDTIMEOUT            = 32000
 
 function MessageBox(text, title, MB, parent, langid)
-	return checknz(ffi.C.MessageBoxExW(parent, wcs(text), wcs(title), flags(MB), langid or 0))
+	return checknz(C.MessageBoxExW(parent, wcs(text), wcs(title), flags(MB), langid or 0))
 end
 
 function GetDialogBaseUnits()
-	local long = ffi.C.GetDialogBaseUnits()
+	local long = C.GetDialogBaseUnits()
 	return bit.band(long, 0xFFFF), bit.rshift(long, 16)
 end
 

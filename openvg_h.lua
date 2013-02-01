@@ -1,4 +1,4 @@
---result of `cpp openvg.h` from khronos.org/OpenVG 1.1 Header File, October 29, 2008
+--result of `cpp openvg.h` from http://www.khronos.org/registry/vg/api/1.1/openvg.h
 local ffi = require'ffi'
 
 ffi.cdef[[

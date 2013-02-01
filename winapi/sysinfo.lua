@@ -26,6 +26,6 @@ void GetSystemInfo(LPSYSTEM_INFO lpSystemInfo);
 
 function GetSystemInfo(sysinfo)
 	local sysinfo = sysinfo or ffi.new'SYSTEM_INFO'
-	ffi.C.GetSystemInfo(sysinfo)
+	C.GetSystemInfo(sysinfo)
 	return sysinfo
 end

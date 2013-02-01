@@ -86,7 +86,7 @@ WS_EX_PALETTEWINDOW = bit.bor(WS_EX_WINDOWEDGE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST)
 CW_USEDEFAULT = 0x80000000 --for x and y
 
 function CreateWindow(info)
-	local hwnd = checkh(ffi.C.CreateWindowExW(
+	local hwnd = checkh(C.CreateWindowExW(
 								flags(info.style_ex),
 								ffi.cast('LPCWSTR', wcs(MAKEINTRESOURCE(info.class))),
 								wcs(info.text),
@@ -100,7 +100,7 @@ end
 
 function DestroyWindow(hwnd)
 	if not hwnd then return end
-	checknz(ffi.C.DestroyWindow(hwnd))
+	checknz(C.DestroyWindow(hwnd))
 	disown(hwnd)
 end
 
@@ -127,7 +127,7 @@ SW_FORCEMINIMIZE     = 11
 SW_MAX               = 11
 
 function ShowWindow(hwnd, SW)
-	return ffi.C.ShowWindow(hwnd, flags(SW)) ~= 0
+	return C.ShowWindow(hwnd, flags(SW)) ~= 0
 end
 
 ffi.cdef[[
@@ -144,13 +144,13 @@ BOOL SetWindowTextW(
 ]]
 
 function GetWindowText(hwnd, buf)
-	local ws, sz = WCS(buf or checkpoz(ffi.C.GetWindowTextLengthW(hwnd)))
-	ffi.C.GetWindowTextW(hwnd, ws, sz+1)
+	local ws, sz = WCS(buf or checkpoz(C.GetWindowTextLengthW(hwnd)))
+	C.GetWindowTextW(hwnd, ws, sz+1)
 	return buf or mbs(ws)
 end
 
 function SetWindowText(hwnd, text)
-	checknz(ffi.C.SetWindowTextW(hwnd, wcs(text)))
+	checknz(C.SetWindowTextW(hwnd, wcs(text)))
 end
 
 ffi.cdef[[
@@ -189,7 +189,7 @@ SWP_FRAMECHANGED_ONLY = bit.bor(SWP_NOZORDER, SWP_NOOWNERZORDER, SWP_NOACTIVATE,
 SWP_ZORDER_CHANGED_ONLY = bit.bor(SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE)
 
 function SetWindowPos(hwnd, back_hwnd, x, y, cx, cy, SWP)
-	checknz(ffi.C.SetWindowPos(hwnd, back_hwnd, x, y, cx, cy, flags(SWP)))
+	checknz(C.SetWindowPos(hwnd, back_hwnd, x, y, cx, cy, flags(SWP)))
 end
 
 ffi.cdef[[
@@ -215,63 +215,63 @@ BOOL IsWindowUnicode(HWND hWnd);
 ]]
 
 function MoveWindow(hwnd, x, y, w, h, repaint)
-	checknz(ffi.C.MoveWindow(hwnd, x, y, w, h, repaint))
+	checknz(C.MoveWindow(hwnd, x, y, w, h, repaint))
 end
 
 function UpdateWindow(hwnd) --send WM_PAINT _if_ current update region is not empty
-	checknz(ffi.C.UpdateWindow(hwnd))
+	checknz(C.UpdateWindow(hwnd))
 end
 
 function EnableWindow(hwnd, enable)
-	return ffi.C.EnableWindow(hwnd, enable) ~= 0
+	return C.EnableWindow(hwnd, enable) ~= 0
 end
 
 function GetWindowRect(hwnd, rect)
 	rect = RECT(rect)
-	checknz(ffi.C.GetWindowRect(hwnd, rect))
+	checknz(C.GetWindowRect(hwnd, rect))
 	return rect
 end
 
 function GetClientRect(hwnd, rect)
 	rect = RECT(rect)
-	checknz(ffi.C.GetClientRect(hwnd, rect))
+	checknz(C.GetClientRect(hwnd, rect))
 	return rect
 end
 
-GetParent = ffi.C.GetParent
+GetParent = C.GetParent
 
 function SetParent(hwnd, parent)
-	local prev_parent = checkh(ffi.C.SetParent(hwnd, parent))
+	local prev_parent = checkh(C.SetParent(hwnd, parent))
 	if parent == nil then own(hwnd, DestroyWindow) else disown(hwnd) end
 	return prev_parent
 end
 
 function IsWindowVisible(hwnd)
-	return ffi.C.IsWindowVisible(hwnd) ~= 0
+	return C.IsWindowVisible(hwnd) ~= 0
 end
 
 function IsWindowEnabled(hwnd)
-	return ffi.C.IsWindowEnabled(hwnd) ~= 0
+	return C.IsWindowEnabled(hwnd) ~= 0
 end
 
 function GetActiveWindow()
-	return ptr(ffi.C.GetActiveWindow())
+	return ptr(C.GetActiveWindow())
 end
 
-SetActiveWindow = ffi.C.SetActiveWindow
+SetActiveWindow = C.SetActiveWindow
 
 function BringWindowToTop(hwnd)
-	checknz(ffi.C.BringWindowToTop(hwnd))
+	checknz(C.BringWindowToTop(hwnd))
 end
 
-IsMinimized = ffi.C.IsIconic
-IsMaximized = ffi.C.IsZoomed
+IsMinimized = C.IsIconic
+IsMaximized = C.IsZoomed
 
 function GetFocus()
-	return ptr(ffi.C.GetFocus())
+	return ptr(C.GetFocus())
 end
 
-SetFocus = ffi.C.SetFocus
+SetFocus = C.SetFocus
 
 GW_HWNDFIRST        = 0
 GW_HWNDLAST         = 1
@@ -281,7 +281,7 @@ GW_OWNER            = 4
 GW_CHILD            = 5
 GW_ENABLEDPOPUP     = 6
 
-function GetWindow(hwnd, GW) return ptr(ffi.C.GetWindow(hwnd, flags(GW))) end
+function GetWindow(hwnd, GW) return ptr(C.GetWindow(hwnd, flags(GW))) end
 function GetOwner(hwnd)        return callh2(GetWindow, hwnd, GW_OWNER) end
 function GetFirstChild(hwnd)   return callh2(GetWindow, hwnd, GW_CHILD) end
 function GetFirstSibling(hwnd) return callh2(GetWindow, hwnd, GW_HWNDFIRST) end
@@ -297,10 +297,10 @@ function GetChildWindows(hwnd) --returns a stateless iterator iterating from top
 	return nextchild, hwnd
 end
 
-GetTopWindow = ffi.C.GetTopWindow --same semantics as GetFirstChild ?
+GetTopWindow = C.GetTopWindow --same semantics as GetFirstChild ?
 
 function IsWindowUnicode(hwnd) --for outside windows; ours are always unicode
-	return ffi.C.IsWindowUnicode(hwnd) ~= 0
+	return C.IsWindowUnicode(hwnd) ~= 0
 end
 
 ffi.cdef[[
@@ -317,7 +317,7 @@ function EnumChildWindows(hwnd) --for a not null hwnd use GetChildWindows (no ca
 		t[#t+1] = hwnd
 		return 1 --continue
 	end)
-	ffi.C.EnumChildWindows(hwnd, cb, 0)
+	C.EnumChildWindows(hwnd, cb, 0)
 	cb:free()
 	return t
 end
@@ -351,13 +351,13 @@ WINDOWPLACEMENT = struct{
 
 function GetWindowPlacement(hwnd, wpl)
 	wpl = WINDOWPLACEMENT(wpl)
-	checknz(ffi.C.GetWindowPlacement(hwnd, wpl))
+	checknz(C.GetWindowPlacement(hwnd, wpl))
 	return wpl
 end
 
 function SetWindowPlacement(hwnd, wpl)
 	wpl = WINDOWPLACEMENT(wpl)
-	checknz(ffi.C.SetWindowPlacement(hwnd, wpl))
+	checknz(C.SetWindowPlacement(hwnd, wpl))
 end
 
 ffi.cdef[[
@@ -375,8 +375,8 @@ LRESULT CallWindowProcW(
      LPARAM lParam);
 ]]
 
-DefWindowProc = ffi.C.DefWindowProcW
-CallWindowProc = ffi.C.CallWindowProcW
+DefWindowProc = C.DefWindowProcW
+CallWindowProc = C.CallWindowProcW
 
 --set/get window long
 
@@ -393,15 +393,15 @@ if ffi.abi'64bit' then
 	LONG_PTR SetWindowLongPtrW(HWND hWnd, int nIndex, LONG_PTR dwNewLong);
 	LONG_PTR GetWindowLongPtrW(HWND hWnd, int nIndex);
 	]]
-	SetWindowLongW = ffi.C.SetWindowLongPtrW
-	GetWindowLongW = ffi.C.GetWindowLongPtrW
+	SetWindowLongW = C.SetWindowLongPtrW
+	GetWindowLongW = C.GetWindowLongPtrW
 else --32bit
 	ffi.cdef[[
 	LONG SetWindowLongW(HWND hWnd, int nIndex, LONG dwNewLong);
 	LONG GetWindowLongW(HWND hWnd, int nIndex);
 	]]
-	SetWindowLongW = ffi.C.SetWindowLongW
-	GetWindowLongW = ffi.C.GetWindowLongW
+	SetWindowLongW = C.SetWindowLongW
+	GetWindowLongW = C.GetWindowLongW
 end
 
 function SetWindowLong(hwnd, GWL, long)
@@ -446,32 +446,32 @@ BOOL AdjustWindowRectEx(
 
 function MapWindowPoints(hwndFrom, hwndTo, points)
 	local points, sz = arrays.POINT(points)
-	callnz2(ffi.C.MapWindowPoints, hwndFrom, hwndTo, points, sz)
+	callnz2(C.MapWindowPoints, hwndFrom, hwndTo, points, sz)
 	return points
 end
 
 function MapWindowPoint(hwndFrom, hwndTo, ...) --changes and returns the same passed point
 	local p = POINT(...)
-	callnz2(ffi.C.MapWindowPoints, hwndFrom, hwndTo, ffi.cast('POINT*', p), 1)
+	callnz2(C.MapWindowPoints, hwndFrom, hwndTo, ffi.cast('POINT*', p), 1)
 	return p
 end
 
 function MapWindowRect(hwndFrom, hwndTo, ...) --changes and returns the same passed rect
 	local r = RECT(...)
-	callnz2(ffi.C.MapWindowPoints, hwndFrom, hwndTo, ffi.cast('POINT*', r), 2)
+	callnz2(C.MapWindowPoints, hwndFrom, hwndTo, ffi.cast('POINT*', r), 2)
 	return r
 end
 
 function WindowFromPoint(...)
-	return ptr(ffi.C.WindowFromPoint(POINT(...)))
+	return ptr(C.WindowFromPoint(POINT(...)))
 end
 
 function ChildWindowFromPoint(hwnd, ...)
-	return ptr(ffi.C.ChildWindowFromPoint(hwnd, POINT(...)))
+	return ptr(C.ChildWindowFromPoint(hwnd, POINT(...)))
 end
 
 function RealChildWindowFromPoint(hwnd, ...)
-	return ptr(ffi.C.RealChildWindowFromPoint(hwnd, POINT(...)))
+	return ptr(C.RealChildWindowFromPoint(hwnd, POINT(...)))
 end
 
 function AdjustWindowRect(cr, wstyle, wstylex, hasmenu, rect)
@@ -480,7 +480,7 @@ function AdjustWindowRect(cr, wstyle, wstylex, hasmenu, rect)
 	rect.y1 = cr.y1
 	rect.x2 = cr.x2
 	rect.y2 = cr.y2
-	checknz(ffi.C.AdjustWindowRectEx(rect))
+	checknz(C.AdjustWindowRectEx(rect))
 	return rect
 end
 
@@ -555,23 +555,23 @@ BOOL KillTimer(
 ]]
 
 function GetMessage(hwnd, WMmin, WMmax, msg)
-	return checkpoz(ffi.C.GetMessageW(types.MSG(msg), hwnd, flags(WMmin), flags(WMmax)))
+	return checkpoz(C.GetMessageW(types.MSG(msg), hwnd, flags(WMmin), flags(WMmax)))
 end
 
 function DispatchMessage(msg)
-	return ffi.C.DispatchMessageW(msg)
+	return C.DispatchMessageW(msg)
 end
 
 function TranslateAccelerator(hwnd, haccel, msg)
-	return ffi.C.TranslateAcceleratorW(hwnd, haccel, msg) ~= 0
+	return C.TranslateAcceleratorW(hwnd, haccel, msg) ~= 0
 end
 
 function TranslateMessage(msg)
-	return ffi.C.TranslateMessage(msg)
+	return C.TranslateMessage(msg)
 end
 
 function IsDialogMessage(hwnd, msg)
-	return ffi.C.IsDialogMessageW(hwnd, msg) ~= 0
+	return C.IsDialogMessageW(hwnd, msg) ~= 0
 end
 
 --[[
@@ -599,13 +599,13 @@ HWND_BROADCAST = ffi.cast('HWND', 0xffff)
 HWND_MESSAGE   = ffi.cast('HWND', -3)
 
 function PostQuitMessage(exitcode)
-	ffi.C.PostQuitMessage(exitcode or 0)
+	C.PostQuitMessage(exitcode or 0)
 end
 
 function SendMessage(hwnd, WM, wparam, lparam)
 	if wparam == nil then wparam = 0 end
 	if type(lparam) == 'nil' then lparam = 0 end
-	return ffi.C.SendMessageW(hwnd, WM,
+	return C.SendMessageW(hwnd, WM,
 										ffi.cast('WPARAM', wparam),
 										ffi.cast('LPARAM', lparam))
 end
@@ -615,7 +615,7 @@ SNDMSG = SendMessage --less typing on those tedious macros
 function PostMessage(hwnd, WM, wparam, lparam)
 	if wparam == nil then wparam = 0 end
 	if lparam == nil then lparam = 0 end
-	return ffi.C.PostMessageW(hwnd, WM,
+	return C.PostMessageW(hwnd, WM,
 										ffi.cast('WPARAM', wparam),
 										ffi.cast('LPARAM', lparam))
 end
@@ -646,23 +646,23 @@ PM_QS_SENDMESSAGE   = bit.lshift(QS_SENDMESSAGE, 16)
 
 function PeekMessage(hwnd, WMmin, WMmax, PM, msg)
 	msg = types.MSG(msg)
-	return ffi.C.PeekMessageW(msg, hwnd, flags(WMmin), flags(WMmax), flags(PM)) ~= 0, msg
+	return C.PeekMessageW(msg, hwnd, flags(WMmin), flags(WMmax), flags(PM)) ~= 0, msg
 end
 
 function SetCapture(hwnd)
-	return ptr(ffi.C.SetCapture(hwnd))
+	return ptr(C.SetCapture(hwnd))
 end
 
 function ReleaseCapture()
-	return checknz(ffi.C.ReleaseCapture())
+	return checknz(C.ReleaseCapture())
 end
 
 function SetTimer(hwnd, id, timeout, callback)
-	return checknz(ffi.C.SetTimer(hwnd, id, timeout, callback))
+	return checknz(C.SetTimer(hwnd, id, timeout, callback))
 end
 
 function KillTimer(hwnd, id)
-	checknz(ffi.C.KillTimer(hwnd, id))
+	checknz(C.KillTimer(hwnd, id))
 end
 
 --message-based commands
@@ -702,7 +702,7 @@ BOOL DragDetect(HWND hwnd, POINT pt);
 ]]
 
 function DragDetect(hwnd, point)
-	return ffi.C.DragDetect(hwnd, POINT(point)) ~= 0
+	return C.DragDetect(hwnd, POINT(point)) ~= 0
 end
 
 --message crackers

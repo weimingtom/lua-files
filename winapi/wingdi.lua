@@ -46,8 +46,8 @@ DC_BRUSH             = 18
 DC_PEN               = 19
 
 
-function GetStockObject(i) return checkh(ffi.C.GetStockObject(i)) end
-function DeleteObject(ho) checknz(ffi.C.DeleteObject(ho)) end
+function GetStockObject(i) return checkh(C.GetStockObject(i)) end
+function DeleteObject(ho) checknz(C.DeleteObject(ho)) end
 
 --device contexts
 
@@ -76,22 +76,22 @@ BOOL     SwapBuffers(HDC);
 ]]
 
 function GetDC(hwnd)
-	return checkh(ffi.C.GetDC(hwnd))
+	return checkh(C.GetDC(hwnd))
 end
 
 function ReleaseDC(hwnd, hdc)
-	checktrue(ffi.C.ReleaseDC(hwnd, hdc))
+	checktrue(C.ReleaseDC(hwnd, hdc))
 	disown(hdc)
 end
 
-SelectObject = ffi.C.SelectObject --TODO: checkh for non-regions, HGDI_ERROR (-1U) for regions
+SelectObject = C.SelectObject --TODO: checkh for non-regions, HGDI_ERROR (-1U) for regions
 
 function BeginPaint(hwnd, paintstruct)
-	return checkh(ffi.C.BeginPaint(hwnd, paintstruct))
+	return checkh(C.BeginPaint(hwnd, paintstruct))
 end
 
 function EndPaint(hwnd, paintstruct)
-	return checktrue(ffi.C.EndPaint(hwnd, paintstruct))
+	return checktrue(C.EndPaint(hwnd, paintstruct))
 end
 
 RDW_INVALIDATE          = 0x0001
@@ -114,19 +114,19 @@ function RedrawWindow(hwnd, rect_or_region, RDW)
 	else
 		region = rect_or_region
 	end
-	checknz(ffi.C.RedrawWindow(hwnd, rect, region, flags(RDW)))
+	checknz(C.RedrawWindow(hwnd, rect, region, flags(RDW)))
 end
 
 function InvalidateRect(hwnd, rect, erase_bk)
-	return checktrue(ffi.C.InvalidateRect(hwnd, rect, erase_bk or false))
+	return checktrue(C.InvalidateRect(hwnd, rect, erase_bk or false))
 end
 
 function SetDCBrushColor(hdc, color)
-	return checkclr(ffi.C.SetDCBrushColor(hdc, color))
+	return checkclr(C.SetDCBrushColor(hdc, color))
 end
 
 function SetDCPenColor(hdc, color)
-	return checkclr(ffi.C.SetDCPenColor(hdc, color))
+	return checkclr(C.SetDCPenColor(hdc, color))
 end
 
 TRANSPARENT         = 1
@@ -137,15 +137,15 @@ function SetBkMode(hdc, mode)
 end
 
 function CreateCompatibleDC(hdc)
-	return checkh(ffi.C.CreateCompatibleDC(hdc))
+	return checkh(C.CreateCompatibleDC(hdc))
 end
 
 function DeleteDC(hdc)
-	return checknz(ffi.C.DeleteDC(hdc))
+	return checknz(C.DeleteDC(hdc))
 end
 
 function SwapBuffers(hdc)
-	return checknz(ffi.C.SwapBuffers(hdc))
+	return checknz(C.SwapBuffers(hdc))
 end
 
 --dc pixel format
@@ -227,12 +227,12 @@ PFD_STEREO_DONTCARE          = 0x80000000
 
 function ChoosePixelFormat(hdc, pfd)
 	pfd = PIXELFORMATDESCRIPTOR(pfd)
-	return checkpoz(ffi.C.ChoosePixelFormat(hdc, pfd))
+	return checkpoz(C.ChoosePixelFormat(hdc, pfd))
 end
 
 function SetPixelFormat(hdc, format, pfd)
 	pfd = PIXELFORMATDESCRIPTOR(pfd)
-	return checktrue(ffi.C.SetPixelFormat(hdc, format, pfd))
+	return checktrue(C.SetPixelFormat(hdc, format, pfd))
 end
 
 --brushes
@@ -242,7 +242,7 @@ HBRUSH CreateSolidBrush(COLORREF color);
 ]]
 
 function CreateSolidBrush(color)
-	return checkh(ffi.C.CreateSolidBrush(color))
+	return checkh(C.CreateSolidBrush(color))
 end
 
 --pens
@@ -277,7 +277,7 @@ PS_GEOMETRIC        = 0x00010000
 PS_TYPE_MASK        = 0x000F0000
 
 function CreatePen(style, width, color)
-	return checkh(ffi.C.CreatePen(style, width, color))
+	return checkh(C.CreatePen(style, width, color))
 end
 
 --text
@@ -287,7 +287,7 @@ COLORREF SetTextColor(HDC hdc, COLORREF color);
 ]]
 
 function SetTextColor(hdc, color)
-	return checkclr(ffi.C.SetTextColor(hdc, color))
+	return checkclr(C.SetTextColor(hdc, color))
 end
 
 --bitmaps
@@ -393,7 +393,7 @@ BOOL     BitBlt(HDC hdc, int x, int y, int cx, int cy, HDC hdcSrc, int x1, int y
 ]]
 
 function CreateCompatibleBitmap(hdc, w, h)
-	return checkh(ffi.C.CreateCompatibleBitmap(hdc, w, h))
+	return checkh(C.CreateCompatibleBitmap(hdc, w, h))
 end
 
 function CreateDIBSection()
@@ -401,7 +401,7 @@ function CreateDIBSection()
 end
 
 function SetPixel(hdc, x, y, color)
-	return ffi.C.SetPixel(hdc, x, y, color) --TODO: checkclr
+	return C.SetPixel(hdc, x, y, color) --TODO: checkclr
 end
 
 R2_BLACK            = 1   -- 0
@@ -444,7 +444,7 @@ function MAKEROP4(fore,back)
 end
 
 function BitBlt(dst, x, y, w, h, src, x1, y1, rop)
-	return checknz(ffi.C.BitBlt(dst, x, y, w, h, src, x1, y1, flags(rop)))
+	return checknz(C.BitBlt(dst, x, y, w, h, src, x1, y1, flags(rop)))
 end
 
 --filled shapes
@@ -462,16 +462,16 @@ BOOL Rectangle(HDC hdc, int left, int top, int right, int bottom);
 BOOL RoundRect(HDC hdc, int left, int top, int right, int bottom, int width, int height);
 ]]
 
-function Chord(...) return checknz(ffi.C.Chord(...)) end
-function Ellipse(...) return checknz(ffi.C.Ellipse(...)) end
-function FillRect(...) return checknz(ffi.C.FillRect(...)) end
-function FrameRect(...) return checknz(ffi.C.FrameRect(...)) end
-function InvertRect(...) return checknz(ffi.C.InvertRect(...)) end
-function Pie(...) return checknz(ffi.C.Pie(...)) end
-function PolyPolygon(...) return checknz(ffi.C.PolyPolygon(...)) end
-function Polygon(...) return checknz(ffi.C.Polygon(...)) end
-function Rectangle(...) return checknz(ffi.C.Rectangle(...)) end
-function RoundRect(...) return checknz(ffi.C.RoundRect(...)) end
+function Chord(...) return checknz(C.Chord(...)) end
+function Ellipse(...) return checknz(C.Ellipse(...)) end
+function FillRect(...) return checknz(C.FillRect(...)) end
+function FrameRect(...) return checknz(C.FrameRect(...)) end
+function InvertRect(...) return checknz(C.InvertRect(...)) end
+function Pie(...) return checknz(C.Pie(...)) end
+function PolyPolygon(...) return checknz(C.PolyPolygon(...)) end
+function Polygon(...) return checknz(C.Polygon(...)) end
+function Rectangle(...) return checknz(C.Rectangle(...)) end
+function RoundRect(...) return checknz(C.RoundRect(...)) end
 
 
 --showcase

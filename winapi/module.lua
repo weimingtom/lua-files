@@ -17,7 +17,7 @@ HMODULE LoadLibraryW(LPCWSTR lpLibFileName);
 ]]
 
 function GetModuleHandle(name)
-	return checkh(ffi.C.GetModuleHandleW(wcs(name)))
+	return checkh(C.GetModuleHandleW(wcs(name)))
 end
 
 GET_MODULE_HANDLE_EX_FLAG_PIN                 = 0x00000001
@@ -26,12 +26,12 @@ GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS        = 0x00000004
 
 function GetModuleHandleEx(name, GMHX, h)
 	h = types.HMODULE(h)
-	checkz(ffi.C.GetModuleHandleExW(flags(GMHX), wcs(name), h))
+	checkz(C.GetModuleHandleExW(flags(GMHX), wcs(name), h))
 	return h
 end
 
 function LoadLibrary(filename)
-    return checkh(ffi.C.LoadLibraryW(wcs(filename)))
+    return checkh(C.LoadLibraryW(wcs(filename)))
 end
 
 if not ... then

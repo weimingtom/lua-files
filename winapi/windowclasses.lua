@@ -52,12 +52,12 @@ WNDCLASSEXW = struct{
 }
 
 function RegisterClass(info)
-	return checknz(ffi.C.RegisterClassExW(WNDCLASSEXW(info)))
+	return checknz(C.RegisterClassExW(WNDCLASSEXW(info)))
 end
 
 function UnregisterClass(class)
 	if not class then return end
-	checknz(ffi.C.UnregisterClassW(ffi.cast('LPCWSTR', wcs(MAKEINTRESOURCE(class))), nil))
+	checknz(C.UnregisterClassW(ffi.cast('LPCWSTR', wcs(MAKEINTRESOURCE(class))), nil))
 end
 
 --set/get class long
@@ -79,15 +79,15 @@ if ffi.abi'64bit' then
 	LONG_PTR SetClassLongPtrW(HWND hWnd, int nIndex, LONG_PTR dwNewLong);
 	LONG_PTR GetClassLongPtrW(HWND hWnd, int nIndex);
 	]]
-	SetClassLongW = ffi.C.SetClassLongPtrW
-	GetClassLongW = ffi.C.GetClassLongPtrW
+	SetClassLongW = C.SetClassLongPtrW
+	GetClassLongW = C.GetClassLongPtrW
 else --32bit
 	ffi.cdef[[
 	LONG SetClassLongW(HWND hWnd, int nIndex, LONG dwNewLong);
 	LONG GetClassLongW(HWND hWnd, int nIndex);
 	]]
-	SetClassLongW = ffi.C.SetClassLongW
-	GetClassLongW = ffi.C.GetClassLongW
+	SetClassLongW = C.SetClassLongW
+	GetClassLongW = C.GetClassLongW
 end
 
 function SetClassLong(hwnd, GCL, long)

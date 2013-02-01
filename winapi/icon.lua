@@ -20,12 +20,12 @@ IDI_SHIELD        = 32518 --not found in XP
 
 function LoadIconFromInstance(hInstance, name)
 	if not name then hInstance, name = nil, hInstance end
-	return own(checkh(ffi.C.LoadIconW(hInstance,
+	return own(checkh(C.LoadIconW(hInstance,
 							ffi.cast('LPCWSTR', wcs(MAKEINTRESOURCE(name))))), DestroyIcon)
 end
 
 function DestroyIcon(hicon)
-	checknz(ffi.C.DestroyIcon(hicon))
+	checknz(C.DestroyIcon(hicon))
 end
 
 if not ... then

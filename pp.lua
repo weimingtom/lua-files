@@ -67,7 +67,7 @@ end
 local function pp(...)
 	local t = {}
 	for i=1,select('#',...) do
-		t[i] = pformat(select(i,...), '   ', {})
+		t[i] = to_string(select(i,...), '   ', {})
 	end
 	print(unpack(t))
 	return ...

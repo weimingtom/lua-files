@@ -28,15 +28,15 @@ DWORD FormatMessageA(
 	 );
 ]]
 
-GetLastError = ffi.C.GetLastError
-SetLastError = ffi.C.SetLastError
+GetLastError = C.GetLastError
+SetLastError = C.SetLastError
 
 FORMAT_MESSAGE_FROM_SYSTEM     = 0x00001000
 
 local function get_error_message(id)
 	local bufsize = 2048
 	local buf = ffi.new('char[?]', bufsize)
-	local sz = ffi.C.FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nil, id, 0, buf, bufsize, nil)
+	local sz = C.FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nil, id, 0, buf, bufsize, nil)
 	assert(sz ~= 0, 'error getting error message: %d', GetLastError())
 	return ffi.string(buf, sz)
 end

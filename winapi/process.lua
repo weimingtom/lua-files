@@ -42,7 +42,7 @@ STARTF_PREVENTPINNING   = 0x00002000
 
 function GetStartupInfo(si)
 	si = types.STARTUPINFOW(si)
-	ffi.C.GetStartupInfoW(si)
+	C.GetStartupInfoW(si)
 	return si
 end
 

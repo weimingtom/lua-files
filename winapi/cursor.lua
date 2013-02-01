@@ -36,17 +36,17 @@ IDC_HELP        = 32651
 
 function LoadCursor(hInstance, name)
 	if not name then hInstance, name = nil, hInstance end
-   return checkh(ffi.C.LoadCursorW(hInstance,
+   return checkh(C.LoadCursorW(hInstance,
 						ffi.cast('LPCWSTR', wcs(MAKEINTRESOURCE(name)))))
 end
 
 function SetCursor(cursor)
-	return ptr(ffi.C.SetCursor(cursor))
+	return ptr(C.SetCursor(cursor))
 end
 
 function GetCursorPos(p)
 	p = POINT(p)
-	checknz(ffi.C.GetCursorPos(p))
+	checknz(C.GetCursorPos(p))
 	return p
 end
 

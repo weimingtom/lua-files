@@ -147,11 +147,11 @@ print(m.count)
 print(m.size)
 function window:WM_PAINT()
 	local p = ffi.new'PAINTSTRUCT'
-	local hdc = ffi.C.BeginPaint(window.hwnd, p)
+	local hdc = C.BeginPaint(window.hwnd, p)
 	for i=1,m.count do
 		m:draw(i, hdc, 50+i*34, 50, ILD_NORMAL)
 	end
-	ffi.C.EndPaint(window.hwnd, p)
+	C.EndPaint(window.hwnd, p)
 end
 window:invalidate()
 MessageLoop()

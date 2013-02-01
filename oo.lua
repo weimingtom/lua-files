@@ -1,14 +1,13 @@
 --object system, see http://code.google.com/p/lua-files/wiki/oo
 local glue = require'glue'
 
-local object = {classname = 'object'}
-
 --[[ TODO: find a nice way to provide a classname on the same line
 local Window = oo.class.Window(BaseWindow)
 local Window = BaseWindow:subclass'Window'
 local Window = oo.class(BaseWindow, 'Window')
 ]]
 
+local object = {classname = 'object'}
 
 local function class(super,...)
 	return (super or object):subclass(...)
@@ -44,16 +43,14 @@ function meta.__newindex(o,k,v)
 end
 
 function object:beforehook(method_name, hook)
-	local method = self[method_name]
-	if not method then error(string.format('method missing for %s hook', k)) end
+	local method = self[method_name] or glue.pass
 	rawset(self, method_name, function(self, ...)
 		return method(self, hook(self, ...))
 	end)
 end
 
 function object:afterhook(method_name, hook)
-	local method = self[method_name]
-	if not method then error(string.format('method missing for %s hook', k)) end
+	local method = self[method_name] or glue.pass
 	rawset(self, method_name, function(self, ...)
 		return hook(method(self, ...))
 	end)
@@ -217,4 +214,3 @@ return {
 	class = class,
 	object = object,
 }
-

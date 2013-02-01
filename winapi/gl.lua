@@ -9,15 +9,10 @@ local function checksym(lib, symbol)
 	if ok then return v else return nil,v end
 end
 
-gl = setmetatable({}, {__index = function(t,k)
-	local v = checksym(opengl32, k)
-	if not v then v = ptr(ffi.cast('PFN' .. k:upper() .. 'PROC', wglGetProcAddress(k))) end
-	if not v then return nil end
-	t[k] = v
-	return v
-end})
+gl = glue.cache(function(k)
+	return checksym(opengl32, k) or ptr(ffi.cast(string.format('PFN%sPROC', k:upper()), wglGetProcAddress(k)))
+end)
 
---[[
 local errors = {
 	[0x0500] = 'GL_INVALID_ENUM',
 	[0x0501] = 'GL_INVALID_VALUE',
@@ -29,35 +24,8 @@ local errors = {
 	[0x8031] = 'GL_TABLE_TOO_LARGE',
 }
 
-local disabled
-
-local function __index(t,k)
-	local sym = gl[k]
-
-	local v = ptr(ffi.cast('PFN' .. k:upper() .. 'PROC', wglGetProcAddress(k)))
-	if not v then return nil end
-	t[k] = v
-	return v
-
-	local v = sym
-	if type(v) == 'cdata' then
-		v = function(...)
-			if k == 'glBegin' then
-				disabled = true
-			elseif k == 'glEnd' then
-				disabled = false
-			end
-			local ret = sym(...)
-			if not disabled then
-				local err = gl.glGetError()
-				if err ~= 0 then
-					error(string.format('%s Error 0x%x: %s', k, err, errors[err] or 'Unknown error.'), 2)
-				end
-			end
-			return ret
-		end
-	end
-	--t[k] = v
-	return v
+function gl.glCheckError()
+	local err = gl.glGetError()
+	glue.assert(err == 0, '%s Error 0x%x: %s', k, err, errors[err] or 'Unknown error.')
 end
-]]
+

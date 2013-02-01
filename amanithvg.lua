@@ -1,3 +1,9 @@
 require'vgext_h_amanith'
+local API = require'openvg'
 local ffi = require'ffi'
-return ffi.load'libAmanithVG'
+local C = ffi.load'libAmanithVG'
+local M = API.bind(C)
+
+if not ... then require'amanithvg_test' end
+
+return M

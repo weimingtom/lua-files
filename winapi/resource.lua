@@ -27,7 +27,7 @@ LR_COPYFROMRESOURCE = 0x00004000
 LR_SHARED           = 0x00008000
 
 function LoadImage(hinst, name, IMAGE, w, h, LR)
-	return checkh(ffi.C.LoadImageW(hinst, wcs(name), flags(IMAGE), w, h, flags(LR)))
+	return checkh(C.LoadImageW(hinst, wcs(name), flags(IMAGE), w, h, flags(LR)))
 end
 
 function LoadIconFromFile(filename, w, h, LR)

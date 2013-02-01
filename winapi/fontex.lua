@@ -33,7 +33,7 @@ ENUMLOGFONTEXDVW = struct{
 
 function CreateFontEx(lfex)
 	lfex = ENUMLOGFONTEXDVW(lfex)
-	return own(checkh(ffi.C.CreateFontIndirectExW(lfex)), DeleteObject)
+	return own(checkh(C.CreateFontIndirectExW(lfex)), DeleteObject)
 end
 
 if not ... then
