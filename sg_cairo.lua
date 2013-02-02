@@ -39,9 +39,10 @@ SG.defaults = {
 
 local function cairo_sym(k) return cairo[k] end --raises an exception for invalid k's
 local function cairo_enum(prefix) --eg. cairo_enum('CAIRO_OPERATOR_') -> t; t.over -> cairo.CAIRO_OPERATOR_OVER
-	return glue.cache(function(k)
-		return glue.unprotect(pcall(cairo_sym, prefix..k:upper()))
-	end)
+	return setmetatable({}, {__index = function(t,k)
+		t[k] = glue.unprotect(pcall(cairo_sym, prefix..k:upper()))
+		return rawget(t,k)
+	end})
 end
 
 local antialias_methods = cairo_enum'CAIRO_ANTIALIAS_'

@@ -9,9 +9,13 @@ local function checksym(lib, symbol)
 	if ok then return v else return nil,v end
 end
 
-gl = glue.cache(function(k)
-	return checksym(opengl32, k) or ptr(ffi.cast(string.format('PFN%sPROC', k:upper()), wglGetProcAddress(k)))
-end)
+gl = setmetatable({}, {
+	__index = function(t,k)
+		t[k] = checksym(opengl32, k) or
+					ptr(ffi.cast(string.format('PFN%sPROC', k:upper()), wglGetProcAddress(k)))
+		return rawget(t,k)
+	end
+})
 
 local errors = {
 	[0x0500] = 'GL_INVALID_ENUM',

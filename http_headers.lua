@@ -573,8 +573,9 @@ local function parse_values(t)
 end
 
 local function lazy_parse(t) --lazy_parse(s) -> t; t.header_name -> parsed_value
-	return glue.cache(function(k)
-		return t[k] and parse_value(k, t[k])
+	return setmetatable({}, {__index = function(dt,k)
+		dt[k] = parse_value(k, t[k])
+		return rawget(dt,k)
 	end)
 end
 

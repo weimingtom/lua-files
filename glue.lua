@@ -215,13 +215,6 @@ function glue.memoize(f)
 	end
 end
 
-function glue.cache(f)
-	return setmetatable({}, {__index = function(t,k)
-		t[k] = f(k)
-		return rawget(t,k)
-	end})
-end
-
 local function index_parents(t,k)
 	local parents = getmetatable(t).__parents
 	for i=1,#parents do
