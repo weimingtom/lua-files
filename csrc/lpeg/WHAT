@@ -1,3 +1,3 @@
-lpeg-0.10.2
+lpeg-0.10.2 from http://www.inf.puc-rio.br/~roberto/lpeg/ (MIT license)
 
 commented out one test that fails (see FIXME in lpeg_test.lua)
