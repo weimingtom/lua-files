@@ -153,13 +153,19 @@ function glue.string.escape(s, mode)
 				:gsub('([%^%$%(%)%.%[%]%*%+%-%?])', '%%%1'))
 end
 
-function glue.string.tohex(s)
+function glue.string.tohex(s, upper)
 	if type(s) == 'number' then
-		return string.format('%08.8x', s)
+		return string.format(upper and '%08.8X' or '%08.8x', s)
 	end
-	return (s:gsub('.', function(c)
-	  return string.format('%02x', string.byte(c))
-	end))
+	if upper then
+		return (s:gsub('.', function(c)
+		  return string.format('%02X', string.byte(c))
+		end))
+	else
+		return (s:gsub('.', function(c)
+		  return string.format('%02x', string.byte(c))
+		end))
+	end
 end
 
 function glue.string.fromhex(s)
@@ -258,6 +264,12 @@ function glue.readfile(name, format)
 	local s = f:read'*a'
 	f:close()
 	return s
+end
+
+function glue.writefile(name, s, format)
+	local f = assert(io.open(name, format=='t' and 'w' or 'wb'))
+	f:write(s)
+	f:close()
 end
 
 function glue.assert(v,err,...)

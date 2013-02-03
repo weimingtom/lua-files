@@ -2,8 +2,9 @@
 local glue = require'glue'
 
 local function readlines(file, callback)
-	local f = assert(io.open(file, 'r'))
-	local ok,err = glue.pcall(function()
+	glue.fcall(function(finally)
+		local f = assert(io.open(file, 'r'))
+		finally(function() f:close() end)
 		local line, line_str = 0, ''
 		local function check(v, ...)
 			if v then return v end
@@ -26,8 +27,6 @@ local function readlines(file, callback)
 			end
 		end
 	end)
-	f:close()
-	if not ok then error(err, 2) end
 end
 
 local map_cmds = glue.index{

@@ -16,3 +16,38 @@
 
 rasterizer:
 - gradients: linear, radial, radial focus, conic, conic angle, diamond, xy, sqrt xy, contour, auto contour, gouraud shading
+
+
+
+
+--2d path vertex pipeline
+--[[
+The vertex pipeline:
+	path_t -> simplify -> elasticize -> transform -> flatten -> gen-stroke -> clip -> write()
+
+A 2d path is a series of path commands and their arguments.
+A path enters the pipeline as a flat list of {command1, arg1, ..., command2, arg1, ...}.
+In transit, it is a series of invocations of a function write(command, arg1, ...) supplied by the consumer.
+It exists the pipeline as a series of invocations of a function write(???) to be used by the rasterizer.
+
+- inline affine transforms to be applied before flattening; they do not affect the current point
+	- they may or may not affect stroke shape (think about how to express this)
+
+- stroke generator
+	- polygon offsetting (use clipper?)
+	- line join types: miter, round, bevel
+	- line cap types: butt, round, square, marker (another path?)
+	- dash generator: dash array + offset; anything else?
+
+- non-linear transforms
+	- path-elasticize: split lines into beziers of fixed length
+		- see what's faster: flattening a lot of tiny beziers or
+		transforming a lot of polygon points (only if it looks good)?
+	- transform functions: perspective, bilinear, envelope, twist, lens, etc.
+	- other transformations from cartography? cylinder projection etc.
+
+- bounding box
+- hit testing
+- polygon clipping
+
+]]

@@ -163,7 +163,7 @@ local gl_source_formats = {
 }
 
 local imagefile_load_options = {
-	accept = glue.update({bottom_up = true}, gl_source_formats, row_align = {1, 2, 4, 8})
+	accept = glue.update({bottom_up = true}, gl_source_formats)
 }
 
 local function texture_free(tex)
