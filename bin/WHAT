@@ -1,8 +1,10 @@
 b64.dll         csrc/libb64
 boxblur.dll     csrc/boxblur
+cairo.dll       csrc/cairo
 cjson.dll       csrc/lua-cjson
 clipper.dll     csrc/clipper
 expat.dll       expat-2.1.0 (static multi-threaded build)
+freetype.dll    csrc/freetype
 giflib5.dll     csrc/giflib
 hpdf.dll        csrc/luahpdf
 lanes/core.dll  csrc/lanes
@@ -11,33 +13,23 @@ libAmanithVG.dll amanithvg 4.0.0.679-eval
 amanithvg.ini    amanithvg 4.0.0.679-eval
 libharu.dll     csrc/libharu
 libjpeg.dll     csrc/libjpegturbo
-libjpeg-62.dll  csrc/libjpegturbo
+libpng.dll      csrc/libpng
 lpeg.dll        csrc/lpeg
 lua51.dll       csrc/luajit
 luajit.exe      csrc/luajit
 luajit.exe.manifest (enables winapi to use comctl 6)
 md5.dll         csrc/md5
 nanojpeg2.dll   csrc/nanojpeg
+pixman.dll      csrc/pixman
 pmurhash.dll    csrc/pmurhash
 sha2.dll        csrc/sha2
 socket_core.dll csrc/luasocket
 vararg.dll      csrc/vararg
 zlib.dll        csrc/zlib
 
-
 TODO
 -------------------------------------------------
 
-png.dll         ufo (replace it with libpng.dll)
-z.dll           ufo (replace it with zlib.dll)
-
-pixman.dll      ufo (compile it)
-freetype2.dll   ufo (compile it)
-bz2.dll         ufo (compile it; used by freetype2.dll)
-cairo.dll       ufo (uses png, z, pixman, freetype2)
-
 libEGL.dll      ufo (google ANGLE, EGL API)
 libGLESv2.dll   ufo (google ANGLE, opengl API)
-
-regal.dll       ufo (opengl API bound to opengl32.dll)
 glut32.dll      ???

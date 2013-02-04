@@ -1,4 +1,8 @@
 gcc \
+	-shared -o ../../bin/pixman.dll -Wall -O3 -s -I. \
+	-mmmx -msse2 -mfpmath=sse -DUSE_X86_MMX -DUSE_SSE2 \
+	-DPACKAGE=pixman \
+	\
 	pixman.c			\
 	pixman-access.c			\
 	pixman-access-accessors.c	\
@@ -31,6 +35,3 @@ gcc \
 	pixman-utils.c			\
 	pixman-mmx.c			\
 	pixman-sse2.c			\
-	-shared -o ../../bin/pixman.dll -Wall -O3 -I. \
-	-mmmx -msse2 -mfpmath=sse -DUSE_X86_MMX -DUSE_SSE2 \
-	-DPACKAGE=pixman

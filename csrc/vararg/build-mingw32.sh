@@ -1,1 +1,1 @@
-gcc vararg.c -O3 -o ../../bin/vararg.dll -shared -ansi -llua51 -L../../bin -I../lua
+gcc vararg.c -O3 -s -o ../../bin/vararg.dll -shared -ansi -I../lua -L../../bin -llua51

@@ -292,6 +292,17 @@ end
 
 --bitmaps
 
+--constants for the biCompression field
+BI_RGB        = 0
+BI_RLE8       = 1
+BI_RLE4       = 2
+BI_BITFIELDS  = 3
+BI_JPEG       = 4
+BI_PNG        = 5
+
+DIB_RGB_COLORS = 0
+DIB_PAL_COLORS = 1
+
 ffi.cdef[[
 typedef struct tagRGBQUAD {
         BYTE    rgbBlue;
@@ -396,8 +407,10 @@ function CreateCompatibleBitmap(hdc, w, h)
 	return checkh(C.CreateCompatibleBitmap(hdc, w, h))
 end
 
-function CreateDIBSection()
-
+function CreateDIBSection(hdc, bmi, usage, hSection, offset, bits)
+	local bits = bits or 'void*[1]'
+	local hbitmap = checkh(C.CreateDIBSection(hdc, bmi, usage, bits, hSection, offset or 0))
+	return hbitmap, bits[0]
 end
 
 function SetPixel(hdc, x, y, color)
@@ -473,6 +486,13 @@ function Polygon(...) return checknz(C.Polygon(...)) end
 function Rectangle(...) return checknz(C.Rectangle(...)) end
 function RoundRect(...) return checknz(C.RoundRect(...)) end
 
+--batching
+
+ffi.cdef[[
+BOOL GdiFlush(void);
+]]
+
+GdiFlush = C.GdiFlush
 
 --showcase
 

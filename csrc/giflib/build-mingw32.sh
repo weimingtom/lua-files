@@ -1,1 +1,1 @@
-gcc *.c -o ../../bin/giflib5.dll -I. -shared -O2
+gcc *.c -O3 -s -o ../../bin/giflib5.dll -I. -shared

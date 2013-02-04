@@ -5,3 +5,5 @@ need: mingw, cmake, nasm (all in PATH)
 > make
 
 copy libjpeg.dll to bin/libjpeg.dll
+
+strip bin/libjpeg.dll

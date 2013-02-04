@@ -1,1 +1,1 @@
-gcc *.c -O3 -o ../../bin/socket_core.dll -shared -llua51 -lwsock32 -L../../bin -I. -I../lua
+gcc *.c -O3 -s -o ../../bin/socket_core.dll -shared -I. -I../lua -L../../bin -llua51 -lwsock32

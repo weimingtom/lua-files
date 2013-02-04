@@ -50,6 +50,7 @@ function CairoPanel:on_paint(window_hdc)
 		self.__window_cr = self.__window_surface:create_context()
 		self.__pixman_surface = cairo.cairo_image_surface_create(cairo.CAIRO_FORMAT_RGB24, w, h)
 		self:__create_surface(self.__pixman_surface)
+		--this way, we avoid a copy from the pixman surface to the window surface
 		self.__window_cr:set_source_surface(self.__pixman_surface, 0, 0)
 	end
 	self:on_render(self.__pixman_surface)
@@ -57,3 +58,26 @@ function CairoPanel:on_paint(window_hdc)
 end
 
 return CairoPanel
+
+--[[
+--from cairo-win32-display-surface.c
+local function get_bits(hdc, width, height)
+	local bitmap_info = ffi.new'BITMAPINFO'
+	bitmap_info.bmiHeader.biSize = ffi.sizeof'BITMAPINFOHEADER'
+	bitmap_info.bmiHeader.biWidth = width
+	bitmap_info.bmiHeader.biHeight = -height --top-down
+	bitmap_info.bmiHeader.biPlanes = 1
+	bitmap_info.bmiHeader.biBitCount = 32
+	bitmap_info.bmiHeader.biCompression = BI_RGB
+	local dc = CreateCompatibleDC(hdc)
+	local bmp, bits = CreateDIBSection(dc, bitmap_info, DIB_RGB_COLORS)
+   GdiFlush()
+	local last_bmp = SelectObject(dc, bmp)
+	--TODO: now use cairo_image_surface_create_for_data(bits)
+
+	--TODO: save and free these on __free_buffers()
+	SelectObject(dc, last_bmp)
+	DeleteObject(bmp)
+	DeleteDC(dc)
+end
+]]

@@ -1,1 +1,1 @@
-gcc boxblur.c -O3 -o ../../bin/boxblur.dll -shared 
+gcc boxblur.c -O3 -s -o ../../bin/boxblur.dll -shared

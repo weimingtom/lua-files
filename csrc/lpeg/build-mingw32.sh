@@ -1,17 +1,2 @@
-gcc lpeg.c -O3 -o ../../bin/lpeg.dll -shared -ansi -llua51 -L../../bin -I. -I../lua -DNDEBUG \
-	-Wall -Wextra -pedantic \
-   -Waggregate-return \
-	-Wbad-function-cast \
-	-Wcast-align \
-   -Wcast-qual \
-	-Wdeclaration-after-statement \
-	-Wdisabled-optimization \
-   -Wmissing-prototypes \
-   -Wnested-externs \
-   -Wpointer-arith \
-   -Wshadow \
-	-Wsign-compare \
-	-Wstrict-prototypes \
-	-Wundef \
-   -Wwrite-strings \
-	-Wunreachable-code
+gcc lpeg.c -O3 -s -o ../../bin/lpeg.dll -shared -I. -I../lua -ansi -L../../bin -llua51 \
+	-Wall -Wextra -DNDEBUG

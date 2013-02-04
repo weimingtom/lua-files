@@ -1,1 +1,1 @@
-gcc md5.c -O3 -I. -shared -o ../../bin/md5.dll
+gcc md5.c -O3 -s -I. -shared -o ../../bin/md5.dll
