@@ -19,23 +19,7 @@ function SG:free()
 	if self.freetype then self.freetype:free() end
 end
 
-SG.defaults = {
-	font = {family = 'Arial', slant = 'normal', weight = 'normal'},
-	font_size = 12,
-	font_options = {antialias = 'default', subpixel_order = 'default',
-							hint_style = 'default', hint_metrics = 'default'},
-	fill_rule = 'nonzero',
-	line_width = 1,
-	line_cap = 'square',
-	line_join = 'miter',
-	miter_limit = 4,
-	line_dashes = {},
-	operator = 'over',
-	gradient_filter = 'fast',
-	gradient_extend = 'pad',
-	image_filter = 'best',
-	image_extend = 'none',
-}
+SG.defaults = require'sg_2d'.defaults
 
 local function cairo_sym(k) return cairo[k] end --raises an exception for invalid k's
 local function cairo_enum(prefix) --eg. cairo_enum('CAIRO_OPERATOR_') -> t; t.over -> cairo.CAIRO_OPERATOR_OVER

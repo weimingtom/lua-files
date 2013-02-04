@@ -66,6 +66,7 @@ local function callback_manager(mgr_ctype, callbacks) --create a callback manage
 		end
 	end
 	local function free_mgr()
+		ffi.gc(mgr, nil)
 		for k,cb in pairs(cbt) do
 			mgr[k] = nil
 			cb:free()
@@ -80,7 +81,6 @@ local function set_source(cinfo, finally, callbacks) --create a source manager a
 	cinfo.src = mgr
 	finally(function() --the finalizer needs to pin mgr or it gets collected
 		cinfo.src = nil
-		ffi.gc(mgr, nil)
 		free_mgr()
 	end)
 end
