@@ -35,9 +35,18 @@
 
 #include "pixman-private.h"
 
+/* Workaround for http://gcc.gnu.org/PR54965 */
+/* GCC 4.6 has problems with force_inline, so just use normal inline instead */
+#if defined(__GNUC__) && (__GNUC__ == 4) && (__GNUC_MINOR__ == 6)
+#undef force_inline
+#define force_inline __inline__
+#endif
+
+#define IS_ZERO(f)     (-FLT_MIN < (f) && (f) < FLT_MIN)
+
 typedef float (* combine_channel_t) (float sa, float s, float da, float d);
 
-static inline void
+static force_inline void
 combine_inner (pixman_bool_t component,
 	       float *dest, const float *src, const float *mask, int n_pixels,
 	       combine_channel_t combine_a, combine_channel_t combine_c)
@@ -52,12 +61,12 @@ combine_inner (pixman_bool_t component,
 	    float sr = src[i + 1];
 	    float sg = src[i + 2];
 	    float sb = src[i + 3];
-
+	    
 	    float da = dest[i + 0];
 	    float dr = dest[i + 1];
 	    float dg = dest[i + 2];
-	    float db = dest[i + 3];
-
+	    float db = dest[i + 3];					
+	    
 	    dest[i + 0] = combine_a (sa, sa, da, da);
 	    dest[i + 1] = combine_c (sa, sr, da, dr);
 	    dest[i + 2] = combine_c (sa, sg, da, dg);
@@ -71,12 +80,12 @@ combine_inner (pixman_bool_t component,
 	    float sa, sr, sg, sb;
 	    float ma, mr, mg, mb;
 	    float da, dr, dg, db;
-
+	    
 	    sa = src[i + 0];
 	    sr = src[i + 1];
 	    sg = src[i + 2];
 	    sb = src[i + 3];
-
+	    
 	    if (component)
 	    {
 		ma = mask[i + 0];
@@ -92,7 +101,7 @@ combine_inner (pixman_bool_t component,
 		mr *= sa;
 		mg *= sa;
 		mb *= sa;
-
+		
 		sa = ma;
 	    }
 	    else
@@ -106,12 +115,12 @@ combine_inner (pixman_bool_t component,
 
 		ma = mr = mg = mb = sa;
 	    }
-
+	    
 	    da = dest[i + 0];
 	    dr = dest[i + 1];
 	    dg = dest[i + 2];
 	    db = dest[i + 3];
-
+	    
 	    dest[i + 0] = combine_a (ma, sa, da, da);
 	    dest[i + 1] = combine_c (mr, sr, da, dr);
 	    dest[i + 2] = combine_c (mg, sg, da, dg);
@@ -194,56 +203,56 @@ get_factor (combine_factor_t factor, float sa, float da)
 	break;
 
     case SA_OVER_DA:
-	if (da == 0.0f)
+	if (IS_ZERO (da))
 	    f = 1.0f;
 	else
 	    f = CLAMP (sa / da);
 	break;
 
     case DA_OVER_SA:
-	if (sa == 0.0f)
+	if (IS_ZERO (sa))
 	    f = 1.0f;
 	else
 	    f = CLAMP (da / sa);
 	break;
 
     case INV_SA_OVER_DA:
-	if (da == 0.0f)
+	if (IS_ZERO (da))
 	    f = 1.0f;
 	else
 	    f = CLAMP ((1.0f - sa) / da);
 	break;
 
     case INV_DA_OVER_SA:
-	if (sa == 0.0f)
+	if (IS_ZERO (sa))
 	    f = 1.0f;
 	else
 	    f = CLAMP ((1.0f - da) / sa);
 	break;
 
     case ONE_MINUS_SA_OVER_DA:
-	if (da == 0.0f)
+	if (IS_ZERO (da))
 	    f = 0.0f;
 	else
 	    f = CLAMP (1.0f - sa / da);
 	break;
 
     case ONE_MINUS_DA_OVER_SA:
-	if (sa == 0.0f)
+	if (IS_ZERO (sa))
 	    f = 0.0f;
 	else
 	    f = CLAMP (1.0f - da / sa);
 	break;
 
     case ONE_MINUS_INV_DA_OVER_SA:
-	if (sa == 0.0f)
+	if (IS_ZERO (sa))
 	    f = 0.0f;
 	else
 	    f = CLAMP (1.0f - (1.0f - da) / sa);
 	break;
 
     case ONE_MINUS_INV_SA_OVER_DA:
-	if (da == 0.0f)
+	if (IS_ZERO (da))
 	    f = 0.0f;
 	else
 	    f = CLAMP (1.0f - (1.0f - sa) / da);
@@ -396,11 +405,11 @@ blend_lighten (float sa, float s, float da, float d)
 static force_inline float
 blend_color_dodge (float sa, float s, float da, float d)
 {
-    if (d == 0.0f)
+    if (IS_ZERO (d))
 	return 0.0f;
     else if (d * sa >= sa * da - s * da)
 	return sa * da;
-    else if (sa - s == 0.0f)
+    else if (IS_ZERO (sa - s))
 	return sa * da;
     else
 	return sa * sa * d / (sa - s);
@@ -413,7 +422,7 @@ blend_color_burn (float sa, float s, float da, float d)
 	return sa * da;
     else if (sa * (da - d) >= s * da)
 	return 0.0f;
-    else if (s == 0.0f)
+    else if (IS_ZERO (s))
 	return 0.0f;
     else
 	return sa * (da - sa * (da - d) / s);
@@ -433,14 +442,14 @@ blend_soft_light (float sa, float s, float da, float d)
 {
     if (2 * s < sa)
     {
-	if (da == 0.0f)
+	if (IS_ZERO (da))
 	    return d * sa;
 	else
 	    return d * sa - d * (da - d) * (sa - 2 * s) / da;
     }
     else
     {
-	if (da == 0.0f)
+	if (IS_ZERO (da))
 	{
 	    return 0.0f;
 	}
@@ -644,10 +653,12 @@ clip_color (rgb_t *color, float a)
     float l = get_lum (color);
     float n = channel_min (color);
     float x = channel_max (color);
+    float t;
 
     if (n < 0.0f)
     {
-	if ((l - n) < 4 * FLT_EPSILON)
+	t = l - n;
+	if (IS_ZERO (t))
 	{
 	    color->r = 0.0f;
 	    color->g = 0.0f;
@@ -655,14 +666,15 @@ clip_color (rgb_t *color, float a)
 	}
 	else
 	{
-	    color->r = l + (((color->r - l) * l) / (l - n));
-	    color->g = l + (((color->g - l) * l) / (l - n));
-	    color->b = l + (((color->b - l) * l) / (l - n));
+	    color->r = l + (((color->r - l) * l) / t);
+	    color->g = l + (((color->g - l) * l) / t);
+	    color->b = l + (((color->b - l) * l) / t);
 	}
     }
     if (x > a)
     {
-	if ((x - l) < 4 * FLT_EPSILON)
+	t = x - l;
+	if (IS_ZERO (t))
 	{
 	    color->r = a;
 	    color->g = a;
@@ -670,9 +682,9 @@ clip_color (rgb_t *color, float a)
 	}
 	else
 	{
-	    color->r = l + (((color->r - l) * (a - l) / (x - l)));
-	    color->g = l + (((color->g - l) * (a - l) / (x - l)));
-	    color->b = l + (((color->b - l) * (a - l) / (x - l)));
+	    color->r = l + (((color->r - l) * (a - l) / t));
+	    color->g = l + (((color->g - l) * (a - l) / t));
+	    color->b = l + (((color->b - l) * (a - l) / t));
 	}
     }
 }
@@ -693,6 +705,7 @@ static void
 set_sat (rgb_t *src, float sat)
 {
     float *max, *mid, *min;
+    float t;
 
     if (src->r > src->g)
     {
@@ -743,14 +756,16 @@ set_sat (rgb_t *src, float sat)
 	}
     }
 
-    if (*max > *min)
+    t = *max - *min;
+
+    if (IS_ZERO (t))
     {
-	*mid = (((*mid - *min) * sat) / (*max - *min));
-	*max = sat;
+	*mid = *max = 0.0f;
     }
     else
     {
-	*mid = *max = 0.0f;
+	*mid = ((*mid - *min) * sat) / t;
+	*max = sat;
     }
 
     *min = 0.0f;
