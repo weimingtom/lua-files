@@ -17,7 +17,7 @@ for i,operator in ipairs{
 		{type = 'shape', path = {'rect', 0, 0, 100, 100}, fill = {type = 'color', 1,0,0,.7}},
 		{type = 'shape', path = {'rect', 0, 0, 100, 100}, fill = {type = 'color', 0,0,1,.7},
 			x = 30, y = 30, operator = operator},
-		{type = 'shape', path = {nocache = true, 'text', {size = 16*2}, 0, 0, operator}, fill = {type = 'color', 1,1,1,1}},
+		{type = 'shape', path = {nocache = true, 'move', 0, 0, 'text', {size = 16*2}, operator}, fill = {type = 'color', 1,1,1,1}},
 	}
 end
 
@@ -152,12 +152,12 @@ local shapes = {type = 'group',
 			'rel_smooth_curve', 100-30, 60, 100, 0,
 			'rel_quad_curve', 50, 50, 100, 0,
 			'rel_smooth_quad_curve', 100, 0,
-			'rel_elliptical_arc', 50, 20, -15, 1, 0, 20, 0,
-			'rel_elliptical_arc', 50, 20, -15, 1, 1, 20, 0,
-			'rel_arc', 0, 0, 50, 30, 120,
+			--'rel_elliptical_arc', 50, 20, -15, 1, 0, 20, 0,
+			--'rel_elliptical_arc', 50, 20, -15, 1, 1, 20, 0,
+			'rel_arc', 0, 0, 50, 0, -330,
+			'rel_arc', 0, 0, 50, 0, 330,
 			'break',
 			'move', 780, 60,
-			'rel_negative_arc', 0, 0, 50, 0, -10,
 
 			'move', 10, 120,
 			'line', 10, 220,
@@ -173,18 +173,19 @@ local shapes = {type = 'group',
 			'smooth_curve', 340+100+100-30, 220+60-50, 340+100+100, 220+0-50,
 			'quad_curve', 340+100+100+50, 220+0-50+50, 340+100+100+100, 220+0-50,
 			'smooth_quad_curve', 340+100+100+100+100, 220+0-50,
-			'elliptical_arc', 50, 20, -15, 1, 0, 340+100+100+100+100+20, 220+0-50,
-			'elliptical_arc', 50, 20, -15, 1, 1, 340+100+100+100+100+20+20, 220+0-50,
-			'arc', 340+100+100+100+100+20+20, 220+0-50, 50, 30, 120,
+			--'elliptical_arc', 50, 20, -15, 1, 0, 340+100+100+100+100+20, 220+0-50,
+			--'elliptical_arc', 50, 20, -15, 1, 1, 340+100+100+100+100+20+20, 220+0-50,
+			'arc', 340+100+100+100+100, 220+0-50, 50, 0, -330,
+			'arc', 340+100+100+100+100, 220+0-50, 50, 0, 330,
 			'break',
 			'move', 340+100+100+100+100+20+20, 220+0-50,
-			'negative_arc', 340+100+100+100+100+20+20, 220+0-50, 50, 0, -10,
 
 			'ellipse', 960, 60, 100, 50,
 			'circle', 960, 60, 50,
 			'rect', 960+110, 10, 100, 100,
 			'round_rect', 960+220, 10, 100, 100, 20,
-			'text', {size = 110, family = 'georgia', slant = 'italic'}, 860, 220, 'g@AWmi',
+			'move', 860, 220,
+			'text', {size = 110, family = 'georgia', slant = 'italic'}, 'g@AWmi',
 		},
 		stroke = {type = 'color', 1,1,1,1},
 	},
@@ -193,6 +194,7 @@ local shapes = {type = 'group',
 local leon = {type = 'svg', x = 1500, file = {path = 'media/svg/leon.svg'}}
 local tiger = {type = 'svg', x = 1400, y = 600, scale = 1.5, file = {path = 'media/svg/tiger.svg'}}
 local futurama = {type = 'svg', x = 1400, y = 600, scale = 1.5, file = {path = 'media/svg/futurama/Homer_and_Bender___Drinking_by_sircle.svg'}}
+local ellipse = {type = 'svg', x = 1400, y = 600, scale = 1.5, file = {path = 'media/svg/arcs02.svg'}}
 
 local scene = {
 	type = 'group', y = .5, x = .5, scale = .5,
@@ -205,7 +207,8 @@ local scene = {
 	operator_palette,
 	measuring_subject,
 	measuring_box,
-	futurama,
+	ellipse,
+	--futurama,
 	--tiger,
 	--leon,
 }
@@ -217,6 +220,7 @@ end
 local highlight_stroke = {type = 'color', 1,0,0,1}
 
 local player = require'sg_cairo_player'
+
 function player:on_render()
 	measuring_box.path = {'rect', box2rect(self:measure(measuring_subject))}
 	local t = {}
@@ -235,5 +239,6 @@ function player:on_render()
 	self:render(scene)
 	for e in pairs(t) do if e.type == 'shape' then e.stroke, e.old_stroke = e.old_stroke end end
 end
+
 player:play()
 

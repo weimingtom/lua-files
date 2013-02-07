@@ -1,7 +1,7 @@
 --scene graph for pdf: converts a 2D scene graph into pdf format.
 --some modules are loaded on-demand: look for require() in the code.
 local glue = require'glue'
-local path_simplify = require'path2d_simplify'
+local path_simplify = require'path_simplify'
 local PDF = require'pdfgen'
 
 local defaults = require'sg_2d'.defaults

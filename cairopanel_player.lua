@@ -2,11 +2,13 @@ local CPanel = require'winapi.cairopanel'
 local winapi = require'winapi'
 require'winapi.messageloop'
 local cairo = require'cairo'
+local fps = require'fps_function'(2)
 
 local main = winapi.Window{
 	autoquit = true,
 	visible = false,
-	state = 'maximized',
+	--state = 'maximized',
+	title = 'CairoPanel Player',
 }
 
 local panel = CPanel{
@@ -16,35 +18,30 @@ local panel = CPanel{
 
 local player = {}
 
-function player:on_render(cr) end --stub
+function player:on_render(cr) end
+function player:on_init(cr) end
+
+function panel:__create_surface(surface)
+	self.cr = surface:create_context()
+	player:on_init(self.cr)
+end
+
+function panel:__destroy_surface(surface)
+	self.cr:free()
+end
 
 function panel:on_render(surface)
-	local cr = surface:create_context()
-	player:on_render(cr)
-	cr:free()
+	main.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
+	player:on_render(self.cr)
 end
 
 function player:play()
 	main:show()
+	panel:settimer(1, panel.invalidate)
 	winapi.MessageLoop()
 end
 
-if not ... then
-	function player:on_render(cr)
-		cr:set_source_rgba(1,1,1,.5)
-		cr:rotate(.2)
-		cr:new_path()
-		cr:rectangle(0,0,100,100)
-		cr:stroke_preserve()
-		local path = cr:copy_path_flat()
-		cr:identity_matrix()
-		cr:translate(500,500)
-		--cr:new_path(); cr:append_path(path)
-		cr:stroke_preserve()
-		cr:rectangle(0,0,100,100)
-		cr:stroke_preserve()
-	end
-	player:play()
-end
+if not ... then require'cairopanel_player_test' end
 
 return player
+

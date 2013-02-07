@@ -265,7 +265,7 @@ local function path(s) --return {cmd1, val11, ..., cmd2, val21, ...}
 		i = i + 1
 	end
 	if t[1] == 'rel_move' then t[1] = 'move' end --starting with m means start with M
-	if t[1] ~= 'move' then return end --must start with M
+	if t[1] ~= 'move' then return end --must start with M or we ignore the whole path
 
 	return t
 end
