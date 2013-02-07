@@ -1,9 +1,9 @@
 gcc -shared -o../../bin/cairo.dll \
 	-O3 -s -Wl,--enable-stdcall-fixup \
-	-I. -I../pixman -I../zlib -I../libpng -I../freetype -IC:/MinGW/include/GL -Ix:/trash/win7sdk/Include/gl  \
+	-I. -I../pixman -I../zlib -I../libpng -I../freetype \
 	\
 	-L../../bin -lpixman -lzlib -llibpng -lfreetype-6 \
-	-L$WINDIR/system32 -lgdi32 -lkernel32 -lmsimg32 -opengl32 \
+	-L$WINDIR/system32 -lgdi32 -lkernel32 -lmsimg32 \
 	\
 	-DHAVE_STDINT_H=1 \
 	-DHAVE_UINT64_T=1 \
