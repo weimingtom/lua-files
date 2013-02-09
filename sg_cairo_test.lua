@@ -207,10 +207,10 @@ local scene = {
 	operator_palette,
 	measuring_subject,
 	measuring_box,
-	ellipse,
+	--ellipse,
 	--futurama,
 	--tiger,
-	--leon,
+	leon,
 }
 
 local function box2rect(x1,y1,x2,y2)
@@ -232,6 +232,7 @@ function player:on_render()
 			if e.type == 'shape' then
 				--e.line_width = 5
 				e.stroke, e.old_stroke = highlight_stroke, e.stroke
+				--pp(e.path)
 			end
 			--print(e.type)
 		end

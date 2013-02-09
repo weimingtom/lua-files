@@ -1,15 +1,21 @@
---2d bezier adaptive interpolation from AGG
+--2d bezier adaptive interpolation.
 --transcribed from: http://www.antigrain.com/research/adaptive_bezier/index.html
 
 local curve_collinearity_epsilon    = 1e-30
 local curve_angle_tolerance_epsilon = 0.01
 local curve_recursion_limit         = 32
 
+local pi, rad, atan2, abs = math.pi, math.rad, math.atan2, math.abs
+
+local function calc_sq_distance(x1, y1, x2, y2)
+	return (x2-x1) * (x2-x1) + (y2-y1) * (y2-y1)
+end
+
 local function bezier_to_lines_function(m_approximation_scale, m_angle_tolerance, m_cusp_limit)
 
 	m_approximation_scale = m_approximation_scale or 1
 	m_angle_tolerance = m_angle_tolerance or 0
-	m_cusp_limit = m_cusp_limit and m_cusp_limit ~= 0 and math.pi - math.rad(m_cusp_limit) or 0
+	m_cusp_limit = m_cusp_limit and m_cusp_limit ~= 0 and pi - rad(m_cusp_limit) or 0
 
 	local m_distance_tolerance_square = 0.5 / m_approximation_scale
 	local m_distance_tolerance_square = m_distance_tolerance_square * m_distance_tolerance_square
@@ -35,8 +41,8 @@ local function bezier_to_lines_function(m_approximation_scale, m_angle_tolerance
 		local dx = x4-x1
 		local dy = y4-y1
 
-		local d2 = math.abs((x2 - x4) * dy - (y2 - y4) * dx)
-		local d3 = math.abs((x3 - x4) * dy - (y3 - y4) * dx)
+		local d2 = abs((x2 - x4) * dy - (y2 - y4) * dx)
+		local d3 = abs((x3 - x4) * dy - (y3 - y4) * dx)
 		local da1, da2, k
 
 		local case = (d2 > curve_collinearity_epsilon and 2 or 0) +
@@ -99,7 +105,7 @@ local function bezier_to_lines_function(m_approximation_scale, m_angle_tolerance
 				end
 
 				-- Angle Condition
-				da1 = math.abs(atan2(y4 - y3, x4 - x3) - atan2(y3 - y2, x3 - x2))
+				da1 = abs(atan2(y4 - y3, x4 - x3) - atan2(y3 - y2, x3 - x2))
 				if da1 >= pi then da1 = 2*pi - da1 end
 
 				if da1 < m_angle_tolerance then
@@ -124,7 +130,7 @@ local function bezier_to_lines_function(m_approximation_scale, m_angle_tolerance
 				end
 
 				-- Angle Condition
-				da1 = math.abs(atan2(y3 - y2, x3 - x2) - atan2(y2 - y1, x2 - x1))
+				da1 = abs(atan2(y3 - y2, x3 - x2) - atan2(y2 - y1, x2 - x1))
 				if da1 >= pi then da1 = 2*pi - da1 end
 
 				if da1 < m_angle_tolerance then
@@ -152,8 +158,8 @@ local function bezier_to_lines_function(m_approximation_scale, m_angle_tolerance
 
 				-- Angle & Cusp Condition
 				k   = atan2(y3 - y2, x3 - x2)
-				da1 = math.abs(k - atan2(y2 - y1, x2 - x1))
-				da2 = math.abs(atan2(y4 - y3, x4 - x3) - k)
+				da1 = abs(k - atan2(y2 - y1, x2 - x1))
+				da2 = abs(atan2(y4 - y3, x4 - x3) - k)
 				if da1 >= pi then da1 = 2*pi - da1 end
 				if da2 >= pi then da2 = 2*pi - da2 end
 
@@ -188,7 +194,7 @@ local function bezier_to_lines_function(m_approximation_scale, m_angle_tolerance
 	end
 end
 
-return {
-	bezier_to_lines_function = bezier_to_lines_function,
-}
+if not ... then require'path_bezier_demo' end
+
+return bezier_to_lines_function
 

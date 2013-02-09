@@ -44,7 +44,7 @@ function convert(t)
 			end
 
 			local first = true
-			path_simplify(t.path, function(cmd, _, _, ...)
+			local function write(cmd, ...)
 				if not first then pdf.S' ' else first = false end
 				if cmd == 'move' then
 					pdf.nums(...); pdf.S' m'
@@ -55,7 +55,8 @@ function convert(t)
 				elseif cmd == 'close' then
 					pdf.S'h'
 				end
-			end)
+			end
+			path_simplify(write, t.path)
 
 			if t.stroke and t.fill then
 				if t.stroke_first then

@@ -49,11 +49,12 @@ end
 
 local bezier_arc_angle_epsilon = 0.01 --limit to prevent adding degenerate curves
 
-local function arc(write, cx, cy, rx, ry, start_angle, sweep_angle, has_cp)
+local function arc(write, cx, cy, rx, ry, start_angle, sweep_angle, has_cp, dont_connect)
 	if rx == 0 or ry == 0 then return cx, cy end
+
 	if abs(sweep_angle) < 1e-10 then
 		local x1, y1, x2, y2 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
-		write(has_cp and 'line' or 'move', x1, y1)
+		if not dont_connect then write(has_cp and 'line' or 'move', x1, y1) end
 		write('line', x2, y2)
 		return x2, y2
 	end
@@ -81,7 +82,7 @@ local function arc(write, cx, cy, rx, ry, start_angle, sweep_angle, has_cp)
 		end
 
 		local x1, y1, x2, y2, x3, y3, x4, y4 = arc_segment(cx, cy, rx, ry, start_angle, local_sweep)
-		if i == 1 then
+		if i == 1 and not dont_connect then
 			write(has_cp and 'line' or 'move', x1, y1)
 		end
 		write('curve', x2, y2, x3, y3, x4, y4)

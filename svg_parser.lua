@@ -109,7 +109,7 @@ local function uri(s, ct) --#<id> | url(#<id>)
 	return s and (ct.byid[s:match'^#(.*)'] or func_uri(s, ct))
 end
 
-local function nccolor(s, ct)
+local function nccolor(s, ct) --none | currentColor | <color>
 	return s == 'none' and s or ccolor(s, ct)
 end
 
@@ -124,6 +124,7 @@ local function paint(s, ct)
 end
 
 local units = glue.index{'em' , 'ex' , 'px' , 'in' , 'cm' , 'mm' , 'pt' , 'pc' , '%'}
+
 local unit_scales = {
 	pt = 1.25,
 	pc = 15,
@@ -132,7 +133,7 @@ local unit_scales = {
 	['in'] = 90,
 }
 
-local function coord(s, ref, ct) --ct must define: w, h, font_size. ref is number, 'x', 'y', or 'xy'.
+local function coord(s, ref, ct) --scalar; ct must contain: w, h, font_size. ref is a number, 'x', 'y', or 'xy'.
 	if not s then return end
 	local n,unit = s:match'^(.-)([a-zA-Z%%]*)$'
 	n = tonumber(n)
@@ -156,7 +157,7 @@ local function coord(s, ref, ct) --ct must define: w, h, font_size. ref is numbe
 	end
 end
 
-local function length(s, ref, ct)
+local function length(s, ref, ct) --positive scalar
 	local n = coord(s, ref, ct)
 	return n and n >= 0 and n or nil
 end
@@ -175,12 +176,10 @@ local function dasharray(s, ct) --none | 1,5,7 -> 1,5,7,1,5,7 | 1,5,7,8
 	return #t > 0 and t or 'none'
 end
 
-local function number_list(s, ct) --1,2,3,...
+local function list(s, ct) --a,b,c,...
 	local t = {}
-	for n in s:gmatch'[^,%s]+' do
-		n = coord(n, 'xy', ct)
-		if not n then return end
-		t[#t+1] = n
+	for s in s:gmatch'[^,%s]+' do
+		t[#t+1] = s
 	end
 	return t
 end
@@ -218,7 +217,7 @@ local function transforms(s) --return {{'func', args_t, ...},...}
 	return t
 end
 
-local path_command_names = {
+local path_cmd = {
 	m = 'rel_move',
 	M = 'move',
 	l = 'rel_line',
@@ -241,33 +240,67 @@ local path_command_names = {
 	A = 'elliptical_arc',
 }
 
+local path_argc = {
+	rel_move = 2,
+	move = 2,
+	rel_line = 2,
+	line = 2,
+	close = 0,
+	rel_hline = 1,
+	hline = 1,
+	rel_vline = 1,
+	vline = 1,
+	rel_curve = 6,
+	curve = 6,
+	rel_smooth_curve = 4,
+	smooth_curve = 4,
+	rel_quad_curve = 4,
+	quad_curve = 4,
+	rel_smooth_quad_curve = 2,
+	smooth_quad_curve = 2,
+	rel_elliptical_arc = 7,
+	elliptical_arc = 7,
+}
+
 local path_re = re.compile([[
 	path <- s (cmd / val)* -> {}
 	cmd  <- {[mMlLzZhHvVcCsSqQtTaA]} -> command s
-	val  <- { ((int? frac) / int) exp? } -> tonumber s
+	val  <- { ((int? frac) / int) exp? } -> number s
 	int  <- '-'? [0-9]+
 	frac <- '.' [0-9]+
-	exp  <- 'e' '-'? [0-9]+
+	exp  <- 'e' int
 	s    <- [%s,]*
-]], {tonumber = tonumber, command = path_command_names})
+]], {
+	command = path_cmd,
+	number = function(s) return tonumber(s) or 0 end
+})
 
 local function path(s) --return {cmd1, val11, ..., cmd2, val21, ...}
 	if not s then return end
 	local t = path_re:match(s)
-	--TODO: check for nil val in array
-	local i = 1
-	while i <= #t do --make any implicit 'line'-after-'move' and 'rel_line'-after-'rel_move' explicit
-		if t[i] == 'move' and t[i+3] and type(t[i+3]) ~= 'string' then
-			table.insert(t, i+3, 'line')
-		elseif t[i] == 'rel_move' and t[i+3] and type(t[i+3]) ~= 'string' then
-			table.insert(t, i+3, 'rel_line')
-		end
-		i = i + 1
-	end
 	if t[1] == 'rel_move' then t[1] = 'move' end --starting with m means start with M
 	if t[1] ~= 'move' then return end --must start with M or we ignore the whole path
-
-	return t
+	--convert implicit commands to explicit commands
+	local dt = {}
+	local i = 1
+	local cmd, argc
+	while i <= #t do
+		if type(t[i]) == 'string' then --see if command changed
+			cmd = t[i]
+			argc = path_argc[cmd]
+			i = i + 1
+		elseif cmd == 'move' then --an implicit 'move' must be interpreted as a 'line'
+			cmd = 'line'
+			argc = path_argc[cmd]
+		elseif cmd == 'rel_move' then --an implicit 'rel_move' must be interpreted as a 'rel_line'
+			cmd = 'rel_line'
+			argc = path_argc[cmd]
+		end
+		dt[#dt+1] = cmd
+		glue.append(dt, unpack(t, i, i+argc-1))
+		i = i + argc
+	end
+	return dt
 end
 
 local function unescape(s)
@@ -661,10 +694,23 @@ function tags.path(t, ct)
 end
 
 function tags.polyline(t, ct)
-	local path = number_list(t.attrs.points)
-	table.insert(path, 1, 'move')
-	table.insert(path, 4, 'line')
-	return shape({path = path}, t, ct)
+	local lt = list(t.attrs.points)
+	local dt = {}
+	local x = coord(lt[1], 'x', ct)
+	local y = coord(lt[2], 'y', ct)
+	if not x or not y then return end
+	glue.append(dt, 'move', x, y)
+	local x = coord(lt[3], 'x', ct)
+	local y = coord(lt[4], 'y', ct)
+	if not x or not y then return end
+	glue.append(dt, 'line', x, y)
+	for i=5,#lt,2 do
+		local x = coord(lt[i+0], 'x', ct)
+		local y = coord(lt[i+1], 'y', ct)
+		if not x or not y then break end
+		glue.append(dt, 'line', x, y)
+	end
+	return shape({path = dt}, t, ct)
 end
 
 function tags.polygon(t, ct)
@@ -697,7 +743,7 @@ local function collect_ids(t, dt)
 	dt = dt or {}
 	local id = t.attrs.id or t.attrs['xml:id']
 	if id then
-		assert(not dt[id], string.format('duplicate id %s', id))
+		glue.assert(not dt[id], 'duplicate id %s', id)
 		dt[id] = t
 	end
 	for _,t in ipairs(t.children) do

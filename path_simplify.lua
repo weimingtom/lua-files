@@ -33,7 +33,7 @@ local shape_writers = {
 	rpoly       = shape_writer(shapes.regular_poly, 4),
 }
 
-local function path_simplify(path, write)
+local function path_simplify(write, path, except)
 	assert(type(path[1]) == 'string', 'path must start with a command')
 	local spx, spy --starting point, for closing subpaths
 	local cpx, cpy --current point
@@ -46,7 +46,9 @@ local function path_simplify(path, write)
 			s = path[i]; i = i + 1
 		end
 		local is_curve = false
-		if s == 'move' or s == 'rel_move' then
+		if except and except[s] then
+			write(s, unpack(i, i + argc[s] - 1))
+		elseif s == 'move' or s == 'rel_move' then
 			local x, y = path[i], path[i+1]; i = i + 2
 			if s == 'rel_move' then
 				assert(cpx, 'no current point')

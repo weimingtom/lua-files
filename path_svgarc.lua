@@ -1,4 +1,5 @@
 --2d svg-style elliptical arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
+--gotdamn never-wrote-a-line-of-code-but-look-how-good-i-am-at-math people.
 local arc = require'path_arc'.arc
 local matrix = require'trans_affine2d'
 
@@ -29,11 +30,14 @@ local function svgarc(write, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, 
 	-- Check that radii are large enough
 	local radii_check = px1/prx + py1/pry
 	if radii_check > 1 then
+		--print(radii_check)
 		rx = sqrt(radii_check) * rx
 		ry = sqrt(radii_check) * ry
 		prx = rx * rx
 		pry = ry * ry
-		if radii_check > 10 then print'invalid radii' end
+		if radii_check > 10 then
+			print'invalid radii'
+			return x0, y0 end
 	end
 
 	-- Calculate (cx1, cy1)
@@ -96,7 +100,10 @@ local function svgarc(write, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, 
 			write(cmd)
 		end
 	end
-	return arc(twrite, 0, 0, rx, ry, start_angle, sweep_angle)
+	local cpx, cpy, bx, by = arc(twrite, 0, 0, rx, ry, start_angle, sweep_angle, nil, true)
+	cpx, cpy = mt:transform_point(cpx, cpy)
+	bx, by = mt:transform_point(bx, by)
+	return cpx, cpy, bx, by
 end
 
 if not ... then require'path_arc_demo' end

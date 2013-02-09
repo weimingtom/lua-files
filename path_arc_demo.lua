@@ -55,8 +55,8 @@ function player:on_render(cr)
 	local a = math.rad(i)
 
 	local function arcs_beziers()
+		cr:save()
 		cr:set_line_width(1)
-		cr:translate(-50, 100)
 		cr:set_source_rgba(1,1,1,.2)
 
 		arc(write, 200, 200, 100, 200, 0, 2*math.pi)
@@ -70,24 +70,27 @@ function player:on_render(cr)
 
 		arc(write, 200, 200, 100, 200, a, 4)
 		cr:stroke()
+		cr:restore()
 	end
 
 	local function arcs_angles() --study the difference between cairo and agg semantics
-		cr:translate(300, -100)
-		local function draw(x, y, a1, a2, start_angle, sweep_angle)
+		local function draw(x, y, cairo_arc, a1, a2, start_angle, sweep_angle)
 			cr:set_source_rgba(0,1,0,0.3)
 			cr:set_line_width(5)
-			cr:arc(x, y, 100, a1, a2)
+			cairo_arc(cr, x, y, 100, a1, a2)
 			cr:stroke()
 			cr:new_path()
 			cr:set_line_width(20)
 			arc(write, x, y, 100, 100, start_angle, sweep_angle)
 			cr:stroke()
 		end
-		draw(300, 300, a, a+a, a, a)
-		draw(300, 600, -a, -2*a, -a, -a)
-		draw(600, 300, 2*a, a, 2*a, 2*math.pi - a % (2*math.pi))
-		draw(600, 600, -2*a, -a, -2*a, -2*math.pi + a % (2*math.pi))
+		cr:save()
+		local pi2 = 2*math.pi
+		draw(300, 300, cr.arc, a, 2*a, a, a)
+		draw(600, 300, cr.arc, 2*a, a, 2*a, pi2 - a % pi2)
+		draw(300, 600, cr.arc_negative, -a, -2*a, -a, -a)
+		draw(600, 600, cr.arc_negative, -2*a, -a, -2*a, -pi2 + a % pi2)
+		cr:restore()
 	end
 
 	local function svgarcs()
@@ -104,7 +107,7 @@ function player:on_render(cr)
 			svgarc(write, 125, 75, 100, 50, 0, large, sweep, 125+100, 75+50)
 			cr:stroke()
 		end
-		cr:translate(900, 200)
+		cr:save()
 		ellipses(0, 0)
 		cr:translate(400, 0)
 		ellipses(0, 1)
@@ -112,10 +115,14 @@ function player:on_render(cr)
 		ellipses(1, 0)
 		cr:translate(-400, 0)
 		ellipses(1, 1)
+		cr:restore()
 	end
 
+	cr:save(); cr:translate(-50, 50)
 	arcs_beziers()
+	cr:restore(); cr:save(); cr:translate(200, -50); cr:scale(0.5, 0.5)
 	arcs_angles()
+	cr:restore(); cr:save(); cr:translate(600, 50); cr:scale(0.5, 0.5)
 	svgarcs()
 end
 

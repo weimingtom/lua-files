@@ -87,15 +87,16 @@ M.deflate = inflate_deflate(init_deflate)
 
 --utility functions
 
-function M.compress_cdata(data, size)
+function M.compress_cdata(data, size, level)
+	level = level or -1
 	local sz = ffi.new('unsigned long[1]', C.compressBound(size))
 	local buf = ffi.new('uint8_t[?]', sz[0])
-	check(C.compress(buf, sz, data, size))
+	check(C.compress2(buf, sz, data, size, level))
 	return buf, sz[0]
 end
 
-function M.compress(s)
-	return ffi.string(M.compress_cdata(s, #s))
+function M.compress(s, level)
+	return ffi.string(M.compress_cdata(s, #s, level))
 end
 
 function M.uncompress_cdata(data, size, sz, buf)
