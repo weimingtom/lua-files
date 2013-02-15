@@ -155,8 +155,9 @@ function Menu:set_info(info)
 end
 
 function Menu:popup(window, x, y, TPM) --TODO: crack TPM
-	MapWindowRect(nil, GetParent(window.hwnd), r)
-	return TrackPopupMenu(self.hmenu, window.hwnd, x, y, bit.bor(flags(TPM), TPM_RETURNCMD))
+	local r = RECT(x, y, x, y)
+	MapWindowRect(window.hwnd, nil, r)
+	return TrackPopupMenu(self.hmenu, window.hwnd, r.x, r.y, bit.bor(flags(TPM), TPM_RETURNCMD))
 end
 
 function Menu:WM_MENUCOMMAND(i) --pseudo-message from the owner window further routed to individual item handlers
