@@ -16,7 +16,7 @@ local panel = CPanel{
 	anchors = {left=true,right=true,top=true,bottom=true}
 }
 
-local player = {}
+local player = {window = main}
 
 function player:on_render(cr) end
 function player:on_init(cr) end
@@ -35,9 +35,34 @@ function panel:on_render(surface)
 	player:on_render(self.cr)
 end
 
+function panel:on_mouse_move(x, y, buttons)
+	player.mouse_x = x
+	player.mouse_y = y
+	player.mouse_buttons = buttons
+	self:invalidate()
+end
+
+panel.on_mouse_move = panel.on_mouse_move
+panel.on_mouse_over = panel.on_mouse_move
+panel.on_mouse_leave = panel.on_mouse_move
+panel.on_lbutton_double_click = panel.on_mouse_move
+panel.on_lbutton_down = panel.on_mouse_move
+panel.on_lbutton_up = panel.on_mouse_move
+panel.on_mbutton_double_click = panel.on_mouse_move
+panel.on_mbutton_down = panel.on_mouse_move
+panel.on_mbutton_up = panel.on_mouse_move
+panel.on_rbutton_double_click = panel.on_mouse_move
+panel.on_rbutton_down = panel.on_mouse_move
+panel.on_rbutton_up = panel.on_mouse_move
+panel.on_xbutton_double_click = panel.on_mouse_move
+panel.on_xbutton_down = panel.on_mouse_move
+panel.on_xbutton_up = panel.on_mouse_move
+panel.on_mouse_wheel = panel.on_mouse_move
+panel.on_mouse_hwheel = panel.on_mouse_move
+
 function player:play()
 	main:show()
-	panel:settimer(1, panel.invalidate)
+	panel:settimer(1, panel.invalidate) --render continuously
 	winapi.MessageLoop()
 end
 
