@@ -1,56 +1,30 @@
 local player = require'cairopanel_player'
-local arc = require'path_arc'.arc
+local arc = require'path_arc'
 local svgarc = require'path_svgarc'
-local shapes = require'path_shapes'
 local glue = require'glue'
 
 local i = 0
 function player:on_render(cr)
 	i=i+1
-
-	--markers
-	local function dot(x,y)
-		cr:new_path()
-		cr:arc(x,y,5,0,2*math.pi)
-		cr:set_source_rgb(1,1,1)
-		cr:fill_preserve()
-		cr:set_source_rgb(1,0,0)
-		cr:stroke()
-	end
-
-	local function line(x1,y1,x2,y2)
-		cr:new_path()
-		cr:set_source_rgba(0,1,0,0.3)
-		cr:move_to(x1,y1)
-		cr:line_to(x2,y2)
-		cr:stroke()
-	end
-
-	local function dots(t)
-		for i=1,#t,2 do dot(t[i], t[i+1]) end
-	end
-
-	local function lines(t)
-		for i=1,#t,4 do line(unpack(t, i, i + 3)) end
-	end
-
-	--path writer
-	local function write(cmd, ...)
-		if cmd == 'move' then
-			cr:move_to(...)
-		elseif cmd == 'line' then
-			cr:line_to(...)
-		elseif cmd == 'curve' then
-			cr:curve_to(...)
-		elseif cmd == 'close' then
-			cr:close_path()
-		end
-	end
-
-	--init
 	cr:identity_matrix()
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
+
+	local function arc_function(arc)
+		return function(...)
+			local segments = arc(...)
+			cr:move_to(segments[1], segments[2])
+			if #segments == 4 then
+				cr:line_to(segments[3], segments[4])
+			else
+				for i=3,#segments,8 do
+					cr:curve_to(unpack(segments, i, i + 6 - 1))
+				end
+			end
+		end
+	end
+	local arc = arc_function(arc)
+	local svgarc = arc_function(svgarc)
 
 	local a = math.rad(i)
 
@@ -59,16 +33,16 @@ function player:on_render(cr)
 		cr:set_line_width(1)
 		cr:set_source_rgba(1,1,1,.2)
 
-		arc(write, 200, 200, 100, 200, 0, 2*math.pi)
+		arc(200, 200, 100, 200, 0, 2*math.pi)
 		cr:stroke()
 
 		cr:set_source_rgb(1,1,1)
 		cr:move_to(200, 200)
-		arc(write, 200, 200, 100, 200, a + 5, 1, true)
+		arc(200, 200, 100, 200, a + 5, 1)
 		cr:line_to(200, 200)
 		cr:stroke()
 
-		arc(write, 200, 200, 100, 200, a, 4)
+		arc(200, 200, 100, 200, a, 4)
 		cr:stroke()
 		cr:restore()
 	end
@@ -81,7 +55,7 @@ function player:on_render(cr)
 			cr:stroke()
 			cr:new_path()
 			cr:set_line_width(20)
-			arc(write, x, y, 100, 100, start_angle, sweep_angle)
+			arc(x, y, 100, 100, start_angle, sweep_angle)
 			cr:stroke()
 		end
 		cr:save()
@@ -98,13 +72,13 @@ function player:on_render(cr)
 		local function ellipses(large, sweep)
 			cr:set_line_width(5)
 			cr:set_source_rgba(0,1,0,0.3)
-			arc(write, 125, 125, 100, 50, 0, math.pi * 2)
+			arc(125, 125, 100, 50, 0, math.pi * 2)
 			cr:stroke()
-			arc(write, 225, 75, 100, 50, 0, math.pi * 2)
+			arc(225, 75, 100, 50, 0, math.pi * 2)
 			cr:stroke()
 			cr:set_source_rgba(1,0,0,1)
 			cr:move_to(125, 75)
-			svgarc(write, 125, 75, 100, 50, 0, large, sweep, 125+100, 75+50)
+			svgarc(125, 75, 100, 50, 0, large, sweep, 125+100, 75+50)
 			cr:stroke()
 		end
 		cr:save()

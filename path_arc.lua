@@ -1,4 +1,4 @@
---conversion of 2d arcs to lines and beziers. adapted from agg/src/agg_bezier_arc.cpp.
+--2d arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
 local glue = require'glue'
 
 local sin, cos, pi, abs, fmod, max, min =
@@ -30,75 +30,38 @@ local function arc_segment(cx, cy, rx, ry, start_angle, sweep_angle)
 		cy + ry * (px3 * sn + py3 * cs)  --p2y
 end
 
-local function normalize_args(rx, ry, start_angle, sweep_angle)
+--returns a table which contains either the points of a line or the points of some 1 to 4 curves.
+--in any case, (t[1],t[2]) is the arc's starting point, and (t[#t-1],t[#t]) is the arc's end point.
+local function arc(cx, cy, rx, ry, start_angle, sweep_angle)
 	rx, ry = abs(rx), abs(ry)
 	start_angle = fmod(start_angle, pi * 2)
 	sweep_angle = max(sweep_angle, -pi * 2)
 	sweep_angle = min(sweep_angle,  pi * 2)
-	return rx, ry, start_angle, sweep_angle
-end
-
-local function arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
-	rx, ry, start_angle, sweep_angle = normalize_args(rx, ry, start_angle, sweep_angle)
-	return
-		cx + rx * cos(start_angle),
-		cy + ry * sin(start_angle),
-		cx + rx * cos(start_angle + sweep_angle),
-		cy + ry * sin(start_angle + sweep_angle)
-end
-
-local bezier_arc_angle_epsilon = 0.01 --limit to prevent adding degenerate curves
-
-local function arc(write, cx, cy, rx, ry, start_angle, sweep_angle, has_cp, dont_connect)
-	if rx == 0 or ry == 0 then return cx, cy end
-
 	if abs(sweep_angle) < 1e-10 then
-		local x1, y1, x2, y2 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
-		if not dont_connect then write(has_cp and 'line' or 'move', x1, y1) end
-		write('line', x2, y2)
-		return x2, y2
+		local x1 = cx + rx * cos(start_angle)
+		local y1 = cy + ry * sin(start_angle)
+		local x2 = cx + rx * cos(start_angle + sweep_angle)
+		local y2 = cy + ry * sin(start_angle + sweep_angle)
+		return {x1, y1, x2, y2}
 	end
-	rx, ry, start_angle, sweep_angle = normalize_args(rx, ry, start_angle, sweep_angle)
-
-	local cpx, cpy, bx, by
-	local total_sweep = 0
-	local local_sweep = 0
-	local prev_sweep, done
-	local step = (sweep_angle < 0 and -1 or 1) * pi * 0.5
-	for i=1,4 do
-		prev_sweep  = total_sweep
-		local_sweep = step
-		total_sweep = total_sweep + step
-		if sweep_angle < 0 then
-			if total_sweep <= sweep_angle + bezier_arc_angle_epsilon then
-				local_sweep = sweep_angle - prev_sweep
-				done = true
-			end
-		else
-			if total_sweep >= sweep_angle - bezier_arc_angle_epsilon then
-				local_sweep = sweep_angle - prev_sweep
-				done = true
-			end
+	local segments = {}
+	local angle, left = start_angle, sweep_angle
+	local sign = sweep_angle > 0 and 1 or -1
+	while left ~= 0 do
+		local sweep = sign * pi * 0.5
+		left = left - sweep
+		if sign * left < 0.01 then
+			--`left` now represents the overflow or a very small underflow, a tiny curve that's left,
+			--which we swallow into this one and make this the last curve.
+			sweep = sweep + left
+			left = 0
 		end
-
-		local x1, y1, x2, y2, x3, y3, x4, y4 = arc_segment(cx, cy, rx, ry, start_angle, local_sweep)
-		if i == 1 and not dont_connect then
-			write(has_cp and 'line' or 'move', x1, y1)
-		end
-		write('curve', x2, y2, x3, y3, x4, y4)
-		bx, by = x3, y3
-		cpx, cpy = x4, y4
-
-		start_angle = start_angle + local_sweep
-		if done then break end
+		glue.append(segments, arc_segment(cx, cy, rx, ry, angle, sweep))
+		angle = angle + sweep
 	end
-	return cpx, cpy, bx, by
+	return segments
 end
 
 if not ... then require'path_arc_demo' end
 
-return {
-	segment = arc_segment,
-	endpoints = arc_endpoints,
-	arc = arc,
-}
+return arc
