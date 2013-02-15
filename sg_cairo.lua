@@ -217,22 +217,25 @@ end
 function SG:draw_path(path)
 	local cr = self.cr
 	cr:new_path()
-	local function write(cmd, ...)
-		if cmd == 'move' then
-			cr:move_to(...)
-		elseif cmd == 'line' then
-			cr:line_to(...)
-		elseif cmd == 'curve' then
-			cr:curve_to(...)
-		elseif cmd == 'close' then
-			cr:close_path()
-		elseif cmd == 'text' then
-			local font, s = ...
-			self:set_font(font)
-			cr:text_path(s)
+	if not self.write_path then
+		local function write(cmd, ...)
+			if cmd == 'move' then
+				cr:move_to(...)
+			elseif cmd == 'line' then
+				cr:line_to(...)
+			elseif cmd == 'curve' then
+				cr:curve_to(...)
+			elseif cmd == 'close' then
+				cr:close_path()
+			elseif cmd == 'text' then
+				local font, s = ...
+				self:set_font(font)
+				cr:text_path(s)
+			end
 		end
+		self.write_path = write
 	end
-	path_simplify(write, path)
+	path_simplify(self.write_path, path)
 end
 
 function SG:set_path(e)
@@ -870,8 +873,6 @@ function SG:hit_test(x, y, e)
 	return elements
 end
 
---showcase
-
-if not ... then require'sg_cairo_test' end
+if not ... then require'sg_cairo_demo' end
 
 return SG
