@@ -3,7 +3,7 @@
 -- pointers to objects for which cairo holds no references get a __gc
 -- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
 -- functions accept/return Lua strings
--- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to,
+-- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to, cairo_circle,
 --   cairo_skew, cairo_safe_transform, cairo_matrix_transform, cairo_matrix_invertible, cairo_matrix_safe_transform,
 --   cairo_matrix_skew, cairo_surface_apply_alpha.
 
@@ -326,6 +326,15 @@ function M.cairo_rel_quad_curve_to(cr, x1, y1, x2, y2)
 	M.cairo_quad_curve_to(cr, x0+x1, y0+y1, x0+x2, y0+y2)
 end
 
+-- arcs addition
+
+local pi = math.pi
+function M.cairo_circle(cr, cx, cy, r)
+	cr:new_sub_path()
+	cr:arc(cx, cy, r, 0, 2 * pi)
+	cr:close_path()
+end
+
 -- matrix additions
 
 function M.cairo_matrix_transform(dmt, mt)
@@ -440,6 +449,7 @@ ffi.metatype('cairo_t', {__index = {
 	quad_curve_to = M.cairo_quad_curve_to,
 	arc = M.cairo_arc,
 	arc_negative = M.cairo_arc_negative,
+	circle = M.cairo_circle,
 	--arc_to = M.cairo_arc_to, --abandoned? cairo_arc_to(x1, y1, x2, y2, radius)
 	rel_move_to = M.cairo_rel_move_to,
 	rel_line_to = M.cairo_rel_line_to,
