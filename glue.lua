@@ -34,7 +34,7 @@ function glue.merge(dt,...)
 	return dt
 end
 
---TODO: document and test this if it stands
+--TODO: document and test this if it's a keeper
 function glue.sortedpairs(t, cmp)
 	local kt = glue.keys(t)
 	table.sort(kt, cmp)
@@ -59,6 +59,32 @@ function glue.append(dt,...)
 	for i=1,select('#',...) do
 		dt[#dt+1] = select(i,...)
 	end
+end
+
+--TODO: document and test this if it's a keeper
+function glue.insert(dest, idest, src, isrc, nsrc)
+    isrc = isrc or 1
+	 local iend
+    if not nsrc then
+        nsrc = #src
+        iend = #src
+    else
+        iend = isrc + min(nsrc-1,#src-isrc)
+    end
+    if dest == src then -- special case
+        if idest > isrc and iend >= idest then -- overlapping ranges
+            src = tablex.sub(src,isrc,nsrc)
+            isrc = 1; iend = #src
+        end
+    end
+    for i = isrc,iend do
+        dest[idest] = src[i]
+        idest = idest + 1
+    end
+    if clean_tail then
+        tablex.clear(dest,idest)
+    end
+    return dest
 end
 
 function glue.pluck(t,key)
@@ -112,9 +138,9 @@ glue.string = {}
 
 getmetatable''.__mod = function(s,v)
 	if type(v) == 'table' then
-		return s:format(unpack(v))
+		return string.format(s, unpack(v))
 	else
-		return s:format(v)
+		return string.format(s, v)
 	end
 end
 
@@ -213,14 +239,6 @@ end
 
 function glue.pass(...) return ... end
 
-function glue.memoize(f)
-	local t = {}
-	return function(x)
-		if t[x] == nil then t[x] = f(x) end
-		return t[x]
-	end
-end
-
 local function index_parents(t,k)
 	local parents = getmetatable(t).__parents
 	for i=1,#parents do
@@ -275,7 +293,7 @@ end
 function glue.assert(v,err,...)
 	if v then return v,err,... end
 	err = err or 'assertion failed!'
-	if select('#',...) > 0 then err = err:format(...) end
+	if select('#',...) > 0 then err = string.format(err,...) end
 	error(err, 2)
 end
 
