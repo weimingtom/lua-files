@@ -70,16 +70,14 @@ union{
       LONG    x2;
       LONG    y2;
   };
+  struct{
+      LONG    x;
+      LONG    y;
+  };
 };
 } RECT, *PRECT,  *NPRECT,  *LPRECT;
 typedef const RECT * LPCRECT;
-typedef struct _RECTL
-{
-    LONG    left;
-    LONG    top;
-    LONG    right;
-    LONG    bottom;
-} RECTL, *PRECTL, *LPRECTL;
+typedef RECT RECTL, *PRECTL, *LPRECTL;
 typedef const RECTL * LPCRECTL;
 
 typedef struct tagPOINT
