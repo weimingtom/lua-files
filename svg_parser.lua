@@ -201,10 +201,10 @@ local transform_re = re.compile([[
 	func <- ({name} s '(' s args s ')') -> {}
 	name <- 'matrix' / 'translate' / 'scale' / 'rotate' / 'skewX' / 'skewY'
 	args <- ( arg (sep arg)* )
-	arg  <- {[0-9.e-]+} -> tonumber
+	arg  <- {[0-9.e-]+} -> number
 	sep  <- s ','? s
 	s    <- %s*
-]], {tonumber = tonumber})
+]], {number = function(s) return tonumber(s) or 0 end})
 
 local function transforms(s) --return {{'func', args_t, ...},...}
 	--TODO: check for nil arg in array
@@ -270,10 +270,7 @@ local path_re = re.compile([[
 	frac <- '.' [0-9]+
 	exp  <- 'e' int
 	s    <- [%s,]*
-]], {
-	command = path_cmd,
-	number = function(s) return tonumber(s) or 0 end
-})
+]], {command = path_cmd, number = function(s) return tonumber(s) or 0 end})
 
 local function path(s) --return {cmd1, val11, ..., cmd2, val21, ...}
 	if not s then return end
