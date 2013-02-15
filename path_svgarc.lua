@@ -1,13 +1,10 @@
 --2d svg-style elliptical arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
---gotdamn never-wrote-a-line-of-code-but-look-how-good-i-am-at-math people.
-local arc = require'path_arc'.arc
+local arc = require'path_arc'
 local matrix = require'trans_affine2d'
 
 local sin, cos, pi, abs, sqrt, acos = math.sin, math.cos, math.pi, math.abs, math.sqrt, math.acos
 
-local function svgarc(write, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
-	if x0 == x2 and y0 == y2 then return x0, y0 end
-	if rx == 0 or ry == 0 then return x0, y0 end
+local function svgarc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 	rx, ry = abs(rx), abs(ry)
 
 	-- Calculate the middle point between the current and the final points
@@ -30,14 +27,10 @@ local function svgarc(write, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, 
 	-- Check that radii are large enough
 	local radii_check = px1/prx + py1/pry
 	if radii_check > 1 then
-		--print(radii_check)
 		rx = sqrt(radii_check) * rx
 		ry = sqrt(radii_check) * ry
 		prx = rx * rx
 		pry = ry * ry
-		if radii_check > 10 then
-			print'invalid radii'
-			return x0, y0 end
 	end
 
 	-- Calculate (cx1, cy1)
@@ -85,25 +78,16 @@ local function svgarc(write, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, 
 	end
 
 	-- We can now build and transform the resulting arc
-	local mt = matrix:new()
-	mt:translate(cx, cy)
-	mt:rotate(angle)
-	local function twrite(cmd, ...)
-		if cmd == 'line' or cmd == 'move' then
-			write(cmd, mt:transform_point(...))
-		elseif cmd == 'curve' then
-			local x2,y2 = mt:transform_point(...)
-			local x3,y3 = mt:transform_point(select(3,...))
-			local x4,y4 = mt:transform_point(select(5,...))
-			write(cmd, x2, y2, x3, y3, x4, y4)
-		elseif cmd == 'close' then
-			write(cmd)
-		end
+	local segments = arc(0, 0, rx, ry, start_angle, sweep_angle)
+	local mt = matrix:new():translate(cx, cy):rotate(angle)
+	for i=1,#segments,2 do
+		segments[i], segments[i+1] = mt:transform_point(segments[i], segments[i+1])
 	end
-	local cpx, cpy, bx, by = arc(twrite, 0, 0, rx, ry, start_angle, sweep_angle, nil, true)
-	cpx, cpy = mt:transform_point(cpx, cpy)
-	bx, by = mt:transform_point(bx, by)
-	return cpx, cpy, bx, by
+	segments[1] = x0
+	segments[2] = y0
+	segments[#segments-1] = x2
+	segments[#segments-0] = y2
+	return segments
 end
 
 if not ... then require'path_arc_demo' end
