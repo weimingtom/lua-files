@@ -284,8 +284,8 @@ local function path(s) --return {cmd1, val11, ..., cmd2, val21, ...}
 	while i <= #t do
 		if type(t[i]) == 'string' then --see if command changed
 			cmd = t[i]
-			argc = path_argc[cmd]
 			i = i + 1
+			argc = path_argc[cmd]
 		elseif cmd == 'move' then --an implicit 'move' must be interpreted as a 'line'
 			cmd = 'line'
 			argc = path_argc[cmd]
@@ -294,7 +294,7 @@ local function path(s) --return {cmd1, val11, ..., cmd2, val21, ...}
 			argc = path_argc[cmd]
 		end
 		dt[#dt+1] = cmd
-		glue.append(dt, unpack(t, i, i+argc-1))
+		glue.append(dt, unpack(t, i, i + argc - 1))
 		i = i + argc
 	end
 	return dt
