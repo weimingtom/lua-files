@@ -35,10 +35,34 @@ function panel:on_render(surface)
 	player:on_render(self.cr)
 end
 
+local function around(x, y, targetx, targety, radius) --point is in the square around target point
+	return
+		x >= targetx - radius and x <= targetx + radius and
+		y >= targety - radius and y <= targety + radius
+end
+
+function player:dragging(x, y, radius)
+	return self.is_dragging and around(self.drag_from_x, self.drag_from_y, x, y, radius or 5)
+end
+
 function panel:on_mouse_move(x, y, buttons)
 	player.mouse_x = x
 	player.mouse_y = y
 	player.mouse_buttons = buttons
+	if player.is_dragging then
+		if buttons.lbutton then
+			player.drag_x = player.mouse_x - player.drag_from_x
+			player.drag_y = player.mouse_y - player.drag_from_y
+		else
+			player.is_dragging = false
+			player.drag_x, player.drag_y, player.drag_from_x, player.drag_from_y = nil
+		end
+	elseif buttons.lbutton then
+		player.is_dragging = true
+		player.drag_from_x = x
+		player.drag_from_y = y
+		player.drag_x, player.drag_y = 0, 0
+	end
 	self:invalidate()
 end
 

@@ -63,14 +63,11 @@ function editor:control_points(at, px, py)
 		glue.append(points, cpx + path[i+ofs+1], cpy + path[i+ofs+2], style or '')
 	end
 
+	local deltax, deltay = 0, 0
 	for i,s in self:commands() do
-		local cpx1, cpy1 = cpx, cpy
 
 		if s == 'move' or s == 'line' then
-			local x, y = setpoint(i,0)
-			local nexti, nexts = path_state.next_command(path, i)
-			--if nexts == 'curve' then
-
+			deltax, deltay = setpoint(i,0)
 		elseif s == 'rel_move' or s == 'rel_line' then
 			setrelpoint(i,0)
 		elseif s == 'hline' then
@@ -87,6 +84,7 @@ function editor:control_points(at, px, py)
 			glue.append(points, cpx, cpy + path[i+1], '')
 		elseif s == 'curve' then
 			setpoint(i,0,'cp')
+			path[i+1], path[i+2] = deltax + path[i+1], deltay + path[i+2]
 			local x1, y1 = path[i+5], path[i+6]
 			setpoint(i,4)
 			local x2, y2 = path[i+5], path[i+6]
@@ -104,6 +102,7 @@ function editor:control_points(at, px, py)
 			setrelpoint(i,2)
 		elseif s == 'smooth_curve' or s == 'rel_smooth_curve' then
 			--our first control point is virtual: it actually adjusts the second control point of the previous curve
+			--[[
 			if prev[i] then
 				local pi, pcpx, pcpy = unpack(prev[i])
 				local ps = path[pi]
@@ -120,6 +119,7 @@ function editor:control_points(at, px, py)
 				x, y = path_math.reflect_point(x, y, cpx, cpy)
 				glue.append(points, x, y, '')
 			end
+			--]]
 			if s == 'smooth_curve' then
 				setpoint(i,0,'cp')
 				setpoint(i,2)
@@ -186,8 +186,6 @@ function editor:control_points(at, px, py)
 		elseif s == 'text' then
 			--TODO
 		end
-		cpx_deltax, cpx_deltay = cpx and cpx - cpx1, cpy and cpy - cpy1
-
 		cpx, cpy, spx, spy = self:next_state(i, cpx, cpy, spx, spy)
 	end
 	return points

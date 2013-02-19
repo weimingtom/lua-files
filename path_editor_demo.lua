@@ -121,11 +121,11 @@ function player:on_render(cr)
 	cr:stroke()
 
 	if self.cp then
-		if self.dragging then
+		if self.dragging_point then
 			if self.mouse_buttons.lbutton then
-				self.cp = tpath:control_points(self.dragging, self.mouse_x, self.mouse_y)
+				self.cp = tpath:control_points(self.dragging_point, self.mouse_x, self.mouse_y)
 			else
-				self.dragging = nil
+				self.dragging_point = nil
 			end
 		else
 			if not self.mouse_buttons then goto done end
@@ -133,7 +133,7 @@ function player:on_render(cr)
 				local x, y = self.cp[i], self.cp[i+1]
 				if self.mouse_buttons.lbutton and around(self.mouse_x, self.mouse_y, x, y, 5) then
 					self.cp = tpath:control_points(i, self.mouse_x, self.mouse_y)
-					self.dragging = i
+					self.dragging_point = i
 				end
 			end
 			::done::
