@@ -25,9 +25,7 @@ local shape_writers = {
 }
 
 local function path_simplify(write, path) --avoid making garbage in here
-	local bx, by --last cubic bezier control point, for continuing smooth beziers
-	local qx, qy --last quad bezier control point, for continuing smooth beziers
-	local cpx, cpy, spx, spy
+	local cpx, cpy, spx, spy, bx, by, qx, qy
 	for i,s in path_commands(path) do
 		if s == 'move' or s == 'rel_move' then
 			local x, y = path[i+1], path[i+2]

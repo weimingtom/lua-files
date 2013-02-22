@@ -9,7 +9,7 @@ local function point_angle(x0, y0, x1, y1) --the angle between two points
 end
 
 local function point_distance(x0, y0, x1, y1) --the distance between two points
-	return sqrt((x1 - x0)^2) + (y1 - y0)^2
+	return sqrt((x1 - x0)^2 + (y1 - y0)^2)
 end
 
 local function point_at(x0, y0, distance, angle) --point at distance and angle from origin

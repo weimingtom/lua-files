@@ -124,7 +124,7 @@ function glue.sum(t,key)
 end
 
 function glue.reverse(t)
-	for i=1,math.floor(#t/2) do
+	for i=1,#t/2 do
 		t[#t-i+1],t[i]=t[i],t[#t-i+1]
 	end
 	return t
