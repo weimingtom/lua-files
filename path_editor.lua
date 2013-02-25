@@ -1,6 +1,6 @@
 --2d path editing
 local glue = require'glue'
-local arc = require'path_arc'
+local arc = require'path_arc'.arc
 local path_state = require'path_state'
 local path_math = require'path_math'
 
@@ -58,18 +58,37 @@ function editor:control_points(at, px, py)
 		glue.append(points, x2, y2, style or '')
 		return x2 - x1, y2 - y1
 	end
+
 	local function setrelpoint(i,ofs,style)
 		if at == #points + 1 then path[i+ofs+1], path[i+ofs+2] = px - cpx, py - cpy end
 		glue.append(points, cpx + path[i+ofs+1], cpy + path[i+ofs+2], style or '')
 	end
 
 	local deltax, deltay = 0, 0
+
+	local nexti, nexts
+	local function checknextrel()
+		if nexts == 'rel_hline' then
+			path[nexti+1] = path[nexti+1] - deltax
+		elseif nexts == 'rel_vline' then
+			path[nexti+1] = path[nexti+1] - deltay
+		elseif nexts:match'^rel_' then
+			path[nexti+1], path[nexti+2] = path[nexti+1] - deltax, path[nexti+2] - deltay
+		end
+	end
+
 	for i,s in self:commands() do
+
+		nexti, nexts = path_state.next_command(path, i)
 
 		if s == 'move' or s == 'line' then
 			deltax, deltay = setpoint(i,0)
+			checknextrel()
+		elseif s == 'close' then
+			checknextrel()
 		elseif s == 'rel_move' or s == 'rel_line' then
 			setrelpoint(i,0)
+			checknextrel()
 		elseif s == 'hline' then
 			if at == #points + 1 then path[i+1] = px end
 			glue.append(points, path[i+1], cpy, '')
@@ -102,7 +121,6 @@ function editor:control_points(at, px, py)
 			setrelpoint(i,2)
 		elseif s == 'smooth_curve' or s == 'rel_smooth_curve' then
 			--our first control point is virtual: it actually adjusts the second control point of the previous curve
-			--[[
 			if prev[i] then
 				local pi, pcpx, pcpy = unpack(prev[i])
 				local ps = path[pi]
@@ -119,7 +137,7 @@ function editor:control_points(at, px, py)
 				x, y = path_math.reflect_point(x, y, cpx, cpy)
 				glue.append(points, x, y, '')
 			end
-			--]]
+
 			if s == 'smooth_curve' then
 				setpoint(i,0,'cp')
 				setpoint(i,2)

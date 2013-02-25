@@ -1,6 +1,6 @@
 --2d path simplification: convert a complex path to a path containing only move, line, curve and close commands.
-local arc = require'path_arc'
-local svgarc = require'path_svgarc'
+local arc = require'path_arc'.arc
+local svgarc = require'path_svgarc'.svgarc
 local shapes = require'path_shapes'
 local cubic_control_points = require'path_math'.cubic_control_points
 local reflect_point = require'path_math'.reflect_point

@@ -1,6 +1,6 @@
 local player = require'cairopanel_player'
-local arc = require'path_arc'
-local svgarc = require'path_svgarc'
+local arc = require'path_arc'.arc
+local svgarc = require'path_svgarc'.svgarc
 local glue = require'glue'
 
 local i = 0
@@ -78,7 +78,7 @@ function player:on_render(cr)
 			cr:stroke()
 			cr:set_source_rgba(1,0,0,1)
 			cr:move_to(125, 75)
-			svgarc(125, 75, 100, 50, 0, large, sweep, 125+100, 75+50)
+			svgarc(125, 75, 100, 50, i/100, large, sweep, 125+100, 75+50)
 			cr:stroke()
 		end
 		cr:save()

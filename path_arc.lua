@@ -62,6 +62,15 @@ local function arc(cx, cy, rx, ry, start_angle, sweep_angle)
 	return segments
 end
 
+local function arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
+	local segments = arc(cx, cy, rx, ry, start_angle, sweep_angle)
+	return segments[1], segments[2], segments[#segments-1], segments[#segments]
+end
+
 if not ... then require'path_arc_demo' end
 
-return arc
+return {
+	arc = arc,
+	arc_endpoints = arc_endpoints,
+}
+
