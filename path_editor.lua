@@ -52,8 +52,8 @@ local function middle(t, var1, var2) return t[var1] + (t[var2] - t[var1])/2 end
 local function point_distance(t, p1x, p1y, p2x, p2y)
 	return path_math.point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
 end
-local function point_angle(t, p1x, p1y, p2x, p2y)
-	return math.deg(path_math.point_angle(t[p1x], t[p1y], t[p2x], t[p2y]))
+local function point_angle(t, p2x, p2y, p1x, p1y)
+	return math.deg(path_math.point_angle(t[p2x], t[p2y], t[p1x], t[p1y]))
 end
 
 local function editor(path)
@@ -353,9 +353,9 @@ local function editor(path)
 
 			--arc sweep angle expression
 			local function calc_sweep_angle(t, p1x, p1y, p2x, p2y, p3x, p3y, csweep_angle)
-				local start_angle = path_math.point_angle(t[p1x], t[p1y], t[p2x], t[p2y])
+				local start_angle = path_math.point_angle(t[p2x], t[p2y], t[p1x], t[p1y])
 				local sweep_angle1 = math.rad(t[csweep_angle])
-				local end_angle = path_math.point_angle(t[p1x], t[p1y], t[p3x], t[p3y])
+				local end_angle = path_math.point_angle(t[p3x], t[p3y], t[p1x], t[p1y])
 				local sweep_angle_poz = (end_angle - start_angle) % (2 * math.pi)
 				local sweep_angle_neg = sweep_angle_poz - 2 * math.pi
 				--choose the angle closest to the current sweep angle
@@ -386,8 +386,8 @@ local function editor(path)
 			link(p2y, cr, point_distance, p2x, p2y, pcx, pcy)
 			link(p3x, cr, point_distance, p3x, p3y, pcx, pcy)
 			link(p3y, cr, point_distance, p3x, p3y, pcx, pcy)
-			link(p2x, cstart_angle, point_angle, pcx, pcy, p2x, p2y)
-			link(p2y, cstart_angle, point_angle, pcx, pcy, p2x, p2y)
+			link(p2x, cstart_angle, point_angle, p2x, p2y, pcx, pcy)
+			link(p2y, cstart_angle, point_angle, p2x, p2y, pcx, pcy)
 			link(p3x, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
 			link(p3y, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
 			--arc's start control point updates sweep control point in a separate universe

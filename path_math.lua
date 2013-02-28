@@ -1,10 +1,10 @@
 --2d geometry solutions from various sources.
 local bezier = require'path_bezier'
 
-local sqrt, abs, atan2, cos, sin, pi, log =
-	math.sqrt, math.abs, math.atan2, math.cos, math.sin, math.pi, math.log
+local sqrt, abs, atan2, cos, sin, pi, log, min, max =
+	math.sqrt, math.abs, math.atan2, math.cos, math.sin, math.pi, math.log, math.min, math.max
 
---hypotenuse function: computes sqrt((x2 - x1)^2 + (y2 - y1)^2) without overflow/underflow problems.
+--hypotenuse function: computes sqrt(x^2 + y^2) avoiding overflow and underflow cases.
 local function hypot(x, y)
 	x, y = abs(x), abs(y)
 	local t = min(x, y)
@@ -13,34 +13,37 @@ local function hypot(x, y)
 	return x * sqrt(1 + t * t)
 end
 
-local function point_angle(x1, y1, x2, y2) --the angle between two points
-	return atan2(y2 - y1, x2 - x1)
+local function point_angle(x, y, cx, cy) --the angle of a point relative to an origin point.
+	return atan2(y - cy, x - cx)
 end
 
 local function point_distance(x1, y1, x2, y2) --the distance between two points
 	return hypot(x2 - x1, y2 - y1)
 end
 
-local function arc_point(xc, yc, distance, angle) --point at distance and angle from origin
+local function arc_point(cx, cy, distance, angle) --point at distance and angle from origin
 	return
-		xc + cos(angle) * distance,
-		yc + sin(angle) * distance
+		cx + cos(angle) * distance,
+		cy + sin(angle) * distance
 end
 
 local function arc_length(radius, sweep_angle) --length of a circular arc
+	radius = abs(radius)
+	sweep_angle = max(sweep_angle, -pi * 2)
+	sweep_angle = min(sweep_angle,  pi * 2)
 	return sweep_angle * radius
 end
 
-local function rotate_point(x, y, xc, yc, angle) --point rotated at an angle around origin
-	x, y = x - xc, y - yc
+local function rotate_point(x, y, cx, cy, angle) --point rotated at an angle around origin
+	x, y = x - cx, y - cy
 	local cs, sn = cos(angle), sin(angle)
 	return
-		x * cs - y * sn + xc,
-		y * cs + x * sn + yc
+		x * cs - y * sn + cx,
+		y * cs + x * sn + cy
 end
 
-local function reflect_point(x, y, xc, yc) --point reflected through origin (rotated 180deg around origin)
-	return 2 * xc - x, 2 * yc - y
+local function reflect_point(x, y, cx, cy) --point reflected through origin (rotated 180deg around origin)
+	return 2 * cx - x, 2 * cy - y
 end
 
 --get the control points of a cubic bezier corresponding to a quadratic bezier.
@@ -60,7 +63,7 @@ local function quad_control_points(x1, y1, x2, y2, x3, y3, x4, y4)
 		-.25*y1 + .75*y2 + .75*y3 -.25*y4
 end
 
---evaluate a line at time t between 0..1
+--evaluate a line at time t (t is between 0..1) using linear interpolation.
 local function line_point(t, x1, y1, x2, y2)
 	return x1 + t * (x2 - x1), y1 + t * (y2 - y1)
 end
@@ -124,18 +127,28 @@ local function curve_point(t, x1, y1, x2, y2, x3, y3, x4, y4)
 		x34, y34   --curve2.cp2
 end
 
---integrates the estimated length of the cubic bezier curve by adding the lengths of linear lines between points at t.
---the number of points is defined by n: n=10 would add the lengths of lines between 0.0 and 0.1, between 0.1 and 0.2 etc.
---the default n=20 is fine for most cases, usually resulting in a deviation of less than 0.01.
+--length of cubic bezier by integrating its linear interpolation.
 local function curve_length(x1, y1, x2, y2, x3, y3, x4, y4, n)
 	n = n or 20
-	local xi, yi = x0, y0
+	local x0, y0 = x1, y1
 	local length = 0
 	for i=1,n do
 		local x, y = curve_point(i / n, x1, y1, x2, y2, x3, y3, x4, y4)
-		length = length + line_length(xi, yi, x, y)
-		xi, yi = x, y
+		length = length + line_length(x0, y0, x, y)
+		x0, y0 = x, y
 	end
+	return length
+end
+
+--length of cubic bezier by integrating its adaptive interpolation.
+local function curve_length2(x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
+	local x0, y0 = x1, y1
+	local length = 0
+	local function write(_, x, y)
+		length = length + line_length(x0, y0, x, y)
+		x0, y0 = x, y
+	end
+	bezier(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
 	return length
 end
 
@@ -149,29 +162,35 @@ local function point_line_intersection(x, y, x1, y1, x2, y2)
 	return x - k * py, y + k * px
 end
 
---shortest distance from (x0, y0) to a line segment.
+--shortest distance from point (x0, y0) to a line segment. also returns the intersection point.
 local function point_line_segment_distance(x0, y0, x1, y1, x2, y2)
 	local x, y = point_line_intersection(x0, y0, x1, y1, x2, y2)
 	if x < x1 or x > x2 or y < y1 or y > y2 then return end --intersection is outside the segment
-	return point_distance(x0, y0, x, y)
+	return point_distance(x0, y0, x, y), x, y
 end
 
-local function point_line_segment_cut(x0, y0, x1, y1, x2, y2)
-
-end
-
---
+--shortest distance from point (x0, y0) to a circular arc.
 local function point_arc_distance(x0, y0, cx, cy, r, start_angle, sweep_angle)
-
+	r = abs(r)
+	start_angle = fmod(start_angle, pi * 2)
+	sweep_angle = max(sweep_angle, -pi * 2)
+	sweep_angle = min(sweep_angle,  pi * 2)
+	local a = point_angle(x0, y0, cx, cy)
+	local a1, a2 = start_angle, start_angle + sweep_angle
+	if a1 > a2 then a1, a2 = a2, a1 end
+	if a < a1 or a > a2 then return end --point is outside arc's opening
+	local x, y = arc_point(cx, cy, r, a)
+	return point_distance(x0, y0, x, y), x, y
 end
 
 local function point_quad_curve_distance(x0, y0, x1, y1, x2, y2, x3, y3)
-
+	--
 end
 
 local function point_curve_distance(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 
 end
+
 
 --[[
 
