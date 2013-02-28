@@ -1,107 +1,108 @@
-local editor = require'path_editor'
-local player = require'cairopanel_player'
-local path_simplify = require'path_simplify'
-local path_math = require'path_math'
-local winapi = require'winapi'
-require'winapi.menuclass'
-
-local tpath = editor:new{
-	'move', 10, 10,
-	'rel_line', 0, 100,
+local path = {
+	'move', 100, 100,
+	'line', 200, 200,
+	'line', 300, 50,
+	'close',
+	'rel_move', 0, 100,
+	'rel_line', 100, -100,
+	'hline', 500,
+	'vline', 200,
+	'hline', 600,
+	'vline', 300,
 	'rel_hline', 100,
 	'rel_vline', -100,
-	'close',
-	'rel_move', 110, 0,
-	'rel_curve', 100, 0, 0, 100, 100, 100,
-	'rel_move', 10, -100,
-	'rel_curve', 100, 200, 100, -100, 0, 100,
-	'rel_move', 110, -50,
-	'rel_curve', 30, -60, 100-30, -60, 100, 0,
-	'rel_smooth_curve', 100-30, 60, 100, 0,
-	'rel_quad_curve', 50, 50, 100, 0,
+	'rel_hline', 100,
+	'rel_vline', 100,
+	'rel_hline', 100,
+	'rel_quad_curve', 50, -100, 100, 0,
 	'rel_smooth_quad_curve', 100, 0,
-	'rel_elliptical_arc', 50, 20, -15, 1, 0, 20, 0,
-	'rel_elliptical_arc', 50, 20, -15, 1, 1, 20, 0,
-	'rel_arc', 0, 0, 50, 0, -330,
-	'rel_arc', 0, 0, 50, 0, 330,
+	'rel_smooth_quad_curve', 100, 0,
+	'rel_smooth_quad_curve', 100, 0,
+	'rel_smooth_quad_curve', 100, 0,
+	'move', 100, 400,
+	'quad_curve', 200, 300, 300, 400,
+	'smooth_quad_curve', 500, 400,
+	'rel_line', 50, 100,
+	'rel_smooth_quad_curve', 100, 0,
+	'rel_smooth_quad_curve', 0, -100,
+	'rel_smooth_quad_curve', 100, 0,
+	'move', 100, 600,
+	'curve', 50, 500, 250, 500, 200, 600,
+	'rel_curve', 150, 100, -50, 100, 100, 0,
+	'smooth_curve', 350, 500, 500, 600,
+	'rel_smooth_curve', -50, 100, 100, 0,
+	'rel_line', 100, 0,
+	'rel_smooth_curve', 50, 100, 100, 0,
+	'rel_arc', 100, 0, 50, 30, 60,
 	'break',
-
-	'move', 10, 120,
-	'line', 10, 220,
-	'hline', 110,
-	'vline', 120,
-	'close',
-	'move', 120, 120,
-	'curve', 120+100, 120+0, 120+0, 120+100, 120+100, 120+100,
-	'move', 230, 120,
-	'curve', 230+100, 120+200, 230+100, 120+-100, 230+0, 120+100,
-	'move', 340, 220-50,
-	'curve', 340+30, 220+-60-50, 340+100-30, 220+-60-50, 340+100, 220+0-50,
-	'smooth_curve', 340+100+100-30, 220+60-50, 340+100+100, 220+0-50,
-	'quad_curve', 340+100+100+50, 220+0-50+50, 340+100+100+100, 220+0-50,
-	'smooth_quad_curve', 340+100+100+100+100, 220+0-50,
-	'elliptical_arc', 50, 20, -15, 1, 0, 340+100+100+100+100+20, 220+0-50,
-	'elliptical_arc', 50, 20, -15, 1, 1, 340+100+100+100+100+20+20, 220+0-50,
-	'arc', 340+100+100+100+100, 220+0-50, 50, 0, -330,
-	'arc', 340+100+100+100+100, 220+0-50, 50, 0, 330,
-	'break',
-
-	'ellipse', 960, 60, 100, 50,
-	'circle', 960, 60, 50,
-	'rect', 960+110, 10, 100, 100,
-	'round_rect', 960+220, 10, 100, 100, 20,
-	--'move', 860, 220,
-	--'text', {size = 110, family = 'georgia', slant = 'italic'}, 'g@AWmi',
+	'arc', 1000, 600, 50, 30, 60,
+	'rect', 600, 120, -50, -100,
+	'round_rect', 700, 120, -50, -100, -10,
+	'circle', 850, 70, -50,
+	'ellipse', 1000, 70, -50, -30,
+	'move', 1000, 500,
+	'elliptical_arc', -50, -20, 0, 0, 1, 1000+30, 500+40,
+	'rel_elliptical_arc', -50, -20, 0, 1, 0, 30, 40,
 }
 
---[[
-	menu_bar_break = MFT_MENUBARBREAK,
-	menu_break = MFT_MENUBREAK,
-	separator = MFT_SEPARATOR,
-	owner_draw = MFT_OWNERDRAW,
-	radio_check = MFT_RADIOCHECK,
-	rtl = MFT_RIGHTORDER,
-	right_align = MFT_RIGHTJUSTIFY, --this and subsequent items (only for menu bar items)
+local editor = require'path_editor'
+local glue = require'glue'
+local player = require'cairopanel_player'
+local path_simplify = require'path_simplify'
+local ffi = require'ffi'
 
-	checked = MFS_CHECKED,
-	enabled = negate(MFS_DISABLED),
-	highlight = MFS_HILITE,
-	is_default = MFS_DEFAULT,
-]]
-function player:on_init(cr)
-	self.menu = self.menu or winapi.Menu{
-		items = {
-			{text = 'Dude'},--submenu =--type = ,--state = ,
-		},
-	}
-end
+local e = editor(path)
 
-local function around(x, y, targetx, targety, radius) --point is in the square around target point
-	return
-		x >= targetx - radius and x <= targetx + radius and
-		y >= targety - radius and y <= targety + radius
-end
+local i = 0
+local selected_pi = {} --point indices
+local command = 'select'
 
 function player:on_render(cr)
-	cr:identity_matrix()
+	i = i + 1
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
+	cr:identity_matrix()
 
-	local function dot(x,y,style)
-		cr:new_path()
-		cr:circle(x,y,2)
-		cr:set_source_rgb(1,1,1)
-		cr:fill_preserve()
-		cr:set_source_rgb(1,0,0)
-		cr:stroke()
+	for i=#e.points-1,1,-2 do
+		local x, y = e.points[i], e.points[i+1]
+		if self.is_dragging then
+			if not self.dragging_handle and self:dragging(x, y) then
+				self.dragging_handle = i
+				self.old_path = glue.update({}, path)
+			end
+		else
+			self.dragging_handle = nil
+			self.old_path = nil
+		end
+		if self.dragging_handle == i then
+			e.update_point(i, self.mouse_x, self.mouse_y)
+		end
 	end
 
-	local function line(x1,y1,x2,y2)
-		cr:new_path()
-		cr:set_source_rgba(0,1,0,0.3)
-		cr:move_to(x1,y1)
-		cr:line_to(x2,y2)
-		cr:stroke()
+	if not self.dragging_handle then
+		if self.is_dragging then
+			cr:set_source_rgb(1,1,1)
+			cr:set_dash(ffi.new('double[?]', 2, {1,2}), 2, 0)
+			cr:rectangle(self.drag_from_x, self.drag_from_y, self.drag_x, self.drag_y)
+			cr:stroke()
+			local x1, y1, x2, y2 =
+				self.drag_from_x,
+				self.drag_from_y,
+				self.drag_from_x + self.drag_x,
+				self.drag_from_y + self.drag_y
+			if x2 < x1 then x1, x2 = x2, x1 end
+			if y2 < y1 then y1, y2 = y2, y1 end
+			selected_pi = {}
+			for i=#e.points-1,1,-2 do
+				local x, y = e.points[i], e.points[i+1]
+				if not e.point_styles[i] and x >= x1 and x <= x2 and y >= y1 and y <= y2 then
+					selected_pi[i] = true
+				end
+			end
+			self.drag_select = true
+		elseif self.drag_select then
+			self.drag_select = nil
+		end
 	end
 
 	local function write(s,...)
@@ -115,39 +116,48 @@ function player:on_render(cr)
 			cr:close_path()
 		end
 	end
-	path_simplify(write, tpath.path)
+
 	cr:set_line_width(1)
-	cr:set_source_rgba(1,1,1,1)
+
+	cr:set_dash(ffi.new('double[?]', 2, {1,2}), 2, 0)
+	cr:set_source_rgb(0.5,1,0.5)
+	path_simplify(write, e.control_path)
 	cr:stroke()
 
-	if self.cp then
-		if self.dragging_point then
-			if self.mouse_buttons.lbutton then
-				self.cp = tpath:control_points(self.dragging_point, self.mouse_x, self.mouse_y)
-			else
-				self.dragging_point = nil
-			end
-		else
-			if not self.mouse_buttons then goto done end
-			for i=1,#self.cp,3 do
-				local x, y = self.cp[i], self.cp[i+1]
-				if self.mouse_buttons.lbutton and around(self.mouse_x, self.mouse_y, x, y, 5) then
-					self.cp = tpath:control_points(i, self.mouse_x, self.mouse_y)
-					self.dragging_point = i
-				end
-			end
-			::done::
-		end
+	if self.old_path then
+		cr:set_dash(nil, 0, 0)
+		cr:set_source_rgb(1,1,1)
+		cr:new_path()
+		path_simplify(write, self.old_path)
+		cr:stroke()
+
+		cr:set_dash(ffi.new('double[?]', 2, {1,2}), 2, 0)
+		cr:set_source_rgb(0.5,0.5,1)
+		cr:new_path()
+		path_simplify(write, path)
+		cr:stroke()
 	else
-		self.cp = tpath:control_points()
-	end
-	for i=1,#self.cp,3 do
-		dot(self.cp[i], self.cp[i+1], self.cp[i+2])
+		cr:set_dash(nil, 0, 0)
+		cr:set_source_rgb(1,1,1)
+		cr:new_path()
+		path_simplify(write, path)
+		--cr:fill_preserve()
+		cr:stroke()
 	end
 
-	if self.mouse_buttons and self.mouse_buttons.rbutton then
-		self.menu:popup(self.window, self.mouse_x, self.mouse_y)
+	for i=1,#e.points,2 do
+		local x, y = e.points[i], e.points[i+1]
+		if selected_pi[i] then
+			cr:set_source_rgb(.5,.5,1)
+			cr:rectangle(x-3, y-3, 6, 6)
+		elseif e.point_styles[i] == 'control' then
+			cr:set_source_rgb(0,1,0)
+			cr:circle(x, y, 2)
+		else
+			cr:set_source_rgb(1,1,1)
+			cr:rectangle(x-3, y-3, 6, 6)
+		end
+		cr:fill()
 	end
 end
-
 player:play()

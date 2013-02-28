@@ -1,10 +1,10 @@
 --2d bezier adaptive interpolation from agg: http://www.antigrain.com/research/adaptive_bezier/index.html
 
+local pi, rad, atan2, abs = math.pi, math.rad, math.atan2, math.abs
+
 local curve_collinearity_epsilon    = 1e-30
 local curve_angle_tolerance_epsilon = 0.01
 local curve_recursion_limit         = 32
-
-local pi, rad, atan2, abs = math.pi, math.rad, math.atan2, math.abs
 
 local function calc_sq_distance(x1, y1, x2, y2)
 	return (x2-x1) * (x2-x1) + (y2-y1) * (y2-y1)

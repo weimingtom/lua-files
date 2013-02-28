@@ -84,6 +84,26 @@ panel.on_xbutton_up = panel.on_mouse_move
 panel.on_mouse_wheel = panel.on_mouse_move
 panel.on_mouse_hwheel = panel.on_mouse_move
 
+function panel.on_key_down(vk, flags)
+	self.key_code = vk
+	self.key_flags = flags
+	self:invalidate()
+end
+
+panel.on_key_up = panel.on_key_down
+panel.on_syskey_down = panel.on_key_down
+panel.on_syskey_up = panel.on_key_down
+
+function panel.on_key_down_char(char, flags)
+	self.key_char = char
+	self.key_flags = flags
+	self:invalidate()
+end
+
+panel.on_syskey_down_char = panel.on_key_down_char
+panel.on_dead_key_up_char = panel.on_key_down_char
+panel.on_dead_syskey_down_char = panel.on_key_down_char
+
 function player:play()
 	main:show()
 	panel:settimer(1, panel.invalidate) --render continuously

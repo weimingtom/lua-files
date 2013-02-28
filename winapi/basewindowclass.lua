@@ -109,8 +109,8 @@ BaseWindow = {
 		on_syskey_up = WM_SYSKEYUP,
 		on_key_down_char = WM_CHAR,
 		on_syskey_down_char = WM_SYSCHAR,
-		on_dead_key_up = WM_DEADCHAR,
-		on_dead_syskey_down = WM_SYSDEADCHAR,
+		on_dead_key_up_char = WM_DEADCHAR,
+		on_dead_syskey_down_char = WM_SYSDEADCHAR,
 		--system events
 		on_timer = WM_TIMER,
 	},

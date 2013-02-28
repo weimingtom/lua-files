@@ -1,257 +1,617 @@
---2d path editing
+--[[
+CAVEATS:
+- the algorithm for choosing between negative and positive arc is prone to histeresis.
+  that's not a problem for mouse handling (in fact it's a feature), but may become a problem
+  for programatic update.
+- linking in terms of delta is not idempotent. this only becomes a problem if you link the
+- same variable to delta in more than one linkset, which you shouldn't have reason to do anyway.
+
+FEATURES:
+- separate endpoints from control points
+- independent-point move:
+	- independent move of bezier points from control points and viceversa
+		* to avoid recreating the editor everytime, set a variable and make conditional_link(cond_var, ...)
+	- independent move of arc start point from end point
+	- independent move of rect x1,y1 from x2,y2
+- constrained change:
+	- fix arc radius, only change the angle
+	- rect w = h => square
+	- rect resize from center
+	- rect resize only on x or y axis
+	- ellipse w = h => circle
+- constrained move:
+	- rect move only on x or y axis
+
+NEW SHAPES:
+- 3-point arc: cpx, cpy, x2, y2, radius, start_angle, sweep_angle
+- html5 3-point arc: cpx, cpy, x2, y2, x3, y3, radius
+- elliptic_arc: cx, cy, rx, ry, rot
+- svgarc: rx, ry, angle, f1, f2, x2, y2
+- angle_ellipse: cx, cy, rx, ry, angle
+- angle_arc: cx, cy, rx, ry, angle, start_angle, sweep_angle
+- angle_rect: x1, y1, x2, y2, length_flag, length
+
+]]
+
 local glue = require'glue'
-local arc = require'path_arc'.arc
 local path_state = require'path_state'
+local arc = require'path_arc'.arc
+local arc_endpoints = require'path_arc'.arc_endpoints
 local path_math = require'path_math'
+local svgarc_to_arc = require'path_svgarc'.svgarc_to_arc
+local varlinker = require'varlinker'
 
-local editor = {}
-local editor_mt = {__index = editor}
+local function sign(x) return x > 0 and 1 or -1 end
 
-function editor:new(path)
-	return setmetatable({path = path}, editor_mt)
+--varlinker expressions
+local function copy(t, var) return t[var] end
+local function add(t, var1, var2) return t[var1] + t[var2] end
+local function sub(t, var1, var2) return t[var1] - t[var2] end
+local function reflect(t, varx, varc) return 2 * t[varc] - t[varx] end
+local function middle(t, var1, var2) return t[var1] + (t[var2] - t[var1])/2 end
+local function point_distance(t, p1x, p1y, p2x, p2y)
+	return path_math.point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
+end
+local function point_angle(t, p1x, p1y, p2x, p2y)
+	return math.deg(path_math.point_angle(t[p1x], t[p1y], t[p2x], t[p2y]))
 end
 
-function editor:insert(i, ...)
-	error'NYI'
-end
-
-function editor:commands()
-	return path_state.commands(self.path)
-end
-
-function editor:next_state(...)
-	return path_state.next_state(self.path, ...)
-end
-
-function editor:command_indices()
-	local t = {}
-	for k in self.path:commands() do
-		if k == i then break end
-		t[#t+1] = k
-	end
-	return t
-end
-
-function editor:control_points(at, px, py)
-	local path = self.path
-
-	--remember path indices of compatible curve commands that precede smooth curve commands
-	local prev = {}
-	local cpx, cpy, spx, spy
-	for i,s in self:commands() do
-		local nexti, nexts = path_state.next_command(path, i)
-		if nexts and nexts:match'smooth_(.-)curve$' and path[i]:match'curve$'
-			and path[i]:match'quad_' == nexts:match'quad_' --quads smooth quads, cubics smooth cubics
-		then
-			prev[nexti] = {i, cpx, cpy}
-		end
-		cpx, cpy, spx, spy = self:next_state(i, cpx, cpy, spx, spy)
-	end
+local function editor(path)
+	local linker = varlinker()
+	local var, val, linkon, expron, constrain =
+		linker.var, linker.val, linker.link, linker.expr, linker.constrain
+	local function link(...) linkon(1, ...) end
+	local function expr(...) expron(1, ...) end
 
 	local points = {}
-	local cpx, cpy, spx, spy
-
-	local function setpoint(i,ofs,style)
-		local x1, y1 = path[i+ofs+1], path[i+ofs+2]
-		if at == #points + 1 then path[i+ofs+1], path[i+ofs+2] = px, py end
-		local x2, y2 = path[i+ofs+1], path[i+ofs+2]
-		glue.append(points, x2, y2, style or '')
-		return x2 - x1, y2 - y1
+	local point_vars = {}
+	local function pointvar(x, setter, ...)
+		glue.append(points, x)
+		local px = var(points, #points, setter, ...)
+		glue.append(point_vars, px)
+		return px
+	end
+	local delta = var({},1)
+	local function update(xi,x)
+		local px = point_vars[xi]
+		local d = x - val[px]
+		if d == 0 then return end
+		val[delta] = d
+		val[px] = x
 	end
 
-	local function setrelpoint(i,ofs,style)
-		if at == #points + 1 then path[i+ofs+1], path[i+ofs+2] = px - cpx, py - cpy end
-		glue.append(points, cpx + path[i+ofs+1], cpy + path[i+ofs+2], style or '')
+	local point_styles = {}
+	local function point(x, y, style)
+		point_styles[#points+1] = style
+		return pointvar(x), pointvar(y)
+	end
+	local function update_point(xi,x,y)
+		update(xi,x)
+		update(xi+1,y)
 	end
 
-	local deltax, deltay = 0, 0
-
-	local nexti, nexts
-	local function checknextrel()
-		if nexts == 'rel_hline' then
-			path[nexti+1] = path[nexti+1] - deltax
-		elseif nexts == 'rel_vline' then
-			path[nexti+1] = path[nexti+1] - deltay
-		elseif nexts:match'^rel_' then
-			path[nexti+1], path[nexti+2] = path[nexti+1] - deltax, path[nexti+2] - deltay
-		end
+	local control_path = {}
+	local function cpline(p1x, p1y, p2x, p2y)
+		glue.append(control_path, 'move', val[p1x], val[p1y])
+		local cp1x = var(control_path, #control_path-1)
+		local cp1y = var(control_path, #control_path-0)
+		link(p1x, cp1x)
+		link(p1y, cp1y)
+		glue.append(control_path, 'line', val[p2x], val[p2y])
+		local cp2x = var(control_path, #control_path-1)
+		local cp2y = var(control_path, #control_path-0)
+		link(p2x, cp2x)
+		link(p2y, cp2y)
+		return cp1x, cp1y, cp2x, cp2y
 	end
 
-	for i,s in self:commands() do
+	local pcpx, pcpy, pspx, pspy, pbx, pby, pqx, pqy
 
-		nexti, nexts = path_state.next_command(path, i)
+	for i,s in path_state.commands(path) do
+
+		local rel = s:match'^rel_'
+
+		local p1x, p1y = pcpx, pcpy
+		local ox = rel and val[p1x] or 0
+		local oy = rel and val[p1y] or 0
+
+		local pbx1, pby1, pqx1, pqy1 = pbx, pby, pqx, pqy
+		pbx, pby, pqx, pqy = nil
 
 		if s == 'move' or s == 'line' then
-			deltax, deltay = setpoint(i,0)
-			checknextrel()
+			local c2x, c2y = var(path, i+1), var(path, i+2)
+			local p2x, p2y = point(val[c2x], val[c2y])
+
+			--point updates point in path
+			link(p2x, c2x)
+			link(p2y, c2y)
+
+			pcpx, pcpy = p2x, p2y
+			if s == 'move' then pspx, pspy = pcpx, pcpy end
 		elseif s == 'close' then
-			checknextrel()
+			pcpx, pcpy = pspx, pspy
 		elseif s == 'rel_move' or s == 'rel_line' then
-			setrelpoint(i,0)
-			checknextrel()
+			local c2x, c2y = var(path, i+1), var(path, i+2)
+			local p2x, p2y = point(ox + val[c2x], oy + val[c2y])
+
+			--both first and second points update point in path
+			expr(c2x, sub, p2x, p1x)
+			expr(c2y, sub, p2y, p1y)
+
+			pcpx, pcpy = p2x, p2y
+			if s == 'rel_move' then pspx, pspy = pcpx, pcpy end
 		elseif s == 'hline' then
-			if at == #points + 1 then path[i+1] = px end
-			glue.append(points, path[i+1], cpy, '')
-		elseif s == 'rel_hline' then
-			if at == #points + 1 then path[i+1] = px - cpx end
-			glue.append(points, cpx + path[i+1], cpy, '')
+			local c2x = var(path, i+1)
+			local p2x, p2y, h2x, h2y = point(val[c2x], val[p1y])
+
+			--point updates length in path
+			link(p2x, c2x)
+			--second point updates first point
+			link(p2y, p1y)
+			--first point updates second point
+			link(p1y, p2y)
+
+			pcpx, pcpy = p2x, p2y
 		elseif s == 'vline' then
-			if at == #points + 1 then path[i+1] = py end
-			glue.append(points, cpx, path[i+1], '')
+			local c2y = var(path, i+1)
+			local p2x, p2y, h2x, h2y = point(val[p1x], val[c2y])
+
+			--point updates length in path
+			link(p2y, c2y)
+			--second point updates first point
+			link(p2x, p1x)
+			--first point updates second point
+			link(p1x, p2x)
+
+			pcpx, pcpy = p2x, p2y
+		elseif s == 'rel_hline' then
+			local c2x = var(path, i+1)
+			local p2x, p2y, h2x, h2y = point(ox + val[c2x], oy)
+
+			--both first point and second point update length in path
+			expr(c2x, sub, p2x, p1x)
+			--second point updates first point
+			link(p2y, p1y)
+			--first point updates second point
+			link(p1y, p2y)
+
+			pcpx, pcpy = p2x, p2y
 		elseif s == 'rel_vline' then
-			if at == #points + 1 then path[i+1] = py - cpy end
-			glue.append(points, cpx, cpy + path[i+1], '')
-		elseif s == 'curve' then
-			setpoint(i,0,'cp')
-			path[i+1], path[i+2] = deltax + path[i+1], deltay + path[i+2]
-			local x1, y1 = path[i+5], path[i+6]
-			setpoint(i,4)
-			local x2, y2 = path[i+5], path[i+6]
-			setpoint(i,2,'cp')
-			path[i+3], path[i+4] = path[i+3] + x2 - x1, path[i+4] + y2 - y1
-		elseif s == 'rel_curve' then
-			setrelpoint(i,0,'cp')
-			setrelpoint(i,2,'cp')
-			setrelpoint(i,4)
-		elseif s == 'quad_curve' then
-			setpoint(i,0,'cp')
-			setpoint(i,2)
-		elseif s == 'rel_quad_curve' then
-			setrelpoint(i,0,'cp')
-			setrelpoint(i,2)
+			local c2y = var(path, i+1)
+			local p2x, p2y, h2x, h2y = point(ox, oy + val[c2y])
+
+			--both first point and second point update length in path
+			expr(c2y, sub, p2y, p1y)
+			--last point updates first point
+			link(p2x, p1x)
+			--first point updates last point
+			link(p1x, p2x)
+
+			pcpx, pcpy = p2x, p2y
+		elseif s == 'curve' or s == 'rel_curve' then
+			local c2x, c2y = var(path, i+1), var(path, i+2)
+			local c3x, c3y = var(path, i+3), var(path, i+4)
+			local c4x, c4y = var(path, i+5), var(path, i+6)
+			--create end point first so it has lower z-order than control points
+			local p4x, p4y = point(ox + val[c4x], oy + val[c4y])
+			local p2x, p2y = point(ox + val[c2x], oy + val[c2y], 'control')
+			local p3x, p3y = point(ox + val[c3x], oy + val[c3y], 'control')
+
+			if rel then
+				--points update themselves in path
+				expr(c2x, sub, p2x, p1x)
+				expr(c2y, sub, p2y, p1y)
+				expr(c3x, sub, p3x, p1x)
+				expr(c3y, sub, p3y, p1y)
+				expr(c4x, sub, p4x, p1x)
+				expr(c4y, sub, p4y, p1y)
+			else
+				--points update themselves in path
+				link(p2x, c2x); link(p2y, c2y)
+				link(p3x, c3x); link(p3y, c3y)
+				link(p4x, c4x); link(p4y, c4y)
+			end
+			--first and last point move their control points
+			link(p1x, p2x, add, p2x, delta)
+			link(p1y, p2y, add, p2y, delta)
+			link(p4x, p3x, add, p3x, delta)
+			link(p4y, p3y, add, p3y, delta)
+
+			cpline(p1x, p1y, p2x, p2y)
+			cpline(p3x, p3y, p4x, p4y)
+
+			pbx, pby = p3x, p3y
+			pcpx, pcpy = p4x, p4y
 		elseif s == 'smooth_curve' or s == 'rel_smooth_curve' then
-			--our first control point is virtual: it actually adjusts the second control point of the previous curve
-			if prev[i] then
-				local pi, pcpx, pcpy = unpack(prev[i])
-				local ps = path[pi]
-				if at == #points + 1 then
-					local x, y = path_math.reflect_point(px, py, cpx, cpy)
-					--adjust the control point that we created for the last cp of the prev. curve
-					points[#points-5], points[#points-4] = x, y
-					--set the last cp of the prev. curve
-					if ps:match'^rel_' then x, y = x - pcpx, y - pcpy end
-					path[i-4], path[i-3] = x, y
-				end
-				local x, y = path[i-4], path[i-3]
-				if ps:match'^rel_' then x, y = x + pcpx, y + pcpy end
-				x, y = path_math.reflect_point(x, y, cpx, cpy)
-				glue.append(points, x, y, '')
+			local c3x, c3y = var(path, i+1), var(path, i+2)
+			local c4x, c4y = var(path, i+3), var(path, i+4)
+			local p2x, p2y
+			if pbx1 then
+				p2x, p2y = point(
+					reflect(val, pbx1, p1x),
+					reflect(val, pby1, p1y), 'control')
 			end
+			--create end point first so it has lower z-order than control points
+			local p4x, p4y = point(ox + val[c4x], oy + val[c4y])
+			local p3x, p3y = point(ox + val[c3x], oy + val[c3y], 'control')
 
-			if s == 'smooth_curve' then
-				setpoint(i,0,'cp')
-				setpoint(i,2)
+			if rel then
+				--points update themselves in path
+				expr(c3x, sub, p3x, p1x)
+				expr(c3y, sub, p3y, p1y)
+				expr(c4x, sub, p4x, p1x)
+				expr(c4y, sub, p4y, p1y)
 			else
-				setrelpoint(i,0,'cp')
-				setrelpoint(i,2)
+				--points update themselves in path
+				link(p3x, c3x); link(p3y, c3y)
+				link(p4x, c4x); link(p4y, c4y)
 			end
+			if p2x then
+				--first point moves its control point
+				link(p1x, p2x, add, p2x, delta)
+				link(p1y, p2y, add, p2y, delta)
+				--reflective control points move each other around first point
+				link(p2x, pbx1, reflect, p2x, p1x)
+				link(p2y, pby1, reflect, p2y, p1y)
+				link(pbx1, p2x, reflect, pbx1, p1x)
+				link(pby1, p2y, reflect, pby1, p1y)
+
+				cpline(p1x, p1y, p2x, p2y)
+			end
+			--last point moves its control point
+			link(p4x, p3x, add, p3x, delta)
+			link(p4y, p3y, add, p3y, delta)
+
+			cpline(p3x, p3y, p4x, p4y)
+
+			pbx, pby = p3x, p3y
+			pcpx, pcpy = p4x, p4y
+		elseif s == 'quad_curve' or s == 'rel_quad_curve' then
+			local c2x, c2y = var(path, i+1), var(path, i+2)
+			local c3x, c3y = var(path, i+3), var(path, i+4)
+			--create end point first so it has lower z-order than control points
+			local p3x, p3y = point(ox + val[c3x], oy + val[c3y])
+			local p2x, p2y = point(ox + val[c2x], oy + val[c2y], 'control')
+
+			if rel then
+				--points update themselves in path
+				expr(c2x, sub, p2x, p1x)
+				expr(c2y, sub, p2y, p1y)
+				expr(c3x, sub, p3x, p1x)
+				expr(c3y, sub, p3y, p1y)
+			else
+				--points update themselves in path
+				link(p2x, c2x); link(p2y, c2y)
+				link(p3x, c3x); link(p3y, c3y)
+			end
+			--first and last point move their control points
+			link(p1x, p2x, add, p2x, delta)
+			link(p1y, p2y, add, p2y, delta)
+			link(p3x, p2x, add, p2x, delta)
+			link(p3y, p2y, add, p2y, delta)
+
+			cpline(p1x, p1y, p2x, p2y)
+			cpline(p2x, p2y, p3x, p3y)
+
+			pqx, pqy = p2x, p2y
+			pcpx, pcpy = p3x, p3y
 		elseif s == 'smooth_quad_curve' or s == 'rel_smooth_quad_curve' then
-			--our first control point is virtual: it actually adjusts the control point of the last non-smooth curve
-			--[[
-			if prev[i] then
-				if at == #points + 1 then
-					local j = i
-					local pti = #points
-					local x, y = path_math.reflect_point(px, py, cpx, cpy)
-					while prev[j] do
-						local pi, pcpx, pcpy = unpack(prev[j])
-						--adjust the control point that we created for the last cp of the prev. curve
-						points[pti-5], points[pti-4] = x, y
-						--set the last cp of the prev. non-smooth curve
-						if not ps:match'smooth_' then
-							if ps:match'^rel_' then x, y = x - pcpx, y - pcpy end
-							path[j-4], path[j-3] = x, y
-							break
-						end
-						pti = pti - 3
-						px, py = path_math.reflect_point(x, y, pcpx, pcpy)
-					end
+			local c3x, c3y = var(path, i+1), var(path, i+2)
+			local p2x, p2y
+			if pqx1 then
+				p2x, p2y = point(
+					reflect(val, pqx1, p1x),
+					reflect(val, pqy1, p1y), 'control')
+			end
+			local p3x, p3y = point(ox + val[c3x], oy + val[c3y])
+
+			if rel then
+				--points update themselves in path
+				expr(c3x, sub, p3x, p1x)
+				expr(c3y, sub, p3y, p1y)
+			else
+				--points update themselves in path
+				link(p3x, c3x)
+				link(p3y, c3y)
+			end
+			if p2x then
+				--first and last point move their control point
+				link(p1x, p2x, add, p2x, delta)
+				link(p1y, p2y, add, p2y, delta)
+				link(p3x, p2x, add, p2x, delta)
+				link(p3y, p2y, add, p2y, delta)
+				--reflective control points move each other around first point
+				link(p2x, pqx1, reflect, p2x, p1x)
+				link(p2y, pqy1, reflect, p2y, p1y)
+				link(pqx1, p2x, reflect, pqx1, p1x)
+				link(pqy1, p2y, reflect, pqy1, p1y)
+
+				cpline(p1x, p1y, p2x, p2y)
+				cpline(p2x, p2y, p3x, p3y)
+			end
+
+			pqx, pqy = p2x or p1x, p2y or p1y
+			pcpx, pcpy = p3x, p3y
+		elseif s == 'arc' or s == 'rel_arc' then
+
+			--path variables
+			local ccx, ccy, cr, cstart_angle, csweep_angle =
+				var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4), var(path, i+5)
+
+			--arc endpoint expressions
+			local function endpoint_arg(i)
+				return function()
+					local t = val
+					local cx, cy = t[ccx], t[ccy]
+					if rel then cx, cy = t[p1x] + cx, t[p1y] + cy end
+					return select(i,
+						arc_endpoints(cx, cy, t[cr], t[cr], math.rad(t[cstart_angle]), math.rad(t[csweep_angle])))
 				end
 			end
-			local x, y = path[i-4], path[i-3]
-			if ps:match'^rel_' then x, y = x + pcpx, y + pcpy end
-			x, y = path_math.reflect_point(x, y, cpx, cpy)
-			glue.append(points, x, y, '')
-			]]
-			if s == 'smooth_quad_curve' then
-				setpoint(i,0)
-			else
-				setrelpoint(i,0)
+			local getp2x, getp2y, getp3x, getp3y =
+				endpoint_arg(1), endpoint_arg(2), endpoint_arg(3), endpoint_arg(4)
+
+			--arc sweep angle expression
+			local function calc_sweep_angle(t, p1x, p1y, p2x, p2y, p3x, p3y, csweep_angle)
+				local start_angle = path_math.point_angle(t[p1x], t[p1y], t[p2x], t[p2y])
+				local sweep_angle1 = math.rad(t[csweep_angle])
+				local end_angle = path_math.point_angle(t[p1x], t[p1y], t[p3x], t[p3y])
+				local sweep_angle_poz = (end_angle - start_angle) % (2 * math.pi)
+				local sweep_angle_neg = sweep_angle_poz - 2 * math.pi
+				--choose the angle closest to the current sweep angle
+				local sweep_angle =
+					math.abs(sweep_angle_poz - sweep_angle1) <
+					math.abs(sweep_angle_neg - sweep_angle1)
+					and sweep_angle_poz or sweep_angle_neg
+				return math.deg(sweep_angle)
 			end
-		elseif s == 'arc' or s == 'rel_arc' then
-			if s == 'arc' then
-				setpoint(i,0)
-			else
-				setrelpoint(i,0)
-			end
+
+			--finally, the points
 			local cx, cy = path[i+1], path[i+2]
-			if s == 'rel_arc' then cx, cy = cpx + cx, cpy + cy end
-			if at == #points + 1 then
-				path[i+4] = math.deg(path_math.point_angle(cx, cy, px, py))
-			elseif at == #points + 4 then
-				path[i+5] = math.deg(path_math.point_angle(cx, cy, px, py)) - path[i+4]
+			if rel then cx, cy = ox + cx, oy + cy end
+			local pcx, pcy = point(cx, cy)
+			local p2x, p2y = point(getp2x(), getp2y(), 'control')
+			local p3x, p3y = point(getp3x(), getp3y(), 'control')
+
+			--center point updates itself in path
+			if rel then
+				expr(ccx, sub, pcx, p1x)
+				expr(ccy, sub, pcy, p1y)
+			else
+				link(pcx, ccx)
+				link(pcy, ccy)
 			end
-			local r, start_angle, sweep_angle = path[i+3], path[i+4], path[i+5]
-			local segments = arc(cx, cy, r, r, math.rad(start_angle), math.rad(sweep_angle))
-			local x0, y0 = segments[1], segments[2]
-			local x1, y1 = segments[#segments-1], segments[#segments]
-			glue.append(points, x0, y0, '')
-			glue.append(points, x1, y1, '')
-		elseif s == 'elliptical_arc' then
-			setpoint(i,5)
-		elseif s == 'rel_elliptical_arc' then
-			setrelpoint(i,5)
+			--arc's control points update the arc parameters in path
+			link(p2x, cr, point_distance, p2x, p2y, pcx, pcy)
+			link(p2y, cr, point_distance, p2x, p2y, pcx, pcy)
+			link(p3x, cr, point_distance, p3x, p3y, pcx, pcy)
+			link(p3y, cr, point_distance, p3x, p3y, pcx, pcy)
+			link(p2x, cstart_angle, point_angle, pcx, pcy, p2x, p2y)
+			link(p2y, cstart_angle, point_angle, pcx, pcy, p2x, p2y)
+			link(p3x, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
+			link(p3y, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
+			--arc's start control point updates sweep control point in a separate universe
+			linkon(2, p2x, p3x, getp3x)
+			linkon(2, p2x, p3y, getp3y)
+			linkon(2, p2y, p3x, getp3x)
+			linkon(2, p2y, p3y, getp3y)
+			--arc's sweep control point updates start control point in a separate universe
+			linkon(3, p3x, p2x, getp2x)
+			linkon(3, p3x, p2y, getp2y)
+			linkon(3, p3y, p2x, getp2x)
+			linkon(3, p3y, p2y, getp2y)
+			--arc's center control point updates angle control points in a separate universe
+			linkon(4, pcx, p2x, add, p2x, delta)
+			linkon(4, pcy, p2y, add, p2y, delta)
+			linkon(4, pcx, p3x, add, p3x, delta)
+			linkon(4, pcy, p3y, add, p3y, delta)
+
+			local lcx, lcy, l2x, l2y = cpline(pcx, pcy, p2x, p2y)
+			for i=2,4 do
+				linkon(i, p2x, l2x)
+				linkon(i, p2y, l2y)
+			end
+			local lcx, lcy, l3x, l3y = cpline(pcx, pcy, p3x, p3y)
+			for i=2,4 do
+				linkon(i, p3x, l3x)
+				linkon(i, p3y, l3y)
+			end
+
+			pcpx, pcpy = p3x, p3y
+		elseif s == 'elliptical_arc' or s == 'rel_elliptical_arc' then
+
+			--path variables
+			local crx, cry, crotate, cflag1, cflag2, c2x, c2y =
+				var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4), var(path, i+5), var(path, i+6), var(path, i+7)
+
+			--second endpoint
+			local rx, ry, rotate, flag1, flag2, x2, y2 = unpack(path, i + 1, i + 7)
+			if rel then x2, y2 = ox + x2, oy + y2 end
+			local p2x, p2y = point(x2, y2)
+
+			--arc arguments expressions
+			local function arc_arg(i)
+				local t = val
+				return function()
+					return select(i,
+						svgarc_to_arc(t[p1x], t[p1y], t[crx], t[cry], t[crotate], t[cflag1], t[cflag2], t[p2x], t[p2y]))
+				end
+			end
+			local getcx, getcy = arc_arg(1), arc_arg(2)
+			local getrx, getry = arc_arg(3), arc_arg(4)
+
+			--arc's center point
+			local pcx, pcy = point(getcx(), getcy())
+			--arc's radiuses points
+			local function getprxx() return getcx() + getrx() end
+			local function getpryy() return getcy() + getry() end
+			local prxx, prxy = point(getprxx(), val[pcy], 'control')
+			local pryx, pryy = point(val[pcx], getpryy(), 'control')
+			constrain(pryx, copy, pcx)
+			constrain(prxy, copy, pcy)
+
+			--arc second endpoint updates itself in path
+			if rel then
+				expr(c2x, sub, p2x, p1x)
+				expr(c2y, sub, p2y, p1y)
+			else
+				link(p2x, c2x)
+				link(p2y, c2y)
+			end
+			--arc's center point updates end points
+			link(pcx, p1x, add, p1x, delta)
+			link(pcy, p1y, add, p1y, delta)
+			link(pcx, p2x, add, p2x, delta)
+			link(pcy, p2y, add, p2y, delta)
+			link(pcx, prxx, add, prxx, delta)
+			link(pcy, pryy, add, pryy, delta)
+			link(pcx, prxy, add, prxy, delta)
+			link(pcy, pryx, add, pryx, delta)
+			--arc's center point changes when end points change
+			expron(2, pcx, getcx, p1x, p1y, p2x, p2y)
+			expron(2, pcy, getcy, p1x, p1y, p2x, p2y)
+			--arc's radiuses points change when end points change
+			expron(2, prxx, getprxx, p1x, p1y, p2x, p2y)
+			expron(2, pryy, getpryy, p1x, p1y, p2x, p2y)
+
+			linkon(2, pcx, prxy)
+			linkon(2, pcy, pryx)
+
+			pcpx, pcpy = p2x, p2y
 		elseif s == 'text' then
-			--TODO
+			--TODO:
+		elseif s == 'rect' or s == 'round_rect' then
+			local x, y, w, h = unpack(path, i + 1, i + 4)
+			local cx, cy = var(path, i+1), var(path, i+2)
+			local cw, ch = var(path, i+3), var(path, i+4)
+
+			--corner control points
+			local p11x, p11y = point(x, y)
+			local p22x, p22y = point(x + w, y + h)
+			local p21x, p21y = point(x + w, y)
+			local p12x, p12y = point(x, y + h)
+			--median control points
+			local pc1x, pc1y = point(x + w/2, y)
+			constrain(pc1x, middle, p22x, p11x)
+			local pc2x, pc2y = point(x + w/2, y + h)
+			constrain(pc2x, middle, p22x, p11x)
+			local pc3x, pc3y = point(x, y + h/2)
+			constrain(pc3y, middle, p22y, p11y)
+			local pc4x, pc4y = point(x + w, y + h/2)
+			constrain(pc4y, middle, p22y, p11y)
+
+			--moving top,left and bottom,right (primary) corner control points updates the rect in path
+			link(p11x, cx)
+			link(p11y, cy)
+			link(p11x, cw, sub, p22x, p11x)
+			link(p11y, ch, sub, p22y, p11y)
+			link(p22x, cw, sub, p22x, p11x)
+			link(p22y, ch, sub, p22y, p11y)
+			--moving primary corner control points moves top,right and bottom,left (secondary) corner control points
+			link(p11x, p12x)
+			link(p11y, p21y)
+			link(p22x, p21x)
+			link(p22y, p12y)
+			--moving secondary corner control points moves primary corner control points
+			link(p21x, p22x)
+			link(p21y, p11y)
+			link(p12x, p11x)
+			link(p12y, p22y)
+			--moving primary control points moves median control points
+			link(p22x, pc1x, middle, p22x, p11x)
+			link(p11x, pc1x, middle, p22x, p11x)
+			link(p11y, pc1y)
+			link(p22x, pc2x, middle, p22x, p11x)
+			link(p11x, pc2x, middle, p22x, p11x)
+			link(p22y, pc2y)
+			link(p22y, pc3y, middle, p22y, p11y)
+			link(p11y, pc3y, middle, p22y, p11y)
+			link(p11x, pc3x)
+			link(p22y, pc4y, middle, p22y, p11y)
+			link(p11y, pc4y, middle, p22y, p11y)
+			link(p22x, pc4x)
+			--moving median control points moves primary corner control points
+			link(pc1y, p11y)
+			link(pc2y, p22y)
+			link(pc3x, p11x)
+			link(pc4x, p22x)
+
+			if s == 'round_rect' then
+				local r = math.abs(path[i+5])
+				local cr = var(path, i+5)
+
+				local rx = r * (w > 0 and 1 or -1)
+				local ry = r * (h > 0 and 1 or -1)
+
+				local function radius_points()
+					local prx, pry = point(x + rx, y, 'control')
+					constrain(pry, copy, p11y)
+					constrain(prx, function(t)
+						local absr = math.min(math.abs(t[prx] - t[p11x]), math.abs(t[cw]/2), math.abs(t[ch]/2))
+						return t[p11x] + absr * (t[cw] > 0 and 1 or -1)
+					end)
+
+					link(prx, cr, sub, prx, p11x)
+					link(p11x, prx, function(t) return t[p11x] + t[cr] * (t[cw] > 0 and 1 or -1) end)
+					link(p11y, pry)
+					--link(cr, prx, add, p11x, cr)
+				end
+				radius_points()
+			end
+
+			pcpx, pcpy, pspx, pspy = nil
+		elseif s == 'circle' then
+			local x, y, r = path[i+1], path[i+2], path[i+3]
+			local cx, cy, cr = var(path, i+1), var(path, i+2), var(path, i+3)
+			local pcx, pcy = point(x, y)
+			local prx, pry = point(x + r, y, 'control')
+
+			--control points update circle in path
+			link(pcx, cx)
+			link(pcy, cy)
+			link(prx, cr, point_distance, prx, pry, pcx, pcy)
+			link(pry, cr, point_distance, prx, pry, pcx, pcy)
+			--center control point updates radius control point
+			link(pcx, prx, add, prx, delta)
+			link(pcy, pry, add, pry, delta)
+
+			cpline(pcx, pcy, prx, pry)
+
+			pcpx, pcpy, pspx, pspy = nil
+		elseif s == 'ellipse' then
+			local x, y, rx, ry = path[i+1], path[i+2], path[i+3], path[i+4]
+			local cx, cy, crx, cry = var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4)
+			local pcx, pcy = point(x, y)
+			local prxx, prxy = point(x + rx, y, 'control')
+			local pryx, pryy = point(x, y + ry, 'control')
+			constrain(pryx, copy, pcx)
+			constrain(prxy, copy, pcy)
+
+			--control points update circle in path
+			link(pcx, cx)
+			link(pcy, cy)
+			link(prxx, crx, sub, prxx, pcx)
+			link(pryy, cry, sub, pryy, pcy)
+			--center control point updates radius control points
+			link(pcx, prxx, add, prxx, delta)
+			link(pcy, prxy, add, prxy, delta)
+			link(pcx, pryx, add, pryx, delta)
+			link(pcy, pryy, add, pryy, delta)
+
+			cpline(pcx, pcy, prxx, prxy)
+			cpline(pcx, pcy, pryx, pryy)
+
+			pcpx, pcpy, pspx, pspy = nil
 		end
-		cpx, cpy, spx, spy = self:next_state(i, cpx, cpy, spx, spy)
 	end
-	return points
-end
 
-function editor:hit_test(x, y) --return what's found: segment, point, ctrl point etc.
+	return {
+		points = points,
+		update_point = update_point,
+		point_styles = point_styles,
+		control_path = control_path,
+	}
 end
-
-function editor:split_curve(ei, x, y)
-end
-
-function editor:remove_point(pi)
-end
-
-function editor:quad_to_cubic(ei)
-end
-
-function editor:cubic_to_quad(ei)
-end
-
-function editor:smooth_curve(ei)
-end
-
-function editor:cusp_curve(ei)
-end
-
-function editor:curve_to_line(ei)
-end
-
-function editor:line_to_curve(ei)
-end
-
-function editor:break_at_point(pi)
-end
-
---pi1 must end a subpath and pi2 must start a sub-path; re-arrange path if points are not consecutive.
-function editor:join_points(pi1, pi2)
-end
-
-function editor:simplify(ei)
-end
-
-function editor:remove_point(pi) --merge beziers, merge lines, merge bezier with line
-end
-
-function editor:transform(mt, ei) --transform an element or the whole path
-end
-
 
 if not ... then require'path_editor_demo' end
 
