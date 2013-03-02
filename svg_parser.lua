@@ -236,8 +236,8 @@ local path_cmd = {
 	Q = 'quad_curve',
 	t = 'rel_smooth_quad_curve',
 	T = 'smooth_quad_curve',
-	a = 'rel_elliptical_arc',
-	A = 'elliptical_arc',
+	a = 'rel_svgarc',
+	A = 'svgarc',
 }
 
 local path_argc = {
@@ -258,8 +258,8 @@ local path_argc = {
 	quad_curve = 4,
 	rel_smooth_quad_curve = 2,
 	smooth_quad_curve = 2,
-	rel_elliptical_arc = 7,
-	elliptical_arc = 7,
+	rel_svgarc = 7,
+	svgarc = 7,
 }
 
 local path_re = re.compile([[

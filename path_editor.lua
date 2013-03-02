@@ -35,10 +35,9 @@ NEW SHAPES:
 
 local glue = require'glue'
 local path_state = require'path_state'
-local arc = require'path_arc'.arc
+local path_line = require'path_line'
 local arc_endpoints = require'path_arc'.arc_endpoints
-local path_math = require'path_math'
-local svgarc_to_arc = require'path_svgarc'.svgarc_to_arc
+local svgarc_to_elliptic_arc = require'path_svgarc'.svgarc_to_elliptic_arc
 local varlinker = require'varlinker'
 
 local function sign(x) return x > 0 and 1 or -1 end
@@ -50,10 +49,10 @@ local function sub(t, var1, var2) return t[var1] - t[var2] end
 local function reflect(t, varx, varc) return 2 * t[varc] - t[varx] end
 local function middle(t, var1, var2) return t[var1] + (t[var2] - t[var1])/2 end
 local function point_distance(t, p1x, p1y, p2x, p2y)
-	return path_math.point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
+	return path_line.point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
 end
 local function point_angle(t, p2x, p2y, p1x, p1y)
-	return math.deg(path_math.point_angle(t[p2x], t[p2y], t[p1x], t[p1y]))
+	return math.deg(path_line.point_angle(t[p2x], t[p2y], t[p1x], t[p1y]))
 end
 
 local function editor(path)
@@ -345,7 +344,7 @@ local function editor(path)
 					local cx, cy = t[ccx], t[ccy]
 					if rel then cx, cy = t[p1x] + cx, t[p1y] + cy end
 					return select(i,
-						arc_endpoints(cx, cy, t[cr], t[cr], math.rad(t[cstart_angle]), math.rad(t[csweep_angle])))
+						arc_endpoints(cx, cy, t[cr], math.rad(t[cstart_angle]), math.rad(t[csweep_angle])))
 				end
 			end
 			local getp2x, getp2y, getp3x, getp3y =
@@ -353,9 +352,9 @@ local function editor(path)
 
 			--arc sweep angle expression
 			local function calc_sweep_angle(t, p1x, p1y, p2x, p2y, p3x, p3y, csweep_angle)
-				local start_angle = path_math.point_angle(t[p2x], t[p2y], t[p1x], t[p1y])
+				local start_angle = path_line.point_angle(t[p2x], t[p2y], t[p1x], t[p1y])
 				local sweep_angle1 = math.rad(t[csweep_angle])
-				local end_angle = path_math.point_angle(t[p3x], t[p3y], t[p1x], t[p1y])
+				local end_angle = path_line.point_angle(t[p3x], t[p3y], t[p1x], t[p1y])
 				local sweep_angle_poz = (end_angle - start_angle) % (2 * math.pi)
 				local sweep_angle_neg = sweep_angle_poz - 2 * math.pi
 				--choose the angle closest to the current sweep angle
@@ -390,39 +389,40 @@ local function editor(path)
 			link(p2y, cstart_angle, point_angle, p2x, p2y, pcx, pcy)
 			link(p3x, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
 			link(p3y, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
-			--arc's start control point updates sweep control point in a separate universe
+			--arc's start control point updates sweep control point in a separate link chain
 			linkon(2, p2x, p3x, getp3x)
 			linkon(2, p2x, p3y, getp3y)
 			linkon(2, p2y, p3x, getp3x)
 			linkon(2, p2y, p3y, getp3y)
-			--arc's sweep control point updates start control point in a separate universe
+			--arc's sweep control point updates start control point in a separate link chain
 			linkon(3, p3x, p2x, getp2x)
 			linkon(3, p3x, p2y, getp2y)
 			linkon(3, p3y, p2x, getp2x)
 			linkon(3, p3y, p2y, getp2y)
-			--arc's center control point updates angle control points in a separate universe
+			--arc's center control point updates angle control points in a separate link chain
 			linkon(4, pcx, p2x, add, p2x, delta)
 			linkon(4, pcy, p2y, add, p2y, delta)
 			linkon(4, pcx, p3x, add, p3x, delta)
 			linkon(4, pcy, p3y, add, p3y, delta)
 
 			local lcx, lcy, l2x, l2y = cpline(pcx, pcy, p2x, p2y)
-			for i=2,4 do
+			for i=2,4 do --update cpline in all link chains
 				linkon(i, p2x, l2x)
 				linkon(i, p2y, l2y)
 			end
 			local lcx, lcy, l3x, l3y = cpline(pcx, pcy, p3x, p3y)
-			for i=2,4 do
+			for i=2,4 do --update cpline in all link chains
 				linkon(i, p3x, l3x)
 				linkon(i, p3y, l3y)
 			end
 
 			pcpx, pcpy = p3x, p3y
-		elseif s == 'elliptical_arc' or s == 'rel_elliptical_arc' then
+		elseif s == 'svgarc' or s == 'rel_svgarc' then
 
 			--path variables
 			local crx, cry, crotate, cflag1, cflag2, c2x, c2y =
-				var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4), var(path, i+5), var(path, i+6), var(path, i+7)
+				var(path, i+1), var(path, i+2), var(path, i+3),
+				var(path, i+4), var(path, i+5), var(path, i+6), var(path, i+7)
 
 			--second endpoint
 			local rx, ry, rotate, flag1, flag2, x2, y2 = unpack(path, i + 1, i + 7)
@@ -434,7 +434,8 @@ local function editor(path)
 				local t = val
 				return function()
 					return select(i,
-						svgarc_to_arc(t[p1x], t[p1y], t[crx], t[cry], t[crotate], t[cflag1], t[cflag2], t[p2x], t[p2y]))
+						svgarc_to_elliptic_arc(t[p1x], t[p1y], t[crx], t[cry], t[crotate],
+															t[cflag1], t[cflag2], t[p2x], t[p2y]))
 				end
 			end
 			local getcx, getcy = arc_arg(1), arc_arg(2)
@@ -442,7 +443,7 @@ local function editor(path)
 
 			--arc's center point
 			local pcx, pcy = point(getcx(), getcy())
-			--arc's radiuses points
+			--arc's radius points
 			local function getprxx() return getcx() + getrx() end
 			local function getpryy() return getcy() + getry() end
 			local prxx, prxy = point(getprxx(), val[pcy], 'control')
@@ -470,10 +471,9 @@ local function editor(path)
 			--arc's center point changes when end points change
 			expron(2, pcx, getcx, p1x, p1y, p2x, p2y)
 			expron(2, pcy, getcy, p1x, p1y, p2x, p2y)
-			--arc's radiuses points change when end points change
+			--arc's radius points change when end points change
 			expron(2, prxx, getprxx, p1x, p1y, p2x, p2y)
 			expron(2, pryy, getpryy, p1x, p1y, p2x, p2y)
-
 			linkon(2, pcx, prxy)
 			linkon(2, pcy, pryx)
 

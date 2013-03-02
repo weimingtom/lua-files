@@ -1,5 +1,5 @@
 local player = require'cairopanel_player'
-local bezier = require'path_bezier'
+local bezier3 = require'path_bezier3_ai'
 local glue = require'glue'
 
 local i=1
@@ -17,12 +17,12 @@ function player:on_render(cr)
 
 	--path writer
 	local lines
-	local function write(cmd, ...)
+	local function write(cmd, x2, y2)
 		if cmd == 'move' then
-			cr:move_to(...)
+			cr:move_to(x2, y2)
 		elseif cmd == 'line' then
 			lines = lines + 1
-			cr:line_to(...)
+			cr:line_to(x2, y2)
 		elseif cmd == 'close' then
 			cr:close_path()
 		end
@@ -34,9 +34,9 @@ function player:on_render(cr)
 	cr:paint()
 
 	local r = i
-	local bezier = function(write, x1, y1, x2, y2, x3, y3, x4, y4)
+	local function bezier(write, x1, y1, x2, y2, x3, y3, x4, y4)
 		lines = 0
-		bezier(write, x1, y1, x2, y2, x3, y3, x4, y4, r)
+		bezier3(write, x1, y1, x2, y2, x3, y3, x4, y4, r)
 	end
 
 	local function bez(cpx,cpy,...)
@@ -84,7 +84,9 @@ function player:on_render(cr)
 	bez(0,0,0,-400,400,400,400,0)
 
 	reset()
-	cr:translate(1400, 100)
+	cr:translate(100, 900)
+
+	bez(0,0,-200,200,2500,-200,2700,0)
 end
 
 player:play()

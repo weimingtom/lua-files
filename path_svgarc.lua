@@ -1,10 +1,10 @@
 --2d svg-style elliptical arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
-local arc = require'path_arc'.arc
+local elliptic_arc_to_bezier3 = require'path_arc'.elliptic_arc_to_bezier3
 local matrix = require'trans_affine2d'
 
 local sin, cos, pi, abs, sqrt, acos, rad = math.sin, math.cos, math.pi, math.abs, math.sqrt, math.acos, math.rad
 
-local function svgarc_to_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 	rx, ry = abs(rx), abs(ry)
 
 	-- Calculate the middle point between the current and the final points
@@ -80,12 +80,12 @@ local function svgarc_to_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, 
 	return cx, cy, rx, ry, start_angle, sweep_angle
 end
 
-local function svgarc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+local function svgarc_to_bezier3(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 	local cx, cy, rx, ry, start_angle, sweep_angle =
-		svgarc_to_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+		svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 
 	-- Build and transform the resulting arc
-	local segments = arc(0, 0, rx, ry, start_angle, sweep_angle)
+	local segments = elliptic_arc_to_bezier3(0, 0, rx, ry, start_angle, sweep_angle)
 	local mt = matrix:new():translate(cx, cy):rotate(angle)
 	for i=1,#segments,2 do
 		segments[i], segments[i+1] = mt:transform_point(segments[i], segments[i+1])
@@ -103,7 +103,7 @@ end
 if not ... then require'path_arc_demo' end
 
 return {
-	svgarc = svgarc,
-	svgarc_to_arc = svgarc_to_arc,
+	svgarc_to_elliptic_arc = svgarc_to_elliptic_arc,
+	svgarc_to_bezier3 = svgarc_to_bezier3,
 }
 

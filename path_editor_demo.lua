@@ -41,8 +41,8 @@ local path = {
 	'circle', 850, 70, -50,
 	'ellipse', 1000, 70, -50, -30,
 	'move', 1000, 500,
-	'elliptical_arc', -50, -20, 0, 0, 1, 1000+30, 500+40,
-	'rel_elliptical_arc', -50, -20, 0, 1, 0, 30, 40,
+	'svgarc', -50, -20, 0, 0, 1, 1000+30, 500+40,
+	'rel_svgarc', -50, -20, 0, 1, 0, 30, 40,
 }
 
 local editor = require'path_editor'

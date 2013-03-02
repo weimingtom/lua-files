@@ -1,11 +1,11 @@
 --2d path simplification: convert a complex path to a path containing only move, line, curve and close commands.
-local arc = require'path_arc'.arc
-local svgarc = require'path_svgarc'.svgarc
-local shapes = require'path_shapes'
-local cubic_control_points = require'path_math'.cubic_control_points
-local reflect_point = require'path_math'.reflect_point
 local path_commands = require'path_state'.commands
 local next_state = require'path_state'.next_state
+local reflect_point = require'path_point'.reflect_point
+local arc_to_bezier3 = require'path_arc'.arc_to_bezier3
+local svgarc_to_bezier3 = require'path_svgarc'.svgarc_to_bezier3
+local bezier3_control_points = require'path_bezier2'.bezier3_control_points
+local shapes = require'path_shapes'
 
 local unpack, radians = unpack, math.rad
 
@@ -60,7 +60,7 @@ local function path_simplify(write, path) --avoid making garbage in here
 					xc, yc, x4, y4 = unpack(path, i + 1, i + 4)
 					if rel then xc, yc, x4, y4 = cpx + xc, cpy + yc, cpx + x4, cpy + y4 end
 				end
-				x2, y2, x3, y3 = cubic_control_points(cpx, cpy, xc, yc, x4, y4)
+				x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, x4, y4)
 			else
 				if smooth then
 					x2, y2 = reflect_point(bx or cpx, by or cpy, cpx, cpy)
@@ -77,12 +77,12 @@ local function path_simplify(write, path) --avoid making garbage in here
 			if s == 'arc' or s == 'rel_arc' then
 				local cx, cy, r, start_angle, sweep_angle = unpack(path, i + 1, i + 5)
 				if s == 'rel_arc' then cx, cy = cpx + cx, cpy + cy end
-				segments = arc(cx, cy, r, r, radians(start_angle), radians(sweep_angle))
+				segments = arc_to_bezier3(cx, cy, r, radians(start_angle), radians(sweep_angle))
 				write(cpx ~= nil and 'line' or 'move', segments[1], segments[2])
 			else
 				local rx, ry, angle, large_arc_flag, sweep_flag, x2, y2 = unpack(path, i + 1, i + 7)
-				if s == 'rel_elliptical_arc' then x2, y2 = cpx + x2, cpy + y2 end
-				segments = svgarc(cpx, cpy, rx, ry, radians(angle), large_arc_flag, sweep_flag, x2, y2)
+				if s == 'rel_svgarc' then x2, y2 = cpx + x2, cpy + y2 end
+				segments = svgarc_to_bezier3(cpx, cpy, rx, ry, radians(angle), large_arc_flag, sweep_flag, x2, y2)
 			end
 			if #segments == 4 then
 				write('line', segments[3], segments[4])

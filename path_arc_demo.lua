@@ -1,6 +1,7 @@
 local player = require'cairopanel_player'
-local arc = require'path_arc'.arc
-local svgarc = require'path_svgarc'.svgarc
+local arc_to_bezier3 = require'path_arc'.arc_to_bezier3
+local svgarc_to_bezier3 = require'path_svgarc'.svgarc_to_bezier3
+local ellipse = require'path_shapes'.ellipse
 local glue = require'glue'
 
 local i = 0
@@ -10,9 +11,9 @@ function player:on_render(cr)
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
 
-	local function arc_function(arc)
+	local function arc_function(arc_to_bezier3)
 		return function(...)
-			local segments = arc(...)
+			local segments = arc_to_bezier3(...)
 			cr:move_to(segments[1], segments[2])
 			if #segments == 4 then
 				cr:line_to(segments[3], segments[4])
@@ -21,10 +22,12 @@ function player:on_render(cr)
 					cr:curve_to(unpack(segments, i, i + 6 - 1))
 				end
 			end
+			cr:circle(segments[1], segments[2], 2)
+			cr:circle(segments[#segments-1], segments[#segments], 6)
 		end
 	end
-	local arc = arc_function(arc)
-	local svgarc = arc_function(svgarc)
+	local arc = arc_function(arc_to_bezier3)
+	local svgarc = arc_function(svgarc_to_bezier3)
 
 	local a = math.rad(i)
 
@@ -33,16 +36,16 @@ function player:on_render(cr)
 		cr:set_line_width(1)
 		cr:set_source_rgba(1,1,1,.2)
 
-		arc(200, 200, 100, 200, 0, 2*math.pi)
+		arc(200, 200, 100, 0, 2*math.pi)
 		cr:stroke()
 
 		cr:set_source_rgb(1,1,1)
 		cr:move_to(200, 200)
-		arc(200, 200, 100, 200, a + 5, 1)
+		arc(200, 200, 100, a + 5, 1)
 		cr:line_to(200, 200)
 		cr:stroke()
 
-		arc(200, 200, 100, 200, a, 4)
+		arc(200, 200, 100, a, 4)
 		cr:stroke()
 		cr:restore()
 	end
@@ -55,7 +58,7 @@ function player:on_render(cr)
 			cr:stroke()
 			cr:new_path()
 			cr:set_line_width(20)
-			arc(x, y, 100, 100, start_angle, sweep_angle)
+			arc(x, y, 100, start_angle, sweep_angle)
 			cr:stroke()
 		end
 		cr:save()
@@ -67,14 +70,25 @@ function player:on_render(cr)
 		cr:restore()
 	end
 
+	local ellipse_ = ellipse
+	local function write(s, ...)
+		if s == 'move' then cr:move_to(...)
+		elseif s == 'curve' then cr:curve_to(...)
+		elseif s == 'close' then cr:close_path(...)
+		end
+	end
+	local function ellipse(...)
+		ellipse_(write, ...)
+	end
+
 	local function svgarcs()
 		--svg elliptical arc from http://www.w3.org/TR/SVG/images/paths/arcs02.svg
 		local function ellipses(large, sweep)
 			cr:set_line_width(5)
 			cr:set_source_rgba(0,1,0,0.3)
-			arc(125, 125, 100, 50, 0, math.pi * 2)
+			ellipse(125, 125, 100, 50)
 			cr:stroke()
-			arc(225, 75, 100, 50, 0, math.pi * 2)
+			ellipse(225, 75, 100, 50)
 			cr:stroke()
 			cr:set_source_rgba(1,0,0,1)
 			cr:move_to(125, 75)

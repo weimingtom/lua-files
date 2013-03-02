@@ -1,3 +1,5 @@
+--TODO: instead of linksets, introduce the concept of transactions.
+
 --a varlinker links variables together with custom expressions so that when one variable is updated,
 --other dependent variables are updated as well. variables are declared with var(t,i) -> var, which
 --makes val[var] return the value at t[i] and setting val[var] = v results in setting t[i] = v.

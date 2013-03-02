@@ -1,7 +1,7 @@
 --2d path validation and iteration with state (current point) computation
 local glue = require'glue'
 local arc_endpoints = require'path_arc'.arc_endpoints
-local reflect_point = require'path_math'.reflect_point
+local reflect_point = require'path_point'.reflect_point
 local radians = math.rad
 
 local argc = {
@@ -25,8 +25,8 @@ local argc = {
 	rel_smooth_quad_curve = 2,
 	arc = 5,
 	rel_arc = 5,
-	elliptical_arc = 7,
-	rel_elliptical_arc = 7,
+	svgarc = 7,
+	rel_svgarc = 7,
 	text = 2,
 }
 
@@ -112,9 +112,9 @@ local function next_state(path, i, cpx, cpy, spx, spy, bx, by, qx, qy)
 		if s == 'rel_arc' then cx, cy = cpx + cx, cpy + cy end
 		local x1, y1, x2, y2 = arc_endpoints(cx, cy, r, r, radians(start_angle), radians(sweep_angle))
 		cpx, cpy = x2, y2
-	elseif s == 'elliptical_arc' then
+	elseif s == 'svgarc' then
 		cpx, cpy = path[i+6], path[i+7]
-	elseif s == 'rel_elliptical_arc' then
+	elseif s == 'rel_svgarc' then
 		cpx, cpy = cpx + path[i+6], cpy + path[i+7]
 	elseif s == 'text' then
 		--TODO
