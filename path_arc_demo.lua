@@ -1,6 +1,6 @@
 local player = require'cairopanel_player'
-local arc_to_bezier3 = require'path_arc'.arc_to_bezier3
-local svgarc_to_bezier3 = require'path_svgarc'.svgarc_to_bezier3
+local arc_to_bezier3 = require'path_arc'.to_bezier3
+local svgarc_to_bezier3 = require'path_svgarc'.to_bezier3
 local ellipse = require'path_shapes'.ellipse
 local glue = require'glue'
 

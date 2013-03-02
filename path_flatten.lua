@@ -1,7 +1,8 @@
 --convert a complex path into a path containing only move, line and close commands.
 
 local glue = require'glue'
-local interpolate = require'path_bezier3_ai'
+local bezier3_interpolate = require'path_bezier3_ai'
+local bezier2_interpolate = require'path_bezier3_ai' --TODO: use this
 
 --emit only (move, line, close) commands for any path, without cpx,cpy.
 --mt can only be an affine transformation object.
@@ -14,7 +15,7 @@ local function path_flatten(path, write, mt)
 				x3, y3 = mt:transform(x3, y3)
 				x4, y4 = mt:transform(x4, y4)
 			end
-			interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4)
+			bezier3_interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4)
 		elseif s == 'move' then
 			if mt then x2, y2 = mt:transform(x2, y2) end
 			x1, y1 = x2, y2

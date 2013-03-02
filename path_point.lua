@@ -16,7 +16,7 @@ local function point_around(cx, cy, distance, angle)
 end
 
 --point rotated at an angle around origin.
-local function rotate_point(x, y, cx, cy, angle)
+local function point_rotate(x, y, cx, cy, angle)
 	x, y = x - cx, y - cy
 	local cs, sn = cos(angle), sin(angle)
 	return
@@ -41,17 +41,17 @@ local function point_distance2(x1, y1, x2, y2) --the distance between two points
 	return (x2 - x1)^2 + (y2 - y1)^2
 end
 
-local function reflect_point(x, y, cx, cy) --point reflected through origin (rotated 180deg around origin)
+local function point_reflection(x, y, cx, cy) --point reflected through origin (rotated 180deg around origin)
 	return 2 * cx - x, 2 * cy - y
 end
 
 return {
-	point_angle = point_angle,
-	point_around = point_around,
-	rotate_point = rotate_point,
+	angle = point_angle,
+	around = point_around,
+	rotate = point_rotate,
 	hypot = hypot,
-	point_distance = point_distance,
-	point_distance2 = point_distance2,
-	reflect_point = reflect_point,
+	distance = point_distance,
+	distance2 = point_distance2,
+	reflect = point_reflection,
 }
 

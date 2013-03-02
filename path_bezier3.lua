@@ -2,7 +2,9 @@
 --where (x2, y2) and (x3, y3) are the control points and (x1, y1) and (x4, y4) are the end points.
 
 local interpolate = require'path_bezier3_ai'
-local line_hit = require'path_line'.line_hit
+local line_hit = require'path_line'.hit
+local point_distance2 = require'path_point'.distance2
+local hit_function = require'path_bezier'.hit_function
 
 local min, max = math.min, math.max
 
@@ -43,45 +45,28 @@ end
 
 --approximate length of a cubic bezier.
 --computed by summing up the lengths of the segments resulted from the recursive adaptive interpolation of the curve.
-local function bezier3_length(x1, y1, x2, y2, x3, y3, x4, y4,
-										m_approximation_scale, m_angle_tolerance, m_cusp_limit)
+local function bezier3_length(x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale)
 	local x0, y0 = x1, y1
 	local length = 0
 	local function write(_, x, y)
 		length = length + line_length(x0, y0, x, y)
 		x0, y0 = x, y
 	end
-	interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
+	interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale)
 	return length
 end
 
---return shortest distance-squared from point (x0, y0) to curve, plus the touch point, and the time
---in the curve where the touch point splits the curve.
-local function bezier3_hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4,
-									m_approximation_scale, m_angle_tolerance, m_cusp_limit)
-	local cpx, cpy = x1, y1
-	local mind = 1/0
-	local minx, miny, mint
-	local function write(_, x2, y2, t1, t2)
-		local d, x, y, t = line_hit(x0, y0, cpx, cpy, x2, y2)
-		if d and d < mind then
-			mind = d
-			minx, miny, mint = x,y,t
-		end
-		cpx, cpy = x2, y2
-	end
-	interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
-	return mind, minx, miny, mint
-end
+local bezier3_hit = hit_function(interpolate)
 
 if not ... then require'path_hit_demo' end
 
 return {
 	bezier2_control_point = bezier2_control_point,
+	interpolate = interpolate,
 	--hit & split API
-	bezier3_point = bezier3_point,
-	bezier3_length = bezier3_length,
-	bezier3_split = bezier3_split,
-	bezier3_hit = bezier3_hit,
+	point = bezier3_point,
+	length = bezier3_length,
+	split = bezier3_split,
+	hit = bezier3_hit,
 }
 

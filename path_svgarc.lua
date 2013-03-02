@@ -1,8 +1,10 @@
 --2d svg-style elliptical arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
-local elliptic_arc_to_bezier3 = require'path_arc'.elliptic_arc_to_bezier3
+
+local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 local matrix = require'trans_affine2d'
 
-local sin, cos, pi, abs, sqrt, acos, rad = math.sin, math.cos, math.pi, math.abs, math.sqrt, math.acos, math.rad
+local sin, cos, pi, abs, sqrt, acos =
+	math.sin, math.cos, math.pi, math.abs, math.sqrt, math.acos
 
 local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 	rx, ry = abs(rx), abs(ry)
@@ -103,7 +105,7 @@ end
 if not ... then require'path_arc_demo' end
 
 return {
-	svgarc_to_elliptic_arc = svgarc_to_elliptic_arc,
-	svgarc_to_bezier3 = svgarc_to_bezier3,
+	to_elliptic_arc = svgarc_to_elliptic_arc,
+	to_bezier3 = svgarc_to_bezier3,
 }
 

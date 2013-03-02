@@ -1,7 +1,7 @@
 --2d path validation and iteration with state (current point) computation
 local glue = require'glue'
-local arc_endpoints = require'path_arc'.arc_endpoints
-local reflect_point = require'path_point'.reflect_point
+local arc_endpoints = require'path_arc'.endpoints
+local reflect_point = require'path_point'.reflect
 local radians = math.rad
 
 local argc = {

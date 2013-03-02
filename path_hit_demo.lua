@@ -62,7 +62,7 @@ function player:on_render(cr)
 	end
 
 	local function point_hit(x1,y1)
-		local d2 = point.point_distance2(x0,y0,x1,y1)
+		local d2 = point.distance2(x0,y0,x1,y1)
 		addhit(d2,x1,y1,0)
 	end
 
@@ -70,27 +70,28 @@ function player:on_render(cr)
 		x2,y2=x1+x2,y1+y2
 		point_hit(x1,y1); point_hit(x2,y2)
 		draw{'move',x1,y1,'line',x2,y2}
-		addhit(line.line_hit(x0,y0,x1,y1,x2,y2))
+		addhit(line.hit(x0,y0,x1,y1,x2,y2))
 	end
 
 	local function arc_hit(cx,cy,r,a1,a2)
-		local x1,y1,x2,y2 = arc.arc_endpoints(cx,cy,r,math.rad(a1),math.rad(a2))
+		local x1,y1,x2,y2 = arc.endpoints(cx,cy,r,math.rad(a1),math.rad(a2))
 		point_hit(x1,y1); point_hit(x2,y2)
 		draw{'arc',cx,cy,r,a1,a2}
-		addhit(arc.arc_hit(x0,y0,cx,cy,r,math.rad(a1),math.rad(a2)))
+		addhit(arc.hit(x0,y0,cx,cy,r,math.rad(a1),math.rad(a2)))
 	end
 
 	local function bezier2_hit(x1,y1,x2,y2,x3,y3)
 		x2,y2,x3,y3=x1+x2,y1+y2,x1+x3,y1+y3
-		point_hit(x1,y1); point_hit(x2,y2); point_hit(x3,y3)
+		point_hit(x1,y1); point_hit(x3,y3)
 		draw{'move',x1,y1,'quad_curve',x2,y2,x3,y3}
+		addhit(bezier2.hit(x0,y0,x1,y1,x2,y2,x3,y3))
 	end
 
 	local function bezier3_hit(x1,y1,x2,y2,x3,y3,x4,y4)
 		x2,y2,x3,y3,x4,y4=x1+x2,y1+y2,x1+x3,y1+y3,x1+x4,y1+y4
-		point_hit(x1,y1); point_hit(x2,y2); point_hit(x3,y3); point_hit(x4,y4)
+		point_hit(x1,y1); point_hit(x4,y4)
 		draw{'move',x1,y1,'curve',x2,y2,x3,y3,x4,y4}
-		addhit(bezier3.bezier3_hit(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4))
+		addhit(bezier3.hit(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4))
 	end
 
 	line_hit(100, 100, 50, 100)
@@ -102,7 +103,7 @@ function player:on_render(cr)
 	arc_hit(500, 300, 50, 270, -270)
 	arc_hit(700, 300, 50, 0, 360 + 90)
 
-	--bezier2_hit(100, 500, 50, 100, 100, 0)
+	bezier2_hit(500, 500, 50, 100, 100, 0)
 	bezier3_hit(100, 500, 100, 100, 200, 100, 300, 0)
 
 	local mind = 1/0

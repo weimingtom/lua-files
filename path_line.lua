@@ -1,9 +1,9 @@
 --math for 2d line segments defined as (x1, y1, x2, y2).
 
-local abs, max = math.abs, math.max
+local abs, min, max = math.abs, math.min, math.max
 
-local point_distance = require'path_point'.point_distance
-local point_distance2 = require'path_point'.point_distance2
+local distance = require'path_point'.distance
+local distance2 = require'path_point'.distance2
 
 --evaluate a line at time t using linear interpolation.
 --the time between 0..1 covers the segment interval.
@@ -11,7 +11,7 @@ local function line_point(t, x1, y1, x2, y2)
 	return x1 + t * (x2 - x1), y1 + t * (y2 - y1)
 end
 
-local line_length = point_distance
+local line_length = distance
 
 --split line segment into two line segments at time t (t is capped between 0..1).
 local function line_split(t, x1, y1, x3, y3)
@@ -39,7 +39,7 @@ local function line_hit(x0, y0, x1, y1, x2, y2)
 	local tx = x2 == x1 and 0 or (x - x1) / (x2 - x1)
 	local ty = y2 == y1 and 0 or (y - y1) / (y2 - y1)
 	if tx < 0 or tx > 1 or ty < 0 or ty > 1 then return end --intersection occurs outside the segment
-	return point_distance2(x0, y0, x, y), x, y, max(tx, ty)
+	return distance2(x0, y0, x, y), x, y, max(tx, ty)
 end
 
 --intersect line segment (x1, y1, x2, y2) with line segment (x3, y3, x4, y4).
@@ -60,8 +60,8 @@ return {
 	point_line_intersection = point_line_intersection,
 	line_line_intersection = line_line_intersection,
 	--hit & split API
-	line_point = line_point,
-	line_length = line_length,
-	line_split = line_split,
-	line_hit = line_hit,
+	point = line_point,
+	length = line_length,
+	split = line_split,
+	hit = line_hit,
 }

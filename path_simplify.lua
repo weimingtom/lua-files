@@ -1,9 +1,9 @@
 --2d path simplification: convert a complex path to a path containing only move, line, curve and close commands.
 local path_commands = require'path_state'.commands
 local next_state = require'path_state'.next_state
-local reflect_point = require'path_point'.reflect_point
-local arc_to_bezier3 = require'path_arc'.arc_to_bezier3
-local svgarc_to_bezier3 = require'path_svgarc'.svgarc_to_bezier3
+local reflect_point = require'path_point'.reflect
+local arc_to_bezier3 = require'path_arc'.to_bezier3
+local svgarc_to_bezier3 = require'path_svgarc'.to_bezier3
 local bezier3_control_points = require'path_bezier2'.bezier3_control_points
 local shapes = require'path_shapes'
 
