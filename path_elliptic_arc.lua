@@ -1,15 +1,20 @@
 --math for 2d elliptic arcs defined as (centerx, centery, radiusx, radiusy, start_angle, sweep_angle).
---sweep angle can exceed -360..360deg which will cause the arc to draw over itself.
+--sweep angle is capped between -360..360deg when drawing.
 --arc to bezier conversion adapted from agg/src/agg_bezier_arc.cpp.
 
 local glue = require'glue'
 
-local sin, cos, pi, abs = math.sin, math.cos, math.pi, math.abs
+local sin, cos, pi, abs, min, max = math.sin, math.cos, math.pi, math.abs, math.min, math.max
 
 local arc_angle_overflow_epsilon = 0.01
 
+local function observed_sweep(sweep_angle) --we can only observe the first -360..360deg of the sweep.
+	return max(min(sweep_angle, 2*pi), -2*pi)
+end
+
 local function endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
 	rx, ry = abs(rx), abs(ry)
+	sweep_angle = observed_sweep(sweep_angle)
 	return
 		cx + rx * cos(start_angle),
 		cy + ry * sin(start_angle),
@@ -50,6 +55,7 @@ local function to_bezier3(cx, cy, rx, ry, start_angle, sweep_angle)
 		return {endpoints(cx, cy, rx, ry, start_angle, sweep_angle)}
 	end
 	rx, ry = abs(rx), abs(ry)
+	sweep_angle = observed_sweep(sweep_angle)
 	local segments = {}
 	local angle, left = start_angle, sweep_angle
 	local sweep_sign = sweep_angle > 0 and 1 or -1

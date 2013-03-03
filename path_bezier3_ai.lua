@@ -1,4 +1,5 @@
 --2d cubic bezier adaptive interpolation from http://www.antigrain.com/research/adaptive_bezier/index.html
+--apart from the line segments, it also writes the t1,t2 time interval corresponding to the end points of each segment.
 
 local pi, rad, atan2, abs = math.pi, math.rad, math.atan2, math.abs
 
@@ -9,7 +10,7 @@ local curve_recursion_limit         = 32
 local recursive_bezier --forward decl.
 
 --tip: adjust m_approximation_scale to the scale of the world-to-screen transformation.
---tip: enable m_angle_tolerance only when stroke width * scale > 1.
+--tip: enable m_angle_tolerance when stroke width * scale > 1.
 --tip: m_cusp_limit should not exceed 10-15 degrees.
 local function interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
 	m_approximation_scale = m_approximation_scale or 1

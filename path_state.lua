@@ -1,4 +1,4 @@
---2d path validation and iteration with state (current point) computation
+--2d path validation and iteration and computation of the next state.
 local glue = require'glue'
 local arc_endpoints = require'path_arc'.endpoints
 local reflect_point = require'path_point'.reflect
@@ -41,21 +41,27 @@ local shapes_argc = {
 
 glue.update(argc, shapes_argc)
 
-local function nocp_command(s) --command requires no current point
+local function nocp_command(s) --return true if this particular command requires no current point.
 	return s == 'move' or s == 'arc' or shapes_argc[s]
 end
 
+--given an index in path pointing to a command string, return the index of the next command.
 local function next_command(path, i)
 	i = i and i + argc[path[i]] + 1 or 1
 	if i > #path then return end
 	return i, path[i]
 end
 
+--iterate path commands returning the index in path where the command is, and the command string.
 local function commands(path)
 	assert(#path == 0 or nocp_command(path[1]), 'no current point')
 	return next_command, path
 end
 
+--return the state of the next path command given the state of the current path command.
+--cpx, cpy is the current control point, needed for most commands.
+--bx,by is the control point of the last cubic bezier, needed if the current path command is a smooth cubic bezier.
+--qx,qy is the control point of the last quad bezier, needed if the current path command is a smooth quad bezier.
 local function next_state(path, i, cpx, cpy, spx, spy, bx, by, qx, qy)
 	local s = path[i]
 	local qx1, qy1 = qx, qy

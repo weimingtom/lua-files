@@ -1,5 +1,5 @@
 --math for 2d circular arcs defined as (centerx, centery, radius, start_angle, sweep_angle).
---sweep angle can exceed -360..360deg which will cause the arc to draw over itself.
+--sweep angle is capped between -360..360deg when drawing but otherwise the time on the arc is relative to the full sweep.
 
 local glue = require'glue'
 local point_angle = require'path_point'.angle
@@ -43,7 +43,7 @@ end
 
 local function sign(x) return x >= 0 and 1 or -1 end
 
-local function observed_sweep(sweep_angle) --we can only observe the first -360..360deg of the arc.
+local function observed_sweep(sweep_angle) --we can only observe the first -360..360deg of the sweep.
 	return max(min(sweep_angle, 2*pi), -2*pi)
 end
 

@@ -104,7 +104,7 @@ function player:on_render(cr)
 	arc_hit(700, 300, 50, 0, 360 + 90)
 
 	bezier2_hit(500, 500, 50, 100, 100, 0)
-	bezier3_hit(100, 500, 100, 100, 200, 100, 300, 0)
+	bezier3_hit(100, 500, 100, 100, 200, -100, 300, 0)
 
 	local mind = 1/0
 	local x1,y1,t1

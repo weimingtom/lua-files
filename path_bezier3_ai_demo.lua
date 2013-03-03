@@ -67,7 +67,7 @@ function player:on_render(cr)
 	bez(0,0,500,150,-100,150,400,0)
 
 	cr:translate(0,200)
-	bez(0,0,-100,0,500,0,400,0)
+	bez(0,0,-200,0,600,0,400,0)
 
 	reset()
 	cr:translate(700,100)
@@ -83,10 +83,40 @@ function player:on_render(cr)
 	cr:translate(0,200)
 	bez(0,0,0,-400,400,400,400,0)
 
+	--horizontal colinear
+
+	reset()
+	cr:translate(1400,100)
+	bez(0,0,0,0,400,0,400,0) --control points == end points
+
+	cr:translate(0,200)
+	bez(0,0,0,0,200,0,400,0) --first control point == first end point
+
+	cr:translate(0,200)
+	bez(0,0,400,0,0,0,400,0) --control points == end points switched
+
+	--vertical colinear
+
+	reset()
+	cr:translate(2000,100)
+
+	bez(0,0,0,0,0,0,0,400) --control points == end points switched
+
+	cr:translate(200,0)
+	bez(0,0,0,100,0,200,0,400)
+
+	cr:translate(200,0)
+	bez(0,0,0,0,0,200,0,400)
+
+	--long lines
+
 	reset()
 	cr:translate(100, 900)
 
 	bez(0,0,-200,200,2500,-200,2700,0)
+
+	cr:translate(0, 200)
+	bez(0,0,0,-1,2700,-1,2700,0) --almost flat
 end
 
 player:play()
