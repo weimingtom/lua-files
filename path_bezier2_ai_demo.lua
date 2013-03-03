@@ -18,34 +18,34 @@ function player:on_render(cr)
 		cr:fill()
 	end
 
-	local lines
+	local lines, dots
 	local function write(cmd, x2, y2)
-		if cmd == 'move' then
-			cr:move_to(x2, y2)
-		elseif cmd == 'line' then
-			lines = lines + 1
-			cr:line_to(x2, y2)
-		elseif cmd == 'close' then
-			cr:close_path()
-		end
+		lines = lines + 1
+		cr:line_to(x2, y2)
+		glue.append(dots, x2, y2)
 	end
-
-	local r = i
-	local function bezier(write, x1, y1, x2, y2, x3, y3)
+	local function bez(cpx,cpy,x2,y2,x3,y3)
 		lines = 0
-		bezier2(write, x1, y1, x2, y2, x3, y3, r)
-	end
-
-	local function bez(cpx,cpy,...)
+		dots = {}
 		cr:move_to(cpx,cpy)
-		bezier(write, cpx, cpy, ...)
+		glue.append(dots, cpx, cpy)
+		bezier2(write, cpx, cpy, x2, y2, x3, y3, i)
 		cr:set_source_rgb(1,1,1)
 		cr:set_line_width(2)
 		cr:stroke()
+
+		cr:set_source_rgb(0,0,1)
+		cr:set_line_width(3)
+		for i=1,#dots,2 do
+			local x,y = dots[i], dots[i+1]
+			cr:rectangle(x-1,y-1,2,2)
+		end
+		cr:fill()
+
 		label(cpx, cpy - 10, 'segments: %d', lines)
 	end
 
-	label(100, 40, 'scale: %f', r)
+	label(100, 40, 'scale: %f', i)
 
 	cr:translate(100,100)
 	bez(0,0,50,1000,100,0)

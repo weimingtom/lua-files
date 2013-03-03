@@ -135,6 +135,7 @@ end
 if not ... then require'sg_cairo_demo' end
 
 return {
+	command_argc = argc,
 	next_command = next_command,
 	commands = commands,
 	next_state = next_state,

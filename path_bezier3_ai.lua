@@ -32,18 +32,18 @@ function recursive_bezier(write, x1, y1, x2, y2, x3, y3, x4, y4, level, t1, t2,
 	if level > curve_recursion_limit then return t1, t2 end
 
 	--Calculate all the mid-points of the line segments
-	local x12   = (x1 + x2) * 0.5
-	local y12   = (y1 + y2) * 0.5
-	local x23   = (x2 + x3) * 0.5
-	local y23   = (y2 + y3) * 0.5
-	local x34   = (x3 + x4) * 0.5
-	local y34   = (y3 + y4) * 0.5
-	local x123  = (x12 + x23) * 0.5
-	local y123  = (y12 + y23) * 0.5
-	local x234  = (x23 + x34) * 0.5
-	local y234  = (y23 + y34) * 0.5
-	local x1234 = (x123 + x234) * 0.5
-	local y1234 = (y123 + y234) * 0.5
+	local x12   = (x1 + x2) / 2
+	local y12   = (y1 + y2) / 2
+	local x23   = (x2 + x3) / 2
+	local y23   = (y2 + y3) / 2
+	local x34   = (x3 + x4) / 2
+	local y34   = (y3 + y4) / 2
+	local x123  = (x12 + x23) / 2
+	local y123  = (y12 + y23) / 2
+	local x234  = (x23 + x34) / 2
+	local y234  = (y23 + y34) / 2
+	local x1234 = (x123 + x234) / 2
+	local y1234 = (y123 + y234) / 2
 
 	--Try to approximate the full cubic curve by a single straight line
 	local dx = x4-x1
@@ -192,7 +192,7 @@ function recursive_bezier(write, x1, y1, x2, y2, x3, y3, x4, y4, level, t1, t2,
 	end
 
 	-- Continue subdivision
-	local t12 = t1 + (t2 - t1) * 0.5
+	local t12 = t1 + (t2 - t1) / 2
 	recursive_bezier(write, x1, y1, x12, y12, x123, y123, x1234, y1234, level + 1, t1, t12,
 							m_distance_tolerance2, m_angle_tolerance, m_cusp_limit)
 	recursive_bezier(write, x1234, y1234, x234, y234, x34, y34, x4, y4, level + 1, t12, t2,

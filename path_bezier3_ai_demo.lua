@@ -5,6 +5,9 @@ local glue = require'glue'
 local i=1
 function player:on_render(cr)
 	i=i+1/i
+	cr:identity_matrix()
+	cr:set_source_rgb(0,0,0)
+	cr:paint()
 
 	local function label(x, y, ...)
 		cr:move_to(x, y)
@@ -16,35 +19,31 @@ function player:on_render(cr)
 	end
 
 	--path writer
-	local lines
+	local lines, dots
 	local function write(cmd, x2, y2)
-		if cmd == 'move' then
-			cr:move_to(x2, y2)
-		elseif cmd == 'line' then
-			lines = lines + 1
-			cr:line_to(x2, y2)
-		elseif cmd == 'close' then
-			cr:close_path()
-		end
+		lines = lines + 1
+		cr:line_to(x2, y2)
+		glue.append(dots, x2, y2)
 	end
 
-	--init
-	cr:identity_matrix()
-	cr:set_source_rgb(0,0,0)
-	cr:paint()
-
-	local r = i
-	local function bezier(write, x1, y1, x2, y2, x3, y3, x4, y4)
+	local r = i/10
+	local function bez(cpx, cpy, x2, y2, x3, y3, x4, y4)
 		lines = 0
-		bezier3(write, x1, y1, x2, y2, x3, y3, x4, y4, r)
-	end
-
-	local function bez(cpx,cpy,...)
+		dots = {}
 		cr:move_to(cpx,cpy)
-		bezier(write, cpx, cpy, ...)
+		bezier3(write, cpx, cpy, x2, y2, x3, y3, x4, y4, r)
 		cr:set_source_rgb(1,1,1)
-		cr:set_line_width(5)
+		cr:set_line_width(2)
 		cr:stroke()
+
+		cr:set_source_rgb(0,0,1)
+		cr:set_line_width(3)
+		for i=1,#dots,2 do
+			local x,y = dots[i], dots[i+1]
+			cr:rectangle(x-3,y-3,6,6)
+		end
+		cr:fill()
+
 		label(cpx, cpy - 10, 'segments: %d', lines)
 	end
 

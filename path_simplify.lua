@@ -1,4 +1,5 @@
 --2d path simplification: convert a complex path to a path containing only move, line, curve and close commands.
+local command_argc = require'path_state'.command_argc
 local path_commands = require'path_state'.commands
 local next_state = require'path_state'.next_state
 local reflect_point = require'path_point'.reflect
@@ -24,7 +25,7 @@ local shape_writers = {
 	rpoly       = shape_writer(shapes.regular_polygon, 4),
 }
 
-local function path_simplify(write, path) --avoid making garbage in here
+local function path_simplify(write, path) --this is for drawing so avoid making garbage in here
 	local cpx, cpy, spx, spy, bx, by, qx, qy
 	for i,s in path_commands(path) do
 		if s == 'move' or s == 'rel_move' then

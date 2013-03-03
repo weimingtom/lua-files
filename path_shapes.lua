@@ -2,7 +2,7 @@
 
 local max, min, abs = math.max, math.min, math.abs
 
-local kappa = 4 * ((math.sqrt(2) - 1) / 3) --http://www.whizkidtech.redprince.net/bezier/circle/
+local kappa = 4 / 3 * (math.sqrt(2) - 1)
 
 local function ellipse(write, cx, cy, rx, ry)
 	rx, ry = abs(rx), abs(ry)
@@ -18,6 +18,20 @@ end
 
 local function circle(write, cx, cy, r)
 	ellipse(write, cx, cy, r, r)
+end
+
+local sqrt = math.sqrt
+local function circle_from_3points(x1, y1, x2, y2, x3, y3)
+	local h2 = (y1 + y2)/2 + (x2^2 - x1^2/2 * (y2-y1))
+	local h3 = (y1 + y2)/2 + (x3^2 - x1^2/2 * (y2-y1))
+	local k2 = -(x2-x1) / (y2-y1)
+	local k3 = -(x3-x1) / (y3-y1)
+	local x0 = (h3-h2) / (k2-k3)
+	local y0 = (k3*h2 - k2*h3) / (k3-k2)
+	local cx = (h3-h2) / (k2-k3)
+	local cy = (k3*h2 - k2*h3) / (k3-k2)
+	local r = sqrt((x1-x0)^2 + (y1-y0)^2)
+	return cx, cy, r
 end
 
 local function rectangle(write, x1, y1, w, h)
