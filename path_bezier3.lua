@@ -2,9 +2,7 @@
 --where (x2, y2) and (x3, y3) are the control points and (x1, y1) and (x4, y4) are the end points.
 
 local interpolate = require'path_bezier3_ai'
-local line_hit = require'path_line'.hit
-local point_distance2 = require'path_point'.distance2
-local hit_function = require'path_bezier'.hit_function
+local hit_function = require'path_curve_hit'.hit_function
 
 local min, max = math.min, math.max
 

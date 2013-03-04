@@ -41,10 +41,21 @@ local function arc_split(t, cx, cy, r, start_angle, sweep_angle)
 		cx, cy, r, split_angle, sweep2  --second arc
 end
 
-local function sign(x) return x >= 0 and 1 or -1 end
-
 local function observed_sweep(sweep_angle) --we can only observe the first -360..360deg of the sweep.
 	return max(min(sweep_angle, 2*pi), -2*pi)
+end
+
+local function sweep_between(a1, a2, clockwise) --observed sweep between two arbitrary angles.
+	a1 = a1 % (2*pi)
+	a2 = a2 % (2*pi)
+	clockwise = clockwise ~= false
+	local sweep = a2 - a1
+	if sweep < 0 and clockwise then
+		sweep = sweep + 2*pi
+	elseif sweep > 0 and not clockwise then
+		sweep = sweep - 2*pi
+	end
+	return sweep
 end
 
 --shortest distance-squared from point (x0, y0) to an arc, plus the touch point, and the time
@@ -55,27 +66,12 @@ local function arc_hit(x0, y0, cx, cy, r, start_angle, sweep_angle)
 		local x, y = point_around(cx, cy, r, start_angle)
 		return r, x, y, 0
 	end
-	local a = point_angle(x0, y0, cx, cy)
-	local a1 = start_angle
-	local a2 = start_angle + observed_sweep(sweep_angle)
-	--normalize angles in 0..2pi
-	a = a % (2*pi)
-	a1 = a1 % (2*pi)
-	a2 = a2 % (2*pi)
-	--find sweep from a1 to a
-	local sweep = a - a1
-	if sign(sweep_angle) ~= sign(sweep) then
-		sweep = sweep + 2*pi * sign(sweep_angle)
-	end
+	local hit_angle = point_angle(x0, y0, cx, cy)
+	local end_angle = start_angle + observed_sweep(sweep_angle)
+	local sweep = sweep_between(start_angle, hit_angle, sweep_angle >= 0)
 	local t = sweep / sweep_angle
-	--check if point is outside arc's opening
-	if sweep_angle < 0 then a2, a1 = a1, a2 end
-	if a1 < a2 then
-		if a < a1 or a > a2 then return end
-	else
-		if a < a1 and a > a2 then return end
-	end
-	local x, y = point_around(cx, cy, r, a)
+	if t > 1 then return end --hit point is outside arc's sweep
+	local x, y = point_around(cx, cy, r, hit_angle)
 	return point_distance2(x0, y0, x, y), x, y, t
 end
 
@@ -84,6 +80,8 @@ if not ... then require'path_arc_demo' end
 return {
 	to_bezier3 = arc_to_bezier3,
 	endpoints = arc_endpoints,
+	observed_sweep = observed_sweep,
+	sweep_between = sweep_between,
 	--hit & split API
 	point = arc_point,
 	length = arc_length,

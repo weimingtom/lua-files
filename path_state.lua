@@ -2,6 +2,7 @@
 local glue = require'glue'
 local arc_endpoints = require'path_arc'.endpoints
 local reflect_point = require'path_point'.reflect
+local bezier2_3point_control_point = require'path_bezier2'.bezier2_3point_control_point
 local radians = math.rad
 
 local argc = {
@@ -23,8 +24,12 @@ local argc = {
 	rel_quad_curve = 4,
 	smooth_quad_curve = 2,
 	rel_smooth_quad_curve = 2,
+	quad_curve_3p = 4,
+	rel_quad_curve_3p = 4,
 	arc = 5,
 	rel_arc = 5,
+	arc_3p = 4,
+	rel_arc_3p = 4,
 	svgarc = 7,
 	rel_svgarc = 7,
 	text = 2,
@@ -33,6 +38,7 @@ local argc = {
 local shapes_argc = {
 	ellipse = 4,
 	circle = 3,
+	circle_3p = 6,
 	rect = 4,
 	round_rect = 5,
 	star = 7,
@@ -113,11 +119,21 @@ local function next_state(path, i, cpx, cpy, spx, spy, bx, by, qx, qy)
 	elseif s == 'rel_smooth_quad_curve' then
 		qx, qy = reflect_point(qx1 or cpx, qy1 or cpy, cpx, cpy)
 		cpx, cpy = cpx + path[i+1], cpy + path[i+2]
+	elseif s == 'quad_curve_3p' then
+		qx, qy = bezier2_3point_control_point(cpx, cpy, path[i+1], path[i+2], path[i+3], path[i+4])
+		cpx, cpy = path[i+3], path[i+4]
+	elseif s == 'rel_quad_curve_3p' then
+		qx, qy = bezier2_3point_control_point(cpx, cpy, cpx + path[i+1], cpy + path[i+2], cpx + path[i+3], cpy + path[i+4])
+		cpx, cpy = cpx + path[i+3], cpy + path[i+4]
 	elseif s == 'arc' or s == 'rel_arc' then
 		local cx, cy, r, start_angle, sweep_angle = unpack(path, i + 1, i + 5)
 		if s == 'rel_arc' then cx, cy = cpx + cx, cpy + cy end
 		local x1, y1, x2, y2 = arc_endpoints(cx, cy, r, r, radians(start_angle), radians(sweep_angle))
 		cpx, cpy = x2, y2
+	elseif s == 'arc_3p' then
+		cpx, cpy = path[i+3], path[i+4]
+	elseif s == 'rel_arc_3p' then
+		cpx, cpy = cpx + path[i+3], cpy + path[i+4]
 	elseif s == 'svgarc' then
 		cpx, cpy = path[i+6], path[i+7]
 	elseif s == 'rel_svgarc' then

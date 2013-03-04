@@ -1,4 +1,6 @@
---conversion of 2d axes-aligned closed shapes to lines and curves
+--conversion of 2d axes-aligned closed shapes to lines and curves.
+
+local circle_3p_to_circle = require'path_circle_3p'.to_circle
 
 local max, min, abs = math.max, math.min, math.abs
 
@@ -20,18 +22,10 @@ local function circle(write, cx, cy, r)
 	ellipse(write, cx, cy, r, r)
 end
 
-local sqrt = math.sqrt
-local function circle_from_3points(x1, y1, x2, y2, x3, y3)
-	local h2 = (y1 + y2)/2 + (x2^2 - x1^2/2 * (y2-y1))
-	local h3 = (y1 + y2)/2 + (x3^2 - x1^2/2 * (y2-y1))
-	local k2 = -(x2-x1) / (y2-y1)
-	local k3 = -(x3-x1) / (y3-y1)
-	local x0 = (h3-h2) / (k2-k3)
-	local y0 = (k3*h2 - k2*h3) / (k3-k2)
-	local cx = (h3-h2) / (k2-k3)
-	local cy = (k3*h2 - k2*h3) / (k3-k2)
-	local r = sqrt((x1-x0)^2 + (y1-y0)^2)
-	return cx, cy, r
+local function circle_3p(write, x1, y1, x2, y2, x3, y3)
+	local cx, cy, r = circle_3p_to_circle(x1, y1, x2, y2, x3, y3)
+	if not cx then return end
+	circle(write, cx, cy, r)
 end
 
 local function rectangle(write, x1, y1, w, h)
@@ -79,6 +73,7 @@ end
 return {
 	ellipse = ellipse,
 	circle = circle,
+	circle_3p = circle_3p,
 	rectangle = rectangle,
 	round_rectangle = round_rectangle,
 	star = star,

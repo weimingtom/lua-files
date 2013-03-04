@@ -1,10 +1,12 @@
 local line_hit = require'path_line'.hit
 local point_distance2 = require'path_point'.distance2
 
---create a bezier hit function based on a supplied interpolation function.
+--TODO: rename the module to something more generic.
+
+--create a curve hit function based on a supplied interpolation function.
 --the hit function returns shortest distance-squared from point (x0, y0) to curve,
 --plus the touch point, and the time in the curve where the touch point splits the curve.
-local function bezier_hit_function(interpolate)
+local function interpolation_based_hit_function(interpolate)
 	return function(x0, y0, x1, y1, ...)
 		local cpx, cpy = x1, y1
 		local mind = 1/0
@@ -30,5 +32,6 @@ end
 if not ... then require'path_hit_demo' end
 
 return {
-	hit_function = bezier_hit_function,
+	hit_function = interpolation_based_hit_function,
 }
+

@@ -2,7 +2,8 @@
 --where (x2, y2) is the control point and (x1, y1) and (x3, y3) are the end points.
 
 local interpolate = require'path_bezier2_ai'
-local hit_function = require'path_bezier'.hit_function
+local hit_function = require'path_curve_hit'.hit_function
+local point_distance = require'path_point'.distance
 
 local min, max, sqrt, log = math.min, math.max, math.sqrt, math.log
 
@@ -15,19 +16,18 @@ local function bezier3_control_points(x1, y1, x2, y2, x3, y3)
 		(y3 + 2 * y2) / 3
 end
 
---return a good candidate for the control point of a quad bezier given its end points
---which are (x0, y0) and (x2, y2), and a point (x3, y3) on the curve.
-local function bezier2_3point_control_point(x0, y0, x3, y3, x2, y2)
-	-- find chord lengths
-	local c1 = sqrt((x3 - x0)^2 + (y3 - y0)^2)
-	local c2 = sqrt((x3 - x2)^2 + (y3 - y2)^2)
-	-- guess "best" t
+--return a fair candidate for the control point of a quad bezier given its end points (x1, y1) and (x3, y3),
+--and a point (x0, y0) that lies on the curve.
+local function bezier2_3point_control_point(x1, y1, x0, y0, x3, y3)
+	-- find a good candidate for t based on chord lengths
+	local c1 = point_distance(x0, y0, x1, y1)
+	local c2 = point_distance(x0, y0, x3, y3)
 	local t = c1 / (c1 + c2)
-	-- quadratic Bezier is B(t) = (1-t)^2*P0 + 2*t*(1-t)*P1 + t^2*P2
-	-- solving gives P1 = [B(t) - (1-t)^2*P0 - t^2*P2] / [2*t*(1-t)] where P3 is B(t)
-	local x1 = (x3 - (1 - t)^2 * x0 - t^2 * x2) / (2*t * (1 - t))
-	local y1 = (y3 - (1 - t)^2 * y0 - t^2 * y2) / (2*t * (1 - t))
-	return x1, y1
+	-- a point on a quad bezier is at B(t) = (1-t)^2*P1 + 2*t*(1-t)*P2 + t^2*P3
+	-- solving for P2 gives P2 = (B(t) - (1-t)^2*P1 - t^2*P3) / (2*t*(1-t)) where B(t) is P0
+	local x2 = (x0 - (1 - t)^2 * x1 - t^2 * x3) / (2*t * (1 - t))
+	local y2 = (y0 - (1 - t)^2 * y1 - t^2 * y3) / (2*t * (1 - t))
+	return x2, y2
 end
 
 --split a quad bezier at time t (t is capped between 0..1) into two curves using De Casteljau interpolation.

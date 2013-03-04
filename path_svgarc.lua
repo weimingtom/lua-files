@@ -87,7 +87,7 @@ local function svgarc_to_bezier3(x0, y0, rx, ry, angle, large_arc_flag, sweep_fl
 		svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 
 	-- Build and transform the resulting arc
-	local segments = elliptic_arc_to_bezier3(0, 0, rx, ry, start_angle, sweep_angle)
+	local command, segments = elliptic_arc_to_bezier3(0, 0, rx, ry, start_angle, sweep_angle)
 	local mt = matrix:new():translate(cx, cy):rotate(angle)
 	for i=1,#segments,2 do
 		segments[i], segments[i+1] = mt:transform_point(segments[i], segments[i+1])
@@ -99,7 +99,7 @@ local function svgarc_to_bezier3(x0, y0, rx, ry, angle, large_arc_flag, sweep_fl
 	segments[#segments-1] = x2
 	segments[#segments-0] = y2
 
-	return segments
+	return command, segments
 end
 
 if not ... then require'path_arc_demo' end

@@ -13,11 +13,11 @@ function player:on_render(cr)
 
 	local function arc_function(arc_to_bezier3)
 		return function(...)
-			local segments = arc_to_bezier3(...)
+			local command, segments = arc_to_bezier3(...)
 			cr:move_to(segments[1], segments[2])
-			if #segments == 4 then
+			if command == 'line' then
 				cr:line_to(segments[3], segments[4])
-			else
+			elseif command == 'curve' then
 				for i=3,#segments,8 do
 					cr:curve_to(unpack(segments, i, i + 6 - 1))
 				end

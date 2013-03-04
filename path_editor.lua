@@ -35,9 +35,10 @@ NEW SHAPES:
 
 local glue = require'glue'
 local path_state = require'path_state'
-local path_line = require'path_line'
-local arc_endpoints = require'path_arc'.arc_endpoints
-local svgarc_to_elliptic_arc = require'path_svgarc'.svgarc_to_elliptic_arc
+local point_angle = require'path_point'.angle
+local point_distance = require'path_point'.distance
+local arc_endpoints = require'path_arc'.endpoints
+local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local varlinker = require'varlinker'
 
 local function sign(x) return x > 0 and 1 or -1 end
@@ -48,11 +49,11 @@ local function add(t, var1, var2) return t[var1] + t[var2] end
 local function sub(t, var1, var2) return t[var1] - t[var2] end
 local function reflect(t, varx, varc) return 2 * t[varc] - t[varx] end
 local function middle(t, var1, var2) return t[var1] + (t[var2] - t[var1])/2 end
-local function point_distance(t, p1x, p1y, p2x, p2y)
-	return path_line.point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
+local point_distance = function(t, p1x, p1y, p2x, p2y)
+	return point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
 end
-local function point_angle(t, p2x, p2y, p1x, p1y)
-	return math.deg(path_line.point_angle(t[p2x], t[p2y], t[p1x], t[p1y]))
+local point_angle = function(t, p2x, p2y, p1x, p1y)
+	return math.deg(point_angle(t[p2x], t[p2y], t[p1x], t[p1y]))
 end
 
 local function editor(path)
@@ -265,7 +266,8 @@ local function editor(path)
 
 			pbx, pby = p3x, p3y
 			pcpx, pcpy = p4x, p4y
-		elseif s == 'quad_curve' or s == 'rel_quad_curve' then
+		elseif s == 'quad_curve' or s == 'rel_quad_curve' or s == 'quad_curve_3p' or s == 'rel_quad_curve_3p' then
+			local _3p = s:match'_3p$'
 			local c2x, c2y = var(path, i+1), var(path, i+2)
 			local c3x, c3y = var(path, i+3), var(path, i+4)
 			--create end point first so it has lower z-order than control points
@@ -289,10 +291,11 @@ local function editor(path)
 			link(p3x, p2x, add, p2x, delta)
 			link(p3y, p2y, add, p2y, delta)
 
-			cpline(p1x, p1y, p2x, p2y)
-			cpline(p2x, p2y, p3x, p3y)
-
-			pqx, pqy = p2x, p2y
+			if not _3p then
+				cpline(p1x, p1y, p2x, p2y)
+				cpline(p2x, p2y, p3x, p3y)
+				pqx, pqy = p2x, p2y
+			end
 			pcpx, pcpy = p3x, p3y
 		elseif s == 'smooth_quad_curve' or s == 'rel_smooth_quad_curve' then
 			local c3x, c3y = var(path, i+1), var(path, i+2)
@@ -332,7 +335,6 @@ local function editor(path)
 			pqx, pqy = p2x or p1x, p2y or p1y
 			pcpx, pcpy = p3x, p3y
 		elseif s == 'arc' or s == 'rel_arc' then
-
 			--path variables
 			local ccx, ccy, cr, cstart_angle, csweep_angle =
 				var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4), var(path, i+5)
@@ -352,17 +354,17 @@ local function editor(path)
 
 			--arc sweep angle expression
 			local function calc_sweep_angle(t, p1x, p1y, p2x, p2y, p3x, p3y, csweep_angle)
-				local start_angle = path_line.point_angle(t[p2x], t[p2y], t[p1x], t[p1y])
-				local sweep_angle1 = math.rad(t[csweep_angle])
-				local end_angle = path_line.point_angle(t[p3x], t[p3y], t[p1x], t[p1y])
-				local sweep_angle_poz = (end_angle - start_angle) % (2 * math.pi)
-				local sweep_angle_neg = sweep_angle_poz - 2 * math.pi
+				local start_angle = point_angle(t, p2x, p2y, p1x, p1y)
+				local sweep_angle1 = t[csweep_angle]
+				local end_angle = point_angle(t, p3x, p3y, p1x, p1y)
+				local sweep_angle_poz = (end_angle - start_angle) % 360
+				local sweep_angle_neg = sweep_angle_poz - 360
 				--choose the angle closest to the current sweep angle
 				local sweep_angle =
 					math.abs(sweep_angle_poz - sweep_angle1) <
 					math.abs(sweep_angle_neg - sweep_angle1)
 					and sweep_angle_poz or sweep_angle_neg
-				return math.deg(sweep_angle)
+				return sweep_angle
 			end
 
 			--finally, the points
@@ -417,8 +419,25 @@ local function editor(path)
 			end
 
 			pcpx, pcpy = p3x, p3y
-		elseif s == 'svgarc' or s == 'rel_svgarc' then
+		elseif s == 'arc_3p' or s == 'rel_arc_3p' then
+			local c2x, c2y, c3x, c3y =
+				var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4)
+			local p2x, p2y = point(ox + path[i+1], oy + path[i+2])
+			local p3x, p3y = point(ox + path[i+3], oy + path[i+4])
 
+			--control points update circle in path
+			if rel then
+				expr(c2x, sub, p2x, p1x)
+				expr(c2y, sub, p2y, p1y)
+				expr(c3x, sub, p3x, p1x)
+				expr(c3y, sub, p3y, p1y)
+			else
+				link(p2x, c2x); link(p2y, c2y)
+				link(p3x, c3x); link(p3y, c3y)
+			end
+
+			pcpx, pcpy = p3x, p3y
+		elseif s == 'svgarc' or s == 'rel_svgarc' then
 			--path variables
 			local crx, cry, crotate, cflag1, cflag2, c2x, c2y =
 				var(path, i+1), var(path, i+2), var(path, i+3),
@@ -576,6 +595,19 @@ local function editor(path)
 			link(pcy, pry, add, pry, delta)
 
 			cpline(pcx, pcy, prx, pry)
+
+			pcpx, pcpy, pspx, pspy = nil
+		elseif s == 'circle_3p' then
+			local cx1, cy1, cx2, cy2, cx3, cy3 =
+				var(path, i+1), var(path, i+2), var(path, i+3), var(path, i+4), var(path, i+5), var(path, i+6)
+			local px1, py1 = point(path[i+1], path[i+2])
+			local px2, py2 = point(path[i+3], path[i+4])
+			local px3, py3 = point(path[i+5], path[i+6])
+
+			--control points update circle in path
+			link(px1, cx1); link(py1, cy1)
+			link(px2, cx2); link(py2, cy2)
+			link(px3, cx3); link(py3, cy3)
 
 			pcpx, pcpy, pspx, pspy = nil
 		elseif s == 'ellipse' then

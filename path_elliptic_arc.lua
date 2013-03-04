@@ -52,7 +52,7 @@ end
 --in any case, (t[1],t[2]) is the arc's starting point, and (t[#t-1],t[#t]) is the arc's end point.
 local function to_bezier3(cx, cy, rx, ry, start_angle, sweep_angle)
 	if abs(sweep_angle) < 1e-10 then
-		return {endpoints(cx, cy, rx, ry, start_angle, sweep_angle)}
+		return 'line', {endpoints(cx, cy, rx, ry, start_angle, sweep_angle)}
 	end
 	rx, ry = abs(rx), abs(ry)
 	sweep_angle = observed_sweep(sweep_angle)
@@ -77,7 +77,7 @@ local function to_bezier3(cx, cy, rx, ry, start_angle, sweep_angle)
 	segments[2] = y1
 	segments[#segments-1] = x2
 	segments[#segments] = y2
-	return segments
+	return 'curve', segments
 end
 
 if not ... then require'path_arc_demo' end
