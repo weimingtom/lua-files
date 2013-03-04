@@ -20,12 +20,13 @@ local function point_rotate(x, y, cx, cy, angle)
 	x, y = x - cx, y - cy
 	local cs, sn = cos(angle), sin(angle)
 	return
-		x * cs - y * sn + cx,
-		y * cs + x * sn + cy
+		cx + x * cs - y * sn,
+		cy + y * cs + x * sn
 end
 
 --hypotenuse function: computes sqrt(x^2 + y^2) avoiding overflow and underflow cases.
 local function hypot(x, y)
+	if x == 0 and y == 0 then return 0 end
 	x, y = abs(x), abs(y)
 	local t = min(x, y)
 	x = max(x, y)
@@ -41,8 +42,17 @@ local function point_distance2(x1, y1, x2, y2) --the distance between two points
 	return (x2 - x1)^2 + (y2 - y1)^2
 end
 
-local function point_reflection(x, y, cx, cy) --point reflected through origin (rotated 180deg around origin)
+local function reflect_point(x, y, cx, cy) --point reflected through origin (rotated 180deg around origin)
 	return 2 * cx - x, 2 * cy - y
+end
+
+local function reflect_scale_point(x, y, cx, cy, length) --point reflected through origin and resized
+	local d = hypot(x - cx, y - cy)
+	if d == 0 then return cx, cy end
+	local scale = length / d
+	return
+		cx + (cx - x) * scale,
+		cy + (cy - y) * scale
 end
 
 return {
@@ -52,6 +62,7 @@ return {
 	hypot = hypot,
 	distance = point_distance,
 	distance2 = point_distance2,
-	reflect = point_reflection,
+	reflect = reflect_point,
+	reflect_scale = reflect_scale_point,
 }
 

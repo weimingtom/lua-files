@@ -56,7 +56,7 @@ function player:on_render(cr)
 	cr:translate(200,0)
 	bez(0,0,0,250,0,500)
 
-	cr:translate(200,0) --case of smooth bezier with cp1 == cpx
+	cr:translate(200,0) --case of symmetrical bezier with cp1 == cpx
 	bez(0,0,0,0,0,500)
 
 	cr:translate(200,0)

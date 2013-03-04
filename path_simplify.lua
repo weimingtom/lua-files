@@ -3,6 +3,7 @@ local command_argc = require'path_state'.command_argc
 local path_commands = require'path_state'.commands
 local next_state = require'path_state'.next_state
 local reflect_point = require'path_point'.reflect
+local reflect_scale_point = require'path_point'.reflect_scale
 local arc_to_bezier3 = require'path_arc'.to_bezier3
 local arc_3p_to_bezier3 = require'path_arc_3p'.to_bezier3
 local svgarc_to_bezier3 = require'path_svgarc'.to_bezier3
@@ -54,6 +55,18 @@ local function path_simplify(write, path) --this is for drawing so avoid making 
 		elseif s == 'rel_curve' then
 			write('curve', cpx + path[i+1], cpy + path[i+2], cpx + path[i+3], cpy + path[i+4],
 								cpx + path[i+5], cpy + path[i+6])
+		elseif s == 'symm_curve' then
+			local x2, y2 = reflect_point(bx or cpx, by or cpy, cpx, cpy)
+			write('curve', x2, y2, path[i+1], path[i+2], path[i+3], path[i+4])
+		elseif s == 'rel_symm_curve' then
+			local x2, y2 = reflect_point(bx or cpx, by or cpy, cpx, cpy)
+			write('curve', x2, y2, cpx + path[i+1], cpy + path[i+2], cpx + path[i+3], cpy + path[i+4])
+		elseif s == 'smooth_curve' then
+			local x2, y2 = reflect_scale_point(bx or cpx, by or cpy, cpx, cpy, path[i+1])
+			write('curve', x2, y2, path[i+2], path[i+3], path[i+4], path[i+5])
+		elseif s == 'rel_smooth_curve' then
+			local x2, y2 = reflect_scale_point(bx or cpx, by or cpy, cpx, cpy, path[i+1])
+			write('curve', x2, y2, cpx + path[i+2], cpy + path[i+3], cpx + path[i+4], cpy + path[i+5])
 		elseif s == 'quad_curve' then
 			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, path[i+1], path[i+2], path[i+3], path[i+4])
 			write('curve', x2, y2, x3, y3, path[i+3], path[i+4])
@@ -61,20 +74,6 @@ local function path_simplify(write, path) --this is for drawing so avoid making 
 			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, cpx + path[i+1], cpy + path[i+2],
 																						cpx + path[i+3], cpy + path[i+4])
 			write('curve', x2, y2, x3, y3, cpx + path[i+3], cpy + path[i+4])
-		elseif s == 'smooth_curve' then
-			local x2, y2 = reflect_point(bx or cpx, by or cpy, cpx, cpy)
-			write('curve', x2, y2, path[i+1], path[i+2], path[i+3], path[i+4])
-		elseif s == 'rel_smooth_curve' then
-			local x2, y2 = reflect_point(bx or cpx, by or cpy, cpx, cpy)
-			write('curve', x2, y2, cpx + path[i+1], cpy + path[i+2], cpx + path[i+3], cpy + path[i+4])
-		elseif s == 'smooth_quad_curve' then
-			local xc, yc = reflect_point(qx or cpx, qy or cpy, cpx, cpy)
-			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, path[i+1], path[i+2])
-			write('curve', x2, y2, x3, y3, path[i+1], path[i+2])
-		elseif s == 'rel_smooth_quad_curve' then
-			local xc, yc = reflect_point(qx or cpx, qy or cpy, cpx, cpy)
-			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, cpx + path[i+1], cpy + path[i+2])
-			write('curve', x2, y2, x3, y3, cpx + path[i+1], cpy + path[i+2])
 		elseif s == 'quad_curve_3p' then
 			xc, yc = bezier2_3point_control_point(cpx, cpy, path[i+1], path[i+2], path[i+3], path[i+4])
 			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, path[i+3], path[i+4])
@@ -83,6 +82,22 @@ local function path_simplify(write, path) --this is for drawing so avoid making 
 			xc, yc = bezier2_3point_control_point(cpx, cpy, cpx + path[i+1], cpy + path[i+2], cpx + path[i+3], cpy + path[i+4])
 			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, cpx + path[i+3], cpy + path[i+4])
 			write('curve', x2, y2, x3, y3, cpx + path[i+3], cpy + path[i+4])
+		elseif s == 'symm_quad_curve' then
+			local xc, yc = reflect_point(qx or cpx, qy or cpy, cpx, cpy)
+			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, path[i+1], path[i+2])
+			write('curve', x2, y2, x3, y3, path[i+1], path[i+2])
+		elseif s == 'rel_symm_quad_curve' then
+			local xc, yc = reflect_point(qx or cpx, qy or cpy, cpx, cpy)
+			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, cpx + path[i+1], cpy + path[i+2])
+			write('curve', x2, y2, x3, y3, cpx + path[i+1], cpy + path[i+2])
+		elseif s == 'smooth_quad_curve' then
+			local xc, yc = reflect_scale_point(qx or cpx, qy or cpy, cpx, cpy, path[i+1])
+			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, path[i+2], path[i+3])
+			write('curve', x2, y2, x3, y3, path[i+2], path[i+3])
+		elseif s == 'rel_smooth_quad_curve' then
+			local xc, yc = reflect_scale_point(qx or cpx, qy or cpy, cpx, cpy, path[i+1])
+			local x2, y2, x3, y3 = bezier3_control_points(cpx, cpy, xc, yc, cpx + path[i+2], cpy + path[i+3])
+			write('curve', x2, y2, x3, y3, cpx + path[i+2], cpy + path[i+3])
 		elseif s:match'arc' then
 			local command, segments
 			if s == 'arc' or s == 'rel_arc' then
@@ -107,11 +122,16 @@ local function path_simplify(write, path) --this is for drawing so avoid making 
 				for i=3,#segments,8 do
 					write('curve', unpack(segments, i, i+6-1))
 				end
+			else
+				assert(false, command)
 			end
 		elseif s == 'text' then
 			write(s, path[i+1], path[i+2])
 		elseif shape_writers[s] then
 			shape_writers[s](write, path, i)
+		elseif s == 'break' then
+		else
+			assert(false, s)
 		end
 		cpx, cpy, spx, spy, bx, by, qx, qy = next_state(path, i, cpx, cpy, spx, spy, bx, by, qx, qy)
 	end

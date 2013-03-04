@@ -1,10 +1,7 @@
 --[[
 CAVEATS:
-- the algorithm for choosing between negative and positive arc is prone to histeresis.
-  that's not a problem for mouse handling (in fact it's a feature), but may become a problem
-  for programatic update.
 - linking in terms of delta is not idempotent. this only becomes a problem if you link the
-- same variable to delta in more than one linkset, which you shouldn't have reason to do anyway.
+  same variable to delta in more than one linkset (not encountered yet).
 
 FEATURES:
 - separate endpoints from control points
@@ -23,10 +20,8 @@ FEATURES:
 	- rect move only on x or y axis
 
 NEW SHAPES:
-- 3-point arc: cpx, cpy, x2, y2, radius, start_angle, sweep_angle
 - html5 3-point arc: cpx, cpy, x2, y2, x3, y3, radius
 - elliptic_arc: cx, cy, rx, ry, rot
-- svgarc: rx, ry, angle, f1, f2, x2, y2
 - angle_ellipse: cx, cy, rx, ry, angle
 - angle_arc: cx, cy, rx, ry, angle, start_angle, sweep_angle
 - angle_rect: x1, y1, x2, y2, length_flag, length
@@ -37,6 +32,8 @@ local glue = require'glue'
 local path_state = require'path_state'
 local point_angle = require'path_point'.angle
 local point_distance = require'path_point'.distance
+local point_around = require'path_point'.around
+local point_reflect_scale = require'path_point'.reflect_scale
 local arc_endpoints = require'path_arc'.endpoints
 local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local varlinker = require'varlinker'
@@ -48,6 +45,12 @@ local function copy(t, var) return t[var] end
 local function add(t, var1, var2) return t[var1] + t[var2] end
 local function sub(t, var1, var2) return t[var1] - t[var2] end
 local function reflect(t, varx, varc) return 2 * t[varc] - t[varx] end
+local function reflect_scale_x(t, varx, vary, varcx, varcy, varlen)
+	return (point_reflect_scale(t[varx], t[vary], t[varcx], t[varcy], t[varlen]))
+end
+local function reflect_scale_y(t, varx, vary, varcx, varcy, varlen)
+	return select(2, point_reflect_scale(t[varx], t[vary], t[varcx], t[varcy], t[varlen]))
+end
 local function middle(t, var1, var2) return t[var1] + (t[var2] - t[var1])/2 end
 local point_distance = function(t, p1x, p1y, p2x, p2y)
 	return point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
@@ -222,14 +225,24 @@ local function editor(path)
 
 			pbx, pby = p3x, p3y
 			pcpx, pcpy = p4x, p4y
-		elseif s == 'smooth_curve' or s == 'rel_smooth_curve' then
-			local c3x, c3y = var(path, i+1), var(path, i+2)
-			local c4x, c4y = var(path, i+3), var(path, i+4)
+		elseif s == 'symm_curve' or s == 'rel_symm_curve' or s == 'smooth_curve' or s == 'rel_smooth_curve' then
+			local smooth = s == 'smooth_curve' or s == 'rel_smooth_curve'
+			local o = smooth and 1 or 0
+			local c3x, c3y = var(path, i+1+o), var(path, i+2+o)
+			local c4x, c4y = var(path, i+3+o), var(path, i+4+o)
 			local p2x, p2y
+			local clen
 			if pbx1 then
-				p2x, p2y = point(
-					reflect(val, pbx1, p1x),
-					reflect(val, pby1, p1y), 'control')
+				if smooth then
+					clen = var(path, i+1)
+					p2x, p2y = point(
+						reflect_scale_x(val, pbx1, pby1, p1x, p1y, clen),
+						reflect_scale_y(val, pbx1, pby1, p1x, p1y, clen), 'control')
+				else
+					p2x, p2y = point(
+						reflect(val, pbx1, p1x),
+						reflect(val, pby1, p1y), 'control')
+				end
 			end
 			--create end point first so it has lower z-order than control points
 			local p4x, p4y = point(ox + val[c4x], oy + val[c4y])
@@ -250,12 +263,23 @@ local function editor(path)
 				--first point moves its control point
 				link(p1x, p2x, add, p2x, delta)
 				link(p1y, p2y, add, p2y, delta)
-				--reflective control points move each other around first point
-				link(p2x, pbx1, reflect, p2x, p1x)
-				link(p2y, pby1, reflect, p2y, p1y)
-				link(pbx1, p2x, reflect, pbx1, p1x)
-				link(pby1, p2y, reflect, pby1, p1y)
-
+				if smooth then
+					local function reflect_angle(t, p2x, p2y, p1x, p1y, pbx1, pby1)
+						return point_around(t[p1x], t[p1y], point_distance(t, pbx1, pby1, p1x, p1y),
+													math.rad(point_angle(t, p2x, p2y, p1x, p1y)) + math.pi)
+					end
+					local function reflect_angle_x(...) return (reflect_angle(...)) end
+					local function reflect_angle_y(...) return select(2, reflect_angle(...)) end
+					expr(pbx1, reflect_angle_x, p2x, p2y, p1x, p1y, pbx1, pby1)
+					expr(pby1, reflect_angle_y, p2x, p2y, p1x, p1y, pbx1, pby1)
+					expr(clen, point_distance, p2x, p2y, p1x, p1y)
+				else
+					--reflective control points move each other around first point
+					link(p2x, pbx1, reflect, p2x, p1x)
+					link(p2y, pby1, reflect, p2y, p1y)
+					link(pbx1, p2x, reflect, pbx1, p1x)
+					link(pby1, p2y, reflect, pby1, p1y)
+				end
 				cpline(p1x, p1y, p2x, p2y)
 			end
 			--last point moves its control point
@@ -297,7 +321,7 @@ local function editor(path)
 				pqx, pqy = p2x, p2y
 			end
 			pcpx, pcpy = p3x, p3y
-		elseif s == 'smooth_quad_curve' or s == 'rel_smooth_quad_curve' then
+		elseif s == 'symm_quad_curve' or s == 'rel_symm_quad_curve' then
 			local c3x, c3y = var(path, i+1), var(path, i+2)
 			local p2x, p2y
 			if pqx1 then
