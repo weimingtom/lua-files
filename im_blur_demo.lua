@@ -7,9 +7,9 @@ local scene = {
 	},
 }
 
-local boxblur = require'im_boxblur'
-local boxblur_lua = require'im_boxblur_lua'
-local stackblur = require'im_stackblur'
+local boxblur = require'im_boxblur'.blur_8888
+local boxblur_lua = require'im_boxblur_lua'.blur_8888
+local stackblur = require'im_stackblur'.blur_8888
 local ffi = require'ffi'
 
 local player = require'sg_cairo_player'

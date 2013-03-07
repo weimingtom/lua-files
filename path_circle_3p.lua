@@ -1,6 +1,6 @@
 --math for 2d circles defined as passing though 3 points (x1, y1, x2, y2, x3, y3).
 
-local point_distance = require'path_point'.distance
+local distance = require'path_point'.distance
 
 local function circle_3p_to_circle(x1, y1, x2, y2, x3, y3)
 	--if the points are on a vertical line, we can't make a circle.
@@ -17,13 +17,13 @@ local function circle_3p_to_circle(x1, y1, x2, y2, x3, y3)
 	--solve for x the equation for the intersection point between the perpendiculars that pass
 	--through the mid points of p2-p1 and p3-p2.
 	local cx = (mr * mt * (y3 - y1) + mr * (x2 + x3) - mt * (x1 + x2)) / (2 * (mr - mt))
-	--if lines are parallel enough, the center can be further away than what a number can hold.
+	--if lines are parallel enough, the center will be further away than what a number can hold giving us inf or -inf.
 	if cx == 1/0 or cx == -1/0 then return end
 	--solve for y one of the ecuations of the perpendiculars (pick the one that avoids an infinite result).
 	local cy = mt == 0 and
 			-1 / mr * (cx - (x1 + x2) / 2) + (y1 + y2) / 2 or
 			-1 / mt * (cx - (x2 + x3) / 2) + (y2 + y3) / 2
-	return cx, cy, point_distance(cx, cy, x1, y1)
+	return cx, cy, distance(cx, cy, x1, y1)
 end
 
 return {

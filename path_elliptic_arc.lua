@@ -1,14 +1,15 @@
 --math for 2d elliptic arcs defined as (centerx, centery, radiusx, radiusy, start_angle, sweep_angle).
---sweep angle is capped between -360..360deg when drawing.
+--sweep angle is capped between -360..360deg when drawing but otherwise the time on the arc is relative to the full sweep.
 --arc to bezier conversion adapted from agg/src/agg_bezier_arc.cpp.
 
 local glue = require'glue'
 
-local sin, cos, pi, abs, min, max = math.sin, math.cos, math.pi, math.abs, math.min, math.max
+local abs, min, max, sin, cos, pi = math.abs, math.min, math.max, math.sin, math.cos, math.pi
 
-local arc_angle_overflow_epsilon = 0.01
+local arc_angle_tolerance_epsilon = 0.01
 
-local function observed_sweep(sweep_angle) --we can only observe the first -360..360deg of the sweep.
+--observed sweep: we can only observe the first -360..360deg of the total sweep.
+local function observed_sweep(sweep_angle)
 	return max(min(sweep_angle, 2*pi), -2*pi)
 end
 
@@ -16,13 +17,13 @@ local function endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
 	rx, ry = abs(rx), abs(ry)
 	sweep_angle = observed_sweep(sweep_angle)
 	return
-		cx + rx * cos(start_angle),
-		cy + ry * sin(start_angle),
-		cx + rx * cos(start_angle + sweep_angle),
-		cy + ry * sin(start_angle + sweep_angle)
+		cx + cos(start_angle) * rx,
+		cy + sin(start_angle) * ry,
+		cx + cos(start_angle + sweep_angle) * rx,
+		cy + sin(start_angle + sweep_angle) * ry
 end
 
-local function segment(cx, cy, rx, ry, start_angle, sweep_angle)
+local function arc_segment(cx, cy, rx, ry, start_angle, sweep_angle)
 	local x0 = cos(sweep_angle / 2)
 	local y0 = sin(sweep_angle / 2)
 	local tx = (1 - x0) * 4 / 3
@@ -52,7 +53,8 @@ end
 --in any case, (t[1],t[2]) is the arc's starting point, and (t[#t-1],t[#t]) is the arc's end point.
 local function to_bezier3(cx, cy, rx, ry, start_angle, sweep_angle)
 	if abs(sweep_angle) < 1e-10 then
-		return 'line', {endpoints(cx, cy, rx, ry, start_angle, sweep_angle)}
+		local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
+		return 'line', {x1, y1, x2, y2}
 	end
 	rx, ry = abs(rx), abs(ry)
 	sweep_angle = observed_sweep(sweep_angle)
@@ -62,16 +64,16 @@ local function to_bezier3(cx, cy, rx, ry, start_angle, sweep_angle)
 	while left ~= 0 do
 		local sweep = sweep_sign * pi / 2
 		left = left - sweep
-		if sweep_sign * left < arc_angle_overflow_epsilon then
+		if sweep_sign * left < arc_angle_tolerance_epsilon then
 			--`left` now represents the overflow or a very small underflow, a tiny curve that's left,
 			--which we swallow into this one and make this the last curve.
 			sweep = sweep + left
 			left = 0
 		end
-		glue.append(segments, segment(cx, cy, rx, ry, angle, sweep))
+		glue.append(segments, arc_segment(cx, cy, rx, ry, angle, sweep))
 		angle = angle + sweep
 	end
-	--update arc endpoints to exactly match the ones approximated by elliptic_arc_endpoints()
+	--update arc endpoints to exactly match the ones approximated by arc_endpoints()
 	local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
 	segments[1] = x1
 	segments[2] = y1
@@ -83,6 +85,7 @@ end
 if not ... then require'path_arc_demo' end
 
 return {
+	observed_sweep = observed_sweep,
 	endpoints = endpoints,
 	to_bezier3 = to_bezier3,
 }

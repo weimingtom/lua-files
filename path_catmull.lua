@@ -6,8 +6,7 @@ local function to_bezier3(x1, y1, x2, y2, x3, y3, x4, y4)
     --    0      1/6      1     -1/6
     --    0       0       1       0
     --[[
-	 var bp = [];
-    bp.push( { x: p[1].x,  y: p[1].y } );
+	 bp.push( { x: p[1].x,  y: p[1].y } );
     bp.push( { x: ((-p[0].x + 6*p[1].x + p[2].x) / 6), y: ((-p[0].y + 6*p[1].y + p[2].y) / 6)} );
     bp.push( { x: ((p[1].x + 6*p[2].x - p[3].x) / 6),  y: ((p[1].y + 6*p[2].y - p[3].y) / 6) } );
     bp.push( { x: p[2].x,  y: p[2].y } );

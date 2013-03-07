@@ -30,10 +30,10 @@ NEW SHAPES:
 
 local glue = require'glue'
 local path_state = require'path_state'
-local point_angle = require'path_point'.angle
-local point_distance = require'path_point'.distance
-local point_around = require'path_point'.around
-local point_reflect_scale = require'path_point'.reflect_scale
+local distance = require'path_point'.distance
+local point_angle = require'path_point'.point_angle
+local point_around = require'path_point'.point_around
+local reflect_point_distance = require'path_point'.reflect_point_distance
 local arc_endpoints = require'path_arc'.endpoints
 local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local varlinker = require'varlinker'
@@ -46,14 +46,14 @@ local function add(t, var1, var2) return t[var1] + t[var2] end
 local function sub(t, var1, var2) return t[var1] - t[var2] end
 local function reflect(t, varx, varc) return 2 * t[varc] - t[varx] end
 local function reflect_scale_x(t, varx, vary, varcx, varcy, varlen)
-	return (point_reflect_scale(t[varx], t[vary], t[varcx], t[varcy], t[varlen]))
+	return (reflect_point_distance(t[varx], t[vary], t[varcx], t[varcy], t[varlen]))
 end
 local function reflect_scale_y(t, varx, vary, varcx, varcy, varlen)
-	return select(2, point_reflect_scale(t[varx], t[vary], t[varcx], t[varcy], t[varlen]))
+	return select(2, reflect_point_distance(t[varx], t[vary], t[varcx], t[varcy], t[varlen]))
 end
 local function middle(t, var1, var2) return t[var1] + (t[var2] - t[var1])/2 end
-local point_distance = function(t, p1x, p1y, p2x, p2y)
-	return point_distance(t[p1x], t[p1y], t[p2x], t[p2y])
+local distance = function(t, p1x, p1y, p2x, p2y)
+	return distance(t[p1x], t[p1y], t[p2x], t[p2y])
 end
 local point_angle = function(t, p2x, p2y, p1x, p1y)
 	return math.deg(point_angle(t[p2x], t[p2y], t[p1x], t[p1y]))
@@ -265,14 +265,15 @@ local function editor(path)
 				link(p1y, p2y, add, p2y, delta)
 				if smooth then
 					local function reflect_angle(t, p2x, p2y, p1x, p1y, pbx1, pby1)
-						return point_around(t[p1x], t[p1y], point_distance(t, pbx1, pby1, p1x, p1y),
+						local d = distance(t, pbx1, pby1, p1x, p1y)
+						return point_around(t[p1x], t[p1y], d, d,
 													math.rad(point_angle(t, p2x, p2y, p1x, p1y)) + math.pi)
 					end
 					local function reflect_angle_x(...) return (reflect_angle(...)) end
 					local function reflect_angle_y(...) return select(2, reflect_angle(...)) end
 					expr(pbx1, reflect_angle_x, p2x, p2y, p1x, p1y, pbx1, pby1)
 					expr(pby1, reflect_angle_y, p2x, p2y, p1x, p1y, pbx1, pby1)
-					expr(clen, point_distance, p2x, p2y, p1x, p1y)
+					expr(clen, distance, p2x, p2y, p1x, p1y)
 				else
 					--reflective control points move each other around first point
 					link(p2x, pbx1, reflect, p2x, p1x)
@@ -407,10 +408,10 @@ local function editor(path)
 				link(pcy, ccy)
 			end
 			--arc's control points update the arc parameters in path
-			link(p2x, cr, point_distance, p2x, p2y, pcx, pcy)
-			link(p2y, cr, point_distance, p2x, p2y, pcx, pcy)
-			link(p3x, cr, point_distance, p3x, p3y, pcx, pcy)
-			link(p3y, cr, point_distance, p3x, p3y, pcx, pcy)
+			link(p2x, cr, distance, p2x, p2y, pcx, pcy)
+			link(p2y, cr, distance, p2x, p2y, pcx, pcy)
+			link(p3x, cr, distance, p3x, p3y, pcx, pcy)
+			link(p3y, cr, distance, p3x, p3y, pcx, pcy)
 			link(p2x, cstart_angle, point_angle, p2x, p2y, pcx, pcy)
 			link(p2y, cstart_angle, point_angle, p2x, p2y, pcx, pcy)
 			link(p3x, csweep_angle, calc_sweep_angle, pcx, pcy, p2x, p2y, p3x, p3y, csweep_angle)
@@ -477,8 +478,7 @@ local function editor(path)
 				local t = val
 				return function()
 					return select(i,
-						svgarc_to_elliptic_arc(t[p1x], t[p1y], t[crx], t[cry], t[crotate],
-															t[cflag1], t[cflag2], t[p2x], t[p2y]))
+						svgarc_to_elliptic_arc(t[p1x], t[p1y], t[crx], t[cry], t[crotate], t[cflag1], t[cflag2], t[p2x], t[p2y]))
 				end
 			end
 			local getcx, getcy = arc_arg(1), arc_arg(2)
@@ -612,8 +612,8 @@ local function editor(path)
 			--control points update circle in path
 			link(pcx, cx)
 			link(pcy, cy)
-			link(prx, cr, point_distance, prx, pry, pcx, pcy)
-			link(pry, cr, point_distance, prx, pry, pcx, pcy)
+			link(prx, cr, distance, prx, pry, pcx, pcy)
+			link(pry, cr, distance, prx, pry, pcx, pcy)
 			--center control point updates radius control point
 			link(pcx, prx, add, prx, delta)
 			link(pcy, pry, add, pry, delta)

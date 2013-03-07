@@ -239,7 +239,7 @@ local function stackblur_8888(data, w, h, radius)
 	end
 end
 
-if not ... then require'im_blur_test' end
+if not ... then require'im_blur_demo' end
 
 return {
 	blur_8888 = stackblur_8888,

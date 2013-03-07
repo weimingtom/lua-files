@@ -13,6 +13,13 @@ end
 
 local line_length = distance
 
+--bounding box of line in (x,y,w,h) form.
+local function line_bounding_box(x1, y1, x2, y2)
+	if x1 > x2 then x1, x2 = x2, x1 end
+	if y1 > y2 then y1, y2 = y2, y1 end
+	return x1, y1, x2-x1, y2-y1
+end
+
 --split line segment into two line segments at time t (t is capped between 0..1).
 local function line_split(t, x1, y1, x3, y3)
 	t = min(max(t,0),1)
@@ -59,6 +66,7 @@ if not ... then require'path_hit_demo' end
 return {
 	point_line_intersection = point_line_intersection,
 	line_line_intersection = line_line_intersection,
+	bounding_box = line_bounding_box,
 	--hit & split API
 	point = line_point,
 	length = line_length,

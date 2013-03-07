@@ -1,3 +1,14 @@
+
+local abs, cos, sin, pi = math.abs, math.cos, math.sin, math.pi
+
+local function superformula(t, cx, cy, size, a, b, m, n1, n2, n3)
+	local f = t*2*pi
+	local r = (abs(cos(m*f/4)/a)^n2 + abs(sin(m*f/4)/b)^n3)^(-1/n1)
+	return
+		cx + r * cos(f) * size,
+		cy + r * sin(f) * size
+end
+
 local path = {
 	'move', 100, 100,
 	'line', 200, 200,
@@ -42,8 +53,8 @@ local path = {
 	'ellipse', 1000, 70, -50, -30,
 	'circle_3p', 1100, 70, 1200, 70, 1150, 20,
 	'move', 800, 400,
-	'svgarc', -50, -20, 0, 0, 1, 800+30, 400+40,
-	'rel_svgarc', -50, -20, 0, 1, 0, 30, 40,
+	'svgarc', -50, -20, -30, 0, 1, 800+30, 400+40,
+	'rel_svgarc', -50, -20, -30, 1, 0, 30, 40,
 	'move', 950, 400,
 	'rel_arc_3p', 40, 0, 20, 60,
 	'rel_arc_3p', -40, 0, -20, 60,
@@ -53,6 +64,8 @@ local path = {
 	'move', 1100, 650,
 	'rel_curve', 25, 50, 25, 50, 50, 0,
 	'rel_smooth_curve', 100, 50, -50, 50, 0,
+	'break',
+	'formula', superformula, 200, {500, 500, 100, 1, 1, 3, .5, .5, .5},
 }
 
 local editor = require'path_editor'
@@ -72,6 +85,12 @@ function player:on_render(cr)
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
 	cr:identity_matrix()
+
+	if i % 20 == 0 then
+		--path[#path][6] = i % 10
+		path[#path][6] = math.random(10)
+		path[#path][8] = math.random(10)
+	end
 
 	for i=#e.points-1,1,-2 do
 		local x, y = e.points[i], e.points[i+1]

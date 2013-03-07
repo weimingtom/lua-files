@@ -1,5 +1,7 @@
 --2d affine matrix class (transcribed from cairo)
 
+local sin, cos, tan, floor = math.sin, math.cos, math.tan, math.floor
+
 local matrix = {}
 local matrix_mt = {__index = matrix}
 
@@ -32,12 +34,12 @@ end
 
 function matrix:transform_point(x, y)
 	return self.xx * x + self.xy * y + self.x0,
-			 self.yx * y + self.yy * y + self.y0
+			 self.yx * x + self.yy * y + self.y0
 end
 
 function matrix:transform_distance(x, y)
 	return self.xx * x + self.xy * y,
-			 self.yx * y + self.yy * y
+			 self.yx * x + self.yy * y
 end
 
 function matrix:multiply(xx, yx, xy, yy, x0, y0)
@@ -96,7 +98,7 @@ function matrix:inverse()
 	end
 	--inv (A) = 1/det (A) * adj (A)
 	local det = self:determinant()
-	if det == 0 or det == math.huge or det == -math.huge then return end
+	if det == 0 or det == 1/0 or det == -1/0 then return end
 	--adj (A) = transpose (C:cofactor (A,i,j))
 	local a, b, c, d, tx, ty = self:unpack()
    self:reset(d, -b, -c, a, c*ty - d*tx, b*tx - a*ty)
@@ -105,7 +107,7 @@ end
 
 function matrix:is_invertible()
 	local det = self:determinant()
-	return det ~= 0 and det ~= math.huge and det ~= -math.huge
+	return det ~= 0 and det ~= 1/0 and det ~= -1/0
 end
 
 function matrix:translate(x,y)
@@ -121,12 +123,12 @@ function matrix:scale(x,y)
 end
 
 function matrix:skew(ax,ay)
-	return self:multiply(1, math.tan(ay), math.tan(ax), 1, 0, 0)
+	return self:multiply(1, tan(ay), tan(ax), 1, 0, 0)
 end
 
 function matrix:rotate(a)
-    local s = math.sin(a)
-    local c = math.cos(a)
+    local s = sin(a)
+    local c = cos(a)
     return self:multiply(c, s, -s, c, 0, 0)
 end
 
@@ -144,7 +146,7 @@ function matrix:has_unity_scale()
 end
 
 function matrix:is_pixel_perfect() --means pixels map 1:1 with this transform so no filtering necessary
-	return self:has_unity_scale() and math.floor(self.x0) == self.x0 and math.floor(self.y0) == self.y0
+	return self:has_unity_scale() and floor(self.x0) == self.x0 and floor(self.y0) == self.y0
 end
 
 function matrix_mt.__mul(a, b)

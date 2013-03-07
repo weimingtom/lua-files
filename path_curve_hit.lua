@@ -1,25 +1,24 @@
 local line_hit = require'path_line'.hit
-local point_distance2 = require'path_point'.distance2
+local distance2 = require'path_point'.distance2
 
 --TODO: rename the module to something more generic.
 
---create a curve hit function based on a supplied interpolation function.
---the hit function returns shortest distance-squared from point (x0, y0) to curve,
+--create a curve hit function based on a supplied interpolation function that writes ('line', x2, y2, t1, t2)
+--to a supplied write function. the hit function returns shortest distance-squared from point (x0, y0) to curve,
 --plus the touch point, and the time in the curve where the touch point splits the curve.
 local function interpolation_based_hit_function(interpolate)
 	return function(x0, y0, x1, y1, ...)
-		local cpx, cpy = x1, y1
-		local mind = 1/0
-		local minx, miny, mint, mint1, mint2
-		local function write(_, x2, y2, t1, t2)
+		local mind, minx, miny, mint, mint1, mint2 = distance2(x0, y0, x1, y1), x1, y1, 0, 0, 1
+		local cpx, cpy, ct = x1, y1, 0
+		local function write(_, x2, y2, t2)
 			local d, x, y, t = line_hit(x0, y0, cpx, cpy, x2, y2)
 			if not d then
-				d, x, y, t = point_distance2(x0, y0, x2, y2), x2, y2, 0
+				d, x, y, t = distance2(x0, y0, x2, y2), x2, y2, 1
 			end
 			if d < mind then
-				mind, minx, miny, mint, mint1, mint2 = d, x, y, t, t1, t2
+				mind, minx, miny, mint, mint1, mint2 = d, x, y, t, ct, t2
 			end
-			cpx, cpy = x2, y2
+			cpx, cpy, ct = x2, y2, t2
 		end
 		interpolate(write, x1, y1, ...)
 		if mint then

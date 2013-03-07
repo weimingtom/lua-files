@@ -26,8 +26,19 @@ function player:on_render(cr)
 		glue.append(dots, x2, y2)
 	end
 
-	local r = i/10
+	local r = i/100
 	local function bez(cpx, cpy, x2, y2, x3, y3, x4, y4)
+
+		--handle lines
+		cr:move_to(cpx,cpy)
+		cr:line_to(x2,y2)
+		cr:move_to(x4,y4)
+		cr:line_to(x3,y3)
+		cr:set_source_rgb(0,1,0)
+		cr:set_line_width(1)
+		cr:stroke()
+
+		--curve
 		lines = 0
 		dots = {}
 		cr:move_to(cpx,cpy)
@@ -36,12 +47,24 @@ function player:on_render(cr)
 		cr:set_line_width(2)
 		cr:stroke()
 
-		cr:set_source_rgb(0,0,1)
-		cr:set_line_width(3)
+		--control points
+		cr:rectangle(x2-3,y2-3,6,6)
+		cr:rectangle(x3-3,y3-3,6,6)
+		cr:set_source_rgb(1,0,0)
+		cr:fill()
+
+		--end points
+		cr:rectangle(cpx-3,cpy-3,6,6)
+		cr:rectangle(x4-3,y4-3,6,6)
+		cr:set_source_rgb(1,0,1)
+		cr:fill()
+
+		--segment dots
 		for i=1,#dots,2 do
 			local x,y = dots[i], dots[i+1]
-			cr:rectangle(x-3,y-3,6,6)
+			--cr:rectangle(x-2,y-2,4,4)
 		end
+		cr:set_source_rgb(0,0,1)
 		cr:fill()
 
 		label(cpx, cpy - 10, 'segments: %d', lines)
@@ -93,6 +116,9 @@ function player:on_render(cr)
 
 	cr:translate(0,200)
 	bez(0,0,400,0,0,0,400,0) --control points == end points switched
+
+	cr:translate(0,100)
+	bez(10, 80, 10, 80, 310, 80, 110, 80)
 
 	--vertical colinear
 
