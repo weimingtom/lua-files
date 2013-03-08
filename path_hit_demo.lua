@@ -53,7 +53,7 @@ function player:on_render(cr)
 	cr:set_line_width(1)
 	local draw = path_draw(cr)
 
-	local x0,y0 = self.mouse_x or 0/0,self.mouse_y or 0/0
+	local x0,y0 = self.mouse_x or 0,self.mouse_y or 0
 
 	local dists = {}
 
