@@ -3,6 +3,7 @@
 
 local hit_function = require'path_curve_hit'.hit_function
 local bezier3_to_lines = require'path_bezier3_ai'
+local bezier3_to_lines_linear = require'path_bezier3_li'
 
 local min, max, sqrt = math.min, math.max, math.sqrt
 
@@ -99,7 +100,8 @@ local function bezier3_split(t, x1, y1, x2, y2, x3, y3, x4, y4)
 		x1234, y1234, x234, y1234, x34, y34, x4, y4 --second curve
 end
 
-local bezier3_hit = hit_function(bezier3_to_lines)
+local bezier3_hit1 = hit_function(bezier3_to_lines)
+local bezier3_hit2 = hit_function(bezier3_to_lines_linear)
 
 if not ... then require'path_hit_demo' end
 
@@ -107,10 +109,12 @@ return {
 	bounding_box = bezier3_bounding_box,
 	bezier2_control_point = bezier2_control_point,
 	to_lines = bezier3_to_lines,
+	to_lines2 = bezier3_to_lines2,
 	--hit & split API
 	point = bezier3_point,
 	length = bezier3_length,
 	split = bezier3_split,
-	hit = bezier3_hit,
+	hit1 = bezier3_hit1,
+	hit2 = bezier3_hit2,
 }
 

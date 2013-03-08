@@ -91,8 +91,8 @@ local function arc_split(t, cx, cy, r, start_angle, sweep_angle)
 		cx, cy, r, split_angle, sweep2  --second arc
 end
 
---shortest distance-squared from point (x0, y0) to a circular arc, plus the touch point,
---and the time in the arc where the touch point splits the arc.
+--shortest distance-squared from point (x0, y0) to a circular arc, plus the touch point, and the time in the arc
+--where the touch point splits the arc.
 local function arc_hit(x0, y0, cx, cy, r, start_angle, sweep_angle)
 	r = abs(r)
 	if x0 == cx and y0 == cy then --projecting from the center
@@ -102,7 +102,16 @@ local function arc_hit(x0, y0, cx, cy, r, start_angle, sweep_angle)
 	local hit_angle = point_angle(x0, y0, cx, cy)
 	local end_angle = start_angle + observed_sweep(sweep_angle)
 	local t = sweep_time(hit_angle, start_angle, sweep_angle)
-	if t < 0 or t > 1 then return end --hit point is outside arc's sweep
+	if t < 0 or t > 1 then --hit point is outside arc's sweep opening, check distance to end points
+		local x1, y1, x2, y2 = arc_endpoints(cx, cy, r, start_angle, sweep_angle)
+		local d1 = distance2(x0, y0, x1, y1)
+		local d2 = distance2(x0, y0, x2, y2)
+		if d1 <= d2 then
+			return d1, x1, y1, 0
+		else
+			return d2, x2, y2, sweep_time(end_angle, start_angle, sweep_angle)
+		end
+	end
 	local x, y = point_around(cx, cy, r, hit_angle)
 	return distance2(x0, y0, x, y), x, y, t
 end

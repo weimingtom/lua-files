@@ -29,7 +29,7 @@ local function line_split(t, x1, y1, x3, y3)
 		x2, y2, x3, y3  --second segment
 end
 
---intersect infinite line with its perpendicular from point (x, y).
+--intersect infinite line with its perpendicular from point (x, y); return the intersection point.
 local function point_line_intersection(x, y, x1, y1, x2, y2)
 	local dx = x2 - x1
 	local dy = y2 - y1
@@ -39,13 +39,17 @@ local function point_line_intersection(x, y, x1, y1, x2, y2)
 	return x - k * dy, y + k * dx
 end
 
---return shortest distance-squared from point (x0, y0) to line, plus the touch point, and the time
---in the line where the touch point splits the line.
+--return shortest distance-squared from point (x0, y0) to line, plus the touch point, and the time in the line
+--where the touch point splits the line.
 local function line_hit(x0, y0, x1, y1, x2, y2)
 	local x, y = point_line_intersection(x0, y0, x1, y1, x2, y2)
 	local tx = x2 == x1 and 0 or (x - x1) / (x2 - x1)
 	local ty = y2 == y1 and 0 or (y - y1) / (y2 - y1)
-	if tx < 0 or tx > 1 or ty < 0 or ty > 1 then return end --intersection occurs outside the segment
+	if tx < 0 or ty < 0 then --intersection occurs outside the segment, closer to the first endpoint
+		return distance2(x0, y0, x1, y1), x1, y1, 0
+	elseif tx > 1 or ty > 1 then --intersection occurs outside the segment, closer to the second endpoint
+		return distance2(x0, y0, x2, y2), x2, y2, 1
+	end
 	return distance2(x0, y0, x, y), x, y, max(tx, ty)
 end
 

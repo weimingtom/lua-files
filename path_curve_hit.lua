@@ -3,9 +3,9 @@ local distance2 = require'path_point'.distance2
 
 --TODO: rename the module to something more generic.
 
---create a curve hit function based on a supplied interpolation function that writes ('line', x2, y2, t1, t2)
+--create a curve hit function based on a supplied interpolation function that writes ('line', x2, y2, t2)
 --to a supplied write function. the hit function returns shortest distance-squared from point (x0, y0) to curve,
---plus the touch point, and the time in the curve where the touch point splits the curve.
+--plus the touch point, and the time in the curve where the touch point is on the curve.
 local function interpolation_based_hit_function(interpolate)
 	return function(x0, y0, x1, y1, ...)
 		local mind, minx, miny, mint, mint1, mint2 = distance2(x0, y0, x1, y1), x1, y1, 0, 0, 1

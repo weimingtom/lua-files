@@ -1,5 +1,5 @@
 --2d quadratic bezier adaptive interpolation from http://www.antigrain.com/research/adaptive_bezier/index.html
---apart from the line segments, it also writes the t1,t2 time interval corresponding to the end points of each segment.
+--the interpolator also produces the bezier parameter (or time) corresponding to the 2nd point of the line segment.
 
 local pi, atan2, abs = math.pi, math.atan2, math.abs
 

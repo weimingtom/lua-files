@@ -1,5 +1,5 @@
 --2d cubic bezier adaptive interpolation from http://www.antigrain.com/research/adaptive_bezier/index.html
---the interpolator also produces the t1,t2 time interval corresponding to the end points of each line segment.
+--the interpolator also produces the bezier parameter (or time) corresponding to the 2nd point of the line segment.
 
 --NOTE: colinearity detection in agg is not cheap but results in versatile curves. Since the approximation error
 --is adapted to both angle and scale, offsets look good, you can apply non-linear transformations on the resulted

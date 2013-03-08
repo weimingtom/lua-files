@@ -7,6 +7,7 @@ local bezier2 = require'path_bezier2'
 local bezier3 = require'path_bezier3'
 local svgarc = require'path_svgarc'
 local path_simplify = require'path_simplify'
+bezier3.hit = require'path_bezier3_hit'
 
 local function path_draw(cr)
 	local function write(s,...)
@@ -56,14 +57,9 @@ function player:on_render(cr)
 
 	local dists = {}
 
-	local function addhit(d,x,y,t)
-		if not d then return end
-		glue.append(dists,d,x,y,t)
-	end
-
 	local function point_hit(x1,y1)
-		local d2 = distance2(x0,y0,x1,y1)
-		addhit(d2,x1,y1,0)
+		local d = distance2(x0,y0,x1,y1)
+		glue.append(dists,d,x1,y1,0)
 	end
 
 	local function line_hit(x1,y1,x2,y2)
@@ -71,7 +67,12 @@ function player:on_render(cr)
 		point_hit(x1,y1); point_hit(x2,y2)
 		draw({'rect',line.bounding_box(x1,y1,x2,y2)},'#222222')
 		draw{'move',x1,y1,'line',x2,y2}
-		addhit(line.hit(x0,y0,x1,y1,x2,y2))
+		local d,x,y,t = line.hit(x0,y0,x1,y1,x2,y2)
+		if d then
+			glue.append(dists,d,x,y,t)
+			x,y = line.point(t,x1,y1,x2,y2)
+			draw({'circle',x,y,3},'#00ff00')
+		end
 	end
 
 	local function arc_hit(cx,cy,r,a1,a2)
@@ -80,42 +81,65 @@ function player:on_render(cr)
 		point_hit(x1,y1); point_hit(x2,y2)
 		draw({'rect',arc.bounding_box(cx,cy,r,a1,a2)},'#222222')
 		draw{'arc',cx,cy,r,math.deg(a1),math.deg(a2)}
-		addhit(arc.hit(x0,y0,cx,cy,r,a1,a2))
+		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,a1,a2)
+		if d then
+			glue.append(dists,d,x,y,t)
+			x, y = arc.point(t,cx,cy,r,a1,a2)
+			draw({'circle',x,y,3},'#00ff00')
+		end
 	end
 
 	local function write(s,x2,y2)
 		draw{'circle',x2,y2,1}
 	end
 
-	local function bezier2_hit(x1,y1,x2,y2,x3,y3)
+	local function bezier2_hit(x1,y1,x2,y2,x3,y3,scale)
 		x2,y2,x3,y3=x1+x2,y1+y2,x1+x3,y1+y3
 		point_hit(x1,y1); point_hit(x3,y3)
 		draw({'rect',bezier2.bounding_box(x1,y1,x2,y2,x3,y3)},'#222222')
 		draw{'move',x1,y1,'quad_curve',x2,y2,x3,y3}
 		write('move',x1,y1)
 		bezier2.to_lines(write,x1,y1,x2,y2,x3,y3)
-		local d,x,y,t = bezier2.hit(x0,y0,x1,y1,x2,y2,x3,y3)
-		addhit(d,x,y,t)
-		x,y = bezier2.point(t,x1,y1,x2,y2,x3,y3)
-		draw({'circle',x,y,3},'#00ff00')
+		local d,x,y,t = bezier2.hit(x0,y0,x1,y1,x2,y2,x3,y3,scale)
+		if d then
+			glue.append(dists,d,x,y,t)
+			x,y = bezier2.point(t,x1,y1,x2,y2,x3,y3)
+			draw({'circle',x,y,3},'#00ff00')
+		end
 	end
 
-	local function bezier3_hit(x1,y1,x2,y2,x3,y3,x4,y4)
+	local function bezier3_hit(x1,y1,x2,y2,x3,y3,x4,y4,scale)
 		x2,y2,x3,y3,x4,y4=x1+x2,y1+y2,x1+x3,y1+y3,x1+x4,y1+y4
 		point_hit(x1,y1); point_hit(x4,y4)
 		draw({'rect',bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)},'#222222')
 		draw{'move',x1,y1,'curve',x2,y2,x3,y3,x4,y4}
+		--[[
 		write('move',x1,y1)
-		bezier3.to_lines(write,x1,y1,x2,y2,x3,y3,x4,y4)
+		bezier3.to_lines2(write,x1,y1,x2,y2,x3,y3,x4,y4)
+		local d,x,y,t = bezier3.hit2(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4,scale)
+		if d then
+			glue.append(dists,d,x,y,t)
+			x,y = bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4)
+			draw({'circle',x,y,3},'#00ff00')
+		end
+		]]
 		local d,x,y,t = bezier3.hit(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4)
-		addhit(d,x,y,t)
-		x,y = bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4)
-		draw({'circle',x,y,3},'#00ff00')
+		if d then
+			glue.append(dists,d,x,y,t)
+			draw({'circle',x,y,5},'#ffffff')
+			x,y = bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4)
+			draw({'circle',x,y,7},'#ffffff')
+		end
 	end
 
 	line_hit(100, 100, 50, 100)
-	line_hit(300, 100, -100, 0)
+	line_hit(200, 200, -50, -100)
+	line_hit(350, 100, -100, 0)
+	line_hit(250, 150, 100, 0)
 	line_hit(400, 200, 0, -100)
+	line_hit(450, 100, 0, 100)
+	line_hit(600, 100, -100, 50)
+	line_hit(500, 200, 100, -50)
 
 	arc_hit(100, 300, 50, 0, 90)
 	arc_hit(300, 300, 50, -270, 180+45)
@@ -123,8 +147,11 @@ function player:on_render(cr)
 	arc_hit(700, 300, 50, 0, 360 + 90)
 	arc_hit(900, 300, 50, 0, -360)
 
-	bezier2_hit(100, 500, 50, 100, 1000, 0)
-	bezier3_hit(100, 600, 100, 100, 200, -100, 1000, 0)
+	bezier2_hit(100, 400, 50, 100, 1000, 0)
+	bezier2_hit(100, 500, 2000, 0, 0, 10, 10)
+	bezier2_hit(100, 600, 2000, 0, 0, 10)
+	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0, 100)
+	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0, 100)
 
 	local mind = 1/0
 	local x1,y1,t1
