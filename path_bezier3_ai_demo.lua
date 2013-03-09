@@ -62,7 +62,7 @@ function player:on_render(cr)
 		--segment dots
 		for i=1,#dots,2 do
 			local x,y = dots[i], dots[i+1]
-			--cr:rectangle(x-2,y-2,4,4)
+			cr:rectangle(x-2,y-2,4,4)
 		end
 		cr:set_source_rgb(0,0,1)
 		cr:fill()

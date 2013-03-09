@@ -1,14 +1,13 @@
 --math for 2d cubic bezier curves defined as (x1, y1, x2, y2, x3, y3, x4, y4)
 --where (x2, y2) and (x3, y3) are the control points and (x1, y1) and (x4, y4) are the end points.
 
-local hit_function = require'path_curve_hit'.hit_function
 local bezier3_to_lines = require'path_bezier3_ai'
 local bezier3_to_lines_linear = require'path_bezier3_li'
 
 local min, max, sqrt = math.min, math.max, math.sqrt
 
-local function bezier3_base_value(t, a, b, c, d) --compute B(t) for one dimension (see wikipedia).
-	return (1-t)^3 * a + 3*(1-t)^2*t * b + 3*(1-t)*t^2 * c + t^3 * d
+local function bezier3_value(t, x1, x2, x3, x4) --compute B(t) for one dimension (see wikipedia).
+	return (1-t)^3 * x1 + 3*(1-t)^2*t * x2 + 3*(1-t)*t^2 * x3 + t^3 * x4
 end
 
 local function bezier3_first_derivative_roots(a, b, c, d) --solve B(t)'=0 for one dimension (use wolframalpha.com).
@@ -34,12 +33,12 @@ local function bezier3_minmax(x1, x2, x3, x4) --min and max values for B(t) for 
 	--if the curve has local minima and/or maxima then adjust the bounding box.
 	local t1, t2 = bezier3_first_derivative_roots(x1, x2, x3, x4)
 	if t1 and t1 >= 0 and t1 <= 1 then
-		local x = bezier3_base_value(t1, x1, x2, x3, x4)
+		local x = bezier3_value(t1, x1, x2, x3, x4)
 		minx = min(x, minx)
 		maxx = max(x, maxx)
 	end
 	if t2 and t2 >= 0 and t2 <= 1 then
-		local x = bezier3_base_value(t2, x1, x2, x3, x4)
+		local x = bezier3_value(t2, x1, x2, x3, x4)
 		minx = min(x, minx)
 		maxx = max(x, maxx)
 	end
@@ -64,8 +63,8 @@ end
 local function bezier3_point(t, x1, y1, x2, y2, x3, y3, x4, y4)
 	t = min(max(t,0),1)
 	return
-		bezier3_base_value(t, x1, x2, x3, x4),
-		bezier3_base_value(t, y1, y2, y3, y4)
+		bezier3_value(t, x1, x2, x3, x4),
+		bezier3_value(t, y1, y2, y3, y4)
 end
 
 --approximate length of a cubic bezier by integrating the linear interpolation of the curve.
@@ -76,7 +75,7 @@ local function bezier3_length(x1, y1, x2, y2, x3, y3, x4, y4, steps)
 		length = length + line_length(x0, y0, x, y)
 		x0, y0 = x, y
 	end
-	bezier3_to_lines_linear(write, x1, y1, x2, y2, x3, y3, x4, y4, steps)
+	bezier3_to_lines_linear(write, x1, y1, x2, y2, x3, y3, x4, y4, steps or 100)
 	return length
 end
 

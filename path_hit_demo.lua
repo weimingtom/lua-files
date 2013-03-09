@@ -8,6 +8,7 @@ local bezier3 = require'path_bezier3'
 local svgarc = require'path_svgarc'
 local path_simplify = require'path_simplify'
 bezier3.hit = require'path_bezier3_hit'
+bezier2.hit = require'path_bezier2_hit'
 
 local function path_draw(cr)
 	local function write(s,...)
@@ -63,9 +64,7 @@ function player:on_render(cr)
 		draw{'move',x1,y1,'line',x2,y2}
 		local d,x,y,t = line.hit(x0,y0,x1,y1,x2,y2)
 		if d then
-			glue.append(dists,d,x,y,t)
-			x,y = line.point(t,x1,y1,x2,y2)
-			draw({'circle',x,y,3},'#00ff00')
+			glue.append(dists,d,x,y,t,line.point(t,x1,y1,x2,y2))
 		end
 	end
 
@@ -76,9 +75,7 @@ function player:on_render(cr)
 		draw{'arc',cx,cy,r,math.deg(a1),math.deg(a2)}
 		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,a1,a2)
 		if d then
-			glue.append(dists,d,x,y,t)
-			x, y = arc.point(t,cx,cy,r,a1,a2)
-			draw({'circle',x,y,3},'#00ff00')
+			glue.append(dists,d,x,y,t,arc.point(t,cx,cy,r,a1,a2))
 		end
 	end
 
@@ -90,13 +87,9 @@ function player:on_render(cr)
 		x2,y2,x3,y3=x1+x2,y1+y2,x1+x3,y1+y3
 		draw({'rect',bezier2.bounding_box(x1,y1,x2,y2,x3,y3)},'#666666')
 		draw{'move',x1,y1,'quad_curve',x2,y2,x3,y3}
-		write('move',x1,y1)
-		bezier2.to_lines(write,x1,y1,x2,y2,x3,y3)
 		local d,x,y,t = bezier2.hit(x0,y0,x1,y1,x2,y2,x3,y3,scale)
 		if d then
-			glue.append(dists,d,x,y,t)
-			x,y = bezier2.point(t,x1,y1,x2,y2,x3,y3)
-			draw({'circle',x,y,3},'#00ff00')
+			glue.append(dists,d,x,y,t,bezier2.point(t,x1,y1,x2,y2,x3,y3))
 		end
 	end
 
@@ -104,22 +97,9 @@ function player:on_render(cr)
 		x2,y2,x3,y3,x4,y4=x1+x2,y1+y2,x1+x3,y1+y3,x1+x4,y1+y4
 		draw({'rect',bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)},'#666666')
 		draw{'move',x1,y1,'curve',x2,y2,x3,y3,x4,y4}
-		--[[
-		write('move',x1,y1)
-		bezier3.to_lines2(write,x1,y1,x2,y2,x3,y3,x4,y4)
-		local d,x,y,t = bezier3.hit2(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4,scale)
-		if d then
-			glue.append(dists,d,x,y,t)
-			x,y = bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4)
-			draw({'circle',x,y,3},'#00ff00')
-		end
-		]]
 		local d,x,y,t = bezier3.hit(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4)
 		if d then
-			glue.append(dists,d,x,y,t)
-			draw({'circle',x,y,5},'#ffffff')
-			x,y = bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4)
-			draw({'circle',x,y,7},'#ffffff')
+			glue.append(dists,d,x,y,t,bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4))
 		end
 	end
 
@@ -138,16 +118,23 @@ function player:on_render(cr)
 	arc_hit(700, 300, 50, 0, 360 + 90)
 	arc_hit(900, 300, 50, 0, -360)
 
-	bezier2_hit(100, 400, 50, 100, 1000, 0)
-	bezier2_hit(100, 500, 2000, 0, 0, 10, 10)
-	bezier2_hit(100, 600, 2000, 0, 0, 10)
+	bezier2_hit(100, 400, 50, 100, 1000, 0) --wide assymetric
+	bezier2_hit(100, 500, 2000, 0, 0, 5) --very close sides
+	bezier2_hit(100, 550, 0, 0, 1000, 0) --handles on endpoints
 
+	bezier3_hit(100, 600, -500, 5, 1500, 5, 1000, 0) --very close sides
 	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0)
+
+	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0) --elevated quad curve
+	bezier3_hit(700, 100, 400, 100, -200, 100, 200, 0) --loop
+	bezier3_hit(1000, 100, 200, 100, 0, 100, 200, 0) --cusp
 
 	local mind = 1/0
 	local x1,y1,t1
-	for i=1,#dists,4 do
-		local d,x,y,t = unpack(dists,i,i+3)
+	for i=1,#dists,6 do
+		local d,x,y,t,x2,y2 = unpack(dists,i,i+5)
+		draw({'circle',x,y,5},'#ffffff')
+		draw({'circle',x2,y2,7},'#ffffff')
 		if d < mind then
 			mind = d
 			x1,y1,t1=x,y,t
@@ -155,7 +142,7 @@ function player:on_render(cr)
 	end
 	if x1 then
 		draw({'move',x0,y0,'line',x1,y1,'circle',x1,y1,3},'#ff0000')
-		draw({'move',50,560,'text',{family='Arial',size=24},string.format('t: %.2f', t1)},false,'#ffffff')
+		draw({'move',x0+20,y0+24,'text',{family='Arial',size=14},string.format('t: %.2f', t1)},false,'#ffffff')
 	end
 end
 

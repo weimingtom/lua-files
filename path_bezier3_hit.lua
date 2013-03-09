@@ -1,4 +1,5 @@
---finding the nearest-point on a cubic curve, adapted from Graphics Gems (NearestPoint.c) by Cosmin Apreutesei.
+--finding the nearest-point on a cubic bezier curve.
+--solution from Graphics Gems (NearestPoint.c) adapted by Cosmin Apreutesei.
 
 local distance2 = require'path_point'.distance2
 local bezier3_point = require'path_bezier3'.point
@@ -11,8 +12,8 @@ local curve_flatness_epsilon = 1*2^(-curve_recursion_limit-1)
 --forward decl.
 local bezier3_to_bezier5
 local bezier5_roots
-local crossing_count
-local control_polygon_flat_enough
+local bezier5_crossing_count
+local bezier5_flat_enough
 local bezier5_split_in_half
 
 --shortest distance-squared from point (x0, y0) to a cubic bezier curve, plus the touch point,
@@ -100,7 +101,7 @@ end
 
 -- given a 5th-degree equation in Bernstein-Bezier form, find and write all roots in the interval [0, 1].
 function bezier5_roots(write, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, depth)
-	local switch = crossing_count(y1, y2, y3, y4, y5, y6)
+	local switch = bezier5_crossing_count(y1, y2, y3, y4, y5, y6)
 	if switch == 0 then --no solutions here
 		return {}
 	elseif switch == 1 then --unique solution
@@ -109,7 +110,7 @@ function bezier5_roots(write, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, de
 			write((x1 + x6) / 2)
 			return
 		end
-		if control_polygon_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6) then
+		if bezier5_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6) then
 			write(bezier5_xintercept(x1, y1, x6, y6))
 			return
 		end
@@ -163,12 +164,12 @@ local function sign(x) return x >= 0 and 1 or -1 end
 local function sign_flip(x,y) return sign(x) ~= sign(y) and 1 or 0 end
 
 --	count the number of times a Bezier control polygon crosses the 0-axis. This number is >= the number of roots.
-function crossing_count(y1, y2, y3, y4, y5, y6)
+function bezier5_crossing_count(y1, y2, y3, y4, y5, y6)
 	return sign_flip(y1, y2) + sign_flip(y2, y3) + sign_flip(y3, y4) + sign_flip(y4, y5) + sign_flip(y5, y6)
 end
 
 --	check if the control polygon of a Bezier curve is flat enough for recursive subdivision to bottom out.
-function control_polygon_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
+function bezier5_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
 	-- Coefficients of implicit equation for line from (x1,y1)-(x6,y6).
 	-- Derive the implicit equation for line connecting first and last control points.
 	local a = y1 - y6

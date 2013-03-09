@@ -1,20 +1,19 @@
 --math for 2d quadratic bezier curves defined as (x1, y1, x2, y2, x3, y3)
 --where (x2, y2) is the control point and (x1, y1) and (x3, y3) are the end points.
 
-local hit_function = require'path_curve_hit'.hit_function
 local bezier2_to_lines = require'path_bezier2_ai'
 local distance = require'path_point'.distance
 
 local min, max, sqrt, log = math.min, math.max, math.sqrt, math.log
 
-local function bezier2_base_value(t, x1, x2, x3) --compute B(t) on one dimension (see wikipedia)
+local function bezier2_value(t, x1, x2, x3) --compute B(t) on one dimension (see wikipedia).
 	return (1-t)^2 * x1 + 2*(1-t)*t * x2 + t^2 * x3
 end
 
-local function bezier2_first_derivative_root(x1, x2, x3) --solve B(t)'=0 on one dimension (use wolframalpha.com)
-	local denom = x1 - 2*x2 + x3
+local function bezier2_first_derivative_root(a, b, c) --solve B(t)'=0 on one dimension (use wolframalpha.com).
+	local denom = a - 2*b + c
 	if denom ~= 0 then
-		return (x1 - x2) / denom
+		return (a - b) / denom
 	end
 end
 
@@ -25,7 +24,7 @@ local function bezier2_minmax(x1, x2, x3) --min and max values for B(t) on one d
 	--if the curve has local minima and/or maxima then adjust the bounding box.
 	local t = bezier2_first_derivative_root(x1, x2, x3)
 	if t and t >= 0 and t <= 1 then
-		local x = bezier2_base_value(t, x1, x2, x3)
+		local x = bezier2_value(t, x1, x2, x3)
 		minx = min(x, minx)
 		maxx = max(x, maxx)
 	end
@@ -66,8 +65,8 @@ end
 local function bezier2_point(t, x1, y1, x2, y2, x3, y3)
 	t = min(max(t,0),1)
 	return
-		bezier2_base_value(t, x1, x2, x3),
-		bezier2_base_value(t, y1, y2, y3)
+		bezier2_value(t, x1, x2, x3),
+		bezier2_value(t, y1, y2, y3)
 end
 
 --length of quad bezier curve.
@@ -102,8 +101,6 @@ local function bezier2_split(t, x1, y1, x2, y2, x3, y3)
 		x1, y1, x12, y12, x123, y123, --first curve
 		x123, y123, x23, y23, x3, y3  --second curve
 end
-
-local bezier2_hit = hit_function(bezier2_to_lines)
 
 if not ... then require'path_hit_demo' end
 
