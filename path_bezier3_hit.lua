@@ -37,11 +37,11 @@ local function bezier3_hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 	--also test distances to beginning and end of the curve, where t = 0 and 1 respectively.
 	local pd = distance2(x0, y0, x1, y1)
 	if pd < d then
-		return pd, x1, y1, 0
+		d, x, y, t = pd, x1, y1, 0
 	end
 	local pd = distance2(x0, y0, x4, y4)
 	if pd < d then
-		return pd, x4, y4, 1
+		d, x, y, t = pd, x4, y4, 1
 	end
 
 	return d, x, y, t

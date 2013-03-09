@@ -7,20 +7,22 @@ local distance = require'path_point'.distance
 
 local min, max, sqrt, log = math.min, math.max, math.sqrt, math.log
 
-local function bezier2_base_value(t, a, b, c) --compute B(t)
-	return (1-t)^2*a + 2*(1-t)*t*b + t^2*c
+local function bezier2_base_value(t, x1, x2, x3) --compute B(t) on one dimension (see wikipedia)
+	return (1-t)^2 * x1 + 2*(1-t)*t * x2 + t^2 * x3
 end
 
-local function bezier2_first_derivative_root(a, b, c)
-	local denom = a - 2*b + c
-	if denom == 0 then return end
-	return (a-b) / denom
+local function bezier2_first_derivative_root(x1, x2, x3) --solve B(t)'=0 on one dimension (use wolframalpha.com)
+	local denom = x1 - 2*x2 + x3
+	if denom ~= 0 then
+		return (x1 - x2) / denom
+	end
 end
 
---the min and max values that a quad bezier can have on one dimension
-local function bezier2_minmax(x1, x2, x3)
+local function bezier2_minmax(x1, x2, x3) --min and max values for B(t) on one dimension.
+	--start off with the assumption that the curve doesn't extend past its endpoints.
 	local minx = min(x1, x3)
 	local maxx = max(x1, x3)
+	--if the curve has local minima and/or maxima then adjust the bounding box.
 	local t = bezier2_first_derivative_root(x1, x2, x3)
 	if t and t >= 0 and t <= 1 then
 		local x = bezier2_base_value(t, x1, x2, x3)

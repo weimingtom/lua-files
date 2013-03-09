@@ -57,15 +57,9 @@ function player:on_render(cr)
 
 	local dists = {}
 
-	local function point_hit(x1,y1)
-		local d = distance2(x0,y0,x1,y1)
-		glue.append(dists,d,x1,y1,0)
-	end
-
 	local function line_hit(x1,y1,x2,y2)
 		x2,y2=x1+x2,y1+y2
-		point_hit(x1,y1); point_hit(x2,y2)
-		draw({'rect',line.bounding_box(x1,y1,x2,y2)},'#222222')
+		draw({'rect',line.bounding_box(x1,y1,x2,y2)},'#666666')
 		draw{'move',x1,y1,'line',x2,y2}
 		local d,x,y,t = line.hit(x0,y0,x1,y1,x2,y2)
 		if d then
@@ -78,8 +72,7 @@ function player:on_render(cr)
 	local function arc_hit(cx,cy,r,a1,a2)
 		a1,a2=math.rad(a1),math.rad(a2)
 		local x1,y1,x2,y2 = arc.endpoints(cx,cy,r,a1,a2)
-		point_hit(x1,y1); point_hit(x2,y2)
-		draw({'rect',arc.bounding_box(cx,cy,r,a1,a2)},'#222222')
+		draw({'rect',arc.bounding_box(cx,cy,r,a1,a2)},'#666666')
 		draw{'arc',cx,cy,r,math.deg(a1),math.deg(a2)}
 		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,a1,a2)
 		if d then
@@ -95,8 +88,7 @@ function player:on_render(cr)
 
 	local function bezier2_hit(x1,y1,x2,y2,x3,y3,scale)
 		x2,y2,x3,y3=x1+x2,y1+y2,x1+x3,y1+y3
-		point_hit(x1,y1); point_hit(x3,y3)
-		draw({'rect',bezier2.bounding_box(x1,y1,x2,y2,x3,y3)},'#222222')
+		draw({'rect',bezier2.bounding_box(x1,y1,x2,y2,x3,y3)},'#666666')
 		draw{'move',x1,y1,'quad_curve',x2,y2,x3,y3}
 		write('move',x1,y1)
 		bezier2.to_lines(write,x1,y1,x2,y2,x3,y3)
@@ -110,8 +102,7 @@ function player:on_render(cr)
 
 	local function bezier3_hit(x1,y1,x2,y2,x3,y3,x4,y4,scale)
 		x2,y2,x3,y3,x4,y4=x1+x2,y1+y2,x1+x3,y1+y3,x1+x4,y1+y4
-		point_hit(x1,y1); point_hit(x4,y4)
-		draw({'rect',bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)},'#222222')
+		draw({'rect',bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)},'#666666')
 		draw{'move',x1,y1,'curve',x2,y2,x3,y3,x4,y4}
 		--[[
 		write('move',x1,y1)
@@ -150,8 +141,8 @@ function player:on_render(cr)
 	bezier2_hit(100, 400, 50, 100, 1000, 0)
 	bezier2_hit(100, 500, 2000, 0, 0, 10, 10)
 	bezier2_hit(100, 600, 2000, 0, 0, 10)
-	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0, 100)
-	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0, 100)
+
+	bezier3_hit(100, 700, 500, -100, 500, -100, 1000, 0)
 
 	local mind = 1/0
 	local x1,y1,t1
