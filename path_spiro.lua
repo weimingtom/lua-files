@@ -1,5 +1,7 @@
--- generic band-diagonal matrix solver, adapted from numerical recipes
+--generic band-diagonal matrix solver, adapted from numerical recipes.
+
 local abs, pi, cos, sin, sqrt, atan2 = math.abs, math.pi, math.cos, math.sin, math.sqrt, math.atan2
+
 local function bandec(mat, n, m)
 	for i=0,m-1 do
 		local mat_i = mat[i]
@@ -178,7 +180,7 @@ local function integ_spiro_12n(k0, k1, k2, k3, n)
 end
 
 local function fresnel(x, res)
-   local x2 = x^2
+	local x2 = x^2
 	if x2 < 2.5625 then
 		local t = x2^2
 		res[0] = x * x2 * (((((-2.99181919401019853726E3 * t +
@@ -475,20 +477,46 @@ end
 
 
 -------------------------------------------------------
+local player = require'cairopanel_player'
+local bezier2 = require'path_bezier2_ai'
+local glue = require'glue'
 
-local function lineTo(x2, y2)
+local i=1
+function player:on_render(cr)
+	i=i+1
+	cr:identity_matrix()
+	cr:set_source_rgb(0,0,0)
+	cr:paint()
 
+	local function lineTo(x2, y2)
+		cr:line_to(x2, y2)
+	end
+	local function bezierCurveTo(x2, y2, x3, y3, x4, y4)
+		cr:curve_to(x2, y2, x3, y3, x4, y4)
+	end
+
+	local ctx = {
+		lineTo = lineTo,
+		bezierCurveTo = bezierCurveTo,
+	}
+
+	local segs = {}
+	math.randomseed(math.floor(i/20))
+	for i=1,4*10,2 do
+		local x = math.random(1, 1000)
+		local y = math.random(1, 500)
+		glue.append(segs, x, y)
+		cr:circle(x, y, 3)
+	end
+	local ks = {[0]=1,1,1,1}
+
+	cr:move_to(1, 1)
+	for i=1,#segs,4 do
+		local x1, y1, x2, y2 = unpack(segs, i, i+3)
+		seg_to_bez(ctx, ks, x1, y1, x2, y2)
+	end
+	cr:set_source_rgb(1,1,1)
+	cr:stroke()
 end
-local function bezierCurveTo(x2, y2, x3, y3, x4, y4)
 
-end
-
-local ctx = {
-	lineTo = lineTo,
-	bezierCurveTo = bezierCurveTo,
-}
-
-for i=1,#segs do
-	local seg = segs[i]
-	seg_to_bez(ctx, ks, seg.left.xy[0], seg.left.xy[1], seg.right.xy[0], seg.right.xy[1]);
-end
+player:play()

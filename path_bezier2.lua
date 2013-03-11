@@ -1,40 +1,58 @@
 --math for 2d quadratic bezier curves defined as (x1, y1, x2, y2, x3, y3)
 --where (x2, y2) is the control point and (x1, y1) and (x3, y3) are the end points.
 
-local bezier2_to_lines = require'path_bezier2_ai'
 local distance = require'path_point'.distance
+local length_function = require'path_bezier_length'
 
 local min, max, sqrt, log = math.min, math.max, math.sqrt, math.log
 
-local function bezier2_value(t, x1, x2, x3) --compute B(t) on one dimension (see wikipedia).
+--compute B(t) (see wikipedia).
+local function value(t, x1, x2, x3)
 	return (1-t)^2 * x1 + 2*(1-t)*t * x2 + t^2 * x3
 end
 
-local function bezier2_first_derivative_root(a, b, c) --solve B(t)'=0 on one dimension (use wolframalpha.com).
-	local denom = a - 2*b + c
+--separate coefficients from B(t) for using with *_for() functions.
+local function coefficients(x1, x2, x3)
+	return x1-2*x2+x3, 2*(x2-x1), x1 --the a, b, c quadratic coefficients
+end
+
+--compute B(t) for given coefficients.
+local function value_for(t, a, b, c, d)
+	return c + t * (b + t * a) --aka a * t^2 + b * t + c
+end
+
+--compute the first derivative, aka the curve's tangent vector at t, for given coefficients.
+local function derivative1_for(t, a, b)
+	return 2*a*t + b --solution is -b/2a for a ~= 0
+end
+
+--solve B(t)'=0 (use wolframalpha.com).
+local function derivative1_root(x1, x2, x3)
+	local denom = x1 - 2*x2 + x3
 	if denom ~= 0 then
-		return (a - b) / denom
+		return (x1 - x2) / denom
 	end
 end
 
-local function bezier2_minmax(x1, x2, x3) --min and max values for B(t) on one dimension.
+--compute the minimum and maximum values for B(t).
+local function minmax(x1, x2, x3)
 	--start off with the assumption that the curve doesn't extend past its endpoints.
 	local minx = min(x1, x3)
 	local maxx = max(x1, x3)
 	--if the curve has local minima and/or maxima then adjust the bounding box.
-	local t = bezier2_first_derivative_root(x1, x2, x3)
+	local t = derivative1_root(x1, x2, x3)
 	if t and t >= 0 and t <= 1 then
-		local x = bezier2_value(t, x1, x2, x3)
+		local x = value(t, x1, x2, x3)
 		minx = min(x, minx)
 		maxx = max(x, maxx)
 	end
 	return minx, maxx
 end
 
---bounding box (x,y,w,h)
-local function bezier2_bounding_box(x1, y1, x2, y2, x3, y3)
-	local minx, maxx = bezier2_minmax(x1, x2, x3)
-	local miny, maxy = bezier2_minmax(y1, y2, y3)
+--bounding box as (x, y, w, h)
+local function bounding_box(x1, y1, x2, y2, x3, y3)
+	local minx, maxx = minmax(x1, x2, x3)
+	local miny, maxy = minmax(y1, y2, y3)
 	return minx, miny, maxx-minx, maxy-miny
 end
 
@@ -49,7 +67,7 @@ end
 
 --return a fair candidate for the control point of a quad bezier given its end points (x1, y1) and (x3, y3),
 --and a point (x0, y0) that lies on the curve.
-local function bezier2_3point_control_point(x1, y1, x0, y0, x3, y3)
+local function _3point_control_point(x1, y1, x0, y0, x3, y3)
 	-- find a good candidate for t based on chord lengths
 	local c1 = distance(x0, y0, x1, y1)
 	local c2 = distance(x0, y0, x3, y3)
@@ -61,35 +79,17 @@ local function bezier2_3point_control_point(x1, y1, x0, y0, x3, y3)
 		(y0 - (1 - t)^2 * y1 - t^2 * y3) / (2*t * (1 - t))
 end
 
---evaluate a quad bezier at time t (t is capped between 0..1) using linear interpolation.
-local function bezier2_point(t, x1, y1, x2, y2, x3, y3)
-	t = min(max(t,0),1)
+--evaluate a quad bezier at parameter t using linear interpolation.
+local function point(t, x1, y1, x2, y2, x3, y3)
 	return
-		bezier2_value(t, x1, x2, x3),
-		bezier2_value(t, y1, y2, y3)
+		value(t, x1, x2, x3),
+		value(t, y1, y2, y3)
 end
 
---length of quad bezier curve.
---closed-form solution from http://segfaultlabs.com/docs/quadratic-bezier-curve-length.
-local function bezier2_length(x1, y1, x2, y2, x3, y3)
-	local ax = x1 - 2*x2 + x3
-	local ay = y1 - 2*y2 + y3
-	local bx = 2*x2 - 2*x1
-	local by = 2*y2 - 2*y1
-	local A = 4*(ax*ax + ay*ay)
-	local B = 4*(ax*bx + ay*by)
-	local C = bx^2 + by^2
-	local Sabc = 2*sqrt(A+B+C)
-	local A2 = sqrt(A)
-	local A32 = 2*A*A2
-	local C2 = 2*sqrt(C)
-	local BA = B/A2
-	return (A32*Sabc + A2*B*(Sabc - C2) + (4*C*A - B^2)*log((2*A2 + BA + Sabc) / (BA+C2))) / (4*A32)
-end
+local length = length_function(coefficients, derivative1_for)
 
---split a quad bezier at time t (t is capped between 0..1) into two curves using De Casteljau interpolation.
-local function bezier2_split(t, x1, y1, x2, y2, x3, y3)
-	t = min(max(t,0),1)
+--split a quad bezier at parameter t into two curves using De Casteljau interpolation.
+local function split(t, x1, y1, x2, y2, x3, y3)
 	local mt = 1-t
 	local x12 = x1 * mt + x2 * t
 	local y12 = y1 * mt + y2 * t
@@ -105,14 +105,13 @@ end
 if not ... then require'path_hit_demo' end
 
 return {
-	bounding_box = bezier2_bounding_box,
+	bounding_box = bounding_box,
 	bezier3_control_points = bezier3_control_points,
-	bezier2_3point_control_point = bezier2_3point_control_point,
-	to_lines = bezier2_to_lines,
+	bezier2_3point_control_point = _3point_control_point,
 	--hit & split API
-	point = bezier2_point,
-	length = bezier2_length,
-	split = bezier2_split,
-	hit = bezier2_hit,
+	point = point,
+	length = length,
+	split = split,
+	hit = hit,
 }
 

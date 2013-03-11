@@ -48,8 +48,8 @@ local function bezier3_hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 	return d, x, y, t
 end
 
---	Given a polocal (x0,y0) and a Bezier curve, generate a 5th-degree Bezier-format equation whose solution
--- finds the polocal on the curve nearest the user-defined point.
+--given a polocal (x0,y0) and a Bezier curve, generate a 5th-degree Bezier-format equation whose solution
+--finds the polocal on the curve nearest the user-defined point.
 local cubic_z = { -- Precomputed "z" for cubics
 	{1.0, 0.6, 0.3, 0.1},
 	{0.4, 0.6, 0.6, 0.4},
@@ -59,20 +59,20 @@ local function dot_product(ax, ay, bx, by) --the dot product of two vectors
 	return ax * bx + ay * by
 end
 function bezier3_to_bezier5(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
-	-- c's are vectors created by subtracting the polocal (x0,y0) from each of the control points.
+	--c's are vectors created by subtracting the polocal (x0,y0) from each of the control points.
 	local c = {
 		{x1 - x0, y1 - y0},
 		{x2 - x0, y2 - y0},
 		{x3 - x0, y3 - y0},
 		{x4 - x0, y4 - y0},
 	}
-	-- d's are vectors created by subtracting each control polocal from the next and then scaling by 3.
+	--d's are vectors created by subtracting each control polocal from the next and then scaling by 3.
 	local d = {
 		{3 * (x2 - x1), 3 * (y2 - y1)},
 		{3 * (x3 - x2), 3 * (y3 - y2)},
 		{3 * (x4 - x3), 3 * (y4 - y3)},
 	}
-	-- create the c x d table: this is a table of dot products of the c's and d's.
+	--create the c x d table: this is a table of dot products of the c's and d's.
 	local cdTable = {{}, {}, {}}
 	for row=1,3 do
 		for column=1,4 do
@@ -80,7 +80,7 @@ function bezier3_to_bezier5(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 		end
 	end
 
-	-- now, apply the z's to the dot products, on the skew diagonal and set up the x-values, making these "points".
+	--now, apply the z's to the dot products, on the skew diagonal and set up the x-values, making these "points".
 	local w = {}
 	for i=0,5 do
 		w[i] = {y=0, x = i/5}
@@ -99,23 +99,24 @@ function bezier3_to_bezier5(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 	return w[0].x, w[0].y, w[1].x, w[1].y, w[2].x, w[2].y, w[3].x, w[3].y, w[4].x, w[4].y, w[5].x, w[5].y
 end
 
--- given a 5th-degree equation in Bernstein-Bezier form, find and write all roots in the interval [0, 1].
+--given a 5th-degree equation in Bernstein-Bezier form, find and write all roots in the interval [0, 1].
 function bezier5_roots(write, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, depth)
 	local switch = bezier5_crossing_count(y1, y2, y3, y4, y5, y6)
 	if switch == 0 then --no solutions here
 		return {}
 	elseif switch == 1 then --unique solution
-		-- stop recursion when the tree is deep enough and return the one solution at midpoint
+		--stop the recursion when the tree is deep enough and write the one solution at midpoint
 		if depth >= curve_recursion_limit then
 			write((x1 + x6) / 2)
 			return
 		end
+		--stop the recursion when the curve is flat enough and write the solution at x-intercept
 		if bezier5_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6) then
 			write(bezier5_xintercept(x1, y1, x6, y6))
 			return
 		end
 	end
-	-- otherwise, solve recursively after subdividing control polygon
+	--otherwise, solve recursively after subdividing the control polygon
 	local x1, y1, x12, y12, x123, y123, x1234, y1234, x12345, y12345, x123456, y123456,
 			x123456, y123456, x23456, y23456, x3456, y3456, x456, y456, x56, y56, x6, y6 =
 						bezier5_split_in_half(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
@@ -160,18 +161,21 @@ function bezier5_split_in_half(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
 		x123456, y123456, x23456, y23456, x3456, y3456, x456, y456, x56, y56, x6, y6  --second curve
 end
 
-local function sign(x) return x >= 0 and 1 or -1 end
-local function sign_flip(x,y) return sign(x) ~= sign(y) and 1 or 0 end
-
---	count the number of times a Bezier control polygon crosses the 0-axis. This number is >= the number of roots.
+--count the number of times a Bezier control polygon crosses the 0-axis, in other words, the number of times
+--that the sign changes between consecutive y's. This number is >= the number of roots.
 function bezier5_crossing_count(y1, y2, y3, y4, y5, y6)
-	return sign_flip(y1, y2) + sign_flip(y2, y3) + sign_flip(y3, y4) + sign_flip(y4, y5) + sign_flip(y5, y6)
+	return
+		((y1 < 0) ~= (y2 < 0) and 1 or 0) +
+		((y2 < 0) ~= (y3 < 0) and 1 or 0) +
+		((y3 < 0) ~= (y4 < 0) and 1 or 0) +
+		((y4 < 0) ~= (y5 < 0) and 1 or 0) +
+		((y5 < 0) ~= (y6 < 0) and 1 or 0)
 end
 
---	check if the control polygon of a Bezier curve is flat enough for recursive subdivision to bottom out.
+--check if the control polygon of a Bezier curve is flat enough for recursive subdivision to bottom out.
 function bezier5_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
-	-- Coefficients of implicit equation for line from (x1,y1)-(x6,y6).
-	-- Derive the implicit equation for line connecting first and last control points.
+	--coefficients of implicit equation for line from (x1,y1)-(x6,y6).
+	--derive the implicit equation for line connecting first and last control points.
 	local a = y1 - y6
 	local b = x6 - x1
 	local c = x1 * y6 - x6 * y1
@@ -188,26 +192,26 @@ function bezier5_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
 		a * x4 + b * y4 + c,
 		a * x5 + b * y5 + c)
 
-	-- Implicit equation for zero line
+	--implicit equation for the zero line.
 	local a1 = 0.0
 	local b1 = 1.0
 	local c1 = 0.0
 
-	-- Implicit equation for "above" line
+	--implicit equation for the "above" line.
 	local a2 = a
 	local b2 = b
 	local c2 = c - max_distance_above
 	local det = a1 * b2 - a2 * b1
 	local intercept1 = (b1 * c2 - b2 * c1) * (1 / det)
 
-	-- Implicit equation for "below" line
+	--implicit equation for the "below" line.
 	local a2 = a
 	local b2 = b
 	local c2 = c - max_distance_below
 	local det = a1 * b2 - a2 * b1
 	local intercept2 = (b1 * c2 - b2 * c1) * (1 / det)
 
-	-- Compute intercepts of bounding box
+	--intercepts of the bounding box.
 	local left_intercept  = min(intercept1, intercept2)
 	local right_intercept = max(intercept1, intercept2)
 
@@ -215,7 +219,7 @@ function bezier5_flat_enough(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)
 	return error < curve_flatness_epsilon
 end
 
---	compute intersection of chord from first control polocal to last with 0-axis.
+--compute intersection of chord from first control polocal to last with 0-axis.
 function bezier5_xintercept(x1, y1, x6, y6)
 	local XLK = 1.0
 	local YLK = 0.0

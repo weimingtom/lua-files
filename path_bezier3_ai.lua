@@ -1,6 +1,7 @@
---2d cubic bezier adaptive interpolation from http://www.antigrain.com/research/adaptive_bezier/index.html
+--2d cubic bezier adaptive interpolation from AGG.
+--adapted from http://www.antigrain.com/research/adaptive_bezier/index.html by Cosmin Apreutesei.
 
---NOTE: colinearity detection in agg is not cheap but results in versatile curves. Since the approximation error
+--NOTE: colinearity detection in AGG is not cheap but results in versatile curves. Since the approximation error
 --is adapted to both angle and scale, offsets look good, you can apply non-linear transformations on the resulted
 --segments, and you can render the curve with a scanline rasterizer.
 

@@ -2,7 +2,7 @@
 - important: blur, shadow, 2d projection, perspective projection, contrast, gamma, brightness, saturation, grayscale
 
 - bitmaps: vflip, hflip, crop, tile
-- downsampling: dithering, quantization, grayscale
+- downsampling: dithering, quantization
 - projection:
 	- scale up/down (linear, bilinear, bicubic, spline, lanczos), rotate (wrap, smooth), stretch, skew
 	- perspective
@@ -18,10 +18,8 @@ rasterizer:
 - gradients: linear, radial, radial focus, conic, conic angle, diamond, xy, sqrt xy, contour, auto contour, gouraud shading
 
 
-
-
 --2d path vertex pipeline
---[[
+
 The vertex pipeline:
 	path_t -> simplify -> elasticize -> transform -> flatten -> gen-stroke -> clip -> write()
 
@@ -32,6 +30,7 @@ It exists the pipeline as a series of invocations of a function write(???) to be
 
 - inline affine transforms to be applied before flattening; they do not affect the current point
 	- they may or may not affect stroke shape (think about how to express this)
+	- some shapes must be transformed after flattening only in some circumstances eg. arcs & circles.
 
 - stroke generator
 	- polygon offsetting (use clipper?)
@@ -50,4 +49,14 @@ It exists the pipeline as a series of invocations of a function write(???) to be
 - hit testing
 - polygon clipping
 
-]]
+- shape-preserving intersections (needs split API):
+	- line to arc
+	- line to bezier2
+	- line to bezier3
+
+- hi-res intersections?
+	- arc to arc
+	- bezier to bezier
+	- bezier to arc (or arc to bezier)
+	-
+

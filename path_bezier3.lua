@@ -1,53 +1,71 @@
 --math for 2d cubic bezier curves defined as (x1, y1, x2, y2, x3, y3, x4, y4)
 --where (x2, y2) and (x3, y3) are the control points and (x1, y1) and (x4, y4) are the end points.
 
-local bezier3_to_lines = require'path_bezier3_ai'
-local bezier3_to_lines_linear = require'path_bezier3_li'
+local length_function = require'path_bezier_length'
 
 local min, max, sqrt = math.min, math.max, math.sqrt
 
-local function bezier3_value(t, x1, x2, x3, x4) --compute B(t) for one dimension (see wikipedia).
+--compute B(t) (see wikipedia).
+local function value(t, x1, x2, x3, x4)
 	return (1-t)^3 * x1 + 3*(1-t)^2*t * x2 + 3*(1-t)*t^2 * x3 + t^3 * x4
 end
 
-local function bezier3_first_derivative_roots(a, b, c, d) --solve B(t)'=0 for one dimension (use wolframalpha.com).
-	local base = -a*c + a*d+b^2 - b*c - b*d+c^2
-	local denom = -a + 3*b - 3*c + d
+--separate coefficients from B(t) for using with *_for() functions.
+local function coefficients(x1, x2, x3, x4)
+	return x4-x1+3*(x2-x3), 3*x1-6*x2+3*x3, 3*(x2-x1), x1 --the a, b, c, d cubic coefficients
+end
+
+--compute B(t) for given coefficients.
+local function value_for(t, a, b, c, d)
+	return d + t * (c + t * (b + t * a)) --aka a * t^3 + b * t^2 + c * t + d
+end
+
+--compute the first derivative, aka the curve's tangent vector at t, for given coefficients.
+local function derivative1_for(t, a, b, c)
+	return c + t * (2 * b + 3 * a * t)
+end
+
+--solve B(t)'=0 (use wolframalpha.com).
+local function derivative1_roots(x1, x2, x3, x4)
+	local base = -x1*x3 + x1*x4+x2^2 - x2*x3 - x2*x4+x3^2
+	local denom = -x1 + 3*x2 - 3*x3 + x4
 	if base > 0 and denom ~= 0 then
 		local sq = sqrt(base)
 		return
-			 (sq - a + 2*b - c) / denom,
-			(-sq - a + 2*b - c) / denom
+			 (sq - x1 + 2*x2 - x3) / denom,
+			(-sq - x1 + 2*x2 - x3) / denom
 	else
-		local denom = 2*(a - 2*b + c)
+		local denom = 2*(x1 - 2*x2 + x3)
 		if denom ~= 0 then
-			return (a-b) / denom
+			return (x1 - x2) / denom
 		end
 	end
 end
 
-local function bezier3_minmax(x1, x2, x3, x4) --min and max values for B(t) for one dimension.
+--compute the minimum and maximum values for B(t).
+local function minmax(x1, x2, x3, x4)
 	--start off with the assumption that the curve doesn't extend past its endpoints.
 	local minx = min(x1, x4)
 	local maxx = max(x1, x4)
 	--if the curve has local minima and/or maxima then adjust the bounding box.
-	local t1, t2 = bezier3_first_derivative_roots(x1, x2, x3, x4)
+	local t1, t2 = derivative1_roots(x1, x2, x3, x4)
 	if t1 and t1 >= 0 and t1 <= 1 then
-		local x = bezier3_value(t1, x1, x2, x3, x4)
+		local x = value(t1, x1, x2, x3, x4)
 		minx = min(x, minx)
 		maxx = max(x, maxx)
 	end
 	if t2 and t2 >= 0 and t2 <= 1 then
-		local x = bezier3_value(t2, x1, x2, x3, x4)
+		local x = value(t2, x1, x2, x3, x4)
 		minx = min(x, minx)
 		maxx = max(x, maxx)
 	end
 	return minx, maxx
 end
 
-local function bezier3_bounding_box(x1, y1, x2, y2, x3, y3, x4, y4) --bounding box as (x, y, w, h)
-	local minx, maxx = bezier3_minmax(x1, x2, x3, x4)
-	local miny, maxy = bezier3_minmax(y1, y2, y3, y4)
+--bounding box as (x, y, w, h)
+local function bounding_box(x1, y1, x2, y2, x3, y3, x4, y4)
+	local minx, maxx = minmax(x1, x2, x3, x4)
+	local miny, maxy = minmax(y1, y2, y3, y4)
 	return minx, miny, maxx-minx, maxy-miny
 end
 
@@ -59,29 +77,19 @@ local function bezier2_control_point(x1, y1, x2, y2, x3, y3, x4, y4)
 		-.25*y1 + .75*y2 + .75*y3 -.25*y4
 end
 
---evaluate a cubic bezier at time t (t is capped between 0..1) using linear interpolation.
-local function bezier3_point(t, x1, y1, x2, y2, x3, y3, x4, y4)
-	t = min(max(t,0),1)
+--evaluate a cubic bezier at time t using linear interpolation.
+--for bit more speed, we could save and reuse the polynomial coefficients betwen computations for x and y.
+local function point(t, x1, y1, x2, y2, x3, y3, x4, y4)
 	return
-		bezier3_value(t, x1, x2, x3, x4),
-		bezier3_value(t, y1, y2, y3, y4)
+		value(t, x1, x2, x3, x4),
+		value(t, y1, y2, y3, y4)
 end
 
---approximate length of a cubic bezier by integrating the linear interpolation of the curve.
-local function bezier3_length(x1, y1, x2, y2, x3, y3, x4, y4, steps)
-	local x0, y0 = x1, y1
-	local length = 0
-	local function write(_, x, y)
-		length = length + line_length(x0, y0, x, y)
-		x0, y0 = x, y
-	end
-	bezier3_to_lines_linear(write, x1, y1, x2, y2, x3, y3, x4, y4, steps or 100)
-	return length
-end
+--approximate length of a cubic bezier using Gauss quadrature.
+local length = length_function(coefficients, derivative1_for)
 
---split a cubic bezier at time t (t is capped between 0..1) into two curves using De Casteljau interpolation.
-local function bezier3_split(t, x1, y1, x2, y2, x3, y3, x4, y4)
-	t = min(max(t,0),1)
+--split a cubic bezier at time t into two curves using De Casteljau interpolation.
+local function split(t, x1, y1, x2, y2, x3, y3, x4, y4)
 	local mt = 1-t
 	local x12 = x1 * mt + x2 * t
 	local y12 = y1 * mt + y2 * t
@@ -103,15 +111,13 @@ end
 if not ... then require'path_hit_demo' end
 
 return {
-	bounding_box = bezier3_bounding_box,
+	bounding_box = bounding_box,
 	bezier2_control_point = bezier2_control_point,
-	to_lines = bezier3_to_lines,
-	to_lines_linear = bezier_to_lines_linear,
 	--hit & split API
-	point = bezier3_point,
-	length = bezier3_length,
-	split = bezier3_split,
-	hit1 = bezier3_hit1,
-	hit2 = bezier3_hit2,
+	point = point,
+	length = length,
+	split = split,
+	hit1 = hit1,
+	hit2 = hit2,
 }
 

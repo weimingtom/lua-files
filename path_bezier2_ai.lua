@@ -1,4 +1,5 @@
---2d quadratic bezier adaptive interpolation from http://www.antigrain.com/research/adaptive_bezier/index.html
+--2d quadratic bezier adaptive interpolation from AGG.
+--adapted from http://www.antigrain.com/research/adaptive_bezier/index.html by Cosmin Apreutesei.
 
 local pi, atan2, abs = math.pi, math.atan2, math.abs
 

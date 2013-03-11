@@ -7,23 +7,26 @@ local distance2 = require'path_point'.distance2
 
 --evaluate a line at time t using linear interpolation.
 --the time between 0..1 covers the segment interval.
-local function line_point(t, x1, y1, x2, y2)
+local function point(t, x1, y1, x2, y2)
 	return x1 + t * (x2 - x1), y1 + t * (y2 - y1)
 end
 
-local line_length = distance
+--length of line at time t.
+local function length(t, x1, y1, x2, y2)
+	return t * distance(x1, y1, x2, y2)
+end
 
 --bounding box of line in (x,y,w,h) form.
-local function line_bounding_box(x1, y1, x2, y2)
+local function bounding_box(x1, y1, x2, y2)
 	if x1 > x2 then x1, x2 = x2, x1 end
 	if y1 > y2 then y1, y2 = y2, y1 end
 	return x1, y1, x2-x1, y2-y1
 end
 
 --split line segment into two line segments at time t (t is capped between 0..1).
-local function line_split(t, x1, y1, x3, y3)
+local function split(t, x1, y1, x3, y3)
 	t = min(max(t,0),1)
-	local x2, y2 = line_point(t, x1, y1, x3, y3)
+	local x2, y2 = point(t, x1, y1, x3, y3)
 	return
 		x1, y1, x2, y2, --first segment
 		x2, y2, x3, y3  --second segment
@@ -41,7 +44,7 @@ end
 
 --return shortest distance-squared from point (x0, y0) to line, plus the touch point, and the time in the line
 --where the touch point splits the line.
-local function line_hit(x0, y0, x1, y1, x2, y2)
+local function hit(x0, y0, x1, y1, x2, y2)
 	local x, y = point_line_intersection(x0, y0, x1, y1, x2, y2)
 	local tx = x2 == x1 and 0 or (x - x1) / (x2 - x1)
 	local ty = y2 == y1 and 0 or (y - y1) / (y2 - y1)
@@ -70,10 +73,11 @@ if not ... then require'path_hit_demo' end
 return {
 	point_line_intersection = point_line_intersection,
 	line_line_intersection = line_line_intersection,
-	bounding_box = line_bounding_box,
+	bounding_box = bounding_box,
 	--hit & split API
-	point = line_point,
-	length = line_length,
-	split = line_split,
-	hit = line_hit,
+	point = point,
+	length = length,
+	split = split,
+	hit = hit,
 }
+

@@ -3,11 +3,16 @@
 local sqrt, abs, min, max, sin, cos, atan2 =
 	math.sqrt, math.abs, math.min, math.max, math.sin, math.cos, math.atan2
 
+local function hypot(a, b)
+	if a == 0 and a == 0 then return 0 end
+	a, b = abs(a), abs(b)
+	a, b = max(a,b), min(a,b)
+	return a * sqrt(1 + (b / a)^2)
+end
+
 --distance between two points. avoids underflow and overflow.
 local function distance(x1, y1, x2, y2)
-	local x, y = abs(x2-x1), abs(y2-y1)
-	if x == 0 and y == 0 then return 0 end
-	return max(x,y) * sqrt(1 + (min(x,y) / max(x,y))^2)
+	return hypot(x2-x1, y2-y1)
 end
 
 --distance between two points squared.
@@ -42,9 +47,8 @@ local function reflect_point_distance(x, y, cx, cy, length)
 		cy + (cy - y) * scale
 end
 
-if not ... then require'path_point_test' end
-
 return {
+	hypot = hypot,
 	distance = distance,
 	distance2 = distance2,
 	point_around = point_around,
