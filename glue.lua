@@ -2,6 +2,10 @@
 
 local glue = {}
 
+local select, pairs, tonumber, tostring, unpack, xpcall, assert, getmetatable, setmetatable, type, pcall =
+	   select, pairs, tonumber, tostring, unpack, xpcall, assert, getmetatable, setmetatable, type, pcall
+local sort, format, byte, char, max = table.sort, string.format, string.byte, string.char, math.max
+
 function glue.index(t)
 	local dt={} for k,v in pairs(t) do dt[v]=k end
 	return dt
@@ -35,9 +39,10 @@ function glue.merge(dt,...)
 end
 
 --TODO: document and test this if it's a keeper
+local keys = glue.keys
 function glue.sortedpairs(t, cmp)
-	local kt = glue.keys(t)
-	table.sort(kt, cmp)
+	local kt = keys(t)
+	sort(kt, cmp)
 	local i = 0
 	return function()
 		i = i + 1
@@ -59,32 +64,7 @@ function glue.append(dt,...)
 	for i=1,select('#',...) do
 		dt[#dt+1] = select(i,...)
 	end
-end
-
---TODO: document and test this if it's a keeper
-function glue.insert(dest, idest, src, isrc, nsrc)
-    isrc = isrc or 1
-	 local iend
-    if not nsrc then
-        nsrc = #src
-        iend = #src
-    else
-        iend = isrc + min(nsrc-1,#src-isrc)
-    end
-    if dest == src then -- special case
-        if idest > isrc and iend >= idest then -- overlapping ranges
-            src = tablex.sub(src,isrc,nsrc)
-            isrc = 1; iend = #src
-        end
-    end
-    for i = isrc,iend do
-        dest[idest] = src[i]
-        idest = idest + 1
-    end
-    if clean_tail then
-        tablex.clear(dest,idest)
-    end
-    return dest
+	return dt
 end
 
 function glue.pluck(t,key)
@@ -134,9 +114,9 @@ glue.string = {}
 
 getmetatable''.__mod = function(s,v)
 	if type(v) == 'table' then
-		return string.format(s, unpack(v))
+		return format(s, unpack(v))
 	else
-		return string.format(s, v)
+		return format(s, v)
 	end
 end
 
@@ -167,7 +147,7 @@ function glue.string.trim(s)
 end
 
 local function format_ci_pat(c)
-	return string.format('[%s%s]', c:lower(), c:upper())
+	return format('[%s%s]', c:lower(), c:upper())
 end
 function glue.string.escape(s, mode)
 	if mode == '*i' then s = s:gsub('[%a]', format_ci_pat) end
@@ -177,22 +157,22 @@ end
 
 function glue.string.tohex(s, upper)
 	if type(s) == 'number' then
-		return string.format(upper and '%08.8X' or '%08.8x', s)
+		return format(upper and '%08.8X' or '%08.8x', s)
 	end
 	if upper then
 		return (s:gsub('.', function(c)
-		  return string.format('%02X', string.byte(c))
+		  return format('%02X', byte(c))
 		end))
 	else
 		return (s:gsub('.', function(c)
-		  return string.format('%02x', string.byte(c))
+		  return format('%02x', byte(c))
 		end))
 	end
 end
 
 function glue.string.fromhex(s)
 	return (s:gsub('..', function(cc)
-	  return string.char(tonumber(cc, 16))
+	  return char(tonumber(cc, 16))
 	end))
 end
 
@@ -258,9 +238,9 @@ function glue.inherit(t,...)
 	local n=select('#',...)
 	if n==0 then error('parent expected', 2) end
 	if n==1 then return setmeta(t,...,nil) end
-	local parents={}
+	local parents = {}
 	for i=1,n do
-		parents[#parents+1]=select(i,...) --ignore nils
+		parents[#parents+1] = select(i,...) --ignore nils
 	end
 	if #parents < 2 then return setmeta(t,parents[1],nil) end
 	setmeta(t,index_parents,parents)
@@ -289,7 +269,7 @@ end
 function glue.assert(v,err,...)
 	if v then return v,err,... end
 	err = err or 'assertion failed!'
-	if select('#',...) > 0 then err = string.format(err,...) end
+	if select('#',...) > 0 then err = format(err,...) end
 	error(err, 2)
 end
 
@@ -306,6 +286,7 @@ function glue.pcall(f, ...) --luajit and lua 5.2 only!
 	return xpcall(f, pcall_error, ...)
 end
 
+local unprotect = glue.unprotect
 function glue.fpcall(f,...) --bloated: 2 tables, 4 closures. can we reduce the overhead?
 	local fint, errt = {}, {}
 	local function finally(f) fint[#fint+1] = f end
@@ -319,13 +300,14 @@ function glue.fpcall(f,...) --bloated: 2 tables, 4 closures. can we reduce the o
 		if ok then
 			for i=#fint,1,-1 do fint[i]() end
 		end
-		return glue.unprotect(ok,...)
+		return unprotect(ok,...)
 	end
 	return pass(xpcall(f, err, finally, onerror, ...))
 end
 
+local fpcall = glue.fpcall
 function glue.fcall(f,...)
-	return assert(glue.fpcall(f,...))
+	return assert(fpcall(f,...))
 end
 
 if not ... then require'glue_test' end

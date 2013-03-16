@@ -24,6 +24,8 @@ function matrix:new(...)
 	if ... then return m:reset(...) else return m:identity() end
 end
 
+setmetatable(matrix, {__call = matrix.new})
+
 function matrix:unpack()
 	return self.xx, self.yx, self.xy, self.yy, self.x0, self.y0
 end

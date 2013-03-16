@@ -41,17 +41,23 @@ local function is_sweeped(hit_angle, start_angle, sweep_angle)
 	return t >= 0 and t <= 1
 end
 
-local function endpoints(cx, cy, r, start_angle, sweep_angle)
-	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle)
+local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
+	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, x2, y2)
 end
 
-local function to_bezier3(cx, cy, r, start_angle, sweep_angle)
-	return elliptic_arc_to_bezier3(cx, cy, r, r, start_angle, sweep_angle)
+--return a fake control point to serve as reflection point for a following smooth curve.
+local function smooth_point(cx, cy, r, start_angle, sweep_angle, x2, y2)
+	--TODO: construct a point on the tangent of the arc's second endpoint
+	return select(3, endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2))
+end
+
+local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2)
+	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, x2, y2)
 end
 
 --bounding box as (x,y,w,h) for a circular arc.
-local function bounding_box(cx, cy, r, start_angle, sweep_angle)
-	local x1, y1, x2, y2 = endpoints(cx, cy, r, start_angle, sweep_angle)
+local function bounding_box(cx, cy, r, start_angle, sweep_angle, x2, y2)
+	local x1, y1, x2, y2 = endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
 	--assume the bounding box is between endpoints, i.e. that the arc doesn't touch any of its circle's extremities.
 	local x1, x2 = min(x1, x2), max(x1, x2)
 	local y1, y2 = min(y1, y2), max(y1, y2)
@@ -93,7 +99,7 @@ end
 
 --shortest distance-squared from point (x0, y0) to a circular arc, plus the touch point, and the time in the arc
 --where the touch point splits the arc.
-local function hit(x0, y0, cx, cy, r, start_angle, sweep_angle)
+local function hit(x0, y0, cx, cy, r, start_angle, sweep_angle, x2, y2)
 	r = abs(r)
 	if x0 == cx and y0 == cy then --projecting from the center
 		local x, y = point_around(cx, cy, r, start_angle)
@@ -103,7 +109,7 @@ local function hit(x0, y0, cx, cy, r, start_angle, sweep_angle)
 	local end_angle = start_angle + observed_sweep(sweep_angle)
 	local t = sweep_time(hit_angle, start_angle, sweep_angle)
 	if t < 0 or t > 1 then --hit point is outside arc's sweep opening, check distance to end points
-		local x1, y1, x2, y2 = endpoints(cx, cy, r, start_angle, sweep_angle)
+		local x1, y1, x2, y2 = endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
 		local d1 = distance2(x0, y0, x1, y1)
 		local d2 = distance2(x0, y0, x2, y2)
 		if d1 <= d2 then
@@ -123,6 +129,7 @@ return {
 	sweep_between = sweep_between,
 	is_sweeped = is_sweeped,
 	endpoints = endpoints,
+	smooth_point = smooth_point,
 	to_bezier3 = to_bezier3,
 	bounding_box = bounding_box,
 	--hit & split API

@@ -1,8 +1,10 @@
---math for 2d circular arcs defined as the arc between 3 points (x1, y1), (x2, y2), (x3, y3).
+--math for 2d circular arcs defined as (x1, y1, xp, yp, x2, y2) where (x1, y1) and (x2, y2) are its end points
+--and (xp,yp) is a third point on the arc.
 
 local distance2    = require'path_point'.distance2
 local point_angle  = require'path_point'.point_angle
 local point_around = require'path_point'.point_around
+local line_point = require'path_line'.point
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 local sweep_between  = require'path_arc'.sweep_between
 local observed_sweep = require'path_arc'.observed_sweep
@@ -13,12 +15,12 @@ local arc_length     = require'path_arc'.length
 local arc_split      = require'path_arc'.split
 local arc_hit        = require'path_arc'.hit
 
-local function to_arc(x1, y1, x2, y2, x3, y3)
-	local cx, cy, r = circle_3p_to_circle(x1, y1, x2, y2, x3, y3)
+local function to_arc(x1, y1, xp, yp, x2, y2)
+	local cx, cy, r = circle_3p_to_circle(x1, y1, xp, yp, x2, y2)
 	if not cx then return end --points are collinear, can't make an arc.
 	local start_angle = point_angle(x1, y1, cx, cy)
-	local end_angle   = point_angle(x3, y3, cx, cy)
-	local ctl_angle   = point_angle(x2, y2, cx, cy)
+	local end_angle   = point_angle(x2, y2, cx, cy)
+	local ctl_angle   = point_angle(xp, yp, cx, cy)
 	local sweep_angle = sweep_between(start_angle, end_angle)
 	local ctl_sweep   = sweep_between(start_angle, ctl_angle)
 	if ctl_sweep > sweep_angle then --control point is outside the positive sweep, must be inside the negative sweep then.
@@ -29,30 +31,29 @@ end
 
 local function arc_to_arc_3p(cx, cy, r, start_angle, sweep_angle)
 	local x1, y1, x2, y2 = arc_endpoints(cx, cy, r, start_angle, sweep_angle)
-	local x3, y3 = point_around(cx, cy, r, start_angle + observed_sweep(sweep_angle) / 2)
-	return x1, y1, x2, y2, x3, y3
+	local xp, yp = point_around(cx, cy, r, start_angle + observed_sweep(sweep_angle) / 2)
+	return x1, y1, xp, yp, x2, y2
 end
 
-local function to_bezier3(x1, y1, x2, y2, x3, y3)
-	local cx, cy, r, start_angle, sweep_angle = to_arc(x1, y1, x2, y2, x3, y3)
+local function to_bezier3(write, x1, y1, xp, yp, x2, y2)
+	local cx, cy, r, start_angle, sweep_angle = to_arc(x1, y1, xp, yp, x2, y2)
 	if not cx then --ponts are collinear, radius is infinite, arc is a line
-		--find out where p2 is on the line relative to p1 and p3
+		--find out where pp is on the line relative to p1 and p2
+		local d1p = distance2(x1, y1, xp, yp)
+		local d2p = distance2(x2, y2, xp, yp)
 		local d12 = distance2(x1, y1, x2, y2)
-		local d23 = distance2(x2, y2, x3, y3)
-		local d13 = distance2(x1, y1, x3, y3)
-		if d12 > d13 and d12 > d23 then --p3 is between p1 and p2 and so the arc is a line between p1 and p2
-			return 'line', {x1, y1, x2, y2}
-		else --p3 is outside p1 and p2 and so the arc is an infinite line interrupted between p1 and p2
-			return 'negative_line', {x1, y1, x2, y2}
+		if d12 > d1p and d12 > d2p then --pp is between p1 and p2 and so the arc is a line between p1 and p2
+			write('line', x2, y2)
+			return
+		else --pp is outside p1 and p2 and so the arc is an infinite line interrupted between p1 and p2
+			--TODO: make this so it doesn't interrupts the path!!!
+			write('line', line_point(-10000, x1, y1, x2, y2)) --line to -inf
+			write('move', line_point( 10000, x1, y1, x2, y2)) --move to +inf
+			write('line', x2, y2) --line from +inf to arc endpoint
+			return
 		end
 	end
-	local command, segments = arc_to_bezier3(cx, cy, r, start_angle, sweep_angle)
-	-- override arc's end points for numerical stability
-	segments[1] = x1
-	segments[2] = y1
-	segments[#segments-1] = x3
-	segments[#segments-0] = y3
-	return command, segments
+	arc_to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2)
 end
 
 local function point(t, x1, y1, x2, y2, x3, y3)

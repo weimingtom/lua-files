@@ -1,4 +1,4 @@
---2nd degree equation solver using discriminant to analyze the equation.
+--2nd degree equation solver using discriminant.
 --epsilon controls the precision of the solver.
 
 local abs, sqrt = math.abs, math.sqrt

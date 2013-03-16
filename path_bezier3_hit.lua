@@ -23,29 +23,30 @@ local function bezier3_hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 	local ax1, ay1, ax2, ay2, ax3, ay3, ax4, ay4, ax5, ay5, ax6, ay6 =
 		bezier3_to_bezier5(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 
-	local d, x, y, t = 1/0 --shortest distance, touch point, and the parametric value for the touch point.
+	local mind, minx, miny, mint = 1/0 --shortest distance, touch point, and the parametric value for the touch point.
 
 	--find all roots in [0, 1] interval for the 5th-degree equation and see which has the shortest distance.
-	local function write(root)
-		local px, py = bezier3_point(root, x1, y1, x2, y2, x3, y3, x4, y4)
-		local pd = distance2(x0, y0, px, py)
-		if pd < d then
-			d, x, y, t = pd, px, py, root
+	local function test_solution(t)
+		assert(t >= 0 and t <= 1)
+		local x, y = bezier3_point(t, x1, y1, x2, y2, x3, y3, x4, y4)
+		local d = distance2(x0, y0, x, y)
+		if d < mind then
+			mind, minx, miny, mint = d, x, y, t
 		end
 	end
-	bezier5_roots(write, ax1, ay1, ax2, ay2, ax3, ay3, ax4, ay4, ax5, ay5, ax6, ay6, 0)
+	bezier5_roots(test_solution, ax1, ay1, ax2, ay2, ax3, ay3, ax4, ay4, ax5, ay5, ax6, ay6, 0)
 
 	--also test distances to beginning and end of the curve, where t = 0 and 1 respectively.
-	local pd = distance2(x0, y0, x1, y1)
-	if pd < d then
-		d, x, y, t = pd, x1, y1, 0
+	local d = distance2(x0, y0, x1, y1)
+	if d < mind then
+		mind, minx, miny, mint = d, x1, y1, 0
 	end
-	local pd = distance2(x0, y0, x4, y4)
-	if pd < d then
-		d, x, y, t = pd, x4, y4, 1
+	local d = distance2(x0, y0, x4, y4)
+	if d < mind then
+		mind, minx, miny, mint = d, x4, y4, 1
 	end
 
-	return d, x, y, t
+	return mind, minx, miny, mint
 end
 
 --given a polocal (x0,y0) and a Bezier curve, generate a 5th-degree Bezier-format equation whose solution

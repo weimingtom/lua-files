@@ -4,7 +4,7 @@ local sqrt, abs, min, max, sin, cos, atan2 =
 	math.sqrt, math.abs, math.min, math.max, math.sin, math.cos, math.atan2
 
 local function hypot(a, b)
-	if a == 0 and a == 0 then return 0 end
+	if a == 0 and b == 0 then return 0 end
 	a, b = abs(a), abs(b)
 	a, b = max(a,b), min(a,b)
 	return a * sqrt(1 + (b / a)^2)

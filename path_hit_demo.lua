@@ -11,13 +11,6 @@ bezier3.hit = require'path_bezier3_hit'
 bezier2.hit = require'path_bezier2_hit'
 local cairo = require'cairo'
 
-print(bezier3.split(.1, 0, 0, -500, 0, 1500, 0, 1000, 0))
-print(bezier3.length(1, bezier3.split(.1, 0, 0, -500, -10, 1500, -10, 1000, 0)))
-
---print(bezier3.length(1, bezier3.split(.8, 100, 600, -500, 10, 1500, 10, 1000, 0)))
---print(bezier3.length(1, select(7, bezier3.split(.8, 100, 600, -500, 10, 1500, 10, 1000, 0))))
-
-
 local function path_draw(cr)
 	local function write(s,...)
 		if s == 'move' then cr:move_to(...)

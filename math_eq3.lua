@@ -1,4 +1,4 @@
---3rd degree equation solver using Cardan's formula to analyze the equation.
+--3rd degree equation solver using Cardan's formula.
 --epsilon controls the precision of the solver.
 
 local abs, sqrt, acos, cos, pi = math.abs, math.sqrt, math.acos, math.cos, math.pi

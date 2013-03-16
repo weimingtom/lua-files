@@ -1,4 +1,5 @@
---computing the Gauss quadrature in 24 steps, see http://processingjs.nihongoresources.com/bezierinfo/.
+--computing the length of any picewise polynomial curve using the Gauss quadrature.
+--taken from http://processingjs.nihongoresources.com/bezierinfo/
 
 local hypot = require'path_point'.hypot
 
@@ -18,7 +19,7 @@ local function length_function(coefficients, derivative1_for)
 		local ay, by, cy = coefficients(y1, y2, y3, y4)
 		local z2 = t / 2
 		local sum = 0
-		for i=1,24 do
+		for i=1,#abscissae do
 			local corrected_t = z2 * abscissae[i] + z2
 			local dx = derivative1_for(corrected_t, ax, bx, cx)
 			local dy = derivative1_for(corrected_t, ay, by, cy)

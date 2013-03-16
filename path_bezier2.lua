@@ -107,7 +107,7 @@ if not ... then require'path_hit_demo' end
 return {
 	bounding_box = bounding_box,
 	bezier3_control_points = bezier3_control_points,
-	bezier2_3point_control_point = _3point_control_point,
+	_3point_control_point = _3point_control_point,
 	--hit & split API
 	point = point,
 	length = length,

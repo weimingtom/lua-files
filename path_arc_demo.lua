@@ -1,6 +1,8 @@
 local player = require'cairopanel_player'
+local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 local arc_to_bezier3 = require'path_arc'.to_bezier3
+local arc_endpoints = require'path_arc'.endpoints
 local svgarc_to_bezier3 = require'path_svgarc'.to_bezier3
 local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local glue = require'glue'
@@ -12,24 +14,37 @@ function player:on_render(cr)
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
 
-	local function arc_function(arc_to_bezier3)
-		return function(...)
-			local command, segments = arc_to_bezier3(...)
-			cr:move_to(segments[1], segments[2])
-			if command == 'line' then
-				cr:line_to(segments[3], segments[4])
-			elseif command == 'curve' then
-				for i=3,#segments,8 do
-					cr:curve_to(unpack(segments, i, i + 6 - 1))
-				end
-			end
-			cr:circle(segments[1], segments[2], 2)
-			cr:circle(segments[#segments-1], segments[#segments], 6)
+	local function dot(cx,cy)
+		cpx, cpy = cr:get_current_point()
+		cr:circle(cx,cy,2)
+		cr:move_to(cpx, cpy)
+	end
+
+	local function write(command, ...)
+		local cpx, cpy
+		if command == 'line' then
+			cr:line_to(...)
+			dot(...)
+		elseif command == 'curve' then
+			cr:curve_to(...)
+			dot(select(5,...))
 		end
 	end
-	local elarc = arc_function(elliptic_arc_to_bezier3)
-	local arc = arc_function(arc_to_bezier3)
-	local svgarc = arc_function(svgarc_to_bezier3)
+
+	local function elarc(...)
+		local x1, y1 = elliptic_arc_endpoints(...)
+		cr:move_to(x1, y1)
+		elliptic_arc_to_bezier3(write, ...)
+	end
+	local function arc(...)
+		local x1, y1 = arc_endpoints(...)
+		cr:move_to(x1, y1)
+		arc_to_bezier3(write, ...)
+	end
+	local function svgarc(x1, y1, ...)
+		cr:move_to(x1, y1)
+		svgarc_to_bezier3(write, x1, y1, ...)
+	end
 
 	local a = math.rad(i)
 

@@ -1,5 +1,6 @@
 --2d svg-style elliptical arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
 
+local glue = require'glue'
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 local matrix = require'trans_affine2d'
 
@@ -82,24 +83,59 @@ local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, swe
 	return cx, cy, rx, ry, start_angle, sweep_angle
 end
 
-local function svgarc_to_bezier3(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
-	local cx, cy, rx, ry, start_angle, sweep_angle =
-		svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+local function transform_writer(write, mt)
+	return function(s,...)
+		if s == 'line' then
+			write('line', mt:transform_point(...))
+		elseif s == 'curve' then
+			write('curve',
+				mt:transform_point(...),
+				mt:transform_point(select(3,...)),
+				mt:transform_point(select(5,...)))
+		end
+	end
+end
 
-	-- Build and transform the resulting arc
-	local command, segments = elliptic_arc_to_bezier3(0, 0, rx, ry, start_angle, sweep_angle)
-	local mt = matrix:new():translate(cx, cy):rotate(angle)
-	for i=1,#segments,2 do
-		segments[i], segments[i+1] = mt:transform_point(segments[i], segments[i+1])
+local function delayed_writer(write)
+	local lasts, x2, y2, x3, y3, x4, y4
+	return function(s,...)
+
+	end
+end
+
+local function svgarc_to_bezier3(write, x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+	local cx, cy, rx, ry, start_angle, sweep_angle =
+		svgarc_to_elliptic_arc(x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+
+	-- Build and save the resulting arc segments
+	local command, points = nil, {}
+	local function collect(s,...)
+		command = s
+		glue.append(points,...)
+	end
+	elliptic_arc_to_bezier3(collect, 0, 0, rx, ry, start_angle, sweep_angle)
+
+	-- Transform all the points
+	local mt = matrix():translate(cx, cy):rotate(angle)
+	for i=1,#points,2 do
+		points[i], points[i+1] = mt:transform_point(points[i], points[i+1])
 	end
 
-	-- Override arc's end points for numerical stability
-	segments[1] = x0
-	segments[2] = y0
-	segments[#segments-1] = x2
-	segments[#segments-0] = y2
+	-- Override the end point for exact matching with the given one
+	points[#points-1] = x2
+	points[#points-0] = y2
 
-	return command, segments
+	-- Write the segments out
+	local n = command == 'line' and 2 or 6 --we can only have 'line' or 'curve'
+	for i=1,#points,n do
+		write(command, unpack(points, i, i+n-1))
+	end
+end
+
+--TODO: split & hit API for svgarcs
+local function svgarc_split(t, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+	local cx, cy, rx, ry, start_angle, sweep_angle =
+		svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 end
 
 if not ... then require'path_arc_demo' end

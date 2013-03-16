@@ -9,6 +9,18 @@ test(glue.index{a=5,b=7,c=3}, {[5]='a',[7]='b',[3]='c'})
 test(glue.update({a=1,b=2,c=3}, {d='add',b='overwrite'}, {b='over2'}), {a=1,b='over2',c=3,d='add'})
 test(glue.merge({a=1,b=2,c=3}, {d='add',b='overwrite'}, {b='over2'}), {a=1,b=2,c=3,d='add'})
 test(glue.extend({5,6,8}, {1,2}, {'b','x'}), {5,6,8,1,2,'b','x'})
+test(glue.append({1,2,3}, 5,6), {1,2,3,5,6})
+
+--[[
+test(glue.insert({'a','b'}, 1, 'x','y'), {'x','y','a','b'}) --2 shifts
+test(glue.insert({'a','b','c','d'}, 3, 'x', 'y'), {'a','b','x','y','c','d'}) --2 shifts
+test(glue.insert({'a','b','c','d'}, 4, 'x', 'y'), {'a','b','c','x','y','d'}) --1 shift
+test(glue.insert({'a','b','c','d'}, 5, 'x', 'y'), {'a','b','c','d','x','y'}) --0 shifts
+test(glue.insert({'a','b','c','d'}, 6, 'x', 'y'), {'a','b','c','d',nil,'x','y'}) --out of bounds
+test(glue.insert({'a','b','c','d'}, 1, 'x', 'y'), {'x','y','a','b','c','d'}) --first pos
+test(glue.insert({}, 1, 'x', 'y'), {'x','y'}) --empty dest
+test(glue.insert({}, 3, 'x', 'y'), {nil,nil,'x','y'}) --out of bounds
+]]
 
 test(glue.min{5,2,11,3}, 2)
 test(glue.max{5,2,11,3}, 11)
