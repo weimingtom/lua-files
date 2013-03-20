@@ -1,4 +1,5 @@
 --math for 2d circular arcs defined as (centerx, centery, radius, start_angle, sweep_angle).
+--angles are expressed in degrees, not radians.
 --sweep angle is capped between -360..360deg when drawing but otherwise the time on the arc is relative to the full sweep.
 
 local glue = require'glue'
@@ -9,23 +10,23 @@ local point_angle  = require'path_point'.point_angle
 local elliptic_arc_endpoints  = require'path_elliptic_arc'.endpoints
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 
-local abs, min, max, pi = math.abs, math.min, math.max, math.pi
+local abs, min, max, radians = math.abs, math.min, math.max, math.rad
 
 --observed sweep: we can only observe the first -360..360deg of the total sweep.
 local function observed_sweep(sweep_angle)
-	return max(min(sweep_angle, 2*pi), -2*pi)
+	return max(min(sweep_angle, 360), -360)
 end
 
 --observed sweep between two arbitrary angles, sweeping from a1 to a2 in a specified direction.
 local function sweep_between(a1, a2, clockwise)
-	a1 = a1 % (2*pi)
-	a2 = a2 % (2*pi)
+	a1 = a1 % 360
+	a2 = a2 % 360
 	clockwise = clockwise ~= false
 	local sweep = a2 - a1
 	if sweep < 0 and clockwise then
-		sweep = sweep + 2*pi
+		sweep = sweep + 360
 	elseif sweep > 0 and not clockwise then
-		sweep = sweep - 2*pi
+		sweep = sweep - 360
 	end
 	return sweep
 end
@@ -64,13 +65,13 @@ local function bounding_box(cx, cy, r, start_angle, sweep_angle, x2, y2)
 	if is_sweeped(0, start_angle, sweep_angle) then --arc touches its circle's rightmost point
 		x2 = cx + r
 	end
-	if is_sweeped(pi/2, start_angle, sweep_angle) then --arc touches its circle's most bottom point
+	if is_sweeped(90, start_angle, sweep_angle) then --arc touches its circle's most bottom point
 		y2 = cy + r
 	end
-	if is_sweeped(pi, start_angle, sweep_angle) then --arc touches its circle's leftmost point
+	if is_sweeped(180, start_angle, sweep_angle) then --arc touches its circle's leftmost point
 		x1 = cx - r
 	end
-	if is_sweeped(-pi/2, start_angle, sweep_angle) then --arc touches its circle's topmost point
+	if is_sweeped(-90, start_angle, sweep_angle) then --arc touches its circle's topmost point
 		y1 = cy - r
 	end
 	return x1, y1, x2-x1, y2-y1
@@ -83,7 +84,7 @@ end
 
 --length of circular arc at time t.
 local function length(t, cx, cy, r, start_angle, sweep_angle)
-	return abs(t * sweep_angle * r)
+	return abs(t * radians(sweep_angle) * r)
 end
 
 --split a circular arc into two arcs at time t (t is capped between 0..1).
@@ -130,9 +131,9 @@ return {
 	is_sweeped = is_sweeped,
 	endpoints = endpoints,
 	smooth_point = smooth_point,
+	--path API
 	to_bezier3 = to_bezier3,
 	bounding_box = bounding_box,
-	--hit & split API
 	point = point,
 	length = length,
 	split = split,

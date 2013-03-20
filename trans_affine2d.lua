@@ -1,6 +1,7 @@
---2d affine matrix class (transcribed from cairo)
+--2d affine matrix class, transcribed from cairo by Cosmin Apreutesei.
+--angles are expressed in degrees, not radians.
 
-local sin, cos, tan, floor = math.sin, math.cos, math.tan, math.floor
+local sin, cos, radians, tan, floor = math.sin, math.cos, math.rad, math.tan, math.floor
 
 local matrix = {}
 local matrix_mt = {__index = matrix}
@@ -125,11 +126,12 @@ function matrix:scale(x,y)
 end
 
 function matrix:skew(ax,ay)
-	return self:multiply(1, tan(ay), tan(ax), 1, 0, 0)
+	return self:multiply(1, tan(radians(ay)), tan(radians(ax)), 1, 0, 0)
 end
 
 function matrix:rotate(a)
-    local s = sin(a)
+    a = radians(a)
+	 local s = sin(a)
     local c = cos(a)
     return self:multiply(c, s, -s, c, 0, 0)
 end

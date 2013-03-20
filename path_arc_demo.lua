@@ -46,23 +46,23 @@ function player:on_render(cr)
 		svgarc_to_bezier3(write, x1, y1, ...)
 	end
 
-	local a = math.rad(i)
+	local a = i
 
 	local function arcs_beziers()
 		cr:save()
 		cr:set_line_width(1)
 		cr:set_source_rgba(1,1,1,.2)
 
-		elarc(200, 200, 100, 200, 0, 2*math.pi)
+		elarc(200, 200, 100, 200, 0, 360)
 		cr:stroke()
 
 		cr:set_source_rgb(1,1,1)
 		cr:move_to(200, 200)
-		elarc(200, 200, 100, 200, a + 5, 1)
+		elarc(200, 200, 100, 200, a + 270, 60)
 		cr:line_to(200, 200)
 		cr:stroke()
 
-		elarc(200, 200, 100, 200, a, 4)
+		elarc(200, 200, 100, 200, a, 240)
 		cr:stroke()
 		cr:restore()
 	end
@@ -71,7 +71,7 @@ function player:on_render(cr)
 		local function draw(x, y, cairo_arc, a1, a2, start_angle, sweep_angle)
 			cr:set_source_rgba(0,1,0,0.3)
 			cr:set_line_width(5)
-			cairo_arc(cr, x, y, 100, a1, a2)
+			cairo_arc(cr, x, y, 100, math.rad(a1), math.rad(a2))
 			cr:stroke()
 			cr:new_path()
 			cr:set_line_width(20)
@@ -79,11 +79,10 @@ function player:on_render(cr)
 			cr:stroke()
 		end
 		cr:save()
-		local pi2 = 2*math.pi
 		draw(300, 300, cr.arc, a, 2*a, a, a)
-		draw(600, 300, cr.arc, 2*a, a, 2*a, pi2 - a % pi2)
+		draw(600, 300, cr.arc, 2*a, a, 2*a, 360 - a % 360)
 		draw(300, 600, cr.arc_negative, -a, -2*a, -a, -a)
-		draw(600, 600, cr.arc_negative, -2*a, -a, -2*a, -pi2 + a % pi2)
+		draw(600, 600, cr.arc_negative, -2*a, -a, -2*a, -360 + a % 360)
 		cr:restore()
 	end
 
@@ -93,13 +92,13 @@ function player:on_render(cr)
 			cr:set_line_width(5)
 			cr:set_source_rgba(0,1,0,0.3)
 
-			local rotation = -i/100
+			local rotation = -i/2
 			local rx, ry = 100, 50
 
 			local cx, cy, rx, ry = svgarc_to_elliptic_arc(125, 75, rx, ry, rotation, large, sweep, 125+100, 75+50)
 			local mt = cr:get_matrix()
 			cr:translate(cx, cy)
-			cr:rotate(rotation)
+			cr:rotate(math.rad(rotation))
 			cr:translate(-125, -125)
 			cr:ellipse(125, 125, rx, ry)
 			cr:set_matrix(mt)
@@ -107,7 +106,7 @@ function player:on_render(cr)
 
 			local mt = cr:get_matrix()
 			cr:translate(cx, cy)
-			cr:rotate(rotation)
+			cr:rotate(math.rad(rotation))
 			cr:translate(-125, -125)
 			cr:ellipse(225, 75, rx, ry)
 			cr:stroke()

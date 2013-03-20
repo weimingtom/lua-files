@@ -4,7 +4,7 @@ local ffi = require'ffi'
 local cairo = require'cairo'
 local glue = require'glue'
 local BaseSG = require'sg_base'
-local path_simplify = require'path_simplify'
+local path_cairo = require'path_cairo'
 
 local SG = glue.update({}, BaseSG)
 
@@ -215,27 +215,7 @@ function SG:pop_group_as_source(state)
 end
 
 function SG:draw_path(path)
-	local cr = self.cr
-	cr:new_path()
-	if not self.write_path then
-		local function write(cmd, ...)
-			if cmd == 'move' then
-				cr:move_to(...)
-			elseif cmd == 'line' then
-				cr:line_to(...)
-			elseif cmd == 'curve' then
-				cr:curve_to(...)
-			elseif cmd == 'close' then
-				cr:close_path()
-			elseif cmd == 'text' then
-				local font, s = ...
-				self:set_font(font)
-				cr:text_path(s)
-			end
-		end
-		self.write_path = write
-	end
-	path_simplify(self.write_path, path)
+	path_cairo(self.cr, path)
 end
 
 function SG:set_path(e)

@@ -73,8 +73,8 @@ if not ... then require'path_hit_demo' end
 return {
 	point_line_intersection = point_line_intersection,
 	line_line_intersection = line_line_intersection,
+	--path API
 	bounding_box = bounding_box,
-	--hit & split API
 	point = point,
 	length = length,
 	split = split,

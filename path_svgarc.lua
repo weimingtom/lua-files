@@ -4,11 +4,12 @@ local glue = require'glue'
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 local matrix = require'trans_affine2d'
 
-local sin, cos, pi, abs, sqrt, acos =
-	math.sin, math.cos, math.pi, math.abs, math.sqrt, math.acos
+local sin, cos, abs, sqrt, acos, radians, degrees, pi =
+	math.sin, math.cos, math.abs, math.sqrt, math.acos, math.rad, math.deg, math.pi
 
 local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
 	rx, ry = abs(rx), abs(ry)
+	angle = radians(angle)
 
 	-- Calculate the middle point between the current and the final points
 	local dx2 = (x0 - x2) / 2
@@ -75,32 +76,12 @@ local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, swe
 	local sweep_angle = sign * acos(v)
 
 	if sweep_flag == 0 and sweep_angle > 0 then
-		sweep_angle = sweep_angle - pi * 2
+		sweep_angle = sweep_angle - 2*pi
 	elseif sweep_flag == 1 and sweep_angle < 0 then
-		sweep_angle = sweep_angle + pi * 2
+		sweep_angle = sweep_angle + 2*pi
 	end
 
-	return cx, cy, rx, ry, start_angle, sweep_angle
-end
-
-local function transform_writer(write, mt)
-	return function(s,...)
-		if s == 'line' then
-			write('line', mt:transform_point(...))
-		elseif s == 'curve' then
-			write('curve',
-				mt:transform_point(...),
-				mt:transform_point(select(3,...)),
-				mt:transform_point(select(5,...)))
-		end
-	end
-end
-
-local function delayed_writer(write)
-	local lasts, x2, y2, x3, y3, x4, y4
-	return function(s,...)
-
-	end
+	return cx, cy, rx, ry, degrees(start_angle), degrees(sweep_angle)
 end
 
 local function svgarc_to_bezier3(write, x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)

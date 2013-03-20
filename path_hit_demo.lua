@@ -6,46 +6,9 @@ local arc = require'path_arc'
 local bezier2 = require'path_bezier2'
 local bezier3 = require'path_bezier3'
 local svgarc = require'path_svgarc'
-local path_simplify = require'path_simplify'
 bezier3.hit = require'path_bezier3_hit'
 bezier2.hit = require'path_bezier2_hit'
 local cairo = require'cairo'
-
-local function path_draw(cr)
-	local function write(s,...)
-		if s == 'move' then cr:move_to(...)
-		elseif s == 'line' then cr:line_to(...)
-		elseif s == 'curve' then cr:curve_to(...)
-		elseif s == 'close' then cr:close_path()
-		elseif s == 'text' then
-			local font,s = ...
-			cr:select_font_face(font.family or 'Arial', 0, 0)
-			cr:set_font_size(font.size or 12)
-			cr:set_fill_rule(cairo.CAIRO_FILL_RULE_EVEN_ODD)
-			cr:text_path(s)
-		end
-	end
-
-	local function hex_color(s)
-		local r,g,b = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16), tonumber(s:sub(6,7), 16)
-		return r/255, g/255, b/255
-	end
-
-	local function draw(path,stroke_color,fill_color)
-		cr:new_path()
-		path_simplify(write,path)
-		if fill_color then
-			cr:set_source_rgb(hex_color(fill_color))
-			cr:fill_preserve()
-		end
-		if stroke_color ~= false then
-			cr:set_source_rgb(hex_color(stroke_color or '#ffffff'))
-			cr:stroke()
-		end
-	end
-
-	return draw
-end
 
 local i = 0
 function player:on_render(cr)
@@ -54,7 +17,22 @@ function player:on_render(cr)
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
 	cr:set_line_width(1)
-	local draw = path_draw(cr)
+	cr:set_fill_rule(cairo.CAIRO_FILL_RULE_EVEN_ODD)
+	cr:select_font_face('Fixedsys', 0, 0)
+	cr:set_font_size(12)
+
+	local function hex_color(s)
+		local r,g,b = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16), tonumber(s:sub(6,7), 16)
+		return r/255, g/255, b/255
+	end
+	local function stroke(color)
+		cr:set_source_rgb(hex_color(color or '#ffffff'))
+		cr:stroke()
+	end
+	local function fill(color)
+		cr:set_source_rgb(hex_color(color or '#ffffff'))
+		cr:fill()
+	end
 
 	local x0 = self.mouse_x or self.window.client_w/2
 	local y0 = self.mouse_y or self.window.client_h/2
@@ -64,31 +42,32 @@ function player:on_render(cr)
 
 	local function line_hit(x1,y1,x2,y2)
 		x2,y2=x1+x2,y1+y2
-		draw({'rect',line.bounding_box(x1,y1,x2,y2)},'#666666')
-		draw{'move',x1,y1,'line',x2,y2}
+		cr:rectangle(line.bounding_box(x1,y1,x2,y2)); stroke('#666666')
+		cr:move_to(x1,y1); cr:line_to(x2,y2); stroke()
 		local d,x,y,t = line.hit(x0,y0,x1,y1,x2,y2)
 		glue.append(dists,d,x,y,t,line.point(t,x1,y1,x2,y2))
 		lens[#dists] = line.length(t,x1,y1,x2,y2)
 	end
 
 	local function arc_hit(cx,cy,r,a1,a2)
-		a1,a2=math.rad(a1),math.rad(a2)
 		local x1,y1,x2,y2 = arc.endpoints(cx,cy,r,a1,a2)
-		draw({'rect',arc.bounding_box(cx,cy,r,a1,a2)},'#666666')
-		draw{'arc',cx,cy,r,math.deg(a1),math.deg(a2)}
+		cr:rectangle(arc.bounding_box(cx,cy,r,a1,a2)); stroke('#666666')
+		if a2 < 0 then
+			cr:arc_negative(cx,cy,r,math.rad(a1),math.rad(a1+a2))
+		else
+			cr:arc(cx,cy,r,math.rad(a1),math.rad(a1+a2))
+		end
+		stroke()
 		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,a1,a2)
 		glue.append(dists,d,x,y,t,arc.point(t,cx,cy,r,a1,a2))
 		lens[#dists] = arc.length(t, cx,cy,r,a1,a2)
 	end
 
-	local function write(s,x2,y2)
-		draw{'circle',x2,y2,1}
-	end
-
 	local function bezier2_hit(x1,y1,x2,y2,x3,y3)
 		x2,y2,x3,y3=x1+x2,y1+y2,x1+x3,y1+y3
-		draw({'rect',bezier2.bounding_box(x1,y1,x2,y2,x3,y3)},'#666666')
-		draw{'move',x1,y1,'quad_curve',x2,y2,x3,y3}
+		cr:rectangle(bezier2.bounding_box(x1,y1,x2,y2,x3,y3)); stroke('#666666')
+		local bx2,by2,bx3,by3 = bezier2.bezier3_control_points(x1,y1,x2,y2,x3,y3)
+		cr:move_to(x1,y1); cr:curve_to(bx2,by2,bx3,by3,x3,y3); stroke()
 		local d,x,y,t = bezier2.hit(x0,y0,x1,y1,x2,y2,x3,y3)
 		glue.append(dists,d,x,y,t,bezier2.point(t,x1,y1,x2,y2,x3,y3))
 		lens[#dists] = bezier2.length(t,x1,y1,x2,y2,x3,y3)
@@ -96,8 +75,8 @@ function player:on_render(cr)
 
 	local function bezier3_hit(x1,y1,x2,y2,x3,y3,x4,y4)
 		x2,y2,x3,y3,x4,y4=x1+x2,y1+y2,x1+x3,y1+y3,x1+x4,y1+y4
-		draw({'rect',bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)},'#666666')
-		draw{'move',x1,y1,'curve',x2,y2,x3,y3,x4,y4}
+		cr:rectangle(bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)); stroke('#666666')
+		cr:move_to(x1,y1); cr:curve_to(x2,y2,x3,y3,x4,y4); stroke()
 		local d,x,y,t = bezier3.hit(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4)
 		glue.append(dists,d,x,y,t,bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4))
 		lens[#dists] = bezier3.length(t,x1,y1,x2,y2,x3,y3,x4,y4)
@@ -133,18 +112,18 @@ function player:on_render(cr)
 	local x1,y1,t1,len
 	for i=1,#dists,6 do
 		local d,x,y,t,x2,y2 = unpack(dists,i,i+5)
-		draw({'circle',x2,y2,5},false,'#3333ff')
-		draw({'circle',x,y,7,'circle',x,y,9},false,'#ff0000')
+		cr:circle(x2,y2,5); fill('#3333ff')
+		cr:circle(x,y,7); cr:circle(x,y,9); fill('#ff0000')
 		if d < mind then
 			mind = d
 			x1,y1,t1,len=x,y,t,lens[i+5]
 		end
 	end
 	if x1 then
-		draw({'move',x0,y0,'line',x1,y1},'#ff0000')
-		draw({'circle',x1,y1,5},false,'#00ff00')
-		draw({'move',x0+20,y0+24,'text',{family='Arial',size=14},string.format('t: %.2f', t1)},false,'#ffffff')
-		draw({'move',x0+20,y0+38,'text',{family='Arial',size=14},string.format('length: %.2f', len)},false,'#ffffff')
+		cr:move_to(x0,y0); cr:line_to(x1,y1); stroke('#ff0000')
+		cr:circle(x1,y1,5); fill('#00ff00')
+		cr:move_to(x0+20,y0+24); cr:text_path(string.format('t: %.2f', t1)); fill('#ffffff')
+		cr:move_to(x0+20,y0+38); cr:text_path(string.format('length: %.2f', len)); fill('#ffffff')
 	end
 end
 

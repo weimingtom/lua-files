@@ -1,10 +1,10 @@
---conversion of 2d axes-aligned closed shapes to lines and curves.
+--2d axes-aligned and other composite closed shapes.
 
 local elliptic_arc_segment = require'path_elliptic_arc'.segment
 local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 
-local max, min, abs, sin, cos, pi = math.max, math.min, math.abs, math.sin, math.cos, math.pi
+local max, min, abs, sin, cos, radians, pi = math.max, math.min, math.abs, math.sin, math.cos, math.rad, math.pi
 
 local kappa = 4 / 3 * (math.sqrt(2) - 1)
 
@@ -20,8 +20,22 @@ local function ellipse_to_bezier3(write, cx, cy, rx, ry)
 	write('close')
 end
 
+local function ellipse_bbox(cx, cy, rx, ry)
+	rx, ry = abs(rx), abs(ry)
+	return cx-rx, cy-ry, 2*rx, 2*ry
+end
+
 local function circle_to_bezier3(write, cx, cy, r)
 	ellipse_to_bezier3(write, cx, cy, r, r)
+end
+
+local function circle_bbox(cx, cy, r)
+	r = abs(r)
+	return cx-r, cy-r, 2*r, 2*r
+end
+
+local function circle_length(cx, cy, r)
+	return 2*pi*abs(r)
 end
 
 local function circle_3p_to_bezier3(write, x1, y1, x2, y2, x3, y3)
@@ -48,11 +62,19 @@ local function rectangle_to_straight_lines(write, x1, y1, w, h)
 	write('close')
 end
 
-local function round_rectangle_to_bezier3(write, x1, y1, w, h, rx, ry)
-	rx = min(abs(rx), abs(w/2), abs(h/2))
-	ry = rx
-	--rx = min(abs(rx), abs(w/2))
-	--ry = min(abs(ry), abs(h/2))
+local function rectangle_bbox(x, y, w, h)
+	if w < 0 then x, w = x+w, -w end
+	if h < 0 then x, h = x+h, -h end
+	return x, y, w, h
+end
+
+local function rectangle_length(x, y, w, h)
+	return 2 * (abs(w) + abs(h))
+end
+
+local function elliptic_rectangle_to_bezier3(write, x1, y1, w, h, rx, ry)
+	rx = min(abs(rx), abs(w/2))
+	ry = min(abs(ry), abs(h/2))
 	local x2, y2 = x1 + w, y1 + h
 	if x1 > x2 then x2, x1 = x1, x2 end
 	if y1 > y2 then y2, y1 = y1, y2 end
@@ -74,7 +96,7 @@ local function round_rectangle_to_bezier3(write, x1, y1, w, h, rx, ry)
 end
 
 --TODO: we don't have the elliptic_arc command yet, and so we don't know the params yet
-local function round_rectangle_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
+local function elliptic_rectangle_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
 	rx = min(abs(rx), abs(w/2))
 	ry = min(abs(ry), abs(h/2))
 	local x2, y2 = x1 + w, y1 + h
@@ -90,6 +112,11 @@ local function round_rectangle_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
 	cx, cy = x1+rx, y1+ry
 	write('elliptic_arc', cx, cy, rx, ry, 3*pi/2, 0) --q2
 	write('close')
+end
+
+local function round_rectangle_to_bezier3(write, x1, y1, w, h, r)
+	r = min(abs(r), abs(w/2), abs(h/2))
+	elliptic_rectangle_to_bezier3(write, x1, y1, w, h, r, r)
 end
 
 local function round_rectangle_to_arcs(write, x1, y1, w, h, r)
@@ -109,26 +136,33 @@ local function round_rectangle_to_arcs(write, x1, y1, w, h, r)
 	write('close')
 end
 
+local round_rectangle_bbox = rectangle_bbox
+
+local function round_rectangle_length(x1, y1, w, h, r)
+	r = min(abs(r), abs(w/2), abs(h/2))
+	return 2 * (abs(w) + abs(h)) - 8*r + 2*pi*r
+end
+
 local point_angle = require'path_point'.point_angle
 local distance = require'path_point'.distance
 
 --a regular polygon has a center, an anchor point and a number of segments
 local function regular_polygon_to_lines(write, cx, cy, x1, y1, n)
 	if n < 2 then return end
-	local sweep_angle = 2*pi/n
+	local sweep_angle = 360 / n
 	local start_angle = point_angle(x1, y1, cx, cy)
 	local radius = distance(x1, y1, cx, cy)
-	for i=start_angle, start_angle + 2*pi - sweep_angle/2, sweep_angle do
-		local x = cx + cos(i) * radius
-		local y = cy + sin(i) * radius
-		write(i==start_angle and 'move' or 'line', x, y)
+	for a = start_angle, start_angle + 360 - sweep_angle/2, sweep_angle do
+		local x = cx + cos(radians(a)) * radius
+		local y = cy + sin(radians(a)) * radius
+		write(a == start_angle and 'move' or 'line', x, y)
 	end
 	write('close')
 end
 
 --a star has a center, an anchor point, a secondary radius and a number of leafs
 local function star_to_star_2p(cx, cy, x1, y1, r2, n)
-	local a = point_angle(x1, y1, cx, cy) + 2*pi/n/2
+	local a = radians(point_angle(x1, y1, cx, cy) + 360/n/2)
 	local x2, y2 =
 		cx + cos(a) * r2,
 		cy + sin(a) * r2
@@ -138,17 +172,17 @@ end
 --a 2-anchor-point star has a center, two anchor points and a number of leafs
 local function star_2p_to_lines(write, cx, cy, x1, y1, x2, y2, n)
 	if n < 2 then return end
-	local sweep_angle = 2*pi/n
+	local sweep_angle = 360 / n
 	local start_angle = point_angle(x1, y1, cx, cy)
-	local radius = distance(x1, y1, cx, cy)
-	local sweep2  = point_angle(x2, y2, cx, cy) - start_angle
-	local radius2 = distance(x2, y2, cx, cy)
-	for i=start_angle, start_angle + 2*pi - sweep_angle/2, sweep_angle do
-		local x = cx + cos(i) * radius
-		local y = cy + sin(i) * radius
-		write(i==start_angle and 'move' or 'line', x, y)
-		local x = cx + cos(i + sweep2) * radius2
-		local y = cy + sin(i + sweep2) * radius2
+	local radius      = distance(x1, y1, cx, cy)
+	local sweep2      = point_angle(x2, y2, cx, cy) - start_angle
+	local radius2     = distance(x2, y2, cx, cy)
+	for a = start_angle, start_angle + 360 - sweep_angle/2, sweep_angle do
+		local x = cx + cos(radians(a)) * radius
+		local y = cy + sin(radians(a)) * radius
+		write(i == start_angle and 'move' or 'line', x, y)
+		local x = cx + cos(radians(a + sweep2)) * radius2
+		local y = cy + sin(radians(a + sweep2)) * radius2
 		write('line', x, y)
 	end
 	write('close')
@@ -160,12 +194,12 @@ end
 
 --TODO: swirl looks bad, it's badly parametrized, and should probably write out smooth curves instead!
 local function swirl_to_bezier3(write, cx, cy, r, d, n)
-	for i = 0, 2*pi*n - pi/4, pi/2 do
+	for i = 0, 360*n - 45, 90 do
 		if i == 0 then
-			local x1, y1 = elliptic_arc_endpoints(cx, cy, r, r, i, pi/2)
+			local x1, y1 = elliptic_arc_endpoints(cx, cy, r, r, i, 90)
 			write('move', x1, y1)
 		end
-		write('curve', elliptic_arc_segment(cx, cy, r, r, i, pi/2))
+		write('curve', elliptic_arc_segment(cx, cy, r, r, i, 90))
 		r = r - d
 	end
 end
@@ -203,16 +237,39 @@ if not ... then require'path_shapes_demo' end
 
 return {
 	ellipse = ellipse_to_bezier3,
+	ellipse_bbox = ellipse_bbox,
+
 	circle = circle_to_bezier3,
+	circle_bbox = circle_bbox,
+	circle_length = circle_length,
+
 	circle_3p = circle_3p_to_bezier3,
+
 	rectangle = rectangle_to_lines,
+	rectangle_bbox = rectangle_bbox,
+	rectangle_length = rectangle_length,
+
+	elliptic_rectangle = elliptic_rectangle_to_bezier3,
+	elliptic_rectangle_to_elliptic_arcs = elliptic_rectangle_to_elliptic_arcs,
+	elliptic_rectangle_bbox = elliptic_rectangle_bbox,
+	elliptic_rectangle_length = elliptic_rectangle_length,
+
 	round_rectangle = round_rectangle_to_bezier3,
-	star_to_star_2p = star_to_star_2p,
+	round_rectangle_to_arcs = round_rectangle_to_arcs,
+	round_rectangle_bbox = round_rectangle_bbox,
+	round_rectangle_length = round_rectangle_length,
+
 	star_2p = star_2p_to_lines,
+
 	star = star_to_lines,
+	star_to_star_2p = star_to_star_2p,
+
 	regular_polygon = regular_polygon_to_lines,
+
 	swirl = swirl_to_bezier3,
+
 	formula = formula_to_lines,
+
 	superformula = superformula_to_lines,
 }
 

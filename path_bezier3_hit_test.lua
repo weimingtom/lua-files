@@ -5,5 +5,3 @@ local function assertf(x,y) assert(math.abs(x-y) < 0.0000001, x..' ~= '..y) end
 assertf(t, 0.886311733891)
 assertf(x, 3.623099)
 assertf(y, 2.264984)
-
-print(bezier3_hit(-30.5, 50.0, 0.1, 0.1, 1, 2, 3, 3, 4, 2))

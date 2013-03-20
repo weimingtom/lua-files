@@ -7,7 +7,7 @@
 
 local distance2 = require'path_point'.distance2
 
-local pi, rad, atan2, abs = math.pi, math.rad, math.atan2, math.abs
+local pi, atan2, abs, radians = math.pi, math.atan2, math.abs, math.rad
 
 local curve_collinearity_epsilon    = 1e-30
 local curve_angle_tolerance_epsilon = 0.01
@@ -21,7 +21,7 @@ local recursive_bezier --forward decl.
 local function interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
 	m_approximation_scale = m_approximation_scale or 1
 	m_angle_tolerance = m_angle_tolerance or 0
-	m_cusp_limit = m_cusp_limit and m_cusp_limit ~= 0 and pi - rad(m_cusp_limit) or 0
+	m_cusp_limit = m_cusp_limit and m_cusp_limit ~= 0 and pi - radians(m_cusp_limit) or 0
 	local m_distance_tolerance2 = (1 / (2 * m_approximation_scale))^2
 
 	recursive_bezier(write, x1, y1, x2, y2, x3, y3, x4, y4, 0,

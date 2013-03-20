@@ -1,7 +1,8 @@
 --basic math for the cartesian plane.
+--angles are expressed in degrees, not radians.
 
-local sqrt, abs, min, max, sin, cos, atan2 =
-	math.sqrt, math.abs, math.min, math.max, math.sin, math.cos, math.atan2
+local sqrt, abs, min, max, sin, cos, radians, degrees, atan2 =
+	math.sqrt, math.abs, math.min, math.max, math.sin, math.cos, math.rad, math.deg, math.atan2
 
 local function hypot(a, b)
 	if a == 0 and b == 0 then return 0 end
@@ -22,14 +23,15 @@ end
 
 --point at a specified angle on a circle.
 local function point_around(cx, cy, r, angle)
+	angle = radians(angle)
 	return
 		cx + cos(angle) * r,
 		cy + sin(angle) * r
 end
 
---angle between two points in -pi..pi range.
+--angle between two points in -360..360 degree range.
 local function point_angle(x, y, cx, cy)
-	return atan2(y - cy, x - cx)
+	return degrees(atan2(y - cy, x - cx))
 end
 
 --reflect point through origin (i.e. rotate point 180deg around another point).

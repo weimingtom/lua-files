@@ -1,5 +1,8 @@
 --2d path API including iterating, decoding, updating, converting, measuring, etc.
 
+local assert, unpack, select, min, max =
+	   assert, unpack, select, math.min, math.max
+
 --iterating commands
 
 local argc = {
@@ -69,10 +72,12 @@ end
 
 --adding, replacing and removing commands
 
+local tinsert, tremove = table.insert, table.remove
+
 --insert n elements at i, shifting elemens on the right of i (i inclusive) to the right.
 local function table_insert(t, i, n)
 	if n == 1 then --shift 1
-		table.insert(t, i)
+		tinsert(t, i)
 		return
 	end
 	for p = #t,i,-1 do --shift n
@@ -82,9 +87,9 @@ end
 
 --remove n elements at i, shifting elements on the right of i (i inclusive) to the left.
 local function table_remove(t, i, n)
-	n = math.min(n, #t-i+1)
+	n = min(n, #t-i+1)
 	if n == 1 then --shift 1
-		table.remove(t, i)
+		tremove(t, i)
 		return
 	end
 	for p=i+n,#t do --shift n
@@ -140,9 +145,10 @@ local function rel_name(s) --return the rel. variant for any command, be it abs.
 	return is_rel(s) and s or 'rel_'..s
 end
 
---given current point and an unpacked command and its args, return the command in abs. form.
+--given current point and an unpacked command and its args, return the command in absolute form.
 local function abs_cmd(cpx, cpy, s, ...)
 	if is_abs(s) then return s, ... end
+	assert(cpx and cpy, 'no current point')
 	s = abs_name(s)
 	if s == 'move' or s == 'line' then
 		local s, x2, y2 = ...
@@ -218,6 +224,7 @@ end
 local reflect_point = require'path_point'.reflect_point
 local reflect_point_distance = require'path_point'.reflect_point_distance
 local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
+local arc_endpoints = require'path_arc'.endpoints
 
 --given current state and current command in abs. form, return the state of the next path command.
 --cpx, cpy is the next "current point", needed by all relative commands and by most other commands.
@@ -259,8 +266,7 @@ local function next_state(cpx, cpy, spx, spy, bx1, by1, qx1, qy1, s, ...)
 		qx, qy = reflect_point_distance(qx1 or bx1 or cpx, qy1 or by1 or cpy, cpx, cpy, (...))
 		_, cpx, cpy = ...
 	elseif s == 'arc' then
-		local cx, cy, r, start_angle, sweep_angle = ...
-		_, _, cpx, cpy = arc_endpoints(cx, cy, r, radians(start_angle), radians(sweep_angle))
+		_, _, cpx, cpy = arc_endpoints(...)
 	elseif s == 'arc_3p' then
 		_, _, cpx, cpy = ...
 	elseif s == 'svgarc' then
@@ -286,56 +292,62 @@ end
 
 --check if a command is a primitive drawing command that can be decoded with decode_primitive().
 local function is_primitive(s)
-	return s:match'line$' or s:match'curve$' or false
+	return s == 'move' or s == 'rel_move' or s == 'close' or s:match'line$' or s:match'curve$' or false
 end
 
---given current state and a primitive cmd in abs. form, return the corresponding context-free drawing cmd and args.
---primitive context-free commands are only line, bezier2 and bezier3.
+--given current state and a primitive cmd in abs. form, return the corresponding context-free cmd and args.
+--primitive context-free drawing commands are line, quad_curve and curve, and line cap commands are move and close.
 local function decode_primitive(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
-	if s == 'line' then
-		return 'line', cpx, cpy, ...
+	if s == 'move' or s == 'line' then
+		return s, cpx, cpy, ...
+	elseif s == 'close' then
+		return 'line', cpx, cpy, spx, spy
 	elseif s == 'hline' then
 		return 'line', cpx, cpy, ..., cpy
 	elseif s == 'vline' then
 		return 'line', cpx, cpy, cpx, ...
 	elseif s == 'curve' then
-		return 'bezier3', cpx, cpy, ...
+		return 'curve', cpx, cpy, ...
 	elseif s == 'symm_curve' then
 		local x2, y2 = reflect_point(bx, by, cpx, cpy)
-		return 'bezier3', cpx, cpy, x2, y2, ...
+		return 'curve', cpx, cpy, x2, y2, ...
 	elseif s == 'smooth_curve' then
 		local x2, y2 = reflect_point_distance(bx or qx, by or qy, cpx, cpy, (...))
-		return 'bezier3', cpx, cpy, x2, y2, select(2, ...)
+		return 'curve', cpx, cpy, x2, y2, select(2, ...)
 	elseif s == 'quad_curve' then
-		return 'bezier2', cpx, cpy, ...
+		return 'quad_curve', cpx, cpy, ...
 	elseif s == 'quad_curve_3p' then
 		local x2, y2, x3, y3 = ...
-		local x2, y2 = bezier2_3point_control_point(cpx, cpy, x2, y2, x3, y3)
-		return 'bezier2', cpx, cpy, x2, y2, x3, y3
+		local x2, y2 = quad_curve_3point_control_point(cpx, cpy, x2, y2, x3, y3)
+		return 'quad_curve', cpx, cpy, x2, y2, x3, y3
 	elseif s == 'symm_quad_curve' then
 		local x2, y2 = reflect_point(qx, qy, cpx, cpy)
-		return 'bezier2', cpx, cpy, x2, y2, ...
+		return 'quad_curve', cpx, cpy, x2, y2, ...
 	elseif s == 'smooth_quad_curve' then
 		local x2, y2 = reflect_point_distance(bx or qx, by or qy, cpx, cpy, (...))
-		return 'bezier2', cpx, cpy, x2, y2, select(2, ...)
+		return 'quad_curve', cpx, cpy, x2, y2, select(2, ...)
+	else
+		error 'invalid command'
 	end
 end
 
 --given a context-free primitive drawing command, transform it with an affine transformation matrix.
 local function transform_decoded(mt, s, ...)
-	local x1, y1 = ...
-	x1, y1 = mt:transform_point(x1, y1)
-	if s == 'line' then
-		local x2, y2 = ...
+	if not mt then return s, ... end
+	if s == 'move' or s == 'line' then
+		local x1, y1, x2, y2 = ...
+		x1, y1 = mt:transform_point(x1, y1)
 		x2, y2 = mt:transform_point(x2, y2)
 		return s, x1, y1, x2, y2
-	elseif s == 'bezier2' then
-		local x2, y2, x3, y3 = ...
+	elseif s == 'quad_curve' then
+		local x1, y1, x2, y2, x3, y3 = ...
+		x1, y1 = mt:transform_point(x1, y1)
 		x2, y2 = mt:transform_point(x2, y2)
 		x3, y3 = mt:transform_point(x3, y3)
 		return s, x1, y1, x2, y2, x3, y3
-	elseif s == 'bezier3' then
-		local x2, y2, x3, y3, x4, y4 = ...
+	elseif s == 'curve' then
+		local x1, y1, x2, y2, x3, y3, x4, y4 = ...
+		x1, y1 = mt:transform_point(x1, y1)
 		x2, y2 = mt:transform_point(x2, y2)
 		x3, y3 = mt:transform_point(x3, y3)
 		x4, y4 = mt:transform_point(x4, y4)
@@ -343,12 +355,9 @@ local function transform_decoded(mt, s, ...)
 	end
 end
 
---given an affine transformation matrix, return an altered decode_primitive() function that transforms the result.
-local function decode_primitive_function(mt)
-	if not mt then return decode_primitive end
-	return function(...)
-		return transform_decoded(mt, decode_primitive(...))
-	end
+local function write_primitive(write_fcmd, i, mt, accept, cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+	if accept and not accept[s] then return end
+	write_fcmd(i, transform_decoded(mt, decode_primitive(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)))
 end
 
 local composite_converters = {
@@ -375,126 +384,170 @@ local function is_composite(s)
 	return composite_converters[abs_name(s)] and true or false
 end
 
---given current state and a composite cmd in abs. form, write out the corresponding context-free drawing cmds.
-local function decode_composite(write, mt, cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
-	local convert = composite_converters[s]
-	local decode_primitive = decode_primitive_function(mt)
-	local function write_primitive(s, ...)
-		if is_primitive(s) then
-			write(decode_primitive(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...))
-		end
-		cpx, cpy, spx, spy, bx, by, qx, qy = next_state(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+--given current state and a composite cmd in abs. form, return the corresponding context-free drawing cmd and args.
+local function decode_composite(cpx, cpy, s, ...)
+	if s == 'arc_3p' then
+		return s, cpx, cpy, ...
+	else
+		return s, ...
 	end
-	convert(write_primitive, ...)
 end
 
---decode a path and write it out as primitive context-free cmds.
-local function decode_path(write, path, mt)
+--given a composite command in abs. form and the current state, write out the context-free drawing commands for it.
+local function write_composite(write_fcmd, i, mt, accept, cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+
+	--arcs are special: if there's a current point, we need to draw a line from there to the arc's starting point.
+	if s == 'arc' then
+		local x1, y1 = arc_endpoints(...)
+		if cpx then
+			write_fcmd(i, transform_decoded(mt, 'line', cpx, cpy, x1, y1))
+		end
+		cpx, cpy = x1, y1
+	end
+
+	--if there's no transformation, pass through accepted composites without decomposing them.
+	if not mt and accept and accept[s] then
+		write_fcmd(i, decode_composite(cpx, cpy, s, ...))
+		return
+	end
+
+	local function write(s, ...)
+		write_primitive(write_fcmd, i, mt, accept, cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+		cpx, cpy, spx, spy, bx, by, qx, qy = next_state(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+	end
+	composite_converters[s](write, select(2, decode_composite(cpx, cpy, s, ...)))
+end
+
+--decode a path, optionally transforming it by an affine transform, and write it out as primitive context-free cmds.
+--callstack for a primitive command:
+--  next_cmd->is_primitive->cmd->abs_cmd->write_primitive->decode_primitive->transform_decoded->write_fcmd.
+local function decode(write_fcmd, path, mt, accept)
 	local cpx, cpy, spx, spy, bx, by, qx, qy
 	for i,s in commands(path) do
 		if is_primitive(s) then
-			if mt then
-				write(transform(mt, decode_primitive(cpx, cpy, spx, spy, bx, by, qx, qy, abs_cmd(cpx, cpy, cmd(path, i)))))
-			else
-				write(decode_primitive(cpx, cpy, spx, spy, bx, by, qx, qy, abs_cmd(cpx, cpy, cmd(path, i))))
-			end
+			write_primitive(write_fcmd, i, mt, accept, cpx, cpy, spx, spy, bx, by, qx, qy, abs_cmd(cpx, cpy, cmd(path, i)))
 		elseif is_composite(s) then
-			decode_composite(write, mt, cpx, cpy, spx, spy, bx, by, qx, qy, abs_cmd(cpx, cpy, cmd(path, i)))
+			write_composite(write_fcmd, i, mt, accept, cpx, cpy, spx, spy, bx, by, qx, qy, abs_cmd(cpx, cpy, cmd(path, i)))
+		else
+			error'invalid command'
 		end
-		cpx, cpy, spx, spy, bx, by, qx, qy = next_state(path, i, cpx, cpy, spx, spy, bx, by, qx, qy)
+		cpx, cpy, spx, spy, bx, by, qx, qy = next_state(cpx, cpy, spx, spy, bx, by, qx, qy, abs_cmd(cpx, cpy, cmd(path, i)))
 	end
+end
+
+
+if not ... then
+
+decode(print, {
+	'move', 100, 100, 'rel_round_rect', 10, 10, 50, 50, 10, 'move', 0, 0,
+	'arc', 10, 10, 50, 0, 120,
+	'arc_3p', 20, 20, 0, 0,
+	},
+	nil,
+	{move = true, close = true, line = true, curve = true, arc = true})
+
 end
 
 --path measuring
 
 local bbox_functions = {
-	line = require'path_line'.bounding_box,
-	bezier2 = require'path_bezier2'.bounding_box,
-	bezier3 = require'path_bezier3'.bounding_box,
+	line       = require'path_line'.bounding_box,
+	bezier2    = require'path_bezier2'.bounding_box,
+	bezier3    = require'path_bezier3'.bounding_box,
+	arc        = require'path_arc'.bounding_box,
+	arc_3p     = require'path_arc_3p'.bounding_box,
+	ellipse    = require'path_shapes'.ellipse_bbox,
+	circle     = require'path_shapes'.circle_bbox,
+	rect       = require'path_shapes'.rectangle_bbox,
+	round_rect = require'path_shapes'.round_rectangle_bbox,
 }
 
 local function bounding_box(path, mt)
 	local x1, y1, x2, y2
-	local function measure(s, ...)
-		local x, y, w, h
-		if bbox_functions[s] then
-			x, y, w, h = bbox_functions[s](...)
-		else
-			simplify(write, s, ...)
-		end
+	local function write(i, s, ...)
+		local x, y, w, h = bbox_functions[s](...)
 		x1 = min(x1 or 1/0, x)
 		y1 = min(y1 or 1/0, y)
 		x2 = max(x2 or -1/0, x+w)
 		y2 = max(y2 or -1/0, y+h)
 	end
-	local write = measure
-	if mt then
-		function write(s, ...)
-			measure(transform(mt, s, ...))
-		end
-	end
-	decode_path(write, path, mt)
+	decode(write, path, mt, bbox_functions)
 	return x1, y1, x2-x1, y2-y1
 end
 
 local length_functions = {
-	line = require'path_line'.length,
-	bezier2 = require'path_bezier2'.length,
-	bezier3 = require'path_bezier3'.length,
+	line       = require'path_line'.length,
+	bezier2    = require'path_bezier2'.length,
+	bezier3    = require'path_bezier3'.length,
+	arc        = require'path_arc'.length,
+	arc_3p     = require'path_arc_3p'.length,
+	circle     = require'path_shapes'.circle_length,
+	rect       = require'path_shapes'.rectangle_length,
+	round_rect = require'path_shapes'.round_rectangle_length,
 }
 
 local function length(path, mt)
 	local length = 0
-	local function write(s, ...)
-		if length_functions[s] then
-			length = length + length_functions[s](...)
-		else
-			simplify(write, s, ...)
-		end
+	local function write(i, s, ...)
+		length = length + length_functions[s](...)
 	end
-	decode(write, path)
+	decode(write, path, mt, length_functions)
 	return length
 end
 
+local function command_count(path)
+	local count
+	for i,s in commands(path) do
+		count = count + 1
+	end
+	return count
+end
+
+local function global_time(i, t, path)
+	local count = command_count(path)
+	return (i-1+t)/count
+end
+
 local function local_time(t, path)
-	--
+	local count = command_count(path)
 	return i, path
 end
 
 local point_functions = {
-	line = require'path_line'.point,
+	line    = require'path_line'.point,
 	bezier2 = require'path_bezier2'.point,
 	bezier3 = require'path_bezier3'.point,
+	arc     = require'path_arc'.point,
+	arc_3p  = require'path_arc_3p'.point,
 }
 
 local function point(t, path)
-	local x, y
-	local function write(s, ...)
-		if point_functions[s] then
-			x, y = point_functions[s](...)
-		else
-			simplify(write, s, ...)
-		end
+	local i,t = local_time(t, path)
+
+	local function write(i, s, ...)
+		point_functions[s](...)
 	end
 	decode(write, path)
 end
 
 local hit_functions = {
-	line = require'path_line'.hit,
+	line    = require'path_line'.hit,
 	bezier2 = require'path_bezier2_hit',
 	bezier3 = require'path_bezier3_hit',
+	arc     = require'path_arc'.hit,
+	arc_3p  = require'path_arc_3p'.hit,
 }
 
 local function hit(path, mt)
-	local d, x, y, t, i, local_t
-	local function write(s, ...)
-		if hit_functions[s] then
-			d, x, y, t = hit_functions[s](...)
-		else
-			simplify(write, s, ...)
+	local md, mx, my, mt, mi
+	local function write(i, s, ...)
+		local d, x, y, t = hit_functions[s](...)
+		if not md or d < md then
+			md, mx, my, mt, mi = d, x, y, t, i
 		end
 	end
 	decode(write, path)
+	return md, mx, my, mi, mt
 end
 
 --command conversions
@@ -587,6 +640,9 @@ return {
 	remove = remove,
 	--decoding
 	is_rel = is_rel,
+	abs_name = abs_name,
+	abs_cmd = abs_cmd,
+	decode = decode,
 	--measuring
 	bounding_box = bounding_box,
 	length = length,
