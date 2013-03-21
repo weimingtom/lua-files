@@ -57,12 +57,14 @@ local function bounding_box(x1, y1, x2, y2, x3, y3)
 end
 
 --control points of a cubic bezier corresponding to a quadratic bezier.
-local function bezier3_control_points(x1, y1, x2, y2, x3, y3)
+local function to_bezier3(x1, y1, x2, y2, x3, y3)
 	return
+		x1, y1,
 		(x1 + 2 * x2) / 3,
 		(y1 + 2 * y2) / 3,
 		(x3 + 2 * x2) / 3,
-		(y3 + 2 * y2) / 3
+		(y3 + 2 * y2) / 3,
+		x3, y3
 end
 
 --return a fair candidate for the control point of a quad bezier given its end points (x1, y1) and (x3, y3),
@@ -106,7 +108,7 @@ if not ... then require'path_hit_demo' end
 
 return {
 	bounding_box = bounding_box,
-	bezier3_control_points = bezier3_control_points,
+	to_bezier3 = to_bezier3,
 	_3point_control_point = _3point_control_point,
 	--hit & split API
 	point = point,

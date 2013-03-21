@@ -22,15 +22,17 @@ function player:on_render(cr)
 	cr:set_font_size(12)
 
 	local function hex_color(s)
-		local r,g,b = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16), tonumber(s:sub(6,7), 16)
-		return r/255, g/255, b/255
+		local r,g,b,a = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16),
+							 tonumber(s:sub(6,7), 16), tonumber(s:sub(8,9), 16) or 255
+		return r/255, g/255, b/255, a/255
 	end
-	local function stroke(color)
-		cr:set_source_rgb(hex_color(color or '#ffffff'))
+	local function stroke(color, width)
+		cr:set_source_rgba(hex_color(color or '#ffffff'))
+		cr:set_line_width(width or 1)
 		cr:stroke()
 	end
 	local function fill(color)
-		cr:set_source_rgb(hex_color(color or '#ffffff'))
+		cr:set_source_rgba(hex_color(color or '#ffffff'))
 		cr:fill()
 	end
 
@@ -40,45 +42,95 @@ function player:on_render(cr)
 	local dists = {}
 	local lens = {}
 
+	local function draw_line(x1,y1,x2,y2,color,width)
+		cr:move_to(x1,y1)
+		cr:line_to(x2,y2)
+		stroke(color,width)
+	end
+
 	local function line_hit(x1,y1,x2,y2)
 		x2,y2=x1+x2,y1+y2
 		cr:rectangle(line.bounding_box(x1,y1,x2,y2)); stroke('#666666')
-		cr:move_to(x1,y1); cr:line_to(x2,y2); stroke()
+		draw_line(x1,y1,x2,y2)
 		local d,x,y,t = line.hit(x0,y0,x1,y1,x2,y2)
 		glue.append(dists,d,x,y,t,line.point(t,x1,y1,x2,y2))
+
+		local ax1,ay1,ax2,ay2, bx1,by1,bx2,by2 =
+			line.split(t, x1,y1,x2,y2)
+		draw_line(ax1,ay1,ax2,ay2,'#ff000060',10)
+		draw_line(bx1,by1,bx2,by2,'#0000ff60',10)
+
 		lens[#dists] = line.length(t,x1,y1,x2,y2)
+	end
+
+	local function observed_sweep(sweep_angle)
+		return math.max(math.min(sweep_angle, 360), -360)
+	end
+
+	local function draw_arc(cx,cy,r,a1,a2,color,width)
+		a1,a2 = math.rad(a1), math.rad(observed_sweep(a2))
+		if a2 < 0 then
+			cr:arc_negative(cx,cy,r,a1,a1+a2)
+		else
+			cr:arc(cx,cy,r,a1,a1+a2)
+		end
+		stroke(color,width)
 	end
 
 	local function arc_hit(cx,cy,r,a1,a2)
 		local x1,y1,x2,y2 = arc.endpoints(cx,cy,r,a1,a2)
 		cr:rectangle(arc.bounding_box(cx,cy,r,a1,a2)); stroke('#666666')
-		if a2 < 0 then
-			cr:arc_negative(cx,cy,r,math.rad(a1),math.rad(a1+a2))
-		else
-			cr:arc(cx,cy,r,math.rad(a1),math.rad(a1+a2))
-		end
-		stroke()
+		draw_arc(cx,cy,r,a1,a2)
 		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,a1,a2)
 		glue.append(dists,d,x,y,t,arc.point(t,cx,cy,r,a1,a2))
+
+		local acx,acy,ar,aa1,aa2, bcx,bcy,br,ba1,ba2 =
+			arc.split(t,cx,cy,r,a1,a2)
+		draw_arc(acx,acy,ar,aa1,aa2,'#ff000060',10)
+		draw_arc(bcx,bcy,br,ba1,ba2,'#0000ff60',10)
+
 		lens[#dists] = arc.length(t, cx,cy,r,a1,a2)
+	end
+
+	local function draw_bezier2(x1,y1,x2,y2,x3,y3,color,width)
+		cr:move_to(x1,y1)
+		cr:curve_to(select(3, bezier2.to_bezier3(x1,y1,x2,y2,x3,y3)))
+		stroke(color,width)
 	end
 
 	local function bezier2_hit(x1,y1,x2,y2,x3,y3)
 		x2,y2,x3,y3=x1+x2,y1+y2,x1+x3,y1+y3
 		cr:rectangle(bezier2.bounding_box(x1,y1,x2,y2,x3,y3)); stroke('#666666')
-		local bx2,by2,bx3,by3 = bezier2.bezier3_control_points(x1,y1,x2,y2,x3,y3)
-		cr:move_to(x1,y1); cr:curve_to(bx2,by2,bx3,by3,x3,y3); stroke()
+		draw_bezier2(x1,y1,x2,y2,x3,y3)
 		local d,x,y,t = bezier2.hit(x0,y0,x1,y1,x2,y2,x3,y3)
 		glue.append(dists,d,x,y,t,bezier2.point(t,x1,y1,x2,y2,x3,y3))
+
+		local ax1,ay1,ax2,ay2,ax3,ay3, bx1,by1,bx2,by2,bx3,by3 =
+			bezier2.split(t, x1,y1,x2,y2,x3,y3)
+		draw_bezier2(ax1,ay1,ax2,ay2,ax3,ay3,'#ff000060',10)
+		draw_bezier2(bx1,by1,bx2,by2,bx3,by3,'#0000ff60',10)
+
 		lens[#dists] = bezier2.length(t,x1,y1,x2,y2,x3,y3)
+	end
+
+	local function draw_bezier3(x1,y1,x2,y2,x3,y3,x4,y4,color,width)
+		cr:move_to(x1,y1)
+		cr:curve_to(x2,y2,x3,y3,x4,y4)
+		stroke(color,width)
 	end
 
 	local function bezier3_hit(x1,y1,x2,y2,x3,y3,x4,y4)
 		x2,y2,x3,y3,x4,y4=x1+x2,y1+y2,x1+x3,y1+y3,x1+x4,y1+y4
 		cr:rectangle(bezier3.bounding_box(x1,y1,x2,y2,x3,y3,x4,y4)); stroke('#666666')
-		cr:move_to(x1,y1); cr:curve_to(x2,y2,x3,y3,x4,y4); stroke()
+		draw_bezier3(x1,y1,x2,y2,x3,y3,x4,y4)
 		local d,x,y,t = bezier3.hit(x0,y0,x1,y1,x2,y2,x3,y3,x4,y4)
 		glue.append(dists,d,x,y,t,bezier3.point(t,x1,y1,x2,y2,x3,y3,x4,y4))
+
+		local ax1,ay1,ax2,ay2,ax3,ay3,ax4,ay4, bx1,by1,bx2,by2,bx3,by3,bx4,by4 =
+			bezier3.split(t, x1,y1,x2,y2,x3,y3,x4,y4)
+		draw_bezier3(ax1,ay1,ax2,ay2,ax3,ay3,ax4,ay4,'#ff000060',10)
+		draw_bezier3(bx1,by1,bx2,by2,bx3,by3,bx4,by4,'#0000ff60',10)
+
 		lens[#dists] = bezier3.length(t,x1,y1,x2,y2,x3,y3,x4,y4)
 	end
 

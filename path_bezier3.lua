@@ -69,9 +69,9 @@ local function bounding_box(x1, y1, x2, y2, x3, y3, x4, y4)
 	return minx, miny, maxx-minx, maxy-miny
 end
 
---return the control point of a quadratic bezier that (wildly) approximates a cubic bezier.
+--return a quadratic bezier that (wildly) approximates a cubic bezier.
 --the equation has two solutions, which are averaged out to form the final control point.
-local function bezier2_control_point(x1, y1, x2, y2, x3, y3, x4, y4)
+local function to_bezier3(x1, y1, x2, y2, x3, y3, x4, y4)
 	return
 		-.25*x1 + .75*x2 + .75*x3 -.25*x4,
 		-.25*y1 + .75*y2 + .75*y3 -.25*y4
@@ -105,14 +105,14 @@ local function split(t, x1, y1, x2, y2, x3, y3, x4, y4)
 	local y1234 = y123 * mt + y234 * t
 	return
 		x1, y1, x12, y12, x123, y123, x1234, y1234, --first curve
-		x1234, y1234, x234, y1234, x34, y34, x4, y4 --second curve
+		x1234, y1234, x234, y234, x34, y34, x4, y4 --second curve
 end
 
 if not ... then require'path_hit_demo' end
 
 return {
 	bounding_box = bounding_box,
-	bezier2_control_point = bezier2_control_point,
+	to_bezier2 = to_bezier2,
 	--hit & split API
 	point = point,
 	length = length,
