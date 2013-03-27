@@ -1,22 +1,25 @@
---2d svg-style elliptical arc to bezier conversion. adapted from agg/src/agg_bezier_arc.cpp.
+--math for 2d svg-style elliptical arcs defined as:
+--  (x1, y1, radius_x, radius_y, rotation, large_arc_flag, sweep_flag, x2, y2, [matrix], [segment_max_sweep])
+--conversion to elliptic arcs adapted from antigrain library @ agg/src/agg_bezier_arc.cpp by Cosmin Apreutesei.
 
 local glue = require'glue'
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
+local elliptic_arc_hit = require'path_elliptic_arc'.hit
 local matrix = require'trans_affine2d'
 
 local sin, cos, abs, sqrt, acos, radians, degrees, pi =
 	math.sin, math.cos, math.abs, math.sqrt, math.acos, math.rad, math.deg, math.pi
 
-local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+local function to_elliptic_arc(x0, y0, rx, ry, rotation, large_arc_flag, sweep_flag, x2, y2, ...)
 	rx, ry = abs(rx), abs(ry)
-	angle = radians(angle)
 
 	-- Calculate the middle point between the current and the final points
 	local dx2 = (x0 - x2) / 2
 	local dy2 = (y0 - y2) / 2
 
-	local cos_a = cos(angle)
-	local sin_a = sin(angle)
+	local a = radians(rotation)
+	local cos_a = cos(a)
+	local sin_a = sin(a)
 
 	-- Calculate (x1, y1)
 	local x1 =  cos_a * dx2 + sin_a * dy2
@@ -81,48 +84,33 @@ local function svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, swe
 		sweep_angle = sweep_angle + 2*pi
 	end
 
-	return cx, cy, rx, ry, degrees(start_angle), degrees(sweep_angle)
+	return cx, cy, rx, ry, degrees(start_angle), degrees(sweep_angle), rotation, ...
 end
 
-local function svgarc_to_bezier3(write, x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
-	local cx, cy, rx, ry, start_angle, sweep_angle =
-		svgarc_to_elliptic_arc(x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
-
-	-- Build and save the resulting arc segments
-	local command, points = nil, {}
-	local function collect(s,...)
-		command = s
-		glue.append(points,...)
-	end
-	elliptic_arc_to_bezier3(collect, 0, 0, rx, ry, start_angle, sweep_angle)
-
-	-- Transform all the points
-	local mt = matrix():translate(cx, cy):rotate(angle)
-	for i=1,#points,2 do
-		points[i], points[i+1] = mt:transform_point(points[i], points[i+1])
-	end
-
-	-- Override the end point for exact matching with the given one
-	points[#points-1] = x2
-	points[#points-0] = y2
-
-	-- Write the segments out
-	local n = command == 'line' and 2 or 6 --we can only have 'line' or 'curve'
-	for i=1,#points,n do
-		write(command, unpack(points, i, i+n-1))
-	end
+local function to_bezier3(write, ...)
+	elliptic_arc_to_bezier3(write, to_elliptic_arc(...))
 end
 
---TODO: split & hit API for svgarcs
-local function svgarc_split(t, x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
-	local cx, cy, rx, ry, start_angle, sweep_angle =
-		svgarc_to_elliptic_arc(x0, y0, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2)
+local function hit(x0, y0, ...)
+	elliptic_arc_hit(x0, y0, to_elliptic_arc(...))
+end
+
+local function split(t, ...)
+	local
+		cx, cy, rx, ry, start_angle, sweep1, rotation
+		cx, cy, rx, ry, split_angle, sweep2, rotation, x2, y2 =
+		elliptic_arc_split(t, to_elliptic_arc(...))
+	--TODO: elliptic arc to svgarc conversion
+	error'NYI'
 end
 
 if not ... then require'path_arc_demo' end
 
 return {
-	to_elliptic_arc = svgarc_to_elliptic_arc,
-	to_bezier3 = svgarc_to_bezier3,
+	to_elliptic_arc = to_elliptic_arc,
+	--path API
+	to_bezier3 = to_bezier3,
+	hit = hit,
+	split = split,
 }
 

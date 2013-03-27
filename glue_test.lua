@@ -11,16 +11,29 @@ test(glue.merge({a=1,b=2,c=3}, {d='add',b='overwrite'}, {b='over2'}), {a=1,b=2,c
 test(glue.extend({5,6,8}, {1,2}, {'b','x'}), {5,6,8,1,2,'b','x'})
 test(glue.append({1,2,3}, 5,6), {1,2,3,5,6})
 
---[[
-test(glue.insert({'a','b'}, 1, 'x','y'), {'x','y','a','b'}) --2 shifts
-test(glue.insert({'a','b','c','d'}, 3, 'x', 'y'), {'a','b','x','y','c','d'}) --2 shifts
-test(glue.insert({'a','b','c','d'}, 4, 'x', 'y'), {'a','b','c','x','y','d'}) --1 shift
-test(glue.insert({'a','b','c','d'}, 5, 'x', 'y'), {'a','b','c','d','x','y'}) --0 shifts
-test(glue.insert({'a','b','c','d'}, 6, 'x', 'y'), {'a','b','c','d',nil,'x','y'}) --out of bounds
-test(glue.insert({'a','b','c','d'}, 1, 'x', 'y'), {'x','y','a','b','c','d'}) --first pos
-test(glue.insert({}, 1, 'x', 'y'), {'x','y'}) --empty dest
-test(glue.insert({}, 3, 'x', 'y'), {nil,nil,'x','y'}) --out of bounds
-]]
+local function insert(t,i,...)
+	local n = select('#',...)
+	glue.shift(t,i,n)
+	for j=1,n do t[i+j-1] = select(j,...) end
+	return t
+end
+test(insert({'a','b'}, 1, 'x','y'), {'x','y','a','b'}) --2 shifts
+test(insert({'a','b','c','d'}, 3, 'x', 'y'), {'a','b','x','y','c','d'}) --2 shifts
+test(insert({'a','b','c','d'}, 4, 'x', 'y'), {'a','b','c','x','y','d'}) --1 shift
+test(insert({'a','b','c','d'}, 5, 'x', 'y'), {'a','b','c','d','x','y'}) --0 shifts
+test(insert({'a','b','c','d'}, 6, 'x', 'y'), {'a','b','c','d',nil,'x','y'}) --out of bounds
+test(insert({'a','b','c','d'}, 1, 'x', 'y'), {'x','y','a','b','c','d'}) --first pos
+test(insert({}, 1, 'x', 'y'), {'x','y'}) --empty dest
+test(insert({}, 3, 'x', 'y'), {nil,nil,'x','y'}) --out of bounds
+
+local function remove(t,i,n) return glue.shift(t,i,-n) end
+test(remove({'a','b','c','d'}, 1, 3), {'d'})
+test(remove({'a','b','c','d'}, 2, 2), {'a', 'd'})
+test(remove({'a','b','c','d'}, 3, 2), {'a', 'b'})
+test(remove({'a','b','c','d'}, 1, 5), {}) --too many
+test(remove({'a','b','c','d'}, 4, 2), {'a', 'b', 'c'}) --too many
+test(remove({'a','b','c','d'}, 5, 5), {'a', 'b', 'c', 'd'}) --from too far
+test(remove({}, 5, 5), {}) --from too far
 
 test(glue.min{5,2,11,3}, 2)
 test(glue.max{5,2,11,3}, 11)

@@ -4,6 +4,7 @@
 local sqrt, abs, min, max, sin, cos, radians, degrees, atan2 =
 	math.sqrt, math.abs, math.min, math.max, math.sin, math.cos, math.rad, math.deg, math.atan2
 
+--hypotenuse function: computes sqrt(a^2 + b^2) without underflow / overflow problems.
 local function hypot(a, b)
 	if a == 0 and b == 0 then return 0 end
 	a, b = abs(a), abs(b)
@@ -27,6 +28,15 @@ local function point_around(cx, cy, r, angle)
 	return
 		cx + cos(angle) * r,
 		cy + sin(angle) * r
+end
+
+--rotate point (x,y) around origin (cx,cy) by angle.
+local function rotate_point(x, y, cx, cy, angle)
+	if angle == 0 then return x, y end
+	angle = radians(angle)
+	x, y = x-cx, y-cy
+	local c, s = cos(angle), sin(angle)
+	return cx + x*c - y*s, cy + y*c + x*s
 end
 
 --angle between two points in -360..360 degree range.
@@ -54,6 +64,7 @@ return {
 	distance = distance,
 	distance2 = distance2,
 	point_around = point_around,
+	rotate_point = rotate_point,
 	point_angle = point_angle,
 	reflect_point = reflect_point,
 	reflect_point_distance = reflect_point_distance,

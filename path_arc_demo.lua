@@ -53,16 +53,16 @@ function player:on_render(cr)
 		cr:set_line_width(1)
 		cr:set_source_rgba(1,1,1,.2)
 
-		elarc(200, 200, 100, 200, 0, 360)
+		elarc(200, 200, 100, 200, 0, 360, 30)
 		cr:stroke()
 
 		cr:set_source_rgb(1,1,1)
 		cr:move_to(200, 200)
-		elarc(200, 200, 100, 200, a + 270, 60)
+		elarc(200, 200, 100, 200, a + 270, 60, 30)
 		cr:line_to(200, 200)
 		cr:stroke()
 
-		elarc(200, 200, 100, 200, a, 240)
+		elarc(200, 200, 100, 200, a, 240, 30)
 		cr:stroke()
 		cr:restore()
 	end
@@ -93,9 +93,8 @@ function player:on_render(cr)
 			cr:set_source_rgba(0,1,0,0.3)
 
 			local rotation = -i/2
-			local rx, ry = 100, 50
 
-			local cx, cy, rx, ry = svgarc_to_elliptic_arc(125, 75, rx, ry, rotation, large, sweep, 125+100, 75+50)
+			local cx, cy, rx, ry = svgarc_to_elliptic_arc(125, 75, 100, 50, rotation, large, sweep, 125+100, 75+50)
 			local mt = cr:get_matrix()
 			cr:translate(cx, cy)
 			cr:rotate(math.rad(rotation))
@@ -104,24 +103,15 @@ function player:on_render(cr)
 			cr:set_matrix(mt)
 			cr:stroke()
 
-			local mt = cr:get_matrix()
-			cr:translate(cx, cy)
-			cr:rotate(math.rad(rotation))
-			cr:translate(-125, -125)
-			cr:ellipse(225, 75, rx, ry)
-			cr:stroke()
-			cr:set_matrix(mt)
-
 			cr:set_source_rgba(1,0,0,1)
-			cr:move_to(125, 75)
-			svgarc(125, 75, rx, ry, rotation, large, sweep, 125+100, 75+50)
+			svgarc(125, 75, 100, 50, rotation, large, sweep, 125+100, 75+50)
 			cr:stroke()
 		end
 		cr:save()
 		ellipses(0, 0)
 		cr:translate(400, 0)
 		ellipses(0, 1)
-		cr:translate(0, 200)
+		cr:translate(0, 300)
 		ellipses(1, 0)
 		cr:translate(-400, 0)
 		ellipses(1, 1)

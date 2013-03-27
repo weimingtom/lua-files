@@ -1,12 +1,12 @@
 --2d axes-aligned and other composite closed shapes.
 
-local elliptic_arc_segment = require'path_elliptic_arc'.segment
-local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 
-local max, min, abs, sin, cos, radians, pi = math.max, math.min, math.abs, math.sin, math.cos, math.rad, math.pi
+local max, min, abs, sin, cos, radians, pi =
+	math.max, math.min, math.abs, math.sin, math.cos, math.rad, math.pi
 
-local kappa = 4 / 3 * (math.sqrt(2) - 1)
+--with this kappa the error deviation is ~ 0.0003, see http://www.tinaja.com/glib/ellipse4.pdf.
+local kappa = 4 / 3 * (math.sqrt(2) - 1) - 0.000501
 
 local function ellipse_to_bezier3(write, cx, cy, rx, ry)
 	rx, ry = abs(rx), abs(ry)
@@ -29,6 +29,24 @@ local function circle_to_bezier3(write, cx, cy, r)
 	ellipse_to_bezier3(write, cx, cy, r, r)
 end
 
+--from http://mirrors.med.harvard.edu/ctan/macros/latex/contrib/lapdf/rcircle.pdf
+local function circle_to_bezier2(write, cx, cy, r, segments)
+	segments = max(segments or 8, 3)
+	local a = radians(360 / (2 * segments))
+	local R = r / cos(a)
+	write('move', 0, -r)
+	for i=1,segments do
+		local x2, y2 =
+			R * sin((2*i-1)*a),
+		  -R * cos((2*i-1)*a)
+		local x3, y3 =
+			r * sin(2*i*a),
+		  -r * cos(2*i*a)
+		write('quad_curve', x2, y2, x3, y3)
+	end
+	write('close')
+end
+
 local function circle_bbox(cx, cy, r)
 	r = abs(r)
 	return cx-r, cy-r, 2*r, 2*r
@@ -44,7 +62,7 @@ local function circle_3p_to_bezier3(write, x1, y1, x2, y2, x3, y3)
 	circle_to_bezier3(write, cx, cy, r)
 end
 
-local function rectangle_to_lines(write, x1, y1, w, h)
+local function rect_to_lines(write, x1, y1, w, h)
 	local x2, y2 = x1 + w, y1 + h
 	write('move', x1, y1)
 	write('line', x2, y1)
@@ -53,7 +71,7 @@ local function rectangle_to_lines(write, x1, y1, w, h)
 	write('close')
 end
 
-local function rectangle_to_straight_lines(write, x1, y1, w, h)
+local function rect_to_straight_lines(write, x1, y1, w, h)
 	local x2, y2 = x1 + w, y1 + h
 	write('move',  x1, y1)
 	write('hline', x2)
@@ -62,17 +80,17 @@ local function rectangle_to_straight_lines(write, x1, y1, w, h)
 	write('close')
 end
 
-local function rectangle_bbox(x, y, w, h)
+local function rect_bbox(x, y, w, h)
 	if w < 0 then x, w = x+w, -w end
 	if h < 0 then x, h = x+h, -h end
 	return x, y, w, h
 end
 
-local function rectangle_length(x, y, w, h)
+local function rect_length(x, y, w, h)
 	return 2 * (abs(w) + abs(h))
 end
 
-local function elliptic_rectangle_to_bezier3(write, x1, y1, w, h, rx, ry)
+local function elliptic_rect_to_bezier3(write, x1, y1, w, h, rx, ry)
 	rx = min(abs(rx), abs(w/2))
 	ry = min(abs(ry), abs(h/2))
 	local x2, y2 = x1 + w, y1 + h
@@ -95,8 +113,7 @@ local function elliptic_rectangle_to_bezier3(write, x1, y1, w, h, rx, ry)
 	write('close')
 end
 
---TODO: we don't have the elliptic_arc command yet, and so we don't know the params yet
-local function elliptic_rectangle_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
+local function elliptic_rect_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
 	rx = min(abs(rx), abs(w/2))
 	ry = min(abs(ry), abs(h/2))
 	local x2, y2 = x1 + w, y1 + h
@@ -104,22 +121,24 @@ local function elliptic_rectangle_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
 	if y1 > y2 then y2, y1 = y1, y2 end
 	local cx, cy = x2-rx, y1+ry
 	write('move',  cx, y1)
-	write('elliptic_arc', cx, cy, rx, ry, 0, pi/2) --q1
+	write('elliptic_arc', cx, cy, rx, ry, 0, pi/2, 0) --q1
 	cx, cy = x2-rx, y2-ry
-	write('elliptic_arc', cx, cy, rx, ry, pi/2, pi) --q4
+	write('elliptic_arc', cx, cy, rx, ry, pi/2, pi, 0) --q4
 	cx, cy = x1+rx, y2-ry
-	write('elliptic_arc', cx, cy, rx, ry, pi, 3*pi/2) --q3
+	write('elliptic_arc', cx, cy, rx, ry, pi, 3*pi/2, 0) --q3
 	cx, cy = x1+rx, y1+ry
-	write('elliptic_arc', cx, cy, rx, ry, 3*pi/2, 0) --q2
+	write('elliptic_arc', cx, cy, rx, ry, 3*pi/2, 0, 0) --q2
 	write('close')
 end
 
-local function round_rectangle_to_bezier3(write, x1, y1, w, h, r)
+local elliptic_rect_bbox = rect_bbox
+
+local function round_rect_to_bezier3(write, x1, y1, w, h, r)
 	r = min(abs(r), abs(w/2), abs(h/2))
-	elliptic_rectangle_to_bezier3(write, x1, y1, w, h, r, r)
+	elliptic_rect_to_bezier3(write, x1, y1, w, h, r, r)
 end
 
-local function round_rectangle_to_arcs(write, x1, y1, w, h, r)
+local function round_rect_to_arcs(write, x1, y1, w, h, r)
 	r = min(abs(r), abs(w/2), abs(h/2))
 	local x2, y2 = x1 + w, y1 + h
 	if x1 > x2 then x2, x1 = x1, x2 end
@@ -136,9 +155,9 @@ local function round_rectangle_to_arcs(write, x1, y1, w, h, r)
 	write('close')
 end
 
-local round_rectangle_bbox = rectangle_bbox
+local round_rect_bbox = rect_bbox
 
-local function round_rectangle_length(x1, y1, w, h, r)
+local function round_rect_length(x1, y1, w, h, r)
 	r = min(abs(r), abs(w/2), abs(h/2))
 	return 2 * (abs(w) + abs(h)) - 8*r + 2*pi*r
 end
@@ -147,7 +166,7 @@ local point_angle = require'path_point'.point_angle
 local distance = require'path_point'.distance
 
 --a regular polygon has a center, an anchor point and a number of segments
-local function regular_polygon_to_lines(write, cx, cy, x1, y1, n)
+local function rpoly_to_lines(write, cx, cy, x1, y1, n)
 	if n < 2 then return end
 	local sweep_angle = 360 / n
 	local start_angle = point_angle(x1, y1, cx, cy)
@@ -192,18 +211,6 @@ local function star_to_lines(write, cx, cy, x1, y1, r2, n)
 	star_2p_to_lines(write, star_to_star_2p(cx, cy, x1, y1, r2, n))
 end
 
---TODO: swirl looks bad, it's badly parametrized, and should probably write out smooth curves instead!
-local function swirl_to_bezier3(write, cx, cy, r, d, n)
-	for i = 0, 360*n - 45, 90 do
-		if i == 0 then
-			local x1, y1 = elliptic_arc_endpoints(cx, cy, r, r, i, 90)
-			write('move', x1, y1)
-		end
-		write('curve', elliptic_arc_segment(cx, cy, r, r, i, 90))
-		r = r - d
-	end
-end
-
 --linearly interpolate a shape defined by a custom formula, and unite the points with lines.
 local function formula_to_lines(write, formula, steps, ...)
 	local step = 1/steps
@@ -236,40 +243,38 @@ end
 if not ... then require'path_shapes_demo' end
 
 return {
-	ellipse = ellipse_to_bezier3,
+	ellipse_to_bezier3 = ellipse_to_bezier3,
 	ellipse_bbox = ellipse_bbox,
 
-	circle = circle_to_bezier3,
+	circle_to_bezier3 = circle_to_bezier3,
+	circle_to_bezier2 = circle_to_bezier2,
 	circle_bbox = circle_bbox,
 	circle_length = circle_length,
 
-	circle_3p = circle_3p_to_bezier3,
+	circle_3p_to_bezier3 = circle_3p_to_bezier3,
 
-	rectangle = rectangle_to_lines,
-	rectangle_bbox = rectangle_bbox,
-	rectangle_length = rectangle_length,
+	rect_to_lines = rect_to_lines,
+	rect_bbox = rect_bbox,
+	rect_length = rect_length,
 
-	elliptic_rectangle = elliptic_rectangle_to_bezier3,
-	elliptic_rectangle_to_elliptic_arcs = elliptic_rectangle_to_elliptic_arcs,
-	elliptic_rectangle_bbox = elliptic_rectangle_bbox,
-	elliptic_rectangle_length = elliptic_rectangle_length,
+	elliptic_rect_to_bezier3 = elliptic_rect_to_bezier3,
+	elliptic_rect_to_elliptic_arcs = elliptic_rect_to_elliptic_arcs,
+	elliptic_rect_bbox = elliptic_rect_bbox,
 
-	round_rectangle = round_rectangle_to_bezier3,
-	round_rectangle_to_arcs = round_rectangle_to_arcs,
-	round_rectangle_bbox = round_rectangle_bbox,
-	round_rectangle_length = round_rectangle_length,
+	round_rect_to_bezier3 = round_rect_to_bezier3,
+	round_rect_to_arcs = round_rect_to_arcs,
+	round_rect_bbox = round_rect_bbox,
+	round_rect_length = round_rect_length,
 
-	star_2p = star_2p_to_lines,
+	star_2p_to_lines = star_2p_to_lines,
 
-	star = star_to_lines,
+	star_to_lines = star_to_lines,
 	star_to_star_2p = star_to_star_2p,
 
-	regular_polygon = regular_polygon_to_lines,
+	rpoly_to_lines = rpoly_to_lines,
 
-	swirl = swirl_to_bezier3,
+	formula_to_lines = formula_to_lines,
 
-	formula = formula_to_lines,
-
-	superformula = superformula_to_lines,
+	superformula_to_lines = superformula_to_lines,
 }
 

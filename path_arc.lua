@@ -1,21 +1,15 @@
---math for 2d circular arcs defined as (centerx, centery, radius, start_angle, sweep_angle).
---angles are expressed in degrees, not radians.
---sweep angle is capped between -360..360deg when drawing but otherwise the time on the arc is relative to the full sweep.
-
-local glue = require'glue'
+--math for 2D circular arcs defined as (centerx, centery, radius, start_angle, sweep_angle).
+--angles are expressed in degrees, not radians. sweep angle is capped between -360..360deg when drawing but
+--otherwise the time on the arc is relative to the full sweep.
 
 local distance2    = require'path_point'.distance2
-local point_around = require'path_point'.point_around
 local point_angle  = require'path_point'.point_angle
-local elliptic_arc_endpoints  = require'path_elliptic_arc'.endpoints
-local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
+local point_around = require'path_point'.point_around
+local observed_sweep           = require'path_elliptic_arc'.observed_sweep
+local elliptic_arc_endpoints   = require'path_elliptic_arc'.endpoints
+local elliptic_arc_to_bezier3  = require'path_elliptic_arc'.to_bezier3
 
 local abs, min, max, radians = math.abs, math.min, math.max, math.rad
-
---observed sweep: we can only observe the first -360..360deg of the total sweep.
-local function observed_sweep(sweep_angle)
-	return max(min(sweep_angle, 360), -360)
-end
 
 --observed sweep between two arbitrary angles, sweeping from a1 to a2 in a specified direction.
 local function sweep_between(a1, a2, clockwise)
@@ -42,18 +36,25 @@ local function is_sweeped(hit_angle, start_angle, sweep_angle)
 	return t >= 0 and t <= 1
 end
 
-local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
-	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, x2, y2)
+local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
+	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, ...)
 end
 
 --return a fake control point to serve as reflection point for a following smooth curve.
-local function smooth_point(cx, cy, r, start_angle, sweep_angle, x2, y2)
+local function smooth_point(cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
 	--TODO: construct a point on the tangent of the arc's second endpoint
-	return select(3, endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2))
+	return select(3, endpoints(cx, cy, r, start_angle, sweep_angle, 0, x2, y2, ...))
 end
 
-local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2)
-	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, x2, y2)
+local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
+	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, ...)
+end
+
+--convert to a 3-point parametric arc.
+local function to_arc_3p(cx, cy, r, start_angle, sweep_angle, x2, y2)
+	local x1, y1, x2, y2 = endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
+	local xp, yp = point_around(cx, cy, r, start_angle + observed_sweep(sweep_angle) / 2)
+	return x1, y1, xp, yp, x2, y2
 end
 
 --bounding box as (x,y,w,h) for a circular arc.
@@ -131,6 +132,7 @@ return {
 	is_sweeped = is_sweeped,
 	endpoints = endpoints,
 	smooth_point = smooth_point,
+	to_arc_3p = to_arc_3p,
 	--path API
 	to_bezier3 = to_bezier3,
 	bounding_box = bounding_box,

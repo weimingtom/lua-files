@@ -1,4 +1,4 @@
---math for 2d cubic bezier curves defined as (x1, y1, x2, y2, x3, y3, x4, y4)
+--math for 2D cubic bezier curves defined as (x1, y1, x2, y2, x3, y3, x4, y4)
 --where (x2, y2) and (x3, y3) are the control points and (x1, y1) and (x4, y4) are the end points.
 
 local length_function = require'path_bezier_length'
@@ -71,7 +71,7 @@ end
 
 --return a quadratic bezier that (wildly) approximates a cubic bezier.
 --the equation has two solutions, which are averaged out to form the final control point.
-local function to_bezier3(x1, y1, x2, y2, x3, y3, x4, y4)
+local function to_bezier2(x1, y1, x2, y2, x3, y3, x4, y4)
 	return
 		-.25*x1 + .75*x2 + .75*x3 -.25*x4,
 		-.25*y1 + .75*y2 + .75*y3 -.25*y4
@@ -117,7 +117,5 @@ return {
 	point = point,
 	length = length,
 	split = split,
-	hit1 = hit1,
-	hit2 = hit2,
 }
 

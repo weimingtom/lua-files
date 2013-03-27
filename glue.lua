@@ -4,7 +4,8 @@ local glue = {}
 
 local select, pairs, tonumber, tostring, unpack, xpcall, assert, getmetatable, setmetatable, type, pcall =
 	   select, pairs, tonumber, tostring, unpack, xpcall, assert, getmetatable, setmetatable, type, pcall
-local sort, format, byte, char, max = table.sort, string.format, string.byte, string.char, math.max
+local sort, format, byte, char, min, max =
+	table.sort, string.format, string.byte, string.char, math.min, math.max
 
 function glue.index(t)
 	local dt={} for k,v in pairs(t) do dt[v]=k end
@@ -65,6 +66,44 @@ function glue.append(dt,...)
 		dt[#dt+1] = select(i,...)
 	end
 	return dt
+end
+
+local tinsert, tremove = table.insert, table.remove
+
+--insert n elements at i, shifting elemens on the right of i (i inclusive) to the right.
+local function insert(t, i, n)
+	if n == 1 then --shift 1
+		tinsert(t, i)
+		return
+	end
+	for p = #t,i,-1 do --shift n
+		t[p+n] = t[p]
+	end
+end
+
+--remove n elements at i, shifting elements on the right of i (i inclusive) to the left.
+local function remove(t, i, n)
+	n = min(n, #t-i+1)
+	if n == 1 then --shift 1
+		tremove(t, i)
+		return
+	end
+	for p=i+n,#t do --shift n
+		t[p-n] = t[p]
+	end
+	for p=#t,#t-n+1,-1 do --clean tail
+		t[p] = nil
+	end
+end
+
+--shift elements to the right of i (i inclusive) to the left or further to the right.
+function glue.shift(t, i, n)
+	if n > 0 then
+		insert(t, i, n)
+	elseif n < 0 then
+		remove(t, i, -n)
+	end
+	return t
 end
 
 function glue.pluck(t,key)

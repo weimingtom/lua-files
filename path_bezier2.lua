@@ -1,5 +1,5 @@
---math for 2d quadratic bezier curves defined as (x1, y1, x2, y2, x3, y3)
---where (x2, y2) is the control point and (x1, y1) and (x3, y3) are the end points.
+--math for 2D quadratic bezier curves defined as (x1, y1, x2, y2, x3, y3)
+--where (x1, y1) and (x3, y3) are the end points and (x2, y2) is the control point.
 
 local distance = require'path_point'.distance
 local length_function = require'path_bezier_length'
@@ -29,9 +29,8 @@ end
 --solve B(t)'=0 (use wolframalpha.com).
 local function derivative1_root(x1, x2, x3)
 	local denom = x1 - 2*x2 + x3
-	if denom ~= 0 then
-		return (x1 - x2) / denom
-	end
+	if denom == 0 then return end
+	return (x1 - x2) / denom
 end
 
 --compute the minimum and maximum values for B(t).
@@ -39,6 +38,10 @@ local function minmax(x1, x2, x3)
 	--start off with the assumption that the curve doesn't extend past its endpoints.
 	local minx = min(x1, x3)
 	local maxx = max(x1, x3)
+	--if the control point is between the endpoints, the curve has no local extremas.
+	if x2 >= minx and x2 <= maxx then
+		return minx, maxx
+	end
 	--if the curve has local minima and/or maxima then adjust the bounding box.
 	local t = derivative1_root(x1, x2, x3)
 	if t and t >= 0 and t <= 1 then
@@ -56,7 +59,7 @@ local function bounding_box(x1, y1, x2, y2, x3, y3)
 	return minx, miny, maxx-minx, maxy-miny
 end
 
---control points of a cubic bezier corresponding to a quadratic bezier.
+--transform to cubic bezier.
 local function to_bezier3(x1, y1, x2, y2, x3, y3)
 	return
 		x1, y1,

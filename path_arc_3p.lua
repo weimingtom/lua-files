@@ -1,12 +1,12 @@
---math for 2d circular arcs defined as (x1, y1, xp, yp, x2, y2) where (x1, y1) and (x2, y2) are its
---end points, and (xp,yp) is a third point on the arc.
---if the 3 points are collinear, then the arc is a line between (x1, y1) and (x2, y2).
+--math for 2d circular arcs defined as (x1, y1, xp, yp, x2, y2) where (x1, y1) and (x2, y2) are its end points,
+--and (xp, yp) is a third point on the arc. if the 3 points are collinear, then the arc is the line between
+--(x1, y1) and (x2, y2), regardless of where (xp, yp) is.
 
 local distance2    = require'path_point'.distance2
 local point_angle  = require'path_point'.point_angle
-local point_around = require'path_point'.point_around
 
 local line_bounding_box = require'path_line'.bounding_box
+local line_to_bezier3   = require'path_line'.to_bezier3
 local line_point        = require'path_line'.point
 local line_length       = require'path_line'.length
 local line_hit          = require'path_line'.hit
@@ -31,26 +31,21 @@ local function to_arc(x1, y1, xp, yp, x2, y2)
 	local ctl_angle   = point_angle(xp, yp, cx, cy)
 	local sweep_angle = sweep_between(start_angle, end_angle)
 	local ctl_sweep   = sweep_between(start_angle, ctl_angle)
-	if ctl_sweep > sweep_angle then --control point is outside the positive sweep, must be inside the negative sweep then.
+	if ctl_sweep > sweep_angle then
+		--control point is outside the positive sweep, must be inside the negative sweep then.
 		sweep_angle = sweep_between(start_angle, end_angle, false)
 	end
 	return cx, cy, r, start_angle, sweep_angle, x2, y2
 end
 
-local function arc_to_arc_3p(cx, cy, r, start_angle, sweep_angle, x2, y2)
-	local x1, y1, x2, y2 = arc_endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
-	local xp, yp = point_around(cx, cy, r, start_angle + observed_sweep(sweep_angle) / 2)
-	return x1, y1, xp, yp, x2, y2
-end
-
-local function to_bezier3(write, x1, y1, xp, yp, x2, y2)
+local function to_bezier3(write, x1, y1, xp, yp, x2, y2, ...)
 	local cx, cy, r, start_angle, sweep_angle = to_arc(x1, y1, xp, yp, x2, y2)
 	if not cx then
 		--ponts are collinear, radius is infinite, arc is a line between p1 and p2 or an infinite line
 		--interrupted between p1 and p2 but we can't draw that so we draw a line between p1 and p2 either way.
-		write('line', x2, y2)
+		write('curve', select(3, line_to_bezier3(x1, y1, x2, y2)))
 	else
-		arc_to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2)
+		arc_to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
 	end
 end
 
@@ -97,7 +92,6 @@ end
 
 return {
 	to_arc = to_arc,
-	arc_to_arc_3p = arc_to_arc_3p,
 	--path API
 	to_bezier3 = to_bezier3,
 	point = point,

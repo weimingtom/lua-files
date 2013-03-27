@@ -725,7 +725,11 @@ function tags.rect(t, ct)
 	local ry = length(t.attrs.ry or '0', 'y', ct)
 	if not (x and y and w and h and rx and ry and w > 0 and h > 0) then return end
 	if rx ~= 0 and ry ~= 0 then
-		return shape({path = {'round_rect', x, y, w, h, math.min(rx, ry)}}, t, ct) --TODO: round_rect with rx,ry
+		if rx == ry then
+			return shape({path = {'round_rect', x, y, w, h, rx}}, t, ct)
+		else
+			return shape({path = {'elliptic_rect', x, y, w, h, rx, ry}}, t, ct)
+		end
 	else
 		return shape({path = {'rect', x, y, w, h}}, t, ct)
 	end

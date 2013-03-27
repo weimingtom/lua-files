@@ -1,4 +1,4 @@
---math for 2d line segments defined as (x1, y1, x2, y2).
+--math for 2D line segments defined as (x1, y1, x2, y2).
 
 local abs, min, max = math.abs, math.min, math.max
 
@@ -68,11 +68,33 @@ local function line_line_intersection(x1, y1, x2, y2, x3, y3, x4, y4)
 		((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / d
 end
 
+--transform to a quad bezier that advances linearly i.e. the point on the line at t best matches the point on the curve at t.
+local function to_bezier2(x1, y1, x2, y2)
+	return
+		x1, y1,
+		(x1 + x2) / 2,
+		(y1 + y2) / 2,
+		x2, y2
+end
+
+--transform to a cubic bezier that advances linearly i.e. the point on the line at t best matches the point on the curve at t.
+local function to_bezier3(x1, y1, x2, y2)
+	return
+		x1, y1,
+		(2 * x1 + x2) / 3,
+		(2 * y1 + y2) / 3,
+		(x1 + 2 * x2) / 3,
+		(y1 + 2 * y2) / 3,
+		x2, y2
+end
+
 if not ... then require'path_hit_demo' end
 
 return {
 	point_line_intersection = point_line_intersection,
 	line_line_intersection = line_line_intersection,
+	to_bezier2 = to_bezier2,
+	to_bezier3 = to_bezier3,
 	--path API
 	bounding_box = bounding_box,
 	point = point,
