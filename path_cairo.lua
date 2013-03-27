@@ -29,7 +29,7 @@ end
 
 if not ... then
 	local player = require'cairopanel_player'
-	local mt = require'trans_affine2d'.new()
+	local mt = require'affine2d'()
 	local b2_to_b3 = require'path_bezier2'.to_bezier3
 
 	local i=0

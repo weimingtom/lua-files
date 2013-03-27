@@ -202,7 +202,7 @@ local function new(xx, yx, xy, yy, x0, y0)
 	return mt
 end
 
---if not ... then require'trans_affine2d_test' end
+--if not ... then require'affine2d_test' end
 
 return new
 

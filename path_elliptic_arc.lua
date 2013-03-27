@@ -9,7 +9,6 @@
 local rotate_point = require'path_point'.rotate_point
 local hypot        = require'path_point'.hypot
 local line_to_bezier3 = require'path_line'.to_bezier3
-local matrix = require'trans_affine2d'
 local bezier3_hit = require'path_bezier3_hit'
 
 local abs, min, max, sqrt, ceil, sin, cos, radians =

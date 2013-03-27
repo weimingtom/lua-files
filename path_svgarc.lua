@@ -5,7 +5,6 @@
 local glue = require'glue'
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 local elliptic_arc_hit = require'path_elliptic_arc'.hit
-local matrix = require'trans_affine2d'
 
 local sin, cos, abs, sqrt, acos, radians, degrees, pi =
 	math.sin, math.cos, math.abs, math.sqrt, math.acos, math.rad, math.deg, math.pi

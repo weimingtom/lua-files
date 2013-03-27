@@ -498,7 +498,7 @@ end
 
 if not ... then
 
-local mt = require'trans_affine2d'()
+local mt = require'affine2d'()
 
 decode(print, {
 	'move', 100, 100, 'rel_round_rect', 10, 10, 50, 50, 10,
