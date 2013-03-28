@@ -6,35 +6,12 @@ local distance2    = require'path_point'.distance2
 local point_angle  = require'path_point'.point_angle
 local point_around = require'path_point'.point_around
 local observed_sweep           = require'path_elliptic_arc'.observed_sweep
+local is_sweeped               = require'path_elliptic_arc'.is_sweeped
+local sweep_time               = require'path_elliptic_arc'.sweep_time
 local elliptic_arc_endpoints   = require'path_elliptic_arc'.endpoints
 local elliptic_arc_to_bezier3  = require'path_elliptic_arc'.to_bezier3
 
 local abs, min, max, radians = math.abs, math.min, math.max, math.rad
-
---observed sweep between two arbitrary angles, sweeping from a1 to a2 in a specified direction.
-local function sweep_between(a1, a2, clockwise)
-	a1 = a1 % 360
-	a2 = a2 % 360
-	clockwise = clockwise ~= false
-	local sweep = a2 - a1
-	if sweep < 0 and clockwise then
-		sweep = sweep + 360
-	elseif sweep > 0 and not clockwise then
-		sweep = sweep - 360
-	end
-	return sweep
-end
-
---angle time on an arc (or outside the arc if is outside 0..1 range) for a specified angle.
-local function sweep_time(hit_angle, start_angle, sweep_angle)
-	return sweep_between(start_angle, hit_angle, sweep_angle >= 0) / sweep_angle
-end
-
---test if an angle is inside the sweeped arc.
-local function is_sweeped(hit_angle, start_angle, sweep_angle)
-	local t = sweep_time(hit_angle, start_angle, sweep_angle)
-	return t >= 0 and t <= 1
-end
 
 local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
 	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, ...)
@@ -127,9 +104,6 @@ end
 if not ... then require'path_arc_demo' end
 
 return {
-	observed_sweep = observed_sweep,
-	sweep_between = sweep_between,
-	is_sweeped = is_sweeped,
 	endpoints = endpoints,
 	smooth_point = smooth_point,
 	to_arc_3p = to_arc_3p,

@@ -1,9 +1,10 @@
---3rd degree equation solver using Cardan's formula.
+--3rd degree equation solver using Cardano's method.
 --epsilon controls the precision of the solver.
-
-local abs, sqrt, acos, cos, pi = math.abs, math.sqrt, math.acos, math.cos, math.pi
+--TODO: This solver has poor precision. Code-review it for catastrophic cancelations and alike.
 
 local solve_equation2 = require'math_eq2'
+
+local abs, sqrt, acos, cos, pi = math.abs, math.sqrt, math.acos, math.cos, math.pi
 
 local function solve_equation3(a, b, c, d, epsilon)
 	epsilon = epsilon or 1e-16

@@ -275,6 +275,7 @@ return {
 
 	formula_to_lines = formula_to_lines,
 
+	superformula = superformula,
 	superformula_to_lines = superformula_to_lines,
 }
 

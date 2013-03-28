@@ -1,10 +1,13 @@
---math for 2d svg-style elliptical arcs defined as:
+--math for 2D svg-style elliptic arcs defined as:
 --  (x1, y1, radius_x, radius_y, rotation, large_arc_flag, sweep_flag, x2, y2, [matrix], [segment_max_sweep])
 --conversion to elliptic arcs adapted from antigrain library @ agg/src/agg_bezier_arc.cpp by Cosmin Apreutesei.
 
 local glue = require'glue'
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
-local elliptic_arc_hit = require'path_elliptic_arc'.hit
+local elliptic_arc_point      = require'path_elliptic_arc'.point
+local elliptic_arc_hit        = require'path_elliptic_arc'.hit
+local elliptic_arc_split      = require'path_elliptic_arc'.split
+local elliptic_arc_to_svgarc  = require'path_elliptic_arc'.to_svgarc
 
 local sin, cos, abs, sqrt, acos, radians, degrees, pi =
 	math.sin, math.cos, math.abs, math.sqrt, math.acos, math.rad, math.deg, math.pi
@@ -16,7 +19,7 @@ local function to_elliptic_arc(x0, y0, rx, ry, rotation, large_arc_flag, sweep_f
 	local dx2 = (x0 - x2) / 2
 	local dy2 = (y0 - y2) / 2
 
-	local a = radians(rotation)
+	local a = radians(rotation or 0)
 	local cos_a = cos(a)
 	local sin_a = sin(a)
 
@@ -83,32 +86,45 @@ local function to_elliptic_arc(x0, y0, rx, ry, rotation, large_arc_flag, sweep_f
 		sweep_angle = sweep_angle + 2*pi
 	end
 
-	return cx, cy, rx, ry, degrees(start_angle), degrees(sweep_angle), rotation, ...
+	return cx, cy, rx, ry, degrees(start_angle), degrees(sweep_angle), rotation, x2, y2, ...
 end
 
 local function to_bezier3(write, ...)
 	elliptic_arc_to_bezier3(write, to_elliptic_arc(...))
 end
 
+local function point(...)
+	return elliptic_arc_point(to_elliptic_arc(...))
+end
+
 local function hit(x0, y0, ...)
-	elliptic_arc_hit(x0, y0, to_elliptic_arc(...))
+	return elliptic_arc_hit(x0, y0, to_elliptic_arc(...))
 end
 
-local function split(t, ...)
+local function split(t, x1, y1, ...)
 	local
-		cx, cy, rx, ry, start_angle, sweep1, rotation
-		cx, cy, rx, ry, split_angle, sweep2, rotation, x2, y2 =
-		elliptic_arc_split(t, to_elliptic_arc(...))
-	--TODO: elliptic arc to svgarc conversion
-	error'NYI'
+		cx1, cy1, rx1, ry1, start_angle1, sweep_angle1, rotation1,
+		cx2, cy2, rx2, ry2, start_angle2, sweep_angle2, rotation2, x2, y2 =
+			elliptic_arc_split(t, to_elliptic_arc(x1, y1, ...))
+	local
+		x11, y11, rx1, ry1, rotation1, large_arc_flag1, sweep_flag1, x12, y12 =
+			elliptic_arc_to_svgarc(cx1, cy1, rx1, ry1, start_angle1, sweep_angle1, rotation1)
+	local
+		x21, y21, rx2, ry2, rotation2, large_arc_flag2, sweep_flag2, x22, y22 =
+			elliptic_arc_to_svgarc(cx2, cy2, rx2, ry2, start_angle2, sweep_angle2, rotation2, x2, y2)
+	x11, y11 = x1, y1
+	return
+		x11, y11, rx1, ry1, rotation1, large_arc_flag1, sweep_flag1, x12, y12,
+		x21, y21, rx2, ry2, rotation2, large_arc_flag2, sweep_flag2, x22, y22
 end
 
-if not ... then require'path_arc_demo' end
+if not ... then require'path_svgarc_demo' end
 
 return {
 	to_elliptic_arc = to_elliptic_arc,
 	--path API
 	to_bezier3 = to_bezier3,
+	point = point,
 	hit = hit,
 	split = split,
 }
