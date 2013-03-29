@@ -259,7 +259,7 @@ function glue.inherit(t, parent)
 	if meta then
 		meta.__index = parent
 	elseif parent ~= nil then
-		setmetatable({__index = parent})
+		setmetatable(t, {__index = parent})
 	end
 	return t
 end
