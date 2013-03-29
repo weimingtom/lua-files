@@ -1,4 +1,4 @@
-local player = require'cairopanel_player'
+local player = require'cairo_player'
 local arc_to_bezier3 = require'path_arc'.to_bezier3
 local arc_endpoints = require'path_arc'.endpoints
 

@@ -110,7 +110,7 @@ function player:play()
 	winapi.MessageLoop()
 end
 
-if not ... then require'cairopanel_player_test' end
+if not ... then require'cairo_player_demo' end
 
 return player
 

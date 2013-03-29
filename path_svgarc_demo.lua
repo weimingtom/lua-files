@@ -1,4 +1,4 @@
-local player = require'cairopanel_player'
+local player = require'cairo_player'
 local svgarc = require'path_svgarc'
 local matrix = require'affine2d'
 

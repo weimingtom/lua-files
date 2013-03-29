@@ -1,4 +1,4 @@
-local player = require'cairopanel_player'
+local player = require'cairo_player'
 local bezier2 = require'path_bezier2_ai'
 local glue = require'glue'
 

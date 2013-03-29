@@ -1,4 +1,4 @@
-local player = require'cairopanel_player'
+local player = require'cairo_player'
 local glue = require'glue'
 local distance2 = require'path_point'.distance2
 local line = require'path_line'
