@@ -4,8 +4,8 @@
 -- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
 -- functions accept/return Lua strings
 -- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to, cairo_circle, cairo_ellipse,
---   cairo_skew, cairo_safe_transform, cairo_matrix_transform, cairo_matrix_invertible, cairo_matrix_safe_transform,
---   cairo_matrix_skew, cairo_surface_apply_alpha.
+--   cairo_rotate_around, cairo_skew, cairo_safe_transform, cairo_matrix_transform, cairo_matrix_invertible,
+--   cairo_matrix_safe_transform, cairo_matrix_rotate_around, cairo_matrix_skew, cairo_surface_apply_alpha.
 
 local ffi = require'ffi'
 require'cairo_h'
@@ -368,6 +368,12 @@ function M.cairo_matrix_skew(mt, ax, ay)
 	mt:transform(sm)
 end
 
+function M.cairo_matrix_rotate_around(mt, cx, cy, angle)
+	mt:translate(cx, cy)
+	mt:rotate(angle)
+	mt:translate(-cx, -cy)
+end
+
 function M.cairo_matrix_copy(mt)
 	local dmt = ffi.new'cairo_matrix_t'
 	ffi.copy(dmt, mt, ffi.sizeof(mt))
@@ -382,6 +388,12 @@ end
 
 function M.cairo_safe_transform(cr, mt)
 	if mt:invertible() then cr:transform(mt) end
+end
+
+function M.cairo_rotate_around(cr, cx, cy, angle)
+	M.cairo_translate(cr, cx, cy)
+	M.cairo_rotate(cr, angle)
+	M.cairo_translate(cr, -cx, -cy)
 end
 
 function M.cairo_skew(cr, ax, ay)
@@ -440,6 +452,7 @@ ffi.metatype('cairo_t', {__index = {
 	translate = M.cairo_translate,
 	scale = M.cairo_scale,
 	rotate = M.cairo_rotate,
+	rotate_around = M.cairo_rotate_around,
 	transform = M.cairo_transform,
 	safe_transform = M.cairo_safe_transform,
 	set_matrix = M.cairo_set_matrix,
@@ -726,6 +739,7 @@ ffi.metatype('cairo_matrix_t', {__index = {
 	translate = M.cairo_matrix_translate,
 	scale = M.cairo_matrix_scale,
 	rotate = M.cairo_matrix_rotate,
+	rotate_around = M.cairo_matrix_rotate_around,
 	invert = M.cairo_matrix_invert,
 	multiply = M.cairo_matrix_multiply,
 	transform_distance = M.cairo_matrix_transform_distance,

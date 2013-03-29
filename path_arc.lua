@@ -2,9 +2,11 @@
 --angles are expressed in degrees, not radians. sweep angle is capped between -360..360deg when drawing but
 --otherwise the time on the arc is relative to the full sweep.
 
-local distance2    = require'path_point'.distance2
-local point_angle  = require'path_point'.point_angle
 local point_around = require'path_point'.point_around
+local rotate_point = require'path_point'.rotate_point
+local point_angle  = require'path_point'.point_angle
+local distance2    = require'path_point'.distance2
+
 local observed_sweep           = require'path_elliptic_arc'.observed_sweep
 local is_sweeped               = require'path_elliptic_arc'.is_sweeped
 local sweep_time               = require'path_elliptic_arc'.sweep_time
@@ -13,18 +15,18 @@ local elliptic_arc_to_bezier3  = require'path_elliptic_arc'.to_bezier3
 
 local abs, min, max, radians = math.abs, math.min, math.max, math.rad
 
-local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
-	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, ...)
+local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
+	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2)
 end
 
 --return a fake control point to serve as reflection point for a following smooth curve.
-local function smooth_point(cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
+local function smooth_point(cx, cy, r, start_angle, sweep_angle, x2, y2)
 	--TODO: construct a point on the tangent of the arc's second endpoint
-	return select(3, endpoints(cx, cy, r, start_angle, sweep_angle, 0, x2, y2, ...))
+	return select(3, endpoints(cx, cy, r, start_angle, sweep_angle, 0, x2, y2))
 end
 
-local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
-	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, ...)
+local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2)
+	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2)
 end
 
 --convert to a 3-point parametric arc.
@@ -88,7 +90,7 @@ local function hit(x0, y0, cx, cy, r, start_angle, sweep_angle, x2, y2)
 	local end_angle = start_angle + observed_sweep(sweep_angle)
 	local t = sweep_time(hit_angle, start_angle, sweep_angle)
 	if t < 0 or t > 1 then --hit point is outside arc's sweep opening, check distance to end points
-		local x1, y1, x2, y2 = endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
+		local x1, y1, x2, y2 = endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2)
 		local d1 = distance2(x0, y0, x1, y1)
 		local d2 = distance2(x0, y0, x2, y2)
 		if d1 <= d2 then

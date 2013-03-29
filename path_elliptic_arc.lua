@@ -1,10 +1,10 @@
 --math for 2D elliptic arcs defined as:
---  (center_x, center_y, radius_x, radius_y, start_angle, sweep_angle, [rotation], [x2, y2], [matrix], [segment_max_sweep]).
+--  (center_x, center_y, radius_x, radius_y, start_angle, sweep_angle, [rotation], [x2, y2]).
 --angles are expressed in degrees, not radians.
 --sweep angle is capped between -360..360deg when drawing but otherwise the time on the arc is relative to the full sweep.
 --x2, y2 is an optional override of arc's second end point to use when numerical exactness of the endpoint is required.
---matrix is an affine transform that applies to the resulted segments.
---segment_max_sweep is for limiting the arc portion that each bezier segment can cover.
+--mt is an affine transform that applies to the resulted segments.
+--segment_max_sweep is for limiting the arc portion that each bezier segment can cover and is computed automatically.
 
 local rotate_point = require'path_point'.rotate_point
 local hypot        = require'path_point'.hypot
@@ -71,6 +71,8 @@ local function endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2,
 	local x1, y1 = point_at(start_angle, cx, cy, rx, ry, rotation, mt)
 	if not x2 then
 		x2, y2 = point_at(start_angle + observed_sweep(sweep_angle), cx, cy, rx, ry, rotation, mt)
+	elseif mt then
+		x2, y2 = mt(x2, y2)
 	end
 	return x1, y1, x2, y2
 end
@@ -130,6 +132,8 @@ local function to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotat
 	rotation = rotation or 0
 	if not x2 then
 		x2, y2 = point_at(start_angle + sweep_angle, cx, cy, rx, ry, rotation, mt)
+	elseif mt then
+		x2, y2 = mt(x2, y2)
 	end
 	segment_max_sweep = segment_max_sweep or best_segment_max_sweep(mt, max(rx, ry))
 

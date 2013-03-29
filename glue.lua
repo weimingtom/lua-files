@@ -73,7 +73,7 @@ local tinsert, tremove = table.insert, table.remove
 --insert n elements at i, shifting elemens on the right of i (i inclusive) to the right.
 local function insert(t, i, n)
 	if n == 1 then --shift 1
-		tinsert(t, i)
+		tinsert(t, i, t[i])
 		return
 	end
 	for p = #t,i,-1 do --shift n
@@ -96,7 +96,7 @@ local function remove(t, i, n)
 	end
 end
 
---shift elements to the right of i (i inclusive) to the left or further to the right.
+--shift all the elements to the right of i (i inclusive) to the left or further to the right.
 function glue.shift(t, i, n)
 	if n > 0 then
 		insert(t, i, n)
@@ -254,35 +254,13 @@ end
 
 function glue.pass(...) return ... end
 
-local function index_parents(t,k)
-	local parents = getmetatable(t).__parents
-	for i=1,#parents do
-		if parents[i][k] ~= nil then
-			return parents[i][k]
-		end
-	end
-end
-local function setmeta(t,__index,__parents)
+function glue.inherit(t, parent)
 	local meta = getmetatable(t)
-	if not meta then
-		if not __index and not __parents then return t end
-		meta = {}
-		setmetatable(t, meta)
+	if meta then
+		meta.__index = parent
+	elseif parent ~= nil then
+		setmetatable({__index = parent})
 	end
-	meta.__index = __index
-	meta.__parents = __parents
-	return t
-end
-function glue.inherit(t,...)
-	local n=select('#',...)
-	if n==0 then error('parent expected', 2) end
-	if n==1 then return setmeta(t,...,nil) end
-	local parents = {}
-	for i=1,n do
-		parents[#parents+1] = select(i,...) --ignore nils
-	end
-	if #parents < 2 then return setmeta(t,parents[1],nil) end
-	setmeta(t,index_parents,parents)
 	return t
 end
 

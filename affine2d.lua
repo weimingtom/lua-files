@@ -153,6 +153,15 @@ local function new(xx, yx, xy, yy, x0, y0)
 		return mt
 	end
 
+	function mt:rotate_around(cx, cy, a)
+		return mt:translate(cx, cy):rotate(a):translate(-cx, -cy)
+	end
+
+	--check that the matrix is the identity matrix, thus having no effect.
+	function mt:is_identity()
+		return xx == 1 and yy == 1 and yx == 0 and xy == 0 and x0 == 0 and y0 == 0
+	end
+
 	--check that no scaling is done with this transform, only flipping and multiple-of-90deg rotation.
 	function mt:has_unity_scale()
 		return
