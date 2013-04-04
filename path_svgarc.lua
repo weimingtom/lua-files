@@ -136,7 +136,6 @@ end
 
 local function split(t, x1, y1, rx, ry, rotation, large_arc_flag, sweep_flag, x2, y2)
 	if invalid(x1, y1, x2, y2, rx, ry) then
-		x1, y1, x2, y2 = transform_endpoints(mt, x1, y1, x2, y2)
 		local x3, y3 = line_point(t, x1, y1, x2, y2)
 		return
 			x1, y1, rx, ry, rotation, large_arc_flag, sweep_flag, x3, y3,

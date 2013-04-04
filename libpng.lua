@@ -5,7 +5,7 @@ local glue = require'glue'
 local bmpconv = require'bmpconv'
 require'libpng_h'
 require'stdio_h'
-local C = ffi.load'png'
+local C = ffi.load'libpng'
 
 local PNG_LIBPNG_VER_STRING = '1.5.10'
 

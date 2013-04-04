@@ -5,28 +5,9 @@ local circle_3p_to_circle = require'path_circle_3p'.to_circle
 local max, min, abs, sin, cos, radians, pi =
 	math.max, math.min, math.abs, math.sin, math.cos, math.rad, math.pi
 
---with this kappa the error deviation is ~ 0.0003, see http://www.tinaja.com/glib/ellipse4.pdf.
-local kappa = 4 / 3 * (math.sqrt(2) - 1) - 0.000501
-
-local function ellipse_to_bezier3(write, cx, cy, rx, ry)
-	rx, ry = abs(rx), abs(ry)
-	local lx = rx * kappa
-	local ly = ry * kappa
-	write('move',  cx, cy-ry)
-	write('curve', cx+lx, cy-ry, cx+rx, cy-ly, cx+rx, cy) --q1
-	write('curve', cx+rx, cy+ly, cx+lx, cy+ry, cx, cy+ry) --q4
-	write('curve', cx-lx, cy+ry, cx-rx, cy+ly, cx-rx, cy) --q3
-	write('curve', cx-rx, cy-ly, cx-lx, cy-ry, cx, cy-ry) --q2
-	write('close')
-end
-
 local function ellipse_bbox(cx, cy, rx, ry)
 	rx, ry = abs(rx), abs(ry)
 	return cx-rx, cy-ry, 2*rx, 2*ry
-end
-
-local function circle_to_bezier3(write, cx, cy, r)
-	ellipse_to_bezier3(write, cx, cy, r, r)
 end
 
 --from http://mirrors.med.harvard.edu/ctan/macros/latex/contrib/lapdf/rcircle.pdf
@@ -56,18 +37,23 @@ local function circle_length(cx, cy, r)
 	return 2*pi*abs(r)
 end
 
-local function circle_3p_to_bezier3(write, x1, y1, x2, y2, x3, y3)
-	local cx, cy, r = circle_3p_to_circle(x1, y1, x2, y2, x3, y3)
-	if not cx then return end
-	circle_to_bezier3(write, cx, cy, r)
-end
-
-local function rect_to_lines(write, x1, y1, w, h)
-	local x2, y2 = x1 + w, y1 + h
+--note: if w * h is negative, the rect is drawn counterclockwise.
+local function rect_to_lines(write, x1, y1, w, h, mt)
+	local x1, y1 = x1, y1
+	local x3, y3 = x1 + w, y1 + h
+	local x2, y2 = x3, y1
+	local x4, y4 = x1, y3
+	if mt then
+		x1, y1 = mt(x1, y1)
+		x2, y2 = mt(x2, y2)
+		x3, y3 = mt(x3, y3)
+		x4, y4 = mt(x4, y4)
+	end
 	write('move', x1, y1)
-	write('line', x2, y1)
 	write('line', x2, y2)
-	write('line', x1, y2)
+	write('line', x3, y3)
+	write('line', x4, y4)
+	write('line', x1, y1)
 	write('close')
 end
 
@@ -77,12 +63,13 @@ local function rect_to_straight_lines(write, x1, y1, w, h)
 	write('hline', x2)
 	write('vline', y2)
 	write('hline', x1)
+	write('vline', y1)
 	write('close')
 end
 
 local function rect_bbox(x, y, w, h)
 	if w < 0 then x, w = x+w, -w end
-	if h < 0 then x, h = x+h, -h end
+	if h < 0 then y, h = y+h, -h end
 	return x, y, w, h
 end
 
@@ -90,9 +77,16 @@ local function rect_length(x, y, w, h)
 	return 2 * (abs(w) + abs(h))
 end
 
+--with this kappa the error deviation is ~ 0.0003, see http://www.tinaja.com/glib/ellipse4.pdf.
+local kappa = 4 / 3 * (math.sqrt(2) - 1) - 0.000501
+
 local function elliptic_rect_to_bezier3(write, x1, y1, w, h, rx, ry)
 	rx = min(abs(rx), abs(w/2))
 	ry = min(abs(ry), abs(h/2))
+	if rx == 0 and ry == 0 then
+		rect_to_lines(write, x1, y1, w, h)
+		return
+	end
 	local x2, y2 = x1 + w, y1 + h
 	if x1 > x2 then x2, x1 = x1, x2 end
 	if y1 > y2 then y2, y1 = y1, y2 end
@@ -110,6 +104,7 @@ local function elliptic_rect_to_bezier3(write, x1, y1, w, h, rx, ry)
 	write('line',  x1, y1+ry)
 	cx, cy = x1+rx, y1+ry
 	write('curve', cx-rx, cy-ly, cx-lx, cy-ry, cx, cy-ry) --q2
+	write('line',  cx, y1)
 	write('close')
 end
 
@@ -121,21 +116,23 @@ local function elliptic_rect_to_elliptic_arcs(write, x1, y1, w, h, rx, ry)
 	if y1 > y2 then y2, y1 = y1, y2 end
 	local cx, cy = x2-rx, y1+ry
 	write('move',  cx, y1)
-	write('elliptic_arc', cx, cy, rx, ry, 0, pi/2, 0) --q1
+	write('line_elliptic_arc', cx, cy, rx, ry, -90, 90) --q1
 	cx, cy = x2-rx, y2-ry
-	write('elliptic_arc', cx, cy, rx, ry, pi/2, pi, 0) --q4
+	write('line_elliptic_arc', cx, cy, rx, ry, 0, 90, 0) --q4
 	cx, cy = x1+rx, y2-ry
-	write('elliptic_arc', cx, cy, rx, ry, pi, 3*pi/2, 0) --q3
+	write('line_elliptic_arc', cx, cy, rx, ry, 90, 90, 0) --q3
 	cx, cy = x1+rx, y1+ry
-	write('elliptic_arc', cx, cy, rx, ry, 3*pi/2, 0, 0) --q2
+	write('line_elliptic_arc', cx, cy, rx, ry, 180, 90, 0) --q2
 	write('close')
 end
 
-local elliptic_rect_bbox = rect_bbox
+local function round_rect_to_elliptic_rect(x1, y1, w, h, r)
+	r = min(abs(r), abs(w/2), abs(h/2))
+	return x1, y1, w, h, r, r
+end
 
 local function round_rect_to_bezier3(write, x1, y1, w, h, r)
-	r = min(abs(r), abs(w/2), abs(h/2))
-	elliptic_rect_to_bezier3(write, x1, y1, w, h, r, r)
+	elliptic_rect_to_bezier3(write, round_rect_to_elliptic_rect(x1, y1, w, h, r))
 end
 
 local function round_rect_to_arcs(write, x1, y1, w, h, r)
@@ -145,17 +142,15 @@ local function round_rect_to_arcs(write, x1, y1, w, h, r)
 	if y1 > y2 then y2, y1 = y1, y2 end
 	local cx, cy = x2-r, y1+r
 	write('move',  cx, y1)
-	write('arc', cx, cy, r, 0, pi/2) --q1
-	cx, cy = x2-rx, y2-ry
-	write('arc', cx, cy, r, pi/2, pi) --q4
-	cx, cy = x1+rx, y2-ry
-	write('arc', cx, cy, r, pi, 3*pi/2) --q3
-	cx, cy = x1+rx, y1+ry
-	write('arc', cx, cy, r, 3*pi/2, 0) --q2
+	write('line_arc', cx, cy, r, -90, 90) --q1
+	cx, cy = x2-r, y2-r
+	write('line_arc', cx, cy, r, 0, 90) --q4
+	cx, cy = x1+r, y2-r
+	write('line_arc', cx, cy, r, 90, 90) --q3
+	cx, cy = x1+r, y1+r
+	write('line_arc', cx, cy, r, 180, 90) --q2
 	write('close')
 end
-
-local round_rect_bbox = rect_bbox
 
 local function round_rect_length(x1, y1, w, h, r)
 	r = min(abs(r), abs(w/2), abs(h/2))
@@ -168,14 +163,16 @@ local distance = require'path_point'.distance
 --a regular polygon has a center, an anchor point and a number of segments
 local function rpoly_to_lines(write, cx, cy, x1, y1, n)
 	if n < 2 then return end
+	write('move', x1, y1)
 	local sweep_angle = 360 / n
 	local start_angle = point_angle(x1, y1, cx, cy)
 	local radius = distance(x1, y1, cx, cy)
-	for a = start_angle, start_angle + 360 - sweep_angle/2, sweep_angle do
+	for a = start_angle + sweep_angle, start_angle + 360 - sweep_angle/2, sweep_angle do
 		local x = cx + cos(radians(a)) * radius
 		local y = cy + sin(radians(a)) * radius
-		write(a == start_angle and 'move' or 'line', x, y)
+		write('line', x, y)
 	end
+	write('line', x1, y1)
 	write('close')
 end
 
@@ -196,14 +193,16 @@ local function star_2p_to_lines(write, cx, cy, x1, y1, x2, y2, n)
 	local radius      = distance(x1, y1, cx, cy)
 	local sweep2      = point_angle(x2, y2, cx, cy) - start_angle
 	local radius2     = distance(x2, y2, cx, cy)
+	write('move', x1, y1)
 	for a = start_angle, start_angle + 360 - sweep_angle/2, sweep_angle do
 		local x = cx + cos(radians(a)) * radius
 		local y = cy + sin(radians(a)) * radius
-		write(i == start_angle and 'move' or 'line', x, y)
+		write('line', x, y)
 		local x = cx + cos(radians(a + sweep2)) * radius2
 		local y = cy + sin(radians(a + sweep2)) * radius2
 		write('line', x, y)
 	end
+	write('line', x1, y1)
 	write('close')
 end
 
@@ -243,15 +242,11 @@ end
 if not ... then require'path_shapes_demo' end
 
 return {
-	ellipse_to_bezier3 = ellipse_to_bezier3,
 	ellipse_bbox = ellipse_bbox,
 
-	circle_to_bezier3 = circle_to_bezier3,
 	circle_to_bezier2 = circle_to_bezier2,
 	circle_bbox = circle_bbox,
 	circle_length = circle_length,
-
-	circle_3p_to_bezier3 = circle_3p_to_bezier3,
 
 	rect_to_lines = rect_to_lines,
 	rect_bbox = rect_bbox,
@@ -259,11 +254,10 @@ return {
 
 	elliptic_rect_to_bezier3 = elliptic_rect_to_bezier3,
 	elliptic_rect_to_elliptic_arcs = elliptic_rect_to_elliptic_arcs,
-	elliptic_rect_bbox = elliptic_rect_bbox,
 
+	round_rect_to_elliptic_rect = round_rect_to_elliptic_rect,
 	round_rect_to_bezier3 = round_rect_to_bezier3,
 	round_rect_to_arcs = round_rect_to_arcs,
-	round_rect_bbox = round_rect_bbox,
 	round_rect_length = round_rect_length,
 
 	star_2p_to_lines = star_2p_to_lines,

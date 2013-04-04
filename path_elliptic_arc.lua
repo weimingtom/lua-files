@@ -91,8 +91,8 @@ local function transformed_circle_major_axis(mt, r)
 end
 
 --this formula is such that enables a non-oscillating segment-time-to-arc-time at screen resolutions (see demo).
-function best_segment_max_sweep(mt, r)
-	local scale_factor = transformed_circle_major_axis(mt, r) / 1024
+function best_segment_max_sweep(mt, rx, ry)
+	local scale_factor = transformed_circle_major_axis(mt, max(abs(rx), abs(ry))) / 1024
 	scale_factor = max(scale_factor, 0.1) --cap scale factor so that we don't create sweeps larger than 90 deg.
 	return sqrt(1/scale_factor^0.6) * 30 --faster way to say 1/2^log10(scale) * 30
 end
@@ -135,7 +135,7 @@ local function to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotat
 	elseif mt then
 		x2, y2 = mt(x2, y2)
 	end
-	segment_max_sweep = segment_max_sweep or best_segment_max_sweep(mt, max(rx, ry))
+	segment_max_sweep = segment_max_sweep or best_segment_max_sweep(mt, rx, ry)
 
 	local segments = ceil(abs(sweep_angle / segment_max_sweep))
 	local segment_sweep = sweep_angle / segments
@@ -185,7 +185,7 @@ local function hit(x0, y0, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x
 			mind, minx, miny, mint, mini = d, x, y, t, i
 		end
 	end
-	segment_max_sweep = segment_max_sweep or best_segment_max_sweep(mt, max(abs(rx), abs(ry)))
+	segment_max_sweep = segment_max_sweep or best_segment_max_sweep(mt, rx, ry)
 	to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
 	mint = segment_time_to_arc_time(mini, mint, sweep_angle, segment_max_sweep)
 	return mind, minx, miny, mint
@@ -218,6 +218,7 @@ return {
 	is_sweeped = is_sweeped,
 	endpoints = endpoints,
 	to_svgarc = to_svgarc,
+	best_segment_max_sweep = best_segment_max_sweep,
 	--path API
 	to_bezier3 = to_bezier3,
 	point = point,

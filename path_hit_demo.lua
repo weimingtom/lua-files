@@ -160,12 +160,15 @@ function player:on_render(cr)
 	bezier3_hit(1000, 100, 200, 100, 0, 100, 200, 0) --cusp
 	bezier3_hit(1100, 200, -300, 100, 300, 100, 0, 0) --bowl
 
+	bezier3_hit(50, 800, 0, -1000, 2000000, -1000, 2000000, 0) --huge (test precision)
+	bezier3_hit(1300, 100, 10000, 0, 10000, 2000000, 0, 2000000) --huge (test precision)
+
 	local mind = 1/0
 	local x1,y1,t1,len
 	for i=1,#dists,6 do
 		local d,x,y,t,x2,y2 = unpack(dists,i,i+5)
-		cr:circle(x2,y2,5); fill('#3333ff')
-		cr:circle(x,y,7); cr:circle(x,y,9); fill('#ff0000')
+		cr:circle(x2,y2,7); stroke('#3333ff')
+		cr:circle(x,y,9); stroke('#ff0000')
 		if d < mind then
 			mind = d
 			x1,y1,t1,len=x,y,t,lens[i+5]
@@ -173,7 +176,7 @@ function player:on_render(cr)
 	end
 	if x1 then
 		cr:move_to(x0,y0); cr:line_to(x1,y1); stroke('#ff0000')
-		cr:circle(x1,y1,5); fill('#00ff00')
+		--cr:circle(x1,y1,5); fill('#00ff00')
 		cr:move_to(x0+20,y0+24); cr:text_path(string.format('t: %.2f', t1)); fill('#ffffff')
 		cr:move_to(x0+20,y0+38); cr:text_path(string.format('length: %.2f', len)); fill('#ffffff')
 	end

@@ -576,7 +576,7 @@ local function lazy_parse(t) --lazy_parse(s) -> t; t.header_name -> parsed_value
 	return setmetatable({}, {__index = function(dt,k)
 		dt[k] = parse_value(k, t[k])
 		return rawget(dt,k)
-	end)
+	end})
 end
 
 if not ... then require'http_headers_test' end

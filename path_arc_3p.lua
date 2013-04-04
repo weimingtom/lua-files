@@ -1,4 +1,4 @@
---math for 2d circular arcs defined as (x1, y1, xp, yp, x2, y2) where (x1, y1) and (x2, y2) are its end points,
+--math for 2D circular arcs defined as (x1, y1, xp, yp, x2, y2) where (x1, y1) and (x2, y2) are its end points,
 --and (xp, yp) is a third point on the arc. if the 3 points are collinear, then the arc is the line between
 --(x1, y1) and (x2, y2), regardless of where (xp, yp) is.
 
@@ -14,8 +14,8 @@ local line_split        = require'path_line'.split
 
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 
-local sweep_between  = require'path_arc'.sweep_between
-local observed_sweep = require'path_arc'.observed_sweep
+local sweep_between  = require'path_elliptic_arc'.sweep_between
+local observed_sweep = require'path_elliptic_arc'.observed_sweep
 local arc_to_bezier3 = require'path_arc'.to_bezier3
 local arc_endpoints  = require'path_arc'.endpoints
 local arc_point      = require'path_arc'.point
@@ -38,32 +38,50 @@ local function to_arc(x1, y1, xp, yp, x2, y2)
 	return cx, cy, r, start_angle, sweep_angle, x2, y2
 end
 
-local function to_bezier3(write, x1, y1, xp, yp, x2, y2, ...)
+local function transform_endpoints(mt, x1, y1, x2, y2)
+	if mt then
+		x1, y1 = mt(x1, y1)
+		x2, y2 = mt(x2, y2)
+	end
+	return x1, y1, x2, y2
+end
+
+local function to_bezier3(write, x1, y1, xp, yp, x2, y2, mt, ...)
 	local cx, cy, r, start_angle, sweep_angle = to_arc(x1, y1, xp, yp, x2, y2)
 	if not cx then
 		--ponts are collinear, radius is infinite, arc is a line between p1 and p2 or an infinite line
 		--interrupted between p1 and p2 but we can't draw that so we draw a line between p1 and p2 either way.
+		x1, y1, x2, y2 = transform_endpoints(mt, x1, y1, x2, y2)
 		write('curve', select(3, line_to_bezier3(x1, y1, x2, y2)))
-	else
-		arc_to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2, ...)
+		return
 	end
+	arc_to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2, mt, ...)
 end
 
-local function bounding_box(t, x1, y1, xp, yp, x2, y2)
+local function bounding_box(t, x1, y1, xp, yp, x2, y2, mt)
 	local cx, cy, r, start_angle, sweep_angle, x2, y2 = to_arc(x1, y1, xp, yp, x2, y2)
-	if not cx then return line_bounding_box(x1, y1, x2, y2) end
-	return arc_bounding_box(t, cx, cy, r, start_angle, sweep_angle, x2, y2)
+	if not cx then
+		x1, y1, x2, y2 = transform_endpoints(mt, x1, y1, x2, y2)
+		return line_bounding_box(x1, y1, x2, y2)
+	end
+	return arc_bounding_box(t, cx, cy, r, start_angle, sweep_angle, x2, y2, mt)
 end
 
 local function point(t, x1, y1, xp, yp, x2, y2)
 	local cx, cy, r, start_angle, sweep_angle, x2, y2 = to_arc(x1, y1, xp, yp, x2, y2)
-	if not cx then return line_point(t, x1, y1, x2, y2) end
+	if not cx then
+		x1, y1, x2, y2 = transform_endpoints(mt, x1, y1, x2, y2)
+		return line_point(t, x1, y1, x2, y2)
+	end
 	return arc_point(t, cx, cy, r, start_angle, sweep_angle, x2, y2)
 end
 
 local function length(t, x1, y1, xp, yp, x2, y2)
 	local cx, cy, r, start_angle, sweep_angle, x2, y2 = to_arc(x1, y1, xp, yp, x2, y2)
-	if not cx then return line_length(t, x1, y1, x2, y2) end
+	if not cx then
+		x1, y1, x2, y2 = transform_endpoints(mt, x1, y1, x2, y2)
+		return line_length(t, x1, y1, x2, y2)
+	end
 	return arc_length(t, cx, cy, r, start_angle, sweep_angle, x2, y2)
 end
 

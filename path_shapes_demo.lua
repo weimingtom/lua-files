@@ -19,13 +19,15 @@ function player:on_render(cr)
 		elseif s == 'close' then cr:close_path(); x1,y1=nil
 		end
 	end
-
 	cr:set_source_rgb(1,1,1)
+
+	--[[
 	shapes.ellipse_to_bezier3(write, 100, 100, 50, 20)
 	cr:stroke()
 
 	shapes.circle_to_bezier3(write, 100, 100, 50)
 	cr:stroke()
+	]]
 
 	shapes.rect_to_lines(write, 50, 50, 100, 100)
 	cr:stroke()

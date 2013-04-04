@@ -15,8 +15,8 @@ local elliptic_arc_to_bezier3  = require'path_elliptic_arc'.to_bezier3
 
 local abs, min, max, radians = math.abs, math.min, math.max, math.rad
 
-local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2)
-	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2)
+local function endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2, mt)
+	return elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, mt)
 end
 
 --return a fake control point to serve as reflection point for a following smooth curve.
@@ -25,8 +25,8 @@ local function smooth_point(cx, cy, r, start_angle, sweep_angle, x2, y2)
 	return select(3, endpoints(cx, cy, r, start_angle, sweep_angle, x2, y2))
 end
 
-local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2)
-	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2)
+local function to_bezier3(write, cx, cy, r, start_angle, sweep_angle, x2, y2, mt, ...)
+	elliptic_arc_to_bezier3(write, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2, mt, ...)
 end
 
 --convert to a 3-point parametric arc.
