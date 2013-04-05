@@ -1,14 +1,14 @@
 --2D path API: supports lines, with horiz. and vert. variations, quadratic beziers and cubic beziers, with smooth
 --and symmetrical variations, absolute and relative variations for all commands, circular arcs, 3-point circular arcs,
 --svg-style elliptical arcs, text, and many composite shapes.
---supports affine transforms, bounding box, length-at-t, point-at-t, shortest-distance-to-point, splitting, editing.
+--supports affine transforms, bounding box, length, shortest-distance-to-point, splitting, editing, etc.
 
 local glue = require'glue'
 
 local assert, unpack, select =
 	   assert, unpack, select
 
---path command iteration -----------------------------------------------------------------------------
+--path command iteration -------------------------------------------------------------------------------------------------
 
 local argc = {
 	--control commands
@@ -33,12 +33,12 @@ local argc = {
 	arc_3p = 4,                     --xp, yp, x3, y3
 	svgarc = 7,                     --rx, ry, rotation, large_arc_flag, sweep_flag, x2, y2
 	--closed shapes
+	circle = 3,                     --cx, cy, r
+	circle_3p = 6,                  --xp, yp, x3, y3
+	ellipse = 5,                    --cx, cy, rx, ry, rotation
 	rect = 4,                       --x, y, w, h
 	round_rect = 5,                 --x, y, w, h, r
 	elliptic_rect = 6,              --x, y, w, h, rx, ry
-	ellipse = 5,                    --cx, cy, rx, ry, rotation
-	circle = 3,                     --cx, cy, r
-	circle_3p = 6,                  --xp, yp, x3, y3
 	star = 6,                       --cx, cy, x1, y1, r2, n
 	star_2p = 7,                    --cx, cy, x1, y1, x2, y2, n
 	rpoly = 5,                      --cx, cy, x1, y1, n
@@ -47,12 +47,18 @@ local argc = {
 	text = 4,                       --x, y, {[family=s], [size=n]}, text
 }
 
---all commands have relative-to-current-point counterparts with the same number of arguments.
-local t = {}
-for k,n in pairs(argc) do
-	t['rel_'..k] = n
+--helper function to mirror all keys in t with rel_* keys.
+local function add_rel_variations(t)
+	local rt = {}
+	for k,v in pairs(t) do
+		rt['rel_'..k] = v
+	end
+	glue.update(t, rt)
+	return t
 end
-glue.update(argc, t)
+
+--all commands have relative-to-current-point counterparts with the same number of arguments.
+add_rel_variations(argc)
 
 --given an index in path pointing to a command string, return the index of the next command and the command name.
 local function next_cmd(path, i)
@@ -71,7 +77,7 @@ local function cmd(path, i)
 	return unpack(path, i, i+assert(argc[path[i]], 'invalid command'))
 end
 
---adding, replacing and removing path commands -----------------------------------------------------
+--adding, replacing and removing path commands ---------------------------------------------------------------------------
 
 local table_shift = glue.shift
 
@@ -87,6 +93,13 @@ local function table_update_table(dt, i, t)
 	for k=1,#t do
 		dt[i+k-1] = t[k]
 	end
+end
+
+--append command.
+local function append_cmd(path, s, ...)
+	local n = select('#', ...)
+	assert(n == argc[s], 'wrong argument count')
+	table_update(path, #path+1, s, ...)
 end
 
 --insert command at i, shifting elemetns as needed.
@@ -118,20 +131,7 @@ local function remove_cmd(path, i)
 	table_shift(path, i, - (1 + argc[path[i]]))
 end
 
---given a rel. or abs. command name and its args in abs. form, encode the command as abs. or rel. according to the name.
-local function to_rel(cpx, cpy, rs, ...)
-	return abs_cmd(-cpx, -cpy, rs, ...)
-end
-
-local function insert_rel_cmd(path, i, cpx, cpy, rs, ...)
-	insert_cmd(path, i, to_rel(cpx, cpy, rs, ...))
-end
-
-local function replace_rel_cmd(path, i, cpx, cpy, rs, ...)
-	replace_cmd(path, i, to_rel(cpx, cpy, rs, ...))
-end
-
---path command decoding ----------------------------------------------------------------------------
+--path command decoding: absolute and relative commands ------------------------------------------------------------------
 
 local function is_rel(s) --check if the command is rel. or abs.
 	return s:match'^rel_' or false
@@ -215,20 +215,38 @@ local function abs_cmd(cpx, cpy, s, ...)
 	end
 end
 
-local reflect_point = require'path_point'.reflect_point
-local reflect_point_distance = require'path_point'.reflect_point_distance
-local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
+--adding, replacing and removing path commands, in relative or absolute form ---------------------------------------------
+
+--given a rel. or abs. command name and its args in abs. form, encode the command as relative if the name is relative.
+local function to_rel(cpx, cpy, s, ...)
+	if is_rel(s) then
+		assert(cpx and cpy, 'no current point')
+		return s, select(2, abs_cmd(-cpx, -cpy, s, ...))
+	else
+		return s, ...
+	end
+end
+
+local function append_rel_cmd(path, cpx, cpy, s, ...)
+	append_cmd(path, to_rel(cpx, cpy, s, ...))
+end
+
+local function insert_rel_cmd(path, i, cpx, cpy, s, ...)
+	insert_cmd(path, i, to_rel(cpx, cpy, s, ...))
+end
+
+local function replace_rel_cmd(path, i, cpx, cpy, s, ...)
+	replace_cmd(path, i, to_rel(cpx, cpy, s, ...))
+end
+
+--path command decoding: advancing the current point ---------------------------------------------------------------------
+
 local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
 
---given current command in abs. form and current state, return the state of the next path command.
---cpx, cpy is the next "current point", needed by all relative commands and by most other commands.
+--given current command in abs. form and current cp info, return the cp info of the next path command.
+--cpx, cpy is the next "current point" or pen point, needed by all relative commands and by most other commands.
 --spx, spy is the starting point of the current subpath, needed by the "close" command.
---bx,by is the 2nd control point of the current command if it was a cubic bezier, needed by symmetric cubic beziers.
---qx,qy is the control point of the current command if it was a quad bezier, needed by symmetric quad beziers.
---smooth curves will use either bx,by or qx,qy, whichever is available, because they only need the angle from it.
---TODO: find a way to have a smooth curve from a line or an arc (express the tangent at the endpoint somehow).
-local function next_state(cpx, cpy, spx, spy, bx1, by1, qx1, qy1, s, ...)
-	local _, bx, by, qx, qy
+local function next_cp(cpx, cpy, spx, spy, s, ...)
 	if s == 'move' then
 		cpx, cpy = ...
 		spx, spy = ...
@@ -241,58 +259,122 @@ local function next_state(cpx, cpy, spx, spy, bx1, by1, qx1, qy1, s, ...)
 	elseif s == 'vline' then
 		cpy = ...
 	elseif s == 'curve' then
-		_, _, bx, by, cpx, cpy = ...
+		cpx, cpy = select(5, ...)
 	elseif s == 'symm_curve' then
-		bx, by, cpx, cpy = ...
+		cpx, cpy = select(3, ...)
 	elseif s == 'smooth_curve' then
-		_, bx, by, cpx, cpy = ...
+		cpx, cpy = select(4, ...)
 	elseif s == 'quad_curve' then
-		qx, qy, cpx, cpy = ...
+		cpx, cpy = select(3, ...)
 	elseif s == 'quad_curve_3p' then
-		qx, qy = bezier2_3point_control_point(cpx, cpy, ...)
-		_, _, cpx, cpy = ...
+		cpx, cpy = select(3, ...)
 	elseif s == 'symm_quad_curve' then
-		qx, qy = reflect_point(qx1 or cpx, qy1 or cpy, cpx, cpy)
 		cpx, cpy = ...
 	elseif s == 'smooth_quad_curve' then
-		qx, qy = reflect_point_distance(qx1 or bx1 or cpx, qy1 or by1 or cpy, cpx, cpy, (...))
-		_, cpx, cpy = ...
+		cpx, cpy = select(2, ...)
 	elseif s == 'arc' or s == 'line_arc' then
 		local cx, cy, r, start_angle, sweep_angle = ...
-		_, _, cpx, cpy = elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle)
+		cpx, cpy = select(3, elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle))
 	elseif s == 'elliptic_arc' or s == 'line_elliptic_arc' then
-		_, _, cpx, cpy = elliptic_arc_endpoints(...)
+		cpx, cpy = select(3, elliptic_arc_endpoints(...))
 	elseif s == 'arc_3p' then
-		_, _, cpx, cpy = ...
+		cpx, cpy = select(3, ...)
 	elseif s == 'svgarc' then
 		cpx, cpy = select(6, ...)
 	else --closed composite shapes cannot be continued from
 		cpx, cpy, spx, spy = nil
 	end
-	return cpx, cpy, spx, spy, bx, by, qx, qy
+	return cpx, cpy, spx, spy
+end
+
+--return the current point and the starting point of the path command at an arbitrary index.
+local function cp_at(path, target_index)
+	local cpx, cpy, spx, spy
+	for i,s in commands(path) do
+		if i == target_index then
+			return cpx, cpy, spx, spy
+		end
+		cpx, cpy, spx, spy =
+			next_cp(cpx, cpy, spx, spy,
+			abs_cmd(cpx, cpy,
+				 cmd(path, i)))
+	end
+	error'invalid path index'
+end
+
+--path command decoding: computing the tangent vector at command endpoint ------------------------------------------------
+
+local reflect_point = require'path_point'.reflect_point
+local reflect_point_distance = require'path_point'.reflect_point_distance
+local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
+
+--given current command in abs. form and current control point, return the tip of the tangent vector at command endpoint.
+--tkind is 'quad', 'cubic' or 'tangent'. a symm_curve can only use a cubic tip, a symm_quad_curve can only use a quad tip.
+--smooth curves can use any kind of tip.
+local function tangent_tip(cpx, cpy, tkind1, tx1, ty1, s, ...)
+	if s == 'line' then
+		return 'tangent', cpx, cpy
+	elseif s == 'curve' then
+		local tx, ty = select(3, ...)
+		return 'cubic', tx, ty
+	elseif s == 'symm_curve' then
+		local tx, ty = ...
+		return 'cubic', tx, ty
+	elseif s == 'smooth_curve' then
+		local tx, ty = select(2, ...)
+		return 'cubic', tx, ty
+	elseif s == 'quad_curve' then
+		local tx, ty = ...
+		return 'quad', tx, ty
+	elseif s == 'quad_curve_3p' then
+		return 'quad', bezier2_3point_control_point(cpx, cpy, ...)
+	elseif s == 'symm_quad_curve' then
+		return 'quad', reflect_point(kind1 == 'quad' and tx1 or cpx, kind1 == 'quad' and ty1 or cpy, cpx, cpy)
+	elseif s == 'smooth_quad_curve' then
+		return 'quad', reflect_point_distance(tx1 or cpx, ty1 or cpy, cpx, cpy, (...))
+	elseif s == 'arc' or s == 'line_arc' then
+		--TODO: compute a 'tangent' tip for arcs too, why not?
+	elseif s == 'elliptic_arc' or s == 'line_elliptic_arc' then
+		--TODO: compute a 'tangent' tip for arcs too, why not?
+	elseif s == 'svgarc' then
+		--TODO: compute a 'tangent' tip for arcs too, why not?
+	elseif s == 'arc_3p' then
+		--TODO: compute a 'tangent' tip for arcs too, why not?
+	end
+end
+
+--path command decoding: advancing the command state ---------------------------------------------------------------------
+
+local function next_state(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
+	tkind, tx, ty = tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
+	cpx, cpy, spx, spy = next_cp(cpx, cpy, spx, spy, s, ...)
+	return cpx, cpy, spx, spy, tkind, tx, ty
 end
 
 --return the state of the path command at an arbitrary index.
 local function state_at(path, target_index)
-	local cpx, cpy, spx, spy, bx, by, qx, qy
+	local cpx, cpy, spx, spy, tkind, tx, ty
 	for i,s in commands(path) do
 		if i == target_index then
-			return cpx, cpy, spx, spy, bx, by, qx, qy
+			return cpx, cpy, spx, spy, tkind, tx, ty
 		end
-		cpx, cpy, spx, spy, bx, by, qx, qy =
-			next_state(cpx, cpy, spx, spy, bx, by, qx, qy,
+		cpx, cpy, spx, spy, tkind, tx, ty =
+			next_state(cpx, cpy, spx, spy, tkind, tx, ty,
 				abs_cmd(cpx, cpy,
 					 cmd(path, i)))
 	end
 	error'invalid path index'
 end
 
+--path command decoding: state + command = context-free command ----------------------------------------------------------
+
 local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local arc3p_to_arc = require'path_arc_3p'.to_arc
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 
---given a command in abs. form and current state, return the command in context-free form.
-local function context_free_abs_cmd(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+--given a command in abs. form and current state, return the command in canonical context-free form,
+--adding the current point, removing line, curve and arc variations, and dealing with invalid parametrization.
+local function context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 	if s == 'move' then
 		return s, ...
 	elseif s == 'line' or s == 'curve' or s == 'quad_curve' then
@@ -304,20 +386,20 @@ local function context_free_abs_cmd(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
 	elseif s == 'vline' then
 		return 'line', cpx, cpy, cpx, ...
 	elseif s == 'symm_curve' then
-		local x2, y2 = reflect_point(bx or cpx, by or cpy, cpx, cpy)
+		local x2, y2 = reflect_point(tkind == 'cubic' and tx or cpx, tkind == 'cubic' and ty or cpy, cpx, cpy)
 		return 'curve', cpx, cpy, x2, y2, ...
 	elseif s == 'smooth_curve' then
-		local x2, y2 = reflect_point_distance(bx or qx or cpx, by or qy or cpy, cpx, cpy, (...))
+		local x2, y2 = reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
 		return 'curve', cpx, cpy, x2, y2, select(2, ...)
 	elseif s == 'quad_curve_3p' then
 		local x2, y2, x3, y3 = ...
 		local x2, y2 = bezier2_3point_control_point(cpx, cpy, x2, y2, x3, y3)
 		return 'quad_curve', cpx, cpy, x2, y2, x3, y3
 	elseif s == 'symm_quad_curve' then
-		local x2, y2 = reflect_point(qx or cpx, qy or cpy, cpx, cpy)
+		local x2, y2 = reflect_point(tkind == 'quad' and tx or cpx, tkind == 'quad' and ty or cpy, cpx, cpy)
 		return 'quad_curve', cpx, cpy, x2, y2, ...
 	elseif s == 'smooth_quad_curve' then
-		local x2, y2 = reflect_point_distance(bx or qx or cpx, by or qy or cpy, cpx, cpy, (...))
+		local x2, y2 = reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
 		return 'quad_curve', cpx, cpy, x2, y2, select(2, ...)
 	elseif s == 'arc_3p' then
 		local xp, yp, x2, y2 = ...
@@ -356,38 +438,40 @@ local function context_free_abs_cmd(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
 	end
 end
 
+--path command decoding: decode paths and path command streams -----------------------------------------------------------
+
 --given an abs. path command and current state, decode it and pass it to a processor function and then
 --return the next state. the processor will usually write its output using the supplied write function.
-local function decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
-	process(write, mt, i, context_free_abs_cmd(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...))
-	return next_state(cpx, cpy, spx, spy, bx, by, qx, qy, s, ...)
+local function decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
+	process(write, mt, i, context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...))
+	return next_state(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 end
 
 --decode a path and process each command using a processor function.
 --state is optional and can be used for concatenating paths.
-local function decode_path(process, write, path, mt, cpx, cpy, spx, spy, bx, by, qx, qy)
+local function decode_path(process, write, path, mt, cpx, cpy, spx, spy, tkind, tx, ty)
 	for i,s in commands(path) do
-		cpx, cpy, spx, spy, bx, by, qx, qy =
-			decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, bx, by, qx, qy,
+		cpx, cpy, spx, spy, tkind, tx, ty =
+			decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
 					 abs_cmd(cpx, cpy,
 						  cmd(path, i)))
 	end
-	return cpx, cpy, spx, spy, bx, by, qx, qy
+	return cpx, cpy, spx, spy, tkind, tx, ty
 end
 
 --return a decoder function that decodes and processes an arbitrary path command every time it is called, preserving
 --and advancing the state between calls. also returns a function for retrieving the state after the last call.
-local function command_decoder(process, write, mt, i, cpx, cpy, spx, spy, bx, by, qx, qy)
+local function command_decoder(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty)
 	return function(s, ...)
-		cpx, cpy, spx, spy, bx, by, qx, qy =
-			decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, bx, by, qx, qy,
+		cpx, cpy, spx, spy, tkind, tx, ty =
+			decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
 					 abs_cmd(cpx, cpy, s, ...))
 	end, function()
-		return cpx, cpy, spx, spy, bx, by, qx, qy
+		return cpx, cpy, spx, spy, tkind, tx, ty
 	end
 end
 
---point transform helper --------------------------------------------------------------------------
+--point transform helper -------------------------------------------------------------------------------------------------
 
 local function transform_points(mt, ...)
 	if not mt then return ... end
@@ -416,7 +500,7 @@ local function transform_points(mt, ...)
 	assert(false)
 end
 
---path simplification -------------------------------------------------------------------------------
+--path simplification ----------------------------------------------------------------------------------------------------
 
 local simplify = {}
 
@@ -509,33 +593,33 @@ for s,simplify_nt in pairs(simplify_no_transform) do
 end
 
 function simplify.text(write, mt, x, y, font, text)
-	write('text', x, y, font, text)
+	--write('text', x, y, font, text)
 end
 
---recursive path decoding -------------------------------------------------------------------------
+--recursive path decoding ------------------------------------------------------------------------------------------------
 
 --decode a path and process its commands using a conditional processor. the processor will be tried for each command.
 --for commands for which the processor returns false, simplify the command and then process the resulted segments.
 --processors for primitive commands must never return false otherwise infinite recursion occurs.
 local function decode_recursive(process, write, path, mt)
-	local cpx, cpy, spx, spy, bx, by, qx, qy
+	local cpx, cpy, spx, spy, tkind, tx, ty
 
 	local function recursive_processor(write, mt, i, s, ...)
 		if process(write, mt, i, s, ...) == false then
-			local decoder = command_decoder(recursive_processor, write, mt, i, cpx, cpy, spx, spy, bx, by, qx, qy)
+			local decoder = command_decoder(recursive_processor, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty)
 			simplify_processor(decoder, nil, i, s, ...)
 		end
 	end
 
 	for i,s in commands(path) do
-		cpx, cpy, spx, spy, bx, by, qx, qy =
-			decode_abs_cmd(recursive_processor, write, mt, i, cpx, cpy, spx, spy, bx, by, qx, qy,
+		cpx, cpy, spx, spy, tkind, tx, ty =
+			decode_abs_cmd(recursive_processor, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
 					 abs_cmd(cpx, cpy,
 						  cmd(path, i)))
 	end
 end
 
---path bounding box -------------------------------------------------------------------------------
+--path bounding box ------------------------------------------------------------------------------------------------------
 
 local bbox = {}
 
@@ -545,7 +629,7 @@ local function bbox_processor(write, mt, i, s, ...)
 end
 
 local min, max = math.min, math.max
-local function bounding_box(path, mt)
+local function path_bbox(path, mt)
 	local straight = not mt or mt:is_straight()
 	local x1, y1, x2, y2
 	local function write(x, y, w, h)
@@ -573,7 +657,6 @@ local ellipse_bbox    = require'path_shapes'.ellipse_bbox
 local rect_bbox       = require'path_shapes'.rect_bbox
 
 function bbox.move() end
-function bbox.text() end
 
 function bbox.line(write, mt, x1, y1, x2, y2)
 	write(line_bbox(transform_points(mt, x1, y1, x2, y2)))
@@ -611,7 +694,11 @@ end
 bbox.round_rect = bbox.rect
 bbox.elliptic_rect = bbox.rect
 
---path length ------------------------------------------------------------------------------------
+function bbox.text()
+	return false
+end
+
+--path length ------------------------------------------------------------------------------------------------------------
 
 local len = {}
 
@@ -619,7 +706,7 @@ local function len_processor(write, mt, i, s, ...)
 	if not len[s] then return false end
 	return len[s](write, mt, ...)
 end
-local function length(path, mt)
+local function path_length(path, mt)
 	local total = 0
 	local function write(len)
 		total = total + len
@@ -637,7 +724,6 @@ rect_len       = require'path_shapes'.rect_length
 round_rect_len = require'path_shapes'.round_rect_length
 
 function len.move() end
-function len.text() end
 
 function len.line(write, mt, x1, y1, x2, y2)
 	write(line_len(1, transform_points(mt, x1, y1, x2, y2)))
@@ -677,11 +763,15 @@ function len.round_rect(write, mt, x, y, w, h, r)
 	write(round_rect_len(x, y, w, h, r))
 end
 
---path hit -------------------------------------------------------------------------------------------
+function len.text()
+	return false
+end
+
+--path hit ---------------------------------------------------------------------------------------------------------------
 
 local ht = {}
 
-local function hit(x0, y0, path, mt)
+local function hit_path(x0, y0, path, mt)
 	local mi, md, mx, my, mt_
 	local function write(i, d, x, y, t)
 		if not md or d < md then
@@ -710,8 +800,6 @@ function ht.move(write, mt, i, x0, y0, x2, y2)
 	write(i, distance2(x0, y0, x2, y2), x2, y2, 0)
 end
 
-function ht.text() end
-
 function ht.line(write, mt, i, x0, y0, x1, y1, x2, y2)
 	write(i, line_hit(x0, y0, transform_points(mt, x1, y1, x2, y2)))
 end
@@ -739,7 +827,11 @@ function ht.carc(write, mt, i, x0, y0, cpx, cpy, connect, cx, cy, rx, ry, start_
 	end
 end
 
---path split -------------------------------------------------------------------------------------
+function ht.text()
+	return false
+end
+
+--path split -------------------------------------------------------------------------------------------------------------
 
 local line_split       = require'path_line'.split
 local quad_curve_split = require'path_bezier2'.split
@@ -769,32 +861,120 @@ function split.quad_curve(path, i, t, s, rs, cpx, cpy, ...)
 	if s == 'quad_curve' then
 		 insert_rel_cmd(path, i,     rs, cpx, cpy, rs, x12, y12, x13, y13)
 		replace_rel_cmd(path, i + 8, rs, cpx, cpy, rs, x22, y22, x23, y23)
-	elseif s == 'symm_curve' then
+	elseif s == 'symm_quad_curve' then
 		 insert_rel_cmd(path, i,     rs, cpx, cpy, rs, x13, y13)
 		replace_rel_cmd(path, i + 8, rs, cpx, cpy, rs, x23, y23)
+	elseif s == 'smooth_quad_curve' then
+
 	end
 end
 
+function split.quad_curve(path, i, t, s, rs, cpx, cpy, ...)
+	local
+		x11, y11, x12, y12, x13, y13, y14,
+		x21, y21, x22, y22, x23, y23, y24 = quad_curve_split(t, cpx, cpy, ...)
+	if s == 'curve' then
+		 insert_rel_cmd(path, i,     rs, cpx, cpy, rs, x12, y12, x13, y13, y14)
+		replace_rel_cmd(path, i + 8, rs, cpx, cpy, rs, x22, y22, x23, y23, y24)
+	elseif s == 'symm_curve' then
+		 insert_rel_cmd(path, i,     rs, cpx, cpy, rs, x13, y13, y14)
+		replace_rel_cmd(path, i + 8, rs, cpx, cpy, rs, x23, y23, y24)
+	elseif s == 'smooth_curve' then
+
+	end
+end
+
+function split.carc(path, i, t, s, rs, cpx, cpy, ...)
+	--TODO
+end
+
 local function split_path(path, i, t)
-	local cpx, cpy, spx, spy, bx, by, qx, qy = state_at(path, i)
+	local cpx, cpy, spx, spy, tkind, tx, ty = state_at(path, i)
 	local function process(s, ...)
 		local rs = path[i]
 		local as = abs_cmd(rs)
 		split[s](path, i, t, as, rs, ...)
 	end
-	process(context_free_abs_cmd(cpx, cpy, spx, spy, bx, by, qx, qy,
-								abs_cmd(cpx, cpy,
-									 cmd(path, i))))
+	process(context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty,
+						  abs_cmd(cpx, cpy,
+							   cmd(path, i))))
 end
 
---path reverse -----------------------------------------------------------------------------------
+--path to abs/rel conversion ---------------------------------------------------------------------------------------------
+
+local function add_abs_cmd(t, cpx, cpy, spx, spy, ...)
+	append_cmd(t, ...)
+	return next_cp(cpx, cpy, spx, spy, ...)
+end
+local function abs_path(path)
+	local t = {}
+	local cpx, cpy, spx, spy
+	for i,s in commands(path) do
+		cpx, cpy, spx, spy = add_abs_cmd(t, cpx, cpy, spx, spy, abs_cmd(cpx, cpy, cmd(path, i)))
+	end
+	return t
+end
+
+local function add_rel_cmd(t, cpx, cpy, spx, spy, s, ...)
+	append_rel_cmd(t, cpx, cpy, cpx and rel_name(s) or s, ...)
+	return next_cp(cpx, cpy, spx, spy, s, ...)
+end
+local function rel_path(path)
+	local t = {}
+	local cpx, cpy, spx, spy
+	for i,s in commands(path) do
+		cpx, cpy, spx, spy = add_rel_cmd(t, cpx, cpy, spx, spy, abs_cmd(cpx, cpy, cmd(path, i)))
+	end
+	return t
+end
+
+--subpath extraction -----------------------------------------------------------------------------------------------------
+
+local function extract_commands(path, i, j)
+	local cpx, cpy, spx, spy, tkind, tx, ty = state_at(path, i)
+
+end
+
+--subpath iteration ------------------------------------------------------------------------------------------------------
+
+local starts_subpath = add_rel_variations(glue.index{
+		'move', 'circle', 'circle_3p', 'ellipse', 'rect', 'round_rect', 'elliptic_rect',
+		'star', 'star_2p', 'rpoly', 'superformula', 'text'})
+
+local function subpath_end(path, i)
+	local s = path[i]
+	if not s then return end --path empty
+	while true do
+		local nexti, nexts = next_cmd(path, i)
+		if not nexti then return i, s end --path will end
+		if nexts == 'close' or nexts == 'rel_close' then return nexti, nexts end --subpath will close, thus ending
+		if starts_subpath[nexts] then return i, s end --another subpath will start, ending this one
+		i, s = nexti, nexts
+	end
+end
+
+local function next_subpath(path, i)
+	if not i then
+		if #path == 0 then return end
+		return 1, path[1]
+	end
+	local i, s = subpath_end(path, i)
+	if not i then return end --path empty
+	return next_cmd(path, i)
+end
+
+local function subpaths(path)
+	return next_subpath, path
+end
+
+--path reverse -----------------------------------------------------------------------------------------------------------
 
 local function reverse_path(path)
 	local t = {}
 	local function save(write, _, i, s, ...)
 		t[#t+1] = {i, s, ...}
 	end
-	decode_path(save, write, path)
+	decode_path(save, nil, path)
 
 	local p = {}
 	for ti = #t,1,-1 do
@@ -808,7 +988,7 @@ local function reverse_path(path)
 end
 
 --[[
---path global time -------------------------------------------------------------------------------
+--path global time -------------------------------------------------------------------------------------------------------
 
 local is_timed = glue.index{'close', 'line', 'hline', 'vline', 'curve', 'symm_curve', 'smooth_curve', 'quad_curve',
 									'quad_curve_3p', 'symm_quad_curve', 'smooth_quad_curve', 'carc', 'arc', 'elliptic_arc',
@@ -855,7 +1035,7 @@ local function local_time(t, path)
 end
 ]]
 
---command conversions ----------------------------------------------------------------------------
+--command conversions ----------------------------------------------------------------------------------------------------
 
 --[[
 
@@ -936,7 +1116,7 @@ local function to_arc_3p() end
 local function to_arc() end
 local function to_svgarc() end
 
--- conversions table --------------------------------------------------------------
+-- conversions table -----------------------------------------------------------------------------------------------------
 
 local conversions = {}
 
@@ -990,23 +1170,37 @@ return {
 	commands = commands,
 	cmd = cmd,
 	--modifying
-	insert = insert,
-	replace = replace,
-	remove = remove,
+	append_cmd = append_cmd,
+	insert_cmd = insert_cmd,
+	replace_cmd = replace_cmd,
+	remove_cmd = remove_cmd,
 	--decoding
 	is_rel = is_rel,
 	abs_name = abs_name,
 	abs_cmd = abs_cmd,
+	next_cp = next_cp,
+	cp_at = cp_at,
+	next_smooth_points = next_smooth_points,
+	next_state = next_state,
+	state_at = state_at,
+	context_free_cmd = context_free_cmd,
+	decode = decode_path,
+	command_decoder = command_decoder,
 	simplify = simplify_path,
-	--measuring
-	bounding_box = bounding_box,
-	length = length,
-	length_at = length_at,
-	local_time = local_time,
-	global_time = global_time,
-	point = point,
-	hit = hit,
-	--editing
+	decode_recursive = decode_recursive,
+	--measuring and hit testing
+	bounding_box = path_bbox,
+	length = path_length,
+	hit = hit_path,
 	split = split_path,
+	--conversion
+	to_abs = abs_path,
+	to_rel = rel_path,
+	reverse = reverse_path,
+	--subpaths
+	subpath_end = subpath_end,
+	next_subpath = next_subpath,
+	subpaths = subpaths,
+	--
 }
 
