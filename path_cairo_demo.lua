@@ -132,9 +132,9 @@ function player:on_render(cr)
 	if true then
 		local len = path.length(p, mt)
 		cr:set_source_rgb(1,1,1)
-		cr:move_to(self.window.client_w - 160, 20)
+		cr:move_to(self.window.client_w - 260, 20)
 		cr:set_font_size(18)
-		cr:text_path(string.format('length: %4.2f', len))
+		cr:text_path(string.format('length: %4.20f', len))
 		cr:fill()
 	end
 
@@ -145,22 +145,42 @@ function player:on_render(cr)
 		cr:set_source_rgb(1,1,0)
 		cr:fill()
 		cr:move_to(x,y+16)
-		cr:text_path(string.format(t and '%s: %g' or '%s', p[i], t))
+		cr:text_path(string.format(t and '(%d) %s: %g' or '[%d] %s', i, p[i], t))
 		cr:fill()
 	end
 
-	if true then
+	if false then
 		ap = path.to_abs(p)
 		for i,s in path.subpaths(ap) do
-			--[[
-			local x,y,w,h = path.bounding_box({unpack(p,i,path.subpath_end(p,i))}, mt)
+			i = path.next_cmd(ap, i)
+			if not i then break end
+			i = path.next_cmd(ap, i)
+			if not i then break end
+			local j = path.next_subpath(ap, i)
+			local subp = path.extract_subpath(ap,i,j and j-1)
+			--pp(i, j and j-1, subp)
+			local x,y,w,h = path.bounding_box(subp, mt)
 			draw{'rect',x,y,w,h}
 			cr:set_source_rgba(1,1,1,.5)
 			cr:stroke()
-			]]
 		end
 	end
-	--os.exit(1)
+
+	if true then
+		for i,s in path.commands(p) do
+			local j = path.next_subpath(p, i)
+			local subp = path.extract_subpath(p,i,j and j-1)
+			local x,y,w,h = path.bounding_box(subp, mt)
+			draw{'rect',x,y,w,h}
+			cr:set_source_rgba(1,1,1,.5)
+			cr:stroke()
+		end
+	end
+
+	if false then
+		path.pp(p)
+		os.exit(1)
+	end
 
 	--[[
 	for i,s in path.commands(p) do

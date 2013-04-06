@@ -60,21 +60,33 @@ end
 --all commands have relative-to-current-point counterparts with the same number of arguments.
 add_rel_variations(argc)
 
---given an index in path pointing to a command string, return the index of the next command and the command name.
+--given an index in a path pointing at a command string (we'll call that a command index),
+--return the index of the next command and the command name.
 local function next_cmd(path, i)
 	i = i and i + assert(argc[path[i]], 'invalid command') + 1 or 1
 	if i > #path then return end
 	return i, path[i]
 end
 
---iterate over path commands receiving the index in path where the command is, and the command name.
+--iterate over path commands retreiving the command index and the command name.
 local function commands(path)
 	return next_cmd, path
 end
 
---unpack the path command at index i and its args.
+--given a command index, unpack the command and its args.
 local function cmd(path, i)
 	return unpack(path, i, i+assert(argc[path[i]], 'invalid command'))
+end
+
+--given a command index, return the index of the prev. command and the command name.
+local function prev_cmd(path, target_index)
+	if target_index == 1 then return end
+	for i,s in commands(path) do
+		if next_cmd(path,i) == target_index then
+			return i,s
+		end
+	end
+	error'invalid path index'
 end
 
 --adding, replacing and removing path commands ---------------------------------------------------------------------------
@@ -85,13 +97,6 @@ local table_shift = glue.shift
 local function table_update(dt, i, ...)
 	for k=1,select('#',...) do
 		dt[i+k-1] = select(k,...)
-	end
-end
-
---update table elements at i in place with the contents of another table.
-local function table_update_table(dt, i, t)
-	for k=1,#t do
-		dt[i+k-1] = t[k]
 	end
 end
 
@@ -119,16 +124,23 @@ local function replace_cmd(path, i, s, ...)
 	table_update(path, i, s, ...)
 end
 
+--remove command at i, shifting elements as needed.
+local function remove_cmd(path, i)
+	table_shift(path, i, - (1 + argc[path[i]]))
+end
+
+--update table elements at i in place with the contents of another table.
+local function table_update_table(dt, i, t)
+	for k=1,#t do
+		dt[i+k-1] = t[k]
+	end
+end
+
 local function replace_cmd_t(path, i, s, t)
 	local old = argc[path[i]]
 	local new = #t
 	table_shift(path, i+1, new-old)
 	table_update_table(path, i, t)
-end
-
---remove command at i, shifting elements as needed.
-local function remove_cmd(path, i)
-	table_shift(path, i, - (1 + argc[path[i]]))
 end
 
 --path command decoding: absolute and relative commands ------------------------------------------------------------------
@@ -287,7 +299,8 @@ local function next_cp(cpx, cpy, spx, spy, s, ...)
 	return cpx, cpy, spx, spy
 end
 
---return the current point and the starting point of the path command at an arbitrary index.
+--return the "current point" at an arbitrary command index, and the current point of the subpath
+--of which the command is part of, which we'll call the "starting point".
 local function cp_at(path, target_index)
 	local cpx, cpy, spx, spy
 	for i,s in commands(path) do
@@ -351,7 +364,7 @@ local function next_state(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 	return cpx, cpy, spx, spy, tkind, tx, ty
 end
 
---return the state of the path command at an arbitrary index.
+--return the state of the path command at an arbitrary command index.
 local function state_at(path, target_index)
 	local cpx, cpy, spx, spy, tkind, tx, ty
 	for i,s in commands(path) do
@@ -367,6 +380,25 @@ local function state_at(path, target_index)
 end
 
 --path command decoding: state + command = context-free command ----------------------------------------------------------
+
+--given current state and an abs. cmd, if it's a smooth or symm. curve, return it as a cusp curve.
+local function to_cusp(cpx, cpy, tkind, tx, ty, s, ...)
+	if s == 'symm_curve' then
+		local x2, y2 = reflect_point(tkind == 'cubic' and tx or cpx, tkind == 'cubic' and ty or cpy, cpx, cpy)
+		return 'curve', x2, y2, ...
+	elseif s == 'smooth_curve' then
+		local x2, y2 = reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
+		return 'curve', x2, y2, select(2, ...)
+	elseif s == 'symm_quad_curve' then
+		local x2, y2 = reflect_point(tkind == 'quad' and tx or cpx, tkind == 'quad' and ty or cpy, cpx, cpy)
+		return 'quad_curve', x2, y2, ...
+	elseif s == 'smooth_quad_curve' then
+		local x2, y2 = reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
+		return 'quad_curve', x2, y2, select(2, ...)
+	else
+		return s, ...
+	end
+end
 
 local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local arc3p_to_arc = require'path_arc_3p'.to_arc
@@ -385,22 +417,14 @@ local function context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 		return 'line', cpx, cpy, ..., cpy
 	elseif s == 'vline' then
 		return 'line', cpx, cpy, cpx, ...
-	elseif s == 'symm_curve' then
-		local x2, y2 = reflect_point(tkind == 'cubic' and tx or cpx, tkind == 'cubic' and ty or cpy, cpx, cpy)
-		return 'curve', cpx, cpy, x2, y2, ...
-	elseif s == 'smooth_curve' then
-		local x2, y2 = reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
-		return 'curve', cpx, cpy, x2, y2, select(2, ...)
+	elseif s == 'symm_curve' or s == 'smooth_curve' then
+		return 'curve', cpx, cpy, select(2, to_cusp(cpx, cpy, tkind, tx, ty, s, ...))
+	elseif s == 'symm_quad_curve' or s == 'smooth_quad_curve' then
+		return 'quad_curve', cpx, cpy, select(2, to_cusp(cpx, cpy, tkind, tx, ty, s, ...))
 	elseif s == 'quad_curve_3p' then
 		local x2, y2, x3, y3 = ...
 		local x2, y2 = bezier2_3point_control_point(cpx, cpy, x2, y2, x3, y3)
 		return 'quad_curve', cpx, cpy, x2, y2, x3, y3
-	elseif s == 'symm_quad_curve' then
-		local x2, y2 = reflect_point(tkind == 'quad' and tx or cpx, tkind == 'quad' and ty or cpy, cpx, cpy)
-		return 'quad_curve', cpx, cpy, x2, y2, ...
-	elseif s == 'smooth_quad_curve' then
-		local x2, y2 = reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
-		return 'quad_curve', cpx, cpy, x2, y2, select(2, ...)
 	elseif s == 'arc_3p' then
 		local xp, yp, x2, y2 = ...
 		local cx, cy, r, start_angle, sweep_angle = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
@@ -631,7 +655,7 @@ end
 local min, max = math.min, math.max
 local function path_bbox(path, mt)
 	local straight = not mt or mt:is_straight()
-	local x1, y1, x2, y2
+	local x1, y1, x2, y2 = 1/0, 1/0, -1/0, -1/0
 	local function write(x, y, w, h)
 		local ax1, ay1, ax2, ay2 = x, y, x+w, y+h
 
@@ -640,12 +664,13 @@ local function path_bbox(path, mt)
 			ax2, ay2 = mt(ax2, ay2)
 		end
 
-		x1 = min(x1 or  1/0, ax1, ax2)
-		y1 = min(y1 or  1/0, ay1, ay2)
-		x2 = max(x2 or -1/0, ax1, ax2)
-		y2 = max(y2 or -1/0, ay1, ay2)
+		x1 = min(x1, ax1, ax2)
+		y1 = min(y1, ay1, ay2)
+		x2 = max(x2, ax1, ax2)
+		y2 = max(y2, ay1, ay2)
 	end
 	decode_recursive(bbox_processor, write, path, not straight and mt or nil)
+	if x1 == 1/0 then return 0, 0, 0, 0 end
 	return x1, y1, x2-x1, y2-y1
 end
 
@@ -902,8 +927,8 @@ end
 
 --path to abs/rel conversion ---------------------------------------------------------------------------------------------
 
-local function add_abs_cmd(t, cpx, cpy, spx, spy, ...)
-	append_cmd(t, ...)
+local function add_abs_cmd(path, cpx, cpy, spx, spy, ...)
+	append_cmd(path, ...)
 	return next_cp(cpx, cpy, spx, spy, ...)
 end
 local function abs_path(path)
@@ -915,8 +940,8 @@ local function abs_path(path)
 	return t
 end
 
-local function add_rel_cmd(t, cpx, cpy, spx, spy, s, ...)
-	append_rel_cmd(t, cpx, cpy, cpx and rel_name(s) or s, ...)
+local function add_rel_cmd(path, cpx, cpy, spx, spy, s, ...)
+	append_rel_cmd(path, cpx, cpy, cpx and rel_name(s) or s, ...)
 	return next_cp(cpx, cpy, spx, spy, s, ...)
 end
 local function rel_path(path)
@@ -928,19 +953,13 @@ local function rel_path(path)
 	return t
 end
 
---subpath extraction -----------------------------------------------------------------------------------------------------
-
-local function extract_commands(path, i, j)
-	local cpx, cpy, spx, spy, tkind, tx, ty = state_at(path, i)
-
-end
-
 --subpath iteration ------------------------------------------------------------------------------------------------------
 
 local starts_subpath = add_rel_variations(glue.index{
 		'move', 'circle', 'circle_3p', 'ellipse', 'rect', 'round_rect', 'elliptic_rect',
 		'star', 'star_2p', 'rpoly', 'superformula', 'text'})
 
+--given a command index, return the index of the last command of the subpath which the command is part of.
 local function subpath_end(path, i)
 	local s = path[i]
 	if not s then return end --path empty
@@ -953,6 +972,7 @@ local function subpath_end(path, i)
 	end
 end
 
+--given a command index, return the index of the first command of the next subpath.
 local function next_subpath(path, i)
 	if not i then
 		if #path == 0 then return end
@@ -963,11 +983,128 @@ local function next_subpath(path, i)
 	return next_cmd(path, i)
 end
 
+--iterate subpaths, returning every time the index of the first command in the subpath and the command name.
 local function subpaths(path)
 	return next_subpath, path
 end
 
---path reverse -----------------------------------------------------------------------------------------------------------
+--given an arbitrary path index, return the command index which starts the subpath of which the index is part of.
+local function subpath_start(path, target_index)
+	if target_index == 1 then return 1 end
+	for i,s in subpaths(path) do
+		local nexti = next_subpath(path, i)
+		if nexti and nexti >= target_index then
+			return i,s
+		end
+	end
+	error'invalid path index'
+end
+
+--subpath decoding -------------------------------------------------------------------------------------------------------
+
+--given a command index, check if the subpath which the command is part of is closed or not.
+local function is_closed(path, i)
+	--TODO
+end
+
+--subpath manipulation ---------------------------------------------------------------------------------------------------
+
+--given a command index, close the subpath which the command is part of (if it's already closed, do nothing).
+local function close_subpath(path, i)
+	--TODO
+end
+
+--given a command index, open the subpath which the command is part of (if it's already open, do nothing).
+local function open_subpath(path, i)
+	--TODO
+end
+
+--given a command index part of a closed subpath, move the subpath commands around so that the subpath starts
+--at a new command index part of the same subpath, while perfectly preserving the subpath shape. also, if the following
+--subpath, if any, starts implicitly from this subpath's 'close' command, make it explicit by adding a 'move' command.
+local function move_closed_subpath_start_command(path, i, new_index)
+	--TOOD
+end
+
+--break a subpath at a command index. if the subpath was closed, the 'close' command is converted to a 'line' command,
+--and all the commands until the break point are moved after the 'line' command and tied to it. also, if the next subpath
+--was starting implicitly from the current point created by the 'close' command, make it explicit by adding a 'move'.
+local function break_subpath(path, i)
+	--TODO
+end
+
+
+--extract the path subsection between two indices as a valid independent path, assuming i is a command index and j is
+--at the exact position of the last argument of the last command that needs to be included (defaults to #path).
+local function extract_subpath(path, i, j)
+	j = j or #path
+	assert(i >=1 and i <= #path, 'invalid path index')
+	if j < i then return end
+
+	local t = {}
+	local s = path[i]
+
+	if starts_subpath[s] then
+		if is_rel(s) then --starting a subpath, but with a rel. cmd, so we add it in abs. form.
+			local cpx, cpy = cp_at(path, i)
+			append_cmd(t, abs_cmd(cpx, cpy, cmd(path, i)))
+			i = next_cmd(path, i)
+			if not i then return t end
+		end
+	else
+		local pi,ps = prev_cmd(path, i)
+		if ps and abs_name(ps) == 'close' then --starting a subpath is implicit in a prev. close, so make the move explicit.
+			local cpx, cpy = cp_at(path, i)
+			append_cmd(t, 'move', cpx, cpy)
+		else --we're in the middle of a subpath, so make the current point explicit and decontextualize the first command.
+			local cpx, cpy, spx, spy, tkind, tx, ty = state_at(path, i)
+			append_cmd(t, 'move', cpx, cpy)
+			if abs_name(s) == 'close' then
+				append_cmd(t, 'line', spx, spy)
+				local nexti, nexts = next_cmd(path, i)
+				if nexts and not starts_subpath[nexts] then --make sure we break the subpath where the close would had.
+					append_cmd(t, 'move', spx, spy)
+				end
+				i = nexti
+				if not i then return t end
+			elseif s:match'symm_' or s:match'smooth_' then --unsmooth a smooth curve.
+				append_cmd(t, to_cusp(cpx, cpy, tkind, tx, ty, abs_cmd(cpx, cpy, cmd(path, i))))
+				i = next_cmd(path, i)
+				if not i then return t end
+			end
+			--since we are breaking a subpath, if the subpath was closed, we have to reinterpret
+			--the 'close' command as a 'line' and a 'move' and thus end the subpath without closing it.
+			local endi,ends = subpath_end(path, i)
+			if ends and abs_name(ends) == 'close' then
+				--add all cmds till close
+				for i = i, endi-1, 1 do
+					t[#t+1] = path[i]
+				end
+				local cpx, cpy, spx, spy = cp_at(path, endi)
+				append_cmd(t, 'line', spx, spy)
+				local nexti, nexts = next_cmd(path, endi)
+				if nexts and not starts_subpath[nexts] then --make sure we break the subpath where the close would had.
+					append_cmd(t, 'move', spx, spy)
+				end
+				i = nexti
+				if not i then return t end
+			end
+		end
+	end
+
+	for i = i, j do
+		t[#t+1] = path[i]
+	end
+
+	return t
+end
+
+--given a command index which starts a subpath, reverse the subpath.
+local function subpath_reverse(path, i)
+	--TODO
+end
+
+--path manipulation ------------------------------------------------------------------------------------------------------
 
 local function reverse_path(path)
 	local t = {}
@@ -987,57 +1124,12 @@ local function reverse_path(path)
 	end
 end
 
---[[
---path global time -------------------------------------------------------------------------------------------------------
-
-local is_timed = glue.index{'close', 'line', 'hline', 'vline', 'curve', 'symm_curve', 'smooth_curve', 'quad_curve',
-									'quad_curve_3p', 'symm_quad_curve', 'smooth_quad_curve', 'carc', 'arc', 'elliptic_arc',
-									'line_arc', 'line_elliptic_arc', 'arc_3p', 'svgarc'}
-
-local t = {}
-for k in pairs(is_timed) do
-	t['rel_'..k] = true
+--TODO: make this work with __cat (should we do an insert_path_at_index_1() instead? given evaluation of .. operator)
+local function append_path(dst_path, src_path)
+	--TODO
 end
-glue.update(is_timed, t)
-
-local function global_time(i, t, path)
-	local count = 0
-	local n --the number of the command at index i, relative to count.
-	for ci,s in commands(path) do
-		count = count + (is_timed[s] and 1 or 0)
-		if ci == i then n = count end
-	end
-	assert(n, 'invalid command index')
-	return (n - 1 + t)/count
-end
-
-local function local_time(t, path)
-	t = math.min(math.max(t, 0), 1)
-	local count = 0
-	for _,s in commands(path) do
-		count = count + (is_timed[s] and 1 or 0)
-	end
-	if count == 0 then return end --path has no timed commands: any t is invalid.
-	local n, t = math.modf(count * t)
-	n = n + 1
-	if n > count then
-		n, t = count, 1
-	end
-	local count = 0
-	for i,s in commands(path) do
-		count = count + (is_timed[s] and 1 or 0)
-		if count == n then
-			return i, t
-		end
-	end
-	--the time range 0..1 covers the timed commands continuously, so a command must always be found.
-	assert(false)
-end
-]]
 
 --command conversions ----------------------------------------------------------------------------------------------------
-
---[[
 
 local function to_curves(path, i)
 	local spath = {}
@@ -1116,9 +1208,7 @@ local function to_arc_3p() end
 local function to_arc() end
 local function to_svgarc() end
 
--- conversions table -----------------------------------------------------------------------------------------------------
-
-local conversions = {}
+local conversions = {} --{command = {["conversion name"] = converter}}
 
 for _,s in ipairs{'line', 'curve', 'quad_curve', 'arc'} do
 	--abs. commands can be made rel.
@@ -1159,7 +1249,46 @@ glue.update(conversions.rel_arc, arc_conversions)
 local function is_transformable(s)
 
 end
-]]
+
+--path pretty printing ---------------------------------------------------------------------------------------------------
+
+local pp_path --fw. decl.
+do
+	local max_name = 0
+	for k in pairs(argc) do
+		max_name = math.max(max_name, #k)
+	end
+	local name_fmt = '%-'..max_name..'s  '
+
+	function pp_path(path)
+		for i,s in commands(path) do
+			if abs_name(s) == 'text' then
+				--TODO: show the font table too somehow.
+				print(i, string.format(name_fmt, s), path[i+1], path[i+2], path[i+4])
+			else
+				--TODO: format the arguments so they always fit a specific column size.
+				print(i, string.format(name_fmt, s), select(2, cmd(path, i)))
+			end
+		end
+	end
+end
+
+--path class -------------------------------------------------------------------------------------------------------------
+
+local path_class = {
+
+}
+local path_meta = {
+	__index = path_class,
+	__cat = append_path,
+	__tostring = pp_path,
+}
+
+local function new(path)
+	return setmetatable(path or {}, path_meta)
+end
+
+--public API -------------------------------------------------------------------------------------------------------------
 
 if not ... then require'path_cairo_demo' end
 
@@ -1167,6 +1296,7 @@ return {
 	--iterating
 	argc = argc,
 	next_cmd = next_cmd,
+	prev_cmd = prev_cmd,
 	commands = commands,
 	cmd = cmd,
 	--modifying
@@ -1196,11 +1326,18 @@ return {
 	--conversion
 	to_abs = abs_path,
 	to_rel = rel_path,
-	reverse = reverse_path,
 	--subpaths
-	subpath_end = subpath_end,
 	next_subpath = next_subpath,
 	subpaths = subpaths,
+	subpath_start = subpath_start,
+	subpath_end = subpath_end,
+	extract_subpath = extract_subpath,
+	reverse_subpath = reverse_subpath,
 	--
+	reverse = reverse_path,
+	--pretty-printing
+	pp = pp_path,
+	--OO interface
+	new = new,
 }
 
