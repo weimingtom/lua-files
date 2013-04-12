@@ -48,17 +48,16 @@ local argc = {
 }
 
 --helper function to mirror all keys in t with rel_* keys.
-local function add_rel_variations(t)
+local function rel_variations(t)
 	local rt = {}
 	for k,v in pairs(t) do
 		rt['rel_'..k] = v
 	end
-	glue.update(t, rt)
-	return t
+	return rt
 end
 
 --all commands have relative-to-current-point counterparts with the same number of arguments.
-add_rel_variations(argc)
+glue.update(argc, rel_variations(argc))
 
 --given an index in a path pointing at a command string (we'll call that a command index),
 --return the index of the next command and the command name.
@@ -69,8 +68,8 @@ local function next_cmd(path, i)
 end
 
 --iterate over path commands retreiving the command index and the command name.
-local function commands(path)
-	return next_cmd, path
+local function commands(path, last_index)
+	return next_cmd, path, last_index
 end
 
 --given a command index, unpack the command and its args.
@@ -107,15 +106,19 @@ local function append_cmd(path, s, ...)
 	table_update(path, #path+1, s, ...)
 end
 
---insert command at i, shifting elemetns as needed.
+--insert command at index i, shifting elemetns as needed. if i is nil, append the command instead.
 local function insert_cmd(path, i, s, ...)
+	if not i then
+		append_cmd(path, s, ...)
+		return
+	end
 	local n = select('#', ...)
 	assert(n == argc[s], 'wrong argument count')
 	table_shift(path, i, 1 + n)
 	table_update(path, i, s, ...)
 end
 
---replace command at i with a new command and args, shifting elements as needed.
+--replace command at index i with a new command and args, shifting elements as needed.
 local function replace_cmd(path, i, s, ...)
 	local old = argc[path[i]]
 	local new = select('#', ...)
@@ -145,20 +148,23 @@ end
 
 --path command decoding: absolute and relative commands ------------------------------------------------------------------
 
-local function is_rel(s) --check if the command is rel. or abs.
-	return s:match'^rel_' or false
+local abs_names = {}
+local rel_names = {}
+for s in pairs(argc) do
+	abs_names[s] = s:match'^rel_(.*)' or s
+	rel_names[s] = s:match'^rel_' and s or 'rel_'..s
 end
 
-local function is_abs(s) --check if the command is rel. or abs.
-	return not s:match'^rel_'
+local function is_rel(s) --check if the command is rel. or abs.
+	return rel_names[s] == s
 end
 
 local function abs_name(s) --return the abs. variant for any command, be it abs. or rel.
-	return s:match'^rel_(.*)' or s
+	return abs_names[s]
 end
 
 local function rel_name(s) --return the rel. variant for any command, be it abs. or rel.
-	return is_rel(s) and s or 'rel_'..s
+	return rel_names[s]
 end
 
 --commands that start with a point and that point is the only argument that can be abs. or rel.
@@ -168,7 +174,7 @@ local only_x1y1 = glue.index{'arc', 'elliptic_arc', 'line_arc', 'line_elliptic_a
 
 --given current point and an unpacked command and its args, return the command in absolute form.
 local function abs_cmd(cpx, cpy, s, ...)
-	if is_abs(s) then return s, ... end
+	if rel_names[s] ~= s then return s, ... end
 	assert(cpx and cpy, 'no current point')
 	s = abs_name(s)
 	if s == 'move' or s == 'line' then
@@ -284,10 +290,15 @@ local function next_cp(cpx, cpy, spx, spy, s, ...)
 		cpx, cpy = ...
 	elseif s == 'smooth_quad_curve' then
 		cpx, cpy = select(2, ...)
-	elseif s == 'arc' or s == 'line_arc' then
+	elseif s == 'arc' then
+		local cx, cy, r, start_angle, sweep_angle = ...
+		spx, spy, cpx, cpy = elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle)
+	elseif s == 'line_arc' then
 		local cx, cy, r, start_angle, sweep_angle = ...
 		cpx, cpy = select(3, elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle))
-	elseif s == 'elliptic_arc' or s == 'line_elliptic_arc' then
+	elseif s == 'elliptic_arc' then
+		spx, spy, cpx, cpy = elliptic_arc_endpoints(...)
+	elseif s == 'line_elliptic_arc' then
 		cpx, cpy = select(3, elliptic_arc_endpoints(...))
 	elseif s == 'arc_3p' then
 		cpx, cpy = select(3, ...)
@@ -323,8 +334,8 @@ local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
 
 --given current command in abs. form and current control point, return the tip of the tangent vector at command endpoint.
 --tkind is 'quad', 'cubic' or 'tangent'. a symm_curve can only use a cubic tip, a symm_quad_curve can only use a quad tip.
---smooth curves can use any kind of tip.
-local function tangent_tip(cpx, cpy, tkind1, tx1, ty1, s, ...)
+--smooth curves can use any kind of tip as they only use the angle and ignore the length of the vector.
+local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	if s == 'line' then
 		return 'tangent', cpx, cpy
 	elseif s == 'curve' then
@@ -342,9 +353,9 @@ local function tangent_tip(cpx, cpy, tkind1, tx1, ty1, s, ...)
 	elseif s == 'quad_curve_3p' then
 		return 'quad', bezier2_3point_control_point(cpx, cpy, ...)
 	elseif s == 'symm_quad_curve' then
-		return 'quad', reflect_point(kind1 == 'quad' and tx1 or cpx, kind1 == 'quad' and ty1 or cpy, cpx, cpy)
+		return 'quad', reflect_point(tkind == 'quad' and tx or cpx, tkind == 'quad' and ty or cpy, cpx, cpy)
 	elseif s == 'smooth_quad_curve' then
-		return 'quad', reflect_point_distance(tx1 or cpx, ty1 or cpy, cpx, cpy, (...))
+		return 'quad', reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
 	elseif s == 'arc' or s == 'line_arc' then
 		--TODO: compute a 'tangent' tip for arcs too, why not?
 	elseif s == 'elliptic_arc' or s == 'line_elliptic_arc' then
@@ -953,23 +964,37 @@ local function rel_path(path)
 	return t
 end
 
---subpath iteration ------------------------------------------------------------------------------------------------------
+--subpath iteration and decoding -----------------------------------------------------------------------------------------
 
-local starts_subpath = add_rel_variations(glue.index{
-		'move', 'circle', 'circle_3p', 'ellipse', 'rect', 'round_rect', 'elliptic_rect',
-		'star', 'star_2p', 'rpoly', 'superformula', 'text'})
+local closed_shapes = glue.index{
+		'circle', 'circle_3p', 'ellipse', 'rect', 'round_rect', 'elliptic_rect',
+		'star', 'star_2p', 'rpoly', 'superformula', 'text'}
+glue.update(closed_shapes, rel_variations(closed_shapes))
+
+local subpath_starters = glue.index{'move', 'arc', 'elliptic_arc'}
+glue.update(subpath_starters, rel_variations(subpath_starters))
+glue.update(subpath_starters, closed_shapes)
+
+--check if a command starts a subpath, also implicitly ending the prev. subpath, if any.
+local function starts_subpath(s)
+	return subpath_starters[s] and true or false
+end
+
+--check if a command closes a subpath, also implicitly ending it.
+local function closes_subpath(s)
+	return s == 'close' or s == 'rel_close' or closed_shapes[s] and true or false
+end
 
 --given a command index, return the index of the last command of the subpath which the command is part of.
 local function subpath_end(path, i)
-	local s = path[i]
-	if not s then return end --path empty
-	while true do
+	local s = assert(path[i], 'invalid path index')
+	while not closes_subpath(s) do
 		local nexti, nexts = next_cmd(path, i)
-		if not nexti then return i, s end --path will end
-		if nexts == 'close' or nexts == 'rel_close' then return nexti, nexts end --subpath will close, thus ending
-		if starts_subpath[nexts] then return i, s end --another subpath will start, ending this one
+		if not nexts then break end --there's no next command, so path ends here.
+		if starts_subpath(nexts) then break end --the next command starts a new subpath, thus ending this one.
 		i, s = nexti, nexts
 	end
+	return i, s
 end
 
 --given a command index, return the index of the first command of the next subpath.
@@ -978,14 +1003,12 @@ local function next_subpath(path, i)
 		if #path == 0 then return end
 		return 1, path[1]
 	end
-	local i, s = subpath_end(path, i)
-	if not i then return end --path empty
-	return next_cmd(path, i)
+	return next_cmd(path, subpath_end(path, i))
 end
 
 --iterate subpaths, returning every time the index of the first command in the subpath and the command name.
-local function subpaths(path)
-	return next_subpath, path
+local function subpaths(path, last_index)
+	return next_subpath, path, last_index
 end
 
 --given an arbitrary path index, return the command index which starts the subpath of which the index is part of.
@@ -1000,23 +1023,54 @@ local function subpath_start(path, target_index)
 	error'invalid path index'
 end
 
---subpath decoding -------------------------------------------------------------------------------------------------------
+--check if the subpath starting at command index i contains no drawing commands.
+local function subpath_is_empty(path, i)
+	if abs_name(path[i]) ~= 'move' then return false end
+	local nexti, nexts = next_cmd(path, i)
+	return not nexts or starts_subpath(nexts) or closes_subpath(nexts)
+end
 
 --given a command index, check if the subpath which the command is part of is closed or not.
 local function is_closed(path, i)
-	--TODO
+	return closes_subpath(select(2, subpath_end(path, i)))
 end
 
 --subpath manipulation ---------------------------------------------------------------------------------------------------
 
 --given a command index, close the subpath which the command is part of (if it's already closed, do nothing).
 local function close_subpath(path, i)
-	--TODO
+	local endi, ends = subpath_end(path, i)
+	if closes_subpath(ends) then return end
+	local nexti, nexts = next_cmd(path, endi)
+	if nexts and is_rel(nexts) then
+		--the next subpath is relative to the current point in which this subpath ends.
+		--we make that point explicit by prefixing a 'move' as to not affect the shape of the next subpath.
+		local cpx, cpy = cp_at(path, nexti)
+		insert_cmd(path, nexti, 'move', cpx, cpy)
+	end
+	insert_cmd(path, nexti, 'close')
 end
 
---given a command index, open the subpath which the command is part of (if it's already open, do nothing).
+--given a command index, open the subpath which the command is part of.
+--if it's already open, do nothing. if it's a closed shape, do nothing.
 local function open_subpath(path, i)
-	--TODO
+	local endi, ends = subpath_end(path, i)
+	if abs_name(ends) ~= 'close' then return end
+	remove_cmd(path, endi)
+end
+
+--move a subpath to a different position in the path. i and j must be subpath-starting command indices.
+local function move_subpath(path, i, j)
+	--
+end
+
+--given a command index which starts a subpath, reverse the subpath.
+local function reverse_subpath(path, i)
+	local endi, ends = subpath_end(path, i)
+	while true do
+		if i == endi then break end
+		i = next_cmd(path, i)
+	end
 end
 
 --given a command index part of a closed subpath, move the subpath commands around so that the subpath starts
@@ -1033,7 +1087,6 @@ local function break_subpath(path, i)
 	--TODO
 end
 
-
 --extract the path subsection between two indices as a valid independent path, assuming i is a command index and j is
 --at the exact position of the last argument of the last command that needs to be included (defaults to #path).
 local function extract_subpath(path, i, j)
@@ -1044,7 +1097,7 @@ local function extract_subpath(path, i, j)
 	local t = {}
 	local s = path[i]
 
-	if starts_subpath[s] then
+	if starts_subpath(s) then
 		if is_rel(s) then --starting a subpath, but with a rel. cmd, so we add it in abs. form.
 			local cpx, cpy = cp_at(path, i)
 			append_cmd(t, abs_cmd(cpx, cpy, cmd(path, i)))
@@ -1062,7 +1115,7 @@ local function extract_subpath(path, i, j)
 			if abs_name(s) == 'close' then
 				append_cmd(t, 'line', spx, spy)
 				local nexti, nexts = next_cmd(path, i)
-				if nexts and not starts_subpath[nexts] then --make sure we break the subpath where the close would had.
+				if nexts and not starts_subpath(nexts) then --make sure we break the subpath where the close would had.
 					append_cmd(t, 'move', spx, spy)
 				end
 				i = nexti
@@ -1083,7 +1136,7 @@ local function extract_subpath(path, i, j)
 				local cpx, cpy, spx, spy = cp_at(path, endi)
 				append_cmd(t, 'line', spx, spy)
 				local nexti, nexts = next_cmd(path, endi)
-				if nexts and not starts_subpath[nexts] then --make sure we break the subpath where the close would had.
+				if nexts and not starts_subpath(nexts) then --make sure we break the subpath where the close would had.
 					append_cmd(t, 'move', spx, spy)
 				end
 				i = nexti
@@ -1099,12 +1152,7 @@ local function extract_subpath(path, i, j)
 	return t
 end
 
---given a command index which starts a subpath, reverse the subpath.
-local function subpath_reverse(path, i)
-	--TODO
-end
-
---path manipulation ------------------------------------------------------------------------------------------------------
+--whole path manipulation ------------------------------------------------------------------------------------------------
 
 local function reverse_path(path)
 	local t = {}
@@ -1122,11 +1170,6 @@ local function reverse_path(path)
 			--insert_rel_cmd(p, 'move', ...
 		end
 	end
-end
-
---TODO: make this work with __cat (should we do an insert_path_at_index_1() instead? given evaluation of .. operator)
-local function append_path(dst_path, src_path)
-	--TODO
 end
 
 --command conversions ----------------------------------------------------------------------------------------------------
@@ -1250,42 +1293,37 @@ local function is_transformable(s)
 
 end
 
---path pretty printing ---------------------------------------------------------------------------------------------------
+--path reflection --------------------------------------------------------------------------------------------------------
 
-local pp_path --fw. decl.
-do
-	local max_name = 0
-	for k in pairs(argc) do
-		max_name = math.max(max_name, #k)
-	end
-	local name_fmt = '%-'..max_name..'s  '
+local pp = require'pp'
 
-	function pp_path(path)
-		for i,s in commands(path) do
-			if abs_name(s) == 'text' then
-				--TODO: show the font table too somehow.
-				print(i, string.format(name_fmt, s), path[i+1], path[i+2], path[i+4])
-			else
-				--TODO: format the arguments so they always fit a specific column size.
-				print(i, string.format(name_fmt, s), select(2, cmd(path, i)))
-			end
-		end
+local function fmt_args(path, i)
+	if abs_name(path[i]) == 'text' then
+		return path[i+1], path[i+2], pp.pformat(path[i+3]), path[i+4]
+	else
+		return select(2, cmd(path, i))
 	end
 end
 
---path class -------------------------------------------------------------------------------------------------------------
-
-local path_class = {
-
-}
-local path_meta = {
-	__index = path_class,
-	__cat = append_path,
-	__tostring = pp_path,
-}
-
-local function new(path)
-	return setmetatable(path or {}, path_meta)
+local function inspect(path)
+	local t = {}
+	local count = 0
+	for i in subpaths(path) do
+		count = count + 1
+		t[i] = count
+	end
+	print'sub# index#         cpx, cpy  command                  args'
+	print'----------------------------------------------------------------------'
+	local cpx, cpy, spx, spy
+	for i,s in commands(path) do
+		print(string.format('%s %6d %16s  %-24s '..('%s, '):rep(argc[path[i]]),
+									t[i] and string.format('%4s', t[i]) or '    ',
+									i,
+									cpx and string.format('%g, %g', cpx, cpy) or 'nil, nil',
+									s,
+									fmt_args(path, i)))
+		cpx, cpy, spx, spy = next_cp(cpx, cpy, spx, spy, abs_cmd(cpx, cpy, cmd(path, i)))
+	end
 end
 
 --public API -------------------------------------------------------------------------------------------------------------
@@ -1304,6 +1342,10 @@ return {
 	insert_cmd = insert_cmd,
 	replace_cmd = replace_cmd,
 	remove_cmd = remove_cmd,
+
+	append_rel_cmd = append_rel_cmd,
+	insert_rel_cmd = insert_rel_cmd,
+	replace_rel_cmd = replace_rel_cmd,
 	--decoding
 	is_rel = is_rel,
 	abs_name = abs_name,
@@ -1331,13 +1373,15 @@ return {
 	subpaths = subpaths,
 	subpath_start = subpath_start,
 	subpath_end = subpath_end,
-	extract_subpath = extract_subpath,
+	subpath_is_empty = subpath_is_empty,
+	is_closed = is_closed,
+	close_subpath = close_subpath,
+	open_subpath = open_subpath,
 	reverse_subpath = reverse_subpath,
+	extract_subpath = extract_subpath,
 	--
 	reverse = reverse_path,
-	--pretty-printing
-	pp = pp_path,
-	--OO interface
-	new = new,
+	--reflection
+	inspect = inspect,
 }
 

@@ -16,7 +16,7 @@ local panel = CPanel{
 	anchors = {left=true,right=true,top=true,bottom=true}
 }
 
-local player = {window = main}
+local player = {window = main, mouse_buttons = {}}
 
 function player:on_render(cr) end
 function player:on_init(cr) end
@@ -46,6 +46,11 @@ function player:dragging(x, y, radius)
 end
 
 function panel:on_mouse_move(x, y, buttons)
+	player.mouse_last = {
+		x = player.mouse_x,
+		y = player.mouse_y,
+		buttons = player.mouse_buttons
+	}
 	player.mouse_x = x
 	player.mouse_y = y
 	player.mouse_buttons = buttons
@@ -66,7 +71,6 @@ function panel:on_mouse_move(x, y, buttons)
 	self:invalidate()
 end
 
-panel.on_mouse_move = panel.on_mouse_move
 panel.on_mouse_over = panel.on_mouse_move
 panel.on_mouse_leave = panel.on_mouse_move
 panel.on_lbutton_double_click = panel.on_mouse_move
