@@ -219,6 +219,7 @@ return {
 	endpoints = endpoints,
 	to_svgarc = to_svgarc,
 	best_segment_max_sweep = best_segment_max_sweep,
+	point_at = point_at,
 	--path API
 	to_bezier3 = to_bezier3,
 	point = point,
