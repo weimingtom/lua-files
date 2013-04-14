@@ -597,6 +597,98 @@ local function control_points(path)
 			cpx, cpy = px2, py2
 			tkind = nil
 
+		elseif s == 'circle_3p' then
+
+			local cx1, cy1, cx2, cy2, cx3, cy3 = i+1, i+2, i+3, i+4, i+5, i+6
+			local px1, py1 = path_pt(cx1, cy1, rel, cpx, cpy)
+			local px2, py2 = path_pt(cx2, cy2, rel, cpx, cpy)
+			local px3, py3 = path_pt(cx3, cy3, rel, cpx, cpy)
+
+			local pcx, pcy = pt(0, 0)
+			local to_circle = require'path_circle_3p'.to_circle
+			local function set_center()
+				local cx, cy, r = to_circle(points[px1], points[py1], points[px2], points[py2], points[px3], points[py3])
+				if not cx then return end
+				points[pcx], points[pcy] = cx, cy
+			end
+			set_center()
+
+			chain(px1, set_center)
+			chain(py1, set_center)
+			chain(px2, set_center)
+			chain(py2, set_center)
+			chain(px3, set_center)
+			chain(py3, set_center)
+
+			move_delta(pcx, pcy, px1, py1)
+			move_delta(pcx, pcy, px2, py2)
+			move_delta(pcx, pcy, px3, py3)
+
+			cpx, cpy, spx, spy, tkind = nil
+
+		elseif s == 'circle' then
+			local ccx, ccy, cr = i+1, i+2, i+3
+			local pcx, pcy = path_pt(ccx, ccy, rel, cpx, cpy)
+
+			local px, py = pt(points[pcx] - path[cr], points[pcy])
+			local function set_r()
+				path[cr] = distance(points[px], points[py], points[pcx], points[pcy])
+			end
+			chain(px, set_r)
+			chain(py, set_r)
+
+			move_delta(pcx, pcy, px, py)
+
+			cpx, cpy, spx, spy, tkind = nil
+
+		elseif s == 'star' then
+			local star_to_star_2p = require'path_shapes'.star_to_star_2p
+			local ccx, ccy, cx1, cy1, cr2, cn = i+1, i+2, i+3, i+4, i+5, i+6
+			local pcx, pcy = path_pt(ccx, ccy, rel, cpx, cpy)
+			local px1, py1 = path_pt(cx1, cy1, rel, cpx, cpy)
+
+			local px2, py2 = pt(0, 0)
+			local function set_p2()
+				local cx, cy, x1, y1, x2, y2, n =
+					star_to_star_2p(points[pcx], points[pcy], points[px1], points[py1], path[cr2], path[cn])
+				points[px2], points[py2] = x2, y2
+			end
+			set_p2()
+
+			chain(px1, set_p2)
+			chain(py1, set_p2)
+
+			local function set_r2()
+				path[cr2] = distance(points[px2], points[py2], points[pcx], points[pcy])
+				set_p2()
+			end
+			chain(px2, set_r2)
+			chain(py2, set_r2)
+
+			move_delta(pcx, pcy, px1, py1)
+
+			cpx, cpy, spx, spy, tkind = nil
+
+		elseif s == 'star_2p' then
+			local ccx, ccy, cx1, cy1, cx2, cy2, cn = i+1, i+2, i+3, i+4, i+5, i+6, i+7
+			local pcx, pcy = path_pt(ccx, ccy, rel, cpx, cpy)
+			local px1, py1 = path_pt(cx1, cy1, rel, cpx, cpy)
+			local px2, py2 = path_pt(cx2, cy2, rel, cpx, cpy)
+
+			move_delta(pcx, pcy, px1, py1)
+			move_delta(pcx, pcy, px2, py2)
+
+			cpx, cpy, spx, spy, tkind = nil
+
+		elseif s == 'rpoly' then
+			local ccx, ccy, cx1, cy1, cn = i+1, i+2, i+3, i+4, i+5
+			local pcx, pcy = path_pt(ccx, ccy, rel, cpx, cpy)
+			local px1, py1 = path_pt(cx1, cy1, rel, cpx, cpy)
+
+			move_delta(pcx, pcy, px1, py1)
+
+			cpx, cpy, spx, spy, tkind = nil
+
 		end
 	end
 
