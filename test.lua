@@ -7,10 +7,12 @@ local reflect_point = require'path_point'.reflect_point
 local reflect_point_distance = require'path_point'.reflect_point_distance
 local distance = require'path_point'.distance
 local point_angle = require'path_point'.point_angle
---local point_around = require'path_point'.point_around
+local point_around = require'path_point'.point_around
+local rotate_point = require'path_point'.rotate_point
 local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
 local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
 local point_at = require'path_elliptic_arc'.point_at
+local affine2d = require'affine2d'
 
 local path = {
 	'move', 1200, 110,
@@ -83,7 +85,9 @@ local path = {
 	'rel_move', 100, -50,
 	'rel_arc', 0, 0, 50, -90, 180,
 	'rel_move', 100, -100,
-	'rel_svgarc', -50, -20, -30, 0, 1, 30, 40,
+	--'move', 500, 300,
+	--'rel_svgarc', 200, 100, 30, 0, 1, -100, 100,
+	'rel_svgarc', -50, -20, -30, 1, 1, 30, 40,
 	'rel_svgarc', -50, -20, -30, 1, 0, 30, 40,
 	'rel_svgarc', 10, 0, 0, 0, 0, 50, 0, --invalid parametrization (zero radius)
 	'rel_svgarc', 10, 10, 10, 10, 0, 0, 0, --invalid parametrization (endpoints coincide)
@@ -137,72 +141,91 @@ local function new_mutex()
 end
 
 local function control_points(path)
-	local points = {}
-	local setters = {}
-	local dx, dy = 0, 0 --point delta, for shifting points
+	local points = {} --{x1, y1, x2, y2, ...}
+	local setters = {} --{set_x1, set_y1, ...}
 
-	local function pt(x, y)
-		local xi, yi = #points+1, #points+2
-		points[xi] = x
-		points[yi] = y
-		local function set_px(v) points[xi] = v end
-		local function set_py(v) points[yi] = v end
-		setters[xi] = set_px
-		setters[yi] = set_py
-		return xi, yi
-	end
-
-	local function chain(pi, setter)
-		local old_setter = assert(setters[pi])
-		setters[pi] = function(v)
+	--override the value setter at index px so that it chain-calls another setter.
+	local function chain(px, setter)
+		local old_setter = assert(setters[px])
+		setters[px] = function(v)
 			old_setter(v)
 			setter(v)
 		end
+	end
+
+	--create a point with an update handler that updates its coordinates.
+	local function pt(x, y)
+		local px, py = #points+1, #points+2
+		points[px] = x
+		points[py] = y
+		--point updates its own coordinates
+		setters[px] = function(v) points[px] = v end
+		setters[py] = function(v) points[py] = v end
+		return px, py
+	end
+
+	--create a point that directly represents an abs. point in path at index cx, cy
+	local function path_abs_pt(cx, cy)
+		local px, py = pt(path[cx], path[cy])
+		--point updates its representation in path
+		chain(px, function(v) path[cx] = points[px] end)
+		chain(py, function(v) path[cy] = points[py] end)
+		return px, py
+	end
+
+	--create a point that directly represents a rel. point in path at index cx, cy
+	local function path_rel_pt(cx, cy, cpx, cpy)
+		local px, py = pt(points[cpx] + path[cx], points[cpy] + path[cy])
+		local function set_cx(v) path[cx] = points[px] - points[cpx] end
+		local function set_cy(v) path[cy] = points[py] - points[cpy] end
+		--point updates its representation in path
+		chain(px, set_cx)
+		chain(py, set_cy)
+		--current point updates the relative point in path so as to preserve its absolute position
+		chain(cpx, set_cx)
+		chain(cpy, set_cy)
+		return px, py
+	end
+
+	--create a point that directly represents a rel. or an abs. point in path at index cx, cy
+	local function path_pt(cx, cy, rel, cpx, cpy)
+		return (rel and path_rel_pt or path_abs_pt)(cx, cy, cpx, cpy)
+	end
+
+	--move px,py with delta when cx,cy is updated.
+	local dx, dy = 0, 0
+	local function move_delta(cx, cy, px, py)
+		chain(cx, function() setters[px](points[px] + dx) end)
+		chain(cy, function() setters[py](points[py] + dy) end)
 	end
 
 	local cpx, cpy, spx, spy, tkind, tx, ty, tclen
 
 	for i,s in path_state.commands(path) do
 
-		if s == 'move' or s == 'line' then
+		local s, rel = path_state.abs_name(s), path_state.is_rel(s)
+
+		if s == 'move' then
 
 			local c2x, c2y = i+1, i+2
-			local p2x, p2y = pt(path[c2x], path[c2y])
-
-			--endpoint updates its representation in path
-			chain(p2x, function(v) path[c2x] = points[p2x] end)
-			chain(p2y, function(v) path[c2y] = points[p2y] end)
-
-			--advance the state
+			local p2x, p2y = path_pt(c2x, c2y, rel, cpx, cpy)
 			cpx, cpy = p2x, p2y
 			spx, spy = cpx, cpy
 			tkind = nil
 
-		elseif s == 'rel_move' or s == 'rel_line' then
+		elseif s == 'line' then
 
 			local c2x, c2y = i+1, i+2
-			local p1x, p1y = cpx, cpy
-			local p2x, p2y = pt(points[p1x] + path[c2x], points[p1y] + path[c2y])
-
-			--endpoint updates its representation in path
-			chain(p2x, function(v) path[c2x] = points[p2x] - points[p1x] end)
-			chain(p2y, function(v) path[c2y] = points[p2y] - points[p1y] end)
-
-			--current point updates relative points in path so as to preserve their absolute position
-			chain(p1x, function(v) path[c2x] = points[p2x] - points[p1x] end)
-			chain(p1y, function(v) path[c2y] = points[p2y] - points[p1y] end)
-
-			--advance the state
+			local p2x, p2y = path_pt(c2x, c2y, rel, cpx, cpy)
 			cpx, cpy = p2x, p2y
 			tkind = nil
 
-		elseif s == 'close' or s == 'rel_close' then
+		elseif s == 'close' then
 
-			--advance the state
 			cpx, cpy = spx, spy
 			tkind = nil
 
-		elseif s == 'hline' then
+		elseif s == 'hline' and not rel then
 
 			local p1y = cpy
 			local c2x = i+1
@@ -215,7 +238,7 @@ local function control_points(path)
 			cpx, cpy = p2x, p2y
 			tkind = nil
 
-		elseif s == 'vline' then
+		elseif s == 'vline' and not rel then
 
 			local p1x = cpx
 			local c2y = i+1
@@ -228,7 +251,7 @@ local function control_points(path)
 			cpx, cpy = p2x, p2y
 			tkind = nil
 
-		elseif s == 'rel_hline' then
+		elseif s == 'hline' and rel then
 
 			local p1x, p1y = cpx, cpy
 			local c2x = i+1
@@ -249,7 +272,8 @@ local function control_points(path)
 			--advance the state
 			cpx, cpy = p2x, p2y
 			tkind = nil
-		elseif s == 'rel_vline' then
+
+		elseif s == 'vline' and rel then
 
 			local p1x, p1y = cpx, cpy
 			local c2y = i+1
@@ -271,496 +295,226 @@ local function control_points(path)
 			cpx, cpy = p2x, p2y
 			tkind = nil
 
-		elseif s == 'quad_curve' or s == 'rel_quad_curve' then
+		elseif s == 'quad_curve' then
 
 			local p1x, p1y = cpx, cpy
 			local c2x, c2y, c3x, c3y = i+1, i+2, i+3, i+4
-			local p2x, p2y, p3x, p3y
-			if s == 'quad_curve' then
-				p2x, p2y = pt(path[c2x], path[c2y])
-				p3x, p3y = pt(path[c3x], path[c3y])
-
-				--points update their representation in path
-				chain(p2x, function(v) path[c2x] = points[p2x] end)
-				chain(p2y, function(v) path[c2y] = points[p2y] end)
-				chain(p3x, function(v) path[c3x] = points[p3x] end)
-				chain(p3y, function(v) path[c3y] = points[p3y] end)
-			else
-				p2x, p2y = pt(points[p1x] + path[c2x], points[p1y] + path[c2y])
-				p3x, p3y = pt(points[p1x] + path[c3x], points[p1y] + path[c3y])
-
-				local set_c2x = function(v) path[c2x] = points[p2x] - points[p1x] end
-				local set_c2y = function(v) path[c2y] = points[p2y] - points[p1y] end
-				local set_c3x = function(v) path[c3x] = points[p3x] - points[p1x] end
-				local set_c3y = function(v) path[c3y] = points[p3y] - points[p1y] end
-
-				--points update their representation in path
-				chain(p2x, set_c2x)
-				chain(p2y, set_c2y)
-				chain(p3x, set_c3x)
-				chain(p3y, set_c3y)
-
-				--current point moves its relative points
-				chain(p1x, set_c2x)
-				chain(p1y, set_c2y)
-				chain(p1x, set_c3x)
-				chain(p1y, set_c3y)
-			end
+			local p2x, p2y = path_pt(c2x, c2y, rel, cpx, cpy)
+			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
 
 			--end points carry control point
-			local shift_p2x = function(v) setters[p2x](points[p2x] + dx) end
-			local shift_p2y = function(v) setters[p2y](points[p2y] + dy) end
-			chain(p1x, shift_p2x)
-			chain(p1y, shift_p2y)
-			chain(p3x, shift_p2x)
-			chain(p3y, shift_p2y)
+			move_delta(p1x, p1y, p2x, p2y)
+			move_delta(p3x, p3y, p2x, p2y)
 
 			--advance the state
 			cpx, cpy = p3x, p3y
 			tkind, tx, ty, tclen = 'quad', p2x, p2y, nil
 
-		elseif s == 'curve' or s == 'rel_curve' then
+		elseif s == 'quad_curve_3p' then
+
+			local p1x, p1y = cpx, cpy
+			local c2x, c2y, c3x, c3y = i+1, i+2, i+3, i+4
+			local p2x, p2y = path_pt(c2x, c2y, rel, cpx, cpy)
+			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
+
+			--advance the state
+			cpx, cpy = p3x, p3y
+			tkind, tx, ty, tclen = 'tangent', p2x, p2y, nil
+
+		elseif s == 'curve' then
 
 			local p1x, p1y = cpx, cpy
 			local c2x, c2y, c3x, c3y, c4x, c4y = i+1, i+2, i+3, i+4, i+5, i+6
-
-			local p2x, p2y, p3x, p3y, p4x, p4y
-			if s == 'curve' then
-				p2x, p2y = pt(path[c2x], path[c2y])
-				p3x, p3y = pt(path[c3x], path[c3y])
-				p4x, p4y = pt(path[c4x], path[c4y])
-
-				--points update their representation in path
-				chain(p2x, function(v) path[c2x] = points[p2x] end)
-				chain(p2y, function(v) path[c2y] = points[p2y] end)
-				chain(p3x, function(v) path[c3x] = points[p3x] end)
-				chain(p3y, function(v) path[c3y] = points[p3y] end)
-				chain(p4x, function(v) path[c4x] = points[p4x] end)
-				chain(p4y, function(v) path[c4y] = points[p4y] end)
-			else
-				p2x, p2y = pt(points[p1x] + path[c2x], points[p1y] + path[c2y])
-				p3x, p3y = pt(points[p1x] + path[c3x], points[p1y] + path[c3y])
-				p4x, p4y = pt(points[p1x] + path[c4x], points[p1y] + path[c4y])
-
-				local set_c2x = function(v) path[c2x] = points[p2x] - points[p1x] end
-				local set_c2y = function(v) path[c2y] = points[p2y] - points[p1y] end
-				local set_c3x = function(v) path[c3x] = points[p3x] - points[p1x] end
-				local set_c3y = function(v) path[c3y] = points[p3y] - points[p1y] end
-				local set_c4x = function(v) path[c4x] = points[p4x] - points[p1x] end
-				local set_c4y = function(v) path[c4y] = points[p4y] - points[p1y] end
-
-				--points update their representation in path
-				chain(p2x, set_c2x)
-				chain(p2y, set_c2y)
-				chain(p3x, set_c3x)
-				chain(p3y, set_c3y)
-				chain(p4x, set_c4x)
-				chain(p4y, set_c4y)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_c2x)
-				chain(p1y, set_c2y)
-				chain(p1x, set_c3x)
-				chain(p1y, set_c3y)
-				chain(p1x, set_c4x)
-				chain(p1y, set_c4y)
-			end
+			local p2x, p2y = path_pt(c2x, c2y, rel, cpx, cpy)
+			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
+			local p4x, p4y = path_pt(c4x, c4y, rel, cpx, cpy)
 
 			--endpoints carry control points
-			chain(p1x, function(v) setters[p2x](points[p2x] + dx) end)
-			chain(p1y, function(v) setters[p2y](points[p2y] + dy) end)
-			chain(p4x, function(v) setters[p3x](points[p3x] + dx) end)
-			chain(p4y, function(v) setters[p3y](points[p3y] + dy) end)
+			move_delta(p1x, p1y, p2x, p2y)
+			move_delta(p4x, p4y, p3x, p3y)
 
+			--advance the state
 			cpx, cpy = p4x, p4y
 			tkind, tx, ty, tclen = 'cubic', p3x, p3y, nil
 
-		elseif s == 'symm_quad_curve' or s == 'rel_symm_quad_curve' then
+		elseif s == 'symm_quad_curve' or s == 'symm_curve' then
 
+			local kind = s:match'quad' and 'quad' or 'cubic'
 			local p1x, p1y = cpx, cpy
 			local c3x, c3y = i+1, i+2
-
-			local p3x, p3y
-			if s == 'symm_quad_curve' then
-				p3x, p3y = pt(path[c3x], path[c3y])
-
-				--endpoint updates its representation in path
-				chain(p3x, function(v) path[c3x] = points[p3x] end)
-				chain(p3y, function(v) path[c3y] = points[p3y] end)
-			else
-				p3x, p3y = pt(points[p1x] + path[c3x], points[p1y] + path[c3y])
-
-				local set_c3x = function(v) path[c3x] = points[p3x] - points[p1x] end
-				local set_c3y = function(v) path[c3y] = points[p3y] - points[p1y] end
-
-				--endpoint updates its representation in path
-				chain(p3x, set_c3x)
-				chain(p3y, set_c3y)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_c3x)
-				chain(p1y, set_c3y)
+			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
+			local p4x, p4y
+			if kind == 'cubic' then
+				local c4x, c4y = i+3, i+4
+				p4x, p4y = path_pt(c4x, c4y, rel, cpx, cpy)
 			end
 
-			local p2x, p2y
-			if tkind == 'quad' then
-				p2x, p2y = pt(reflect_point(points[tx], points[ty], points[p1x], points[p1y]))
+			local psx, psy
+			if tkind == kind then
+				psx, psy = pt(reflect_point(points[tx], points[ty], points[p1x], points[p1y]))
 				local tx_, ty_ = tx, ty
 
 				--moving the virtual control point moves the tangent tip
-				chain(p2x, recursion_safe(function(v)
-					setters[tx_]((reflect_point(points[p2x], points[p2y], points[p1x], points[p1y])))
-				end))
-				chain(p2y, recursion_safe(function(v)
-					setters[ty_](select(2, reflect_point(points[p2x], points[p2y], points[p1x], points[p1y])))
-				end))
+				chain(psx, recursion_safe(function(v) setters[tx_](2 * points[p1x] - v) end))
+				chain(psy, recursion_safe(function(v) setters[ty_](2 * points[p1y] - v) end))
 
 				--moving the tangent tip moves the virtual control point
-				chain(tx, function(v)
-					setters[p2x]((reflect_point(points[tx_], points[ty_], points[p1x], points[p1y])))
-				end)
-				chain(ty, function(v)
-					setters[p2y](select(2, reflect_point(points[tx_], points[ty_], points[p1x], points[p1y])))
-				end)
+				chain(tx, function(v) setters[psx](2 * points[p1x] - v) end)
+				chain(ty, function(v) setters[psy](2 * points[p1y] - v) end)
 
-				--endpoints carry control point
-				chain(p3x, function(v) setters[p2x](points[p2x] + dx) end)
-				chain(p3y, function(v) setters[p2y](points[p2y] + dy) end)
+				--endpoints carry second control points
+				if kind == 'quad' then
+					move_delta(p3x, p3y, psx, psy)
+				else
+					move_delta(p1x, p1y, psx, psy)
+				end
 			else
-				--if the tangent tip is missing or not of 'quad' type, the first endpoint serves as tangent tip.
-				p2x, p2y = p1x, p1y
-			end
-
-			--advance the state
-			cpx, cpy = p3x, p3y
-			tkind, tx, ty, tclen = 'quad', p2x, p2y, nil
-
-		elseif s == 'symm_curve' or s == 'rel_symm_curve' then
-
-			local p1x, p1y = cpx, cpy
-			local c3x, c3y, c4x, c4y = i+1, i+2, i+3, i+4
-
-			local p3x, p3y, p4x, p4y
-			if s == 'symm_curve' then
-				p3x, p3y = pt(path[c3x], path[c3y])
-				p4x, p4y = pt(path[c4x], path[c4y])
-
-				--points update their representation in path
-				chain(p3x, function(v) path[c3x] = points[p3x] end)
-				chain(p3y, function(v) path[c3y] = points[p3y] end)
-				chain(p4x, function(v) path[c4x] = points[p4x] end)
-				chain(p4y, function(v) path[c4y] = points[p4y] end)
-			else
-				p3x, p3y = pt(points[p1x] + path[c3x], points[p1y] + path[c3y])
-				p4x, p4y = pt(points[p1x] + path[c4x], points[p1y] + path[c4y])
-
-				local set_c3x = function(v) path[c3x] = points[p3x] - points[p1x] end
-				local set_c3y = function(v) path[c3y] = points[p3y] - points[p1y] end
-				local set_c4x = function(v) path[c4x] = points[p4x] - points[p1x] end
-				local set_c4y = function(v) path[c4y] = points[p4y] - points[p1y] end
-
-				--points update their representation in path
-				chain(p3x, set_c3x)
-				chain(p3y, set_c3y)
-				chain(p4x, set_c4x)
-				chain(p4y, set_c4y)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_c3x)
-				chain(p1y, set_c3y)
-				chain(p1x, set_c4x)
-				chain(p1y, set_c4y)
-			end
-
-			local p2x, p2y
-			if tkind == 'cubic' then
-				p2x, p2y = pt(reflect_point(points[tx], points[ty], points[p1x], points[p1y]))
-				local tx_, ty_ = tx, ty
-
-				--moving the virtual control point moves the tangent tip
-				chain(p2x, recursion_safe(function(v)
-					setters[tx_]((reflect_point(points[p2x], points[p2y], points[p1x], points[p1y])))
-				end))
-				chain(p2y, recursion_safe(function(v)
-					setters[ty_](select(2, reflect_point(points[p2x], points[p2y], points[p1x], points[p1y])))
-				end))
-
-				--moving the tangent tip moves the virtual control point
-				chain(tx, function(v)
-					setters[p2x]((reflect_point(points[tx_], points[ty_], points[p1x], points[p1y])))
-				end)
-				chain(ty, function(v)
-					setters[p2y](select(2, reflect_point(points[tx_], points[ty_], points[p1x], points[p1y])))
-				end)
-			else
-				--if the tangent tip is missing or not of 'quad' type, the first endpoint serves as tangent tip.
-				p2x, p2y = p1x, p1y
+				--if the tangent tip is missing or not of the right type, the first endpoint serves as tangent tip.
+				psx, psy = p1x, p1y
 			end
 
 			--second endpoint carries second control point
-			chain(p4x, function(v) setters[p3x](points[p3x] + dx) end)
-			chain(p4y, function(v) setters[p3y](points[p3y] + dy) end)
+			if kind == 'cubic' then
+				--TODO: move_delta(p4x, p4y, p3x, p3y)
+			end
 
 			--advance the state
-			cpx, cpy = p4x, p4y
-			tkind, tx, ty, tclen = 'cubic', p3x, p3y, nil
+			if kind == 'quad' then
+				cpx, cpy = p3x, p3y
+				tkind, tx, ty, tclen = kind, psx, psy, nil
+			else
+				cpx, cpy = p4x, p4y
+				tkind, tx, ty, tclen = kind, p3x, p3y, nil
+			end
 
-		elseif s == 'smooth_quad_curve' or s == 'rel_smooth_quad_curve' then
+		elseif s == 'smooth_quad_curve' or s == 'smooth_curve' then
 
+			local kind = s:match'quad' and 'quad' or 'cubic'
 			local p1x, p1y = cpx, cpy
 			local clen, c3x, c3y = i+1, i+2, i+3
-
-			local p3x, p3y
-			if s == 'smooth_quad_curve' then
-				p3x, p3y = pt(path[c3x], path[c3y])
-
-				--endpoint updates its representation in path
-				chain(p3x, function(v) path[c3x] = points[p3x] end)
-				chain(p3y, function(v) path[c3y] = points[p3y] end)
-			else
-				p3x, p3y = pt(points[p1x] + path[c3x], points[p1y] + path[c3y])
-
-				local set_c3x = function(v) path[c3x] = points[p3x] - points[p1x] end
-				local set_c3y = function(v) path[c3y] = points[p3y] - points[p1y] end
-
-				--endpoint updates its representation in path
-				chain(p3x, set_c3x)
-				chain(p3y, set_c3y)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_c3x)
-				chain(p1y, set_c3y)
+			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
+			local p4x, p4y
+			if kind == 'cubic' then
+				local c4x, c4y = i+4, i+5
+				p4x, p4y = path_pt(c4x, c4y, rel, cpx, cpy)
 			end
 
-			local p2x, p2y
+			local psx, psy
 			if tkind then
-				p2x, p2y = pt(reflect_point_distance(points[tx], points[ty], points[p1x], points[p1y], path[clen]))
-				local tx_, ty_ = tx, ty
+				psx, psy = pt(reflect_point_distance(points[tx], points[ty], points[p1x], points[p1y], path[clen]))
+				local tx_, ty_, tclen_ = tx, ty, tclen
+
+				--moving the virtual control point updates clen
+				local function set_clen()
+					path[clen] = distance(points[psx], points[psy], points[p1x], points[p1y])
+					print(path[clen])
+				end
+				chain(psx, set_clen)
+				chain(psy, set_clen)
+
 				local mutex = new_mutex()
 
 				--moving the virtual control point moves the tangent tip
-				chain(p2x, mutex(function(v)
-					local tclen = tclen and points[tclen] or distance(points[tx_], points[ty_], points[p1x], points[p1y])
-					setters[tx_]((reflect_point_distance(points[p2x], points[p2y], points[p1x], points[p1y], tclen)))
-					path[clen] = distance(points[p2x], points[p2y], points[p1x], points[p1y])
-				end))
-				chain(p2y, mutex(function(v)
-					local tclen = tclen and points[tclen] or distance(points[tx_], points[ty_], points[p1x], points[p1y])
-					setters[ty_](select(2, reflect_point_distance(points[p2x], points[p2y], points[p1x], points[p1y], tclen)))
-					path[clen] = distance(points[p2x], points[p2y], points[p1x], points[p1y])
-				end))
+				local move_tip = mutex(function()
+					if tclen_ then
+						local tlen = path[tclen_]
+						local x, y = reflect_point_distance(points[psx], points[psy], points[p1x], points[p1y], tlen)
+						setters[tx_](x)
+						setters[ty_](y)
+					else
+						local tlen = distance(points[tx_], points[ty_], points[p1x], points[p1y])
+						local x, y = reflect_point_distance(points[psx], points[psy], points[p1x], points[p1y], tlen)
+						setters[tx_](x)
+						setters[ty_](y)
+					end
+				end)
+				chain(psx, move_tip)
+				chain(psy, move_tip)
 
 				--moving the tangent tip moves the virtual control point
-				chain(tx, mutex(function(v)
-					setters[p2x]((reflect_point_distance(points[tx_], points[ty_], points[p1x], points[p1y], path[clen])))
-				end))
-				chain(ty, mutex(function(v)
-					setters[p2y](select(2, reflect_point_distance(points[tx_], points[ty_], points[p1x], points[p1y], path[clen])))
-				end))
+				local move_vpoint = mutex(function()
+					local x, y = reflect_point_distance(points[tx_], points[ty_], points[p1x], points[p1y], path[clen])
+					setters[psx](x)
+					setters[psy](y)
+				end)
+				chain(tx, move_vpoint)
+				chain(ty, move_vpoint)
 
-				--endpoint carries control point
-				chain(p3x, function(v) setters[p2x](points[p2x] + dx) end)
-				chain(p3y, function(v) setters[p2y](points[p2y] + dy) end)
+				--second endpoint carries control point
+				if kind == 'quad' then
+					move_delta(p3x, p3y, psx, psy)
+				end
 			else
 				--if the tangent tip is missing, the first endpoint serves as tangent tip.
-				p2x, p2y = p1x, p1y
+				psx, psy = p1x, p1y
+			end
+
+			--second endpoint carries second control point
+			if kind == 'cubic' then
+				move_delta(p4x, p4y, p3x, p3y)
 			end
 
 			--advance the state
-			cpx, cpy = p3x, p3y
-			tkind, tx, ty, tclen = 'quad', p2x, p2y, clen
+			if kind == 'quad' then
+				cpx, cpy = p3x, p3y
+				tkind, tx, ty, tclen = kind, psx, psy--, clen
+			else
+				cpx, cpy = p4x, p4y
+				tkind, tx, ty, tclen = kind, p3x, p3y--, clen
+			end
 
-		elseif s == 'smooth_curve' or s == 'rel_smooth_curve' then
+		elseif s == 'arc' or s == 'line_arc' or s == 'elliptic_arc' or s == 'line_elliptic_arc' then
 
 			local p1x, p1y = cpx, cpy
-			local clen, c3x, c3y, c4x, c4y = i+1, i+2, i+3, i+4, i+5
-
-			local p3x, p3y
-			if s == 'smooth_curve' then
-				p3x, p3y = pt(path[c3x], path[c3y])
-				p4x, p4y = pt(path[c4x], path[c4y])
-
-				--points update their representation in path
-				chain(p3x, function(v) path[c3x] = points[p3x] end)
-				chain(p3y, function(v) path[c3y] = points[p3y] end)
-				chain(p4x, function(v) path[c4x] = points[p4x] end)
-				chain(p4y, function(v) path[c4y] = points[p4y] end)
+			local ccx, ccy, crx, cry, cstart_angle, csweep_angle, crotation
+			if s:match'elliptic' then
+				ccx, ccy, crx, cry, cstart_angle, csweep_angle, crotation = i+1, i+2, i+3, i+4, i+5, i+6, i+7
 			else
-				p3x, p3y = pt(points[p1x] + path[c3x], points[p1y] + path[c3y])
-				p4x, p4y = pt(points[p1x] + path[c4x], points[p1y] + path[c4y])
-
-				local set_c3x = function(v) path[c3x] = points[p3x] - points[p1x] end
-				local set_c3y = function(v) path[c3y] = points[p3y] - points[p1y] end
-				local set_c4x = function(v) path[c4x] = points[p4x] - points[p1x] end
-				local set_c4y = function(v) path[c4y] = points[p4y] - points[p1y] end
-
-				--points update their representation in path
-				chain(p3x, set_c3x)
-				chain(p3y, set_c3y)
-				chain(p4x, set_c4x)
-				chain(p4y, set_c4y)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_c3x)
-				chain(p1y, set_c3y)
-				chain(p1x, set_c4x)
-				chain(p1y, set_c4y)
+				ccx, ccy, crx, cry, cstart_angle, csweep_angle = i+1, i+2, i+3, i+3, i+4, i+5
 			end
+			local pcx, pcy = path_pt(ccx, ccy, rel, cpx, cpy)
 
-			local p2x, p2y
-			if tkind then
-				p2x, p2y = pt(reflect_point_distance(points[tx], points[ty], points[p1x], points[p1y], path[clen]))
-				local tx_, ty_ = tx, ty
-				local mutex = new_mutex()
-
-				--moving the virtual control point moves the tangent tip
-				chain(p2x, mutex(function(v)
-					local tclen = tclen and points[tclen] or distance(points[tx_], points[ty_], points[p1x], points[p1y])
-					setters[tx_]((reflect_point_distance(points[p2x], points[p2y], points[p1x], points[p1y], tclen)))
-					path[clen] = distance(points[p2x], points[p2y], points[p1x], points[p1y])
-				end))
-				chain(p2y, mutex(function(v)
-					local tclen = tclen and points[tclen] or distance(points[tx_], points[ty_], points[p1x], points[p1y])
-					setters[ty_](select(2, reflect_point_distance(points[p2x], points[p2y], points[p1x], points[p1y], tclen)))
-					path[clen] = distance(points[p2x], points[p2y], points[p1x], points[p1y])
-				end))
-
-				--moving the tangent tip moves the virtual control point
-				chain(tx, mutex(function(v)
-					setters[p2x]((reflect_point_distance(points[tx_], points[ty_], points[p1x], points[p1y], path[clen])))
-				end))
-				chain(ty, mutex(function(v)
-					setters[p2y](select(2, reflect_point_distance(points[tx_], points[ty_], points[p1x], points[p1y], path[clen])))
-				end))
-
-				--second endpoint carries second control point
-				chain(p4x, function(v) setters[p3x](points[p3x] + dx) end)
-				chain(p4y, function(v) setters[p3y](points[p3y] + dy) end)
-			else
-				--if the tangent tip is missing, the first endpoint serves as tangent tip.
-				p2x, p2y = p1x, p1y
+			--find arc's endpoints and create points for them
+			local px1, py1 = pt(0, 0)
+			local px2, py2 = pt(0, 0)
+			local function set_endpoints()
+				local cx, cy = points[pcx], points[pcy]
+				local rx, ry, start_angle, sweep_angle = path[crx], path[cry], path[cstart_angle], path[csweep_angle]
+				local rotation = crotation and path[crotation]
+				local x1, y1, x2, y2 = elliptic_arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation)
+				points[px1] = x1
+				points[py1] = y1
+				points[px2] = x2
+				points[py2] = y2
 			end
+			set_endpoints()
 
-			--advance the state
-			cpx, cpy = p4x, p4y
-			tkind, tx, ty, tclen = 'cubic', p3x, p3y, clen
+			--center carries the rest of the points
+			move_delta(pcx, pcy, px1, py1)
+			move_delta(pcx, pcy, px2, py2)
 
-		elseif s == 'arc' or s == 'rel_arc' or s == 'line_arc' or s == 'rel_line_arc' then
-
-			local rel = s:match'^rel_'
-			local p1x, p1y = cpx, cpy
-			local ccx, ccy, cr, cstart_angle, csweep_angle = i+1, i+2, i+3, i+4, i+5
-
-			local cx, cy, r, start_angle, sweep_angle = path[ccx], path[ccy], path[cr], path[cstart_angle], path[csweep_angle]
-			if rel then
-				cx = points[p1x] + cx
-				cy = points[p1y] + cy
+			--endpoints move angles
+			local function move_angles()
+				local a1 = point_angle(points[px1], points[py1], points[pcx], points[pcy])
+				local a2 = point_angle(points[px2], points[py2], points[pcx], points[pcy])
+				path[cstart_angle] = a1
+				path[csweep_angle] = a2 - a1
+				set_endpoints()
 			end
-			local x1, y1, x2, y2 = elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle)
-
-			local pcx, pcy = pt(cx, cy)
-			local px1, py1 = pt(x1, y1)
-			local px2, py2 = pt(x2, y2)
-
-			if not rel then
-				--center point updates its representation in path
-				chain(pcx, function(v) path[ccx] = points[pcx] end)
-				chain(pcy, function(v) path[ccy] = points[pcy] end)
-			else
-				local function set_ccx(v) path[ccx] = points[pcx] - points[p1x] end
-				local function set_ccy(v) path[ccy] = points[pcy] - points[p1y] end
-
-				--center point updates its representation in path
-				chain(pcx, set_ccx)
-				chain(pcy, set_ccy)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_ccx)
-				chain(p1y, set_ccy)
-			end
-
-			--center carries other points
-			chain(pcx, function(v) setters[px1](points[px1] + dx) end)
-			chain(pcy, function(v) setters[py1](points[py1] + dy) end)
-			chain(pcx, function(v) setters[px2](points[px2] + dx) end)
-			chain(pcy, function(v) setters[py2](points[py2] + dy) end)
+			chain(px1, move_angles)
+			chain(py1, move_angles)
+			chain(px2, move_angles)
+			chain(py2, move_angles)
 
 			--advance the state
 			spx, spy, cpx, cpy = px1, py1, px2, py2
 			tkind = nil
 
-		elseif s == 'elliptic_arc' or s == 'rel_elliptic_arc' or s == 'line_elliptic_arc' or s == 'rel_line_elliptic_arc' then
+		elseif s == 'svgarc' then
 
-			local rel = s:match'^rel_'
-			local p1x, p1y = cpx, cpy
-			local ccx, ccy, crx, cry, cstart_angle, csweep_angle, crotation = i+1, i+2, i+3, i+4, i+5, i+6, i+7
-
-			local cx, cy, rx, ry, start_angle, sweep_angle, rotation =
-				path[ccx], path[ccy], path[crx], path[cry], path[cstart_angle], path[csweep_angle], path[crotation]
-			if rel then
-				cx = points[p1x] + cx
-				cy = points[p1y] + cy
-			end
-			local x1, y1, x2, y2 = elliptic_arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation)
-
-			local pcx, pcy = pt(cx, cy)
-			local px1, py1 = pt(x1, y1)
-			local px2, py2 = pt(x2, y2)
-
-			if not rel then
-				--center point updates its representation in path
-				chain(pcx, function(v) path[ccx] = points[pcx] end)
-				chain(pcy, function(v) path[ccy] = points[pcy] end)
-			else
-				local function set_ccx(v) path[ccx] = points[pcx] - points[p1x] end
-				local function set_ccy(v) path[ccy] = points[pcy] - points[p1y] end
-
-				--center point updates its representation in path
-				chain(pcx, set_ccx)
-				chain(pcy, set_ccy)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(p1x, set_ccx)
-				chain(p1y, set_ccy)
-			end
-
-			--center carries other points
-			chain(pcx, function(v) setters[px1](points[px1] + dx) end)
-			chain(pcy, function(v) setters[py1](points[py1] + dy) end)
-			chain(pcx, function(v) setters[px2](points[px2] + dx) end)
-			chain(pcy, function(v) setters[py2](points[py2] + dy) end)
-
-			--advance the state
-			spx, spy, cpx, cpy = px1, py1, px2, py2
-			tkind = nil
-
-		elseif s == 'svgarc' or s == 'rel_svgarc' then
-
-			local rel = s:match'^rel_'
 			local px1, py1 = cpx, cpy
 			local crx, cry, crotation, clarge_arc_flag, csweep_flag, cx2, cy2 = i+1, i+2, i+3, i+4, i+5, i+6, i+7
-
-			local px2, py2
-			if not rel then
-				px2, py2 = pt(path[cx2], path[cy2])
-
-				--endpoint updates its representation in path
-				chain(px2, function(v) path[cx2] = points[px2] end)
-				chain(py2, function(v) path[cy2] = points[py2] end)
-			else
-				px2, py2 = pt(path[cx2] + points[px1], path[cy2] + points[py1])
-
-				local function set_cx2(v) path[cx2] = points[px2] - points[px1] end
-				local function set_cy2(v) path[cy2] = points[py2] - points[py1] end
-
-				--endpoint updates its representation in path
-				chain(px2, set_cx2)
-				chain(py2, set_cy2)
-
-				--current point updates relative points in path so as to preserve their absolute position
-				chain(px1, set_cx2)
-				chain(py1, set_cy2)
-			end
+			local px2, py2 = path_pt(cx2, cy2, rel, cpx, cpy)
 
 			--convert to elliptic arc for getting the center and radii points
 			local x1, y1 = points[px1], points[py1]
@@ -775,18 +529,20 @@ local function control_points(path)
 				local pcx, pcy = pt(cx, cy)
 				local prxx, prxy = pt(point_at( 0, cx, cy, rx, ry, rotation))
 				local pryx, pryy = pt(point_at(90, cx, cy, rx, ry, rotation))
+				local prxx1, prxy1 = pt(point_at(180, cx, cy, path[crx], path[cry], rotation))
+				local pryx1, pryy1 = pt(point_at(270, cx, cy, path[crx], path[cry], rotation))
 
-				--end points update center and radii points
+				--end points update ellipse points
 				local function set_pts()
 					local cx, cy, rx, ry, start_angle, sweep_angle, rotation =
 						svgarc_to_elliptic_arc(points[px1], points[py1], path[crx], path[cry], path[crotation],
 														path[clarge_arc_flag], path[csweep_flag], points[px2], points[py2])
-
-					local a1 = 0  --start_angle < 90 and  0 or 180
-					local a2 = 90 --start_angle < 90 and 90 or 270
-					points[prxx], points[prxy] = point_at(a1, cx, cy, rx, ry, rotation)
-					points[pryx], points[pryy] = point_at(a2, cx, cy, rx, ry, rotation)
-					points[pcx], points[pcy] = cx, cy
+					points[pcx] = cx
+					points[pcy] = cy
+					points[prxx], points[prxy] = point_at(0, cx, cy, rx, ry, rotation)
+					points[pryx], points[pryy] = point_at(90, cx, cy, rx, ry, rotation)
+					points[prxx1], points[prxy1] = point_at(180, cx, cy, path[crx], path[cry], rotation)
+					points[pryx1], points[pryy1] = point_at(270, cx, cy, path[crx], path[cry], rotation)
 				end
 				chain(px2, set_pts)
 				chain(py2, set_pts)
@@ -799,28 +555,43 @@ local function control_points(path)
 				chain(pcx, function(v) setters[px2](points[px2] + dx) end)
 				chain(pcy, function(v) setters[py2](points[py2] + dy) end)
 
-				--radii points update radii
-				chain(prxx, function(v) ; set_pts() end)
-				chain(prxy, function(v) ; set_pts() end)
+				--rotation points update rotation and ellipse points
+				local function rotate_around_rx()
+					path[crotation] = point_angle(points[prxx], points[prxy], points[pcx], points[pcy])
+					set_pts()
+				end
+				local function rotate_around_ry()
+					path[crotation] = point_angle(points[pryx], points[pryy], points[pcx], points[pcy]) - 90
+					set_pts()
+				end
+				chain(prxx, rotate_around_rx)
+				chain(prxy, rotate_around_rx)
+				chain(pryx, rotate_around_ry)
+				chain(pryy, rotate_around_ry)
+
+				--radii points update radii and ellipse points
+				local function set_radii()
+					path[crx] = distance(points[prxx1], points[prxy1], points[pcx], points[pcy])
+					path[cry] = distance(points[pryx1], points[pryy1], points[pcx], points[pcy])
+					set_pts()
+				end
+				chain(prxx1, set_radii)
+				chain(prxy1, set_radii)
+				chain(pryx1, set_radii)
+				chain(pryy1, set_radii)
 			end
 
 			--advance the state
 			cpx, cpy = px2, py2
 			tkind = nil
 
-		elseif s == 'arc_3p' or s == 'rel_arc_3p' then
+		elseif s == 'arc_3p' then
 
 			local px1, py1 = cpx, cpy
 			local cxp, cyp, cx2, cy2 = i+1, i+2, i+3, i+4
 
-			local pxp, pyp, px2, py2
-			if s == 'arc_3p' then
-				pxp, pyp = pt(path[cxp], path[cyp])
-				px2, py2 = pt(path[cx2], path[cy2])
-			else
-				pxp, pyp = pt(path[cxp] + points[px1], path[cyp] + points[px1])
-				px2, py2 = pt(path[cx2] + points[px1], path[cy2] + points[py1])
-			end
+			local pxp, pyp = path_pt(cxp, cyp, rel, cpx, cpy)
+			local px2, py2 = path_pt(cx2, cy2, rel, cpx, cpy)
 
 			--advance the state
 			cpx, cpy = px2, py2
@@ -838,28 +609,32 @@ local function control_points(path)
 	return points, update
 end
 
-local points, update = control_points(path)
+local mt = affine2d()--:translate(100, 0):rotate(10):scale(1, .7)
+local invmt = mt:inverse()
+local points, update = control_points(path, mt)
 
 local drag_i
-
+local i = 0
 function player:on_render(cr)
 	local draw = path_cairo(cr)
 	cr:set_source_rgb(0,0,0)
 	cr:paint()
 
-	draw(path)
+	draw(path, mt)
 	cr:set_source_rgb(1,1,1)
 	cr:stroke()
 
 	for i=1,#points,2 do
 		local x,y = points[i], points[i+1]
+		x,y = mt(x,y)
 		cr:rectangle(x-3,y-3,6,6)
 		cr:set_source_rgb(1,1,0)
 		cr:fill()
 	end
 
 	for i=1,#points,2 do
-		local x,y = points[i], points[i+1]
+		local x, y = points[i], points[i+1]
+		x,y = mt(x,y)
 		if not drag_i and self.mouse_buttons.lbutton then
 			if self:dragging(x, y, 3) then
 				drag_i = i
@@ -869,7 +644,9 @@ function player:on_render(cr)
 		end
 	end
 	if drag_i then
-		update(drag_i, self.mouse_x, self.mouse_y)
+		local mx, my = self.mouse_x, self.mouse_y
+		mx, my = invmt(mx, my)
+		update(drag_i, mx, my)
 	end
 end
 

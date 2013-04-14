@@ -15,6 +15,7 @@ local abs, min, max, sqrt, ceil, sin, cos, radians =
 	math.abs, math.min, math.max, math.sqrt, math.ceil, math.sin, math.cos, math.rad
 
 local angle_epsilon = 1e-10
+local max_radii = 1e2
 
 --observed sweep: an arc's sweep can be larger than 360deg but we can only render the first -360..360deg of it.
 local function observed_sweep(sweep_angle)
@@ -140,6 +141,7 @@ local function to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotat
 	local segments = ceil(abs(sweep_angle / segment_max_sweep))
 	local segment_sweep = sweep_angle / segments
 	local end_angle = start_angle + sweep_angle - segment_sweep / 2
+
 	for angle = start_angle, end_angle, segment_sweep do
 		local bx2, by2, bx3, by3, bx4, by4 = segment(cx, cy, rx, ry, angle, segment_sweep)
 		if rotation ~= 0 then
