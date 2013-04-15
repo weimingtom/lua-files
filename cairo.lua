@@ -335,9 +335,10 @@ function M.cairo_circle(cr, cx, cy, r)
 	cr:close_path()
 end
 
-function M.cairo_ellipse(cr, cx, cy, rx, ry)
+function M.cairo_ellipse(cr, cx, cy, rx, ry, rotation)
 	local mt = cr:get_matrix()
 	cr:translate(cx, cy)
+	if rotation then cr:rotate(rotation) end
 	cr:scale(1, ry/rx)
 	cr:circle(0, 0, rx)
 	cr:set_matrix(mt)

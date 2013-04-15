@@ -61,11 +61,11 @@ function player:on_render(cr)
 
 	cr:translate(-1000, 300)
 	local s = math.sin(i/20)
-	shapes.superformula_to_lines(write, 0, 0, 10, 300, 1, 1, 6+math.floor(s*3), 1, 7, 8); cr:stroke()
-	shapes.superformula_to_lines(write, 200, 0, 100, 300, 1, 1, 6, 20+s*10, 7, 18); cr:stroke()
-	shapes.superformula_to_lines(write, 500, 0, 100, 300, 1, 1, 8, 1, 1, 8+s); cr:stroke()
-	shapes.superformula_to_lines(write, 800, 0, 50, 300, 1, 1, 5, 2+s/2, 6, 6); cr:stroke()
-	shapes.superformula_to_lines(write, 1100, 0, 50, 300, 1.5, .5, 4+s*4, 4+s, 7, 7); cr:stroke()
+	shapes.superformula_to_lines(write, 0, 0, 10, 300, 30, 1, 1, 6+math.floor(s*3), 1, 7, 8); cr:stroke()
+	shapes.superformula_to_lines(write, 200, 0, 100, 300, 30, 1, 1, 6, 20+s*10, 7, 18); cr:stroke()
+	shapes.superformula_to_lines(write, 500, 0, 100, 300, 30, 1, 1, 8, 1, 1, 8+s); cr:stroke()
+	shapes.superformula_to_lines(write, 800, 0, 50, 300, 30, 1, 1, 5, 2+s/2, 6, 6); cr:stroke()
+	shapes.superformula_to_lines(write, 1100, 0, 50, 300, 30, 1.5, .5, 4+s*4, 4+s, 7, 7); cr:stroke()
 end
 
 player:play()

@@ -68,6 +68,35 @@ local function point(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, 
 	return point_at(start_angle + t * sweep_angle, cx, cy, rx, ry, rotation, mt)
 end
 
+--tangent vector on elliptic arc at time t based on http://content.gpwiki.org/index.php/Tangents_To_Circles_And_Ellipses.
+local function tangent_vector(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+	rx, ry = abs(rx), abs(ry)
+	local px, py
+	if t == 1 and x2 then
+		px, py = x2, y2
+	else
+		local a = radians(start_angle + t * sweep_angle)
+		--px,py is the point at time t on the origin-centered, unrotated ellipse (0, 0, rx, ry, 0).
+		px = cos(a) * rx
+		py = sin(a) * ry
+	end
+	--tx,ty is the tip point of the tangent vector at angle a.
+	local tx = px - rx * py / ry
+	local ty = py + ry * px / rx
+	--now translate the points to origin, and rotate and transform them as needed.
+	px, py = cx + px, cy + py
+	tx, ty = cx + tx, cy + ty
+	if rotation and rotation ~= 0 then
+		px, py = rotate_point(px, py, cx, cy, rotation)
+		tx, ty = rotate_point(tx, ty, cx, cy, rotation)
+	end
+	if mt then
+		px, py = mt(px, py)
+		tx, ty = mt(tx, ty)
+	end
+	return px, py, tx, ty
+end
+
 local function endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 	local x1, y1 = point_at(start_angle, cx, cy, rx, ry, rotation, mt)
 	if not x2 then
@@ -222,6 +251,7 @@ return {
 	to_svgarc = to_svgarc,
 	best_segment_max_sweep = best_segment_max_sweep,
 	point_at = point_at,
+	tangent_vector = tangent_vector,
 	--path API
 	to_bezier3 = to_bezier3,
 	point = point,

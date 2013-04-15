@@ -227,16 +227,17 @@ local function formula_to_lines(write, formula, steps, ...)
 end
 
 --http://en.wikipedia.org/wiki/Superformula
-local function superformula(t, cx, cy, size, a, b, m, n1, n2, n3)
+local function superformula(t, cx, cy, size, rotation, a, b, m, n1, n2, n3)
 	local f = t*2*pi
 	local r = (abs(cos(m*f/4)/a)^n2 + abs(sin(m*f/4)/b)^n3)^(-1/n1)
+	f = f + radians(rotation)
 	return
 		cx + r * cos(f) * size,
 		cy + r * sin(f) * size
 end
 
-local function superformula_to_lines(write, cx, cy, size, steps, a, b, m, n1, n2, n3)
-	formula_to_lines(write, superformula, steps, cx, cy, size, a, b, m, n1, n2, n3)
+local function superformula_to_lines(write, cx, cy, size, steps, rotation, a, b, m, n1, n2, n3)
+	formula_to_lines(write, superformula, steps, cx, cy, size, rotation, a, b, m, n1, n2, n3)
 end
 
 if not ... then require'path_shapes_demo' end

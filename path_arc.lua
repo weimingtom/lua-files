@@ -7,11 +7,12 @@ local rotate_point = require'path_point'.rotate_point
 local point_angle  = require'path_point'.point_angle
 local distance2    = require'path_point'.distance2
 
-local observed_sweep           = require'path_elliptic_arc'.observed_sweep
-local is_sweeped               = require'path_elliptic_arc'.is_sweeped
-local sweep_time               = require'path_elliptic_arc'.sweep_time
-local elliptic_arc_endpoints   = require'path_elliptic_arc'.endpoints
-local elliptic_arc_to_bezier3  = require'path_elliptic_arc'.to_bezier3
+local observed_sweep              = require'path_elliptic_arc'.observed_sweep
+local is_sweeped                  = require'path_elliptic_arc'.is_sweeped
+local sweep_time                  = require'path_elliptic_arc'.sweep_time
+local elliptic_arc_endpoints      = require'path_elliptic_arc'.endpoints
+local elliptic_arc_to_bezier3     = require'path_elliptic_arc'.to_bezier3
+local elliptic_arc_tangent_vector = require'path_elliptic_arc'.tangent_vector
 
 local abs, min, max, radians = math.abs, math.min, math.max, math.rad
 
@@ -62,6 +63,12 @@ local function point(t, cx, cy, r, start_angle, sweep_angle)
 	return point_around(cx, cy, abs(r), start_angle + t * sweep_angle)
 end
 
+--tangent point and angle at time t.
+--TODO: reimplement this using a simpler formula?
+local function tangent_vector(t, cx, cy, r, start_angle, sweep_angle, x2, y2)
+	return elliptic_arc_tangent_vector(t, cx, cy, r, r, start_angle, sweep_angle, nil, x2, y2)
+end
+
 --length of circular arc at time t.
 local function length(t, cx, cy, r, start_angle, sweep_angle)
 	return abs(t * radians(sweep_angle) * r)
@@ -109,6 +116,7 @@ return {
 	endpoints = endpoints,
 	smooth_point = smooth_point,
 	to_arc_3p = to_arc_3p,
+	tangent_vector = tangent_vector,
 	--path API
 	to_bezier3 = to_bezier3,
 	bounding_box = bounding_box,

@@ -5,6 +5,16 @@
 
 local glue = require'glue'
 
+local reflect_point                = require'path_point'.reflect_point
+local reflect_point_distance       = require'path_point'.reflect_point_distance
+local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
+local arc_tangent_vector           = require'path_arc'.tangent_vector
+local elliptic_arc_endpoints       = require'path_elliptic_arc'.endpoints
+local elliptic_arc_tangent_vector  = require'path_elliptic_arc'.tangent_vector
+local svgarc_to_elliptic_arc       = require'path_svgarc'.to_elliptic_arc
+local arc3p_to_arc                 = require'path_arc_3p'.to_arc
+local circle_3p_to_circle          = require'path_circle_3p'.to_circle
+
 local assert, unpack, select =
 	   assert, unpack, select
 
@@ -42,7 +52,7 @@ local argc = {
 	star = 6,                       --cx, cy, x1, y1, r2, n
 	star_2p = 7,                    --cx, cy, x1, y1, x2, y2, n
 	rpoly = 5,                      --cx, cy, x1, y1, n
-	superformula = 10,              --cx, cy, size, steps, a, b, m, n1, n2, n3
+	superformula = 11,              --cx, cy, size, steps, rotation, a, b, m, n1, n2, n3
 	--text
 	text = 4,                       --x, y, {[family=s], [size=n]}, text
 }
@@ -259,8 +269,6 @@ end
 
 --path command decoding: advancing the current point ---------------------------------------------------------------------
 
-local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
-
 --given current command in abs. form and current cp info, return the cp info of the next path command.
 --cpx, cpy is the next "current point" or pen point, needed by all relative commands and by most other commands.
 --spx, spy is the starting point of the current subpath, needed by the "close" command.
@@ -328,13 +336,10 @@ end
 
 --path command decoding: computing the tangent vector at command endpoint ------------------------------------------------
 
-local reflect_point = require'path_point'.reflect_point
-local reflect_point_distance = require'path_point'.reflect_point_distance
-local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
-
 --given current command in abs. form and current control point, return the tip of the tangent vector at command endpoint.
 --tkind is 'quad', 'cubic' or 'tangent'. a symm_curve can only use a cubic tip, a symm_quad_curve can only use a quad tip.
 --smooth curves can use any kind of tip as they only use the angle and ignore the length of the vector.
+--all (and only) commands that leave a current point leave a tangent point.
 local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	if s == 'line' then
 		return 'tangent', cpx, cpy
@@ -357,13 +362,25 @@ local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	elseif s == 'smooth_quad_curve' then
 		return 'quad', reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
 	elseif s == 'arc' or s == 'line_arc' then
-		--TODO: compute a 'tangent' tip for arcs too, why not?
+		return 'tangent', select(3, arc_tangent_vector(1, ...))
 	elseif s == 'elliptic_arc' or s == 'line_elliptic_arc' then
-		--TODO: compute a 'tangent' tip for arcs too, why not?
+		return 'tangent', select(3, elliptic_arc_tangent_vector(1, ...))
 	elseif s == 'svgarc' then
-		--TODO: compute a 'tangent' tip for arcs too, why not?
+		local cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2 = svgarc_to_elliptic_arc(cpx, cpy, ...)
+		if not cx then --invalid parametrization, arc is a line
+			return 'tangent', cpx, cpy
+		else
+			return 'tangent', select(3, elliptic_arc_tangent_vector(1,
+													cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2))
+		end
 	elseif s == 'arc_3p' then
-		--TODO: compute a 'tangent' tip for arcs too, why not?
+		local xp, yp, x2, y2 = ...
+		local cx, cy, r, start_angle, sweep_angle = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
+		if not cx then --invalid parametrization, arc is a line
+			return 'tangent', cpx, cpy
+		else
+			return 'tangent', select(3, arc_tangent_vector(1, cx, cy, r, start_angle, sweep_angle, x2, y2))
+		end
 	end
 end
 
@@ -410,10 +427,6 @@ local function to_cusp(cpx, cpy, tkind, tx, ty, s, ...)
 		return s, ...
 	end
 end
-
-local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
-local arc3p_to_arc = require'path_arc_3p'.to_arc
-local circle_3p_to_circle = require'path_circle_3p'.to_circle
 
 --given a command in abs. form and current state, return the command in canonical context-free form,
 --adding the current point, removing line, curve and arc variations, and dealing with invalid parametrization.
