@@ -7,6 +7,8 @@ local fps = require'fps_function'(2)
 local main = winapi.Window{
 	autoquit = true,
 	visible = false,
+	w = 1366, --settle on typical laptop resolution for demos
+	h = 768,
 	--state = 'maximized',
 	title = 'CairoPanel Player',
 }
@@ -89,9 +91,9 @@ panel.on_mouse_wheel = panel.on_mouse_move
 panel.on_mouse_hwheel = panel.on_mouse_move
 
 function panel.on_key_down(vk, flags)
-	self.key_code = vk
-	self.key_flags = flags
-	self:invalidate()
+	player.key_code = vk
+	player.key_flags = flags
+	panel:invalidate()
 end
 
 panel.on_key_up = panel.on_key_down
@@ -99,9 +101,9 @@ panel.on_syskey_down = panel.on_key_down
 panel.on_syskey_up = panel.on_key_down
 
 function panel.on_key_down_char(char, flags)
-	self.key_char = char
-	self.key_flags = flags
-	self:invalidate()
+	player.key_char = char
+	player.key_flags = flags
+	panel:invalidate()
 end
 
 panel.on_syskey_down_char = panel.on_key_down_char

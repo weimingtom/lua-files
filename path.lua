@@ -272,6 +272,7 @@ end
 --given current command in abs. form and current cp info, return the cp info of the next path command.
 --cpx, cpy is the next "current point" or pen point, needed by all relative commands and by most other commands.
 --spx, spy is the starting point of the current subpath, needed by the "close" command.
+--note: closed composite shapes don't change the current point.
 local function next_cp(cpx, cpy, spx, spy, s, ...)
 	if s == 'move' then
 		cpx, cpy = ...
@@ -312,8 +313,6 @@ local function next_cp(cpx, cpy, spx, spy, s, ...)
 		cpx, cpy = select(3, ...)
 	elseif s == 'svgarc' then
 		cpx, cpy = select(6, ...)
-	else --closed composite shapes cannot be continued from
-		cpx, cpy, spx, spy = nil
 	end
 	return cpx, cpy, spx, spy
 end
@@ -338,8 +337,10 @@ end
 
 --given current command in abs. form and current control point, return the tip of the tangent vector at command endpoint.
 --tkind is 'quad', 'cubic' or 'tangent'. a symm_curve can only use a cubic tip, a symm_quad_curve can only use a quad tip.
---smooth curves can use any kind of tip as they only use the angle and ignore the length of the vector.
---all (and only) commands that leave a current point leave a tangent point.
+--smooth curves can use any kind of tip as they only use the vector's angle, neverminding its length.
+--all (and only) commands that leave a current point leave a tangent point, except 'move'.
+--TODO: svgarc_to_elliptic_arc() is expensive and yet it's called twice, once in tangent_tip() then again in
+--			context_free_cmd(). find a nice way to reuse the results instead of calling it twice.
 local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	if s == 'line' then
 		return 'tangent', cpx, cpy
@@ -375,7 +376,7 @@ local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 		end
 	elseif s == 'arc_3p' then
 		local xp, yp, x2, y2 = ...
-		local cx, cy, r, start_angle, sweep_angle = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
+		local cx, cy, r, start_angle, sweep_angle, x2, y2 = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
 		if not cx then --invalid parametrization, arc is a line
 			return 'tangent', cpx, cpy
 		else
@@ -393,6 +394,7 @@ local function next_state(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 end
 
 --return the state of the path command at an arbitrary command index.
+--TODO: avoid calling tangent_tip() if current cmd is *svgarc and next cmd is not *smooth_*.
 local function state_at(path, target_index)
 	local cpx, cpy, spx, spy, tkind, tx, ty
 	for i,s in commands(path) do
@@ -409,7 +411,7 @@ end
 
 --path command decoding: state + command = context-free command ----------------------------------------------------------
 
---given current state and an abs. cmd, if it's a smooth or symm. curve, return it as a cusp curve.
+--given current state and an abs. cmd, if it's a smooth or symm. curve, return it as a cusp curve, decontextualizing it.
 local function to_cusp(cpx, cpy, tkind, tx, ty, s, ...)
 	if s == 'symm_curve' then
 		local x2, y2 = reflect_point(tkind == 'cubic' and tx or cpx, tkind == 'cubic' and ty or cpy, cpx, cpy)
@@ -612,7 +614,7 @@ function simplify.rect(write, mt, x1, y1, w, h)
 	rect_to_lines(write, x1, y1, w, h, mt)
 end
 
---these shapes can draw themselves but can't transform themselves so we must write custom simplify for them.
+--these shapes can draw themselves but can't transform themselves so we must write custom simplifiers for them.
 --shapes can draw themselves using only primitive commands, starting in an empty state.
 --the ability to draw composites using arbitrary path commands can be enabled in the code below (see comments).
 local simplify_no_transform = {
@@ -1365,7 +1367,7 @@ return {
 	abs_cmd = abs_cmd,
 	next_cp = next_cp,
 	cp_at = cp_at,
-	next_smooth_points = next_smooth_points,
+	tangent_tip = tangent_tip,
 	next_state = next_state,
 	state_at = state_at,
 	context_free_cmd = context_free_cmd,

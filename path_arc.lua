@@ -66,7 +66,7 @@ end
 --tangent point and angle at time t.
 --TODO: reimplement this using a simpler formula?
 local function tangent_vector(t, cx, cy, r, start_angle, sweep_angle, x2, y2)
-	return elliptic_arc_tangent_vector(t, cx, cy, r, r, start_angle, sweep_angle, nil, x2, y2)
+	return elliptic_arc_tangent_vector(t, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2)
 end
 
 --length of circular arc at time t.

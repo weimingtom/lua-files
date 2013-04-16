@@ -6,8 +6,9 @@
 --mt is an affine transform that applies to the resulted segments.
 --segment_max_sweep is for limiting the arc portion that each bezier segment can cover and is computed automatically.
 
-local rotate_point = require'path_point'.rotate_point
-local hypot        = require'path_point'.hypot
+local reflect_point = require'path_point'.reflect_point
+local rotate_point  = require'path_point'.rotate_point
+local hypot         = require'path_point'.hypot
 local line_to_bezier3 = require'path_line'.to_bezier3
 local bezier3_hit = require'path_bezier3_hit'
 
@@ -50,8 +51,8 @@ end
 --evaluate ellipse at angle a.
 local function point_at(a, cx, cy, rx, ry, rotation, mt)
 	rx, ry = abs(rx), abs(ry)
-	rotation = rotation or 0
 	a = radians(a)
+	rotation = rotation or 0
 	local x = cx + cos(a) * rx
 	local y = cy + sin(a) * ry
 	if rotation ~= 0 then
@@ -69,26 +70,27 @@ local function point(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, 
 end
 
 --tangent vector on elliptic arc at time t based on http://content.gpwiki.org/index.php/Tangents_To_Circles_And_Ellipses.
+--the vector is always oriented towards the sweep of the arc.
 local function tangent_vector(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 	rx, ry = abs(rx), abs(ry)
-	local px, py
-	if t == 1 and x2 then
-		px, py = x2, y2
-	else
-		local a = radians(start_angle + t * sweep_angle)
-		--px,py is the point at time t on the origin-centered, unrotated ellipse (0, 0, rx, ry, 0).
-		px = cos(a) * rx
-		py = sin(a) * ry
+	rotation = rotation or 0
+	local a = radians(start_angle + t * sweep_angle)
+	--px,py is the point at time t on the origin-centered, unrotated ellipse (0, 0, rx, ry, 0).
+	local px = cos(a) * rx
+	local py = sin(a) * ry
+	--tx,ty is the tip point of the tangent vector at angle a, oriented towards the sweep.
+	local sign = sweep_angle >= 0 and 1 or -1
+	local tx = px + sign * rx * py / ry
+	local ty = py - sign * ry * px / rx
+	--now rotate, translate to origin, and transform the points as needed.
+	if rotation ~= 0 then
+		px, py = rotate_point(px, py, 0, 0, rotation)
+		tx, ty = rotate_point(tx, ty, 0, 0, rotation)
 	end
-	--tx,ty is the tip point of the tangent vector at angle a.
-	local tx = px - rx * py / ry
-	local ty = py + ry * px / rx
-	--now translate the points to origin, and rotate and transform them as needed.
 	px, py = cx + px, cy + py
 	tx, ty = cx + tx, cy + ty
-	if rotation and rotation ~= 0 then
-		px, py = rotate_point(px, py, cx, cy, rotation)
-		tx, ty = rotate_point(tx, ty, cx, cy, rotation)
+	if t == 1 and x2 then
+		px, py = x2, y2
 	end
 	if mt then
 		px, py = mt(px, py)
