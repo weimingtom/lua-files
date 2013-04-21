@@ -159,6 +159,10 @@ getmetatable''.__mod = function(s,v)
 	end
 end
 
+local function iterate_once(s, s1)
+	return s1 == nil and s or nil
+end
+
 function glue.string.gsplit(s, sep, start, plain)
 	start = start or 1
 	plain = plain or false
@@ -172,6 +176,9 @@ function glue.string.gsplit(s, sep, start, plain)
 			done = true
 			return s:sub(start)
 		end
+	end
+	if not s:find(sep, start, plain) then
+		return iterate_once, s
 	end
 	return function()
 		if done then return end

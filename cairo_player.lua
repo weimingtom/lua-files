@@ -35,6 +35,7 @@ end
 function panel:on_render(surface)
 	main.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
 	player:on_render(self.cr)
+	player.key_state = nil
 end
 
 local function around(x, y, targetx, targety, radius) --point is in the square around target point
@@ -90,25 +91,43 @@ panel.on_xbutton_up = panel.on_mouse_move
 panel.on_mouse_wheel = panel.on_mouse_move
 panel.on_mouse_hwheel = panel.on_mouse_move
 
-function panel.on_key_down(vk, flags)
+function main:WM_GETDLGCODE()
+	return winapi.DLGC_WANTALLKEYS
+end
+
+function main:on_key_down(vk, flags)
+	player.key_state = 'down'
 	player.key_code = vk
 	player.key_flags = flags
 	panel:invalidate()
 end
 
-panel.on_key_up = panel.on_key_down
-panel.on_syskey_down = panel.on_key_down
-panel.on_syskey_up = panel.on_key_down
+function main:on_key_up(vk, flags)
+	player.key_state = 'up'
+	player.key_code = vk
+	player.key_flags = flags
+	panel:invalidate()
+end
 
-function panel.on_key_down_char(char, flags)
+main.on_syskey_down = main.on_key_down
+main.on_syskey_up = main.on_key_up
+
+function main:on_key_down_char(char, flags)
+	player.key_state = 'down'
 	player.key_char = char
 	player.key_flags = flags
 	panel:invalidate()
 end
 
-panel.on_syskey_down_char = panel.on_key_down_char
-panel.on_dead_key_up_char = panel.on_key_down_char
-panel.on_dead_syskey_down_char = panel.on_key_down_char
+main.on_syskey_down_char = main.on_key_down_char
+main.on_dead_syskey_down_char = main.on_key_down_char
+
+function main:on_dead_key_up_char(char, flags)
+	player.key_state = 'up'
+	player.key_char = char
+	player.key_flags = flags
+	panel:invalidate()
+end
 
 function player:play()
 	main:show()

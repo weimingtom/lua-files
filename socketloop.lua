@@ -1,7 +1,15 @@
+--very simple coroutine-based socket loop using luasocket.
+--raises errors on everything except transfer functions which preserve luasocket semantics.
 local socket = require'socket'
 local glue = require'glue'
 
 if not ... then require'socketloop_test' end
+
+--assert the result of coroutine.resume(). on error, raise an error with the traceback of the not-yet unwinded stack.
+local function assert_resume(thread, ok, ...)
+	if ok then return ... end
+	error(debug.traceback(thread, ...))
+end
 
 return function()
 	local loop = {}
@@ -17,12 +25,11 @@ return function()
 	end
 	local function receive(skt,...)
 		wait(read,skt)
-		s = assert(skt:receive(...))
-		return s
+		return skt:receive(...)
 	end
 	local function send(skt,...)
 		wait(write,skt)
-		return assert(skt:send(...))
+		return skt:send(...)
 	end
 	local function close(skt,...)
 		write[skt] = nil
@@ -59,7 +66,7 @@ return function()
 	local function wake(skt,rwt)
 		local thread = rwt[skt]
 		if not thread then return end
-		assert(coroutine.resume(thread))
+		assert_resume(thread, coroutine.resume(thread))
 		if coroutine.status(thread) == 'dead' then
 			if not read[skt] and not write[skt] then
 				skt:close()
@@ -82,7 +89,8 @@ return function()
 		end
 	end
 	function loop.newthread(handler,...)
-		assert(coroutine.resume(coroutine.create(handler),...))
+		local thread = coroutine.create(handler)
+		assert_resume(thread, coroutine.resume(thread, ...))
 	end
 	function loop.newserver(host, port, handler)
 		local server_skt = socket.tcp()
@@ -100,3 +108,4 @@ return function()
 	end
 	return loop
 end
+

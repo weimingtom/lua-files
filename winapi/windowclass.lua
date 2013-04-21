@@ -297,11 +297,21 @@ c:restore()
 print(c.visible, c.state)
 ]]
 
+--[[
 c3 = Window{topmost = true, title='Topmost', h=200,w=200}
 
 local c2 = Window{title = 'Owned by Main', dialog_frame = true, w = 500, h = 300, visible = true, owner = c}
 --c2.min_size = {h=100, h=100}
 c2.max_size = {w=300, h=300}
+]]
+
+function c:WM_GETDLGCODE()
+	return DLGC_WANTALLKEYS
+end
+
+function c:on_key_down(vk, flags)
+	print('WM_KEYDOWN', vk, flags)
+end
 
 MessageLoop()
 
