@@ -1,8 +1,7 @@
---luasocket implementation of the reader interface used by the http parser.
+--luasocket implementation of the readbuffer interface for use with string-based network protocols like http.
 local socket = require'socket'
 
-return function(skt)
-	local reader = {}
+local function new(skt)
 
 	local function readline(prefix)
 		local s, err, partial = skt:receive('*l', prefix)
@@ -12,11 +11,8 @@ return function(skt)
 		end
 		error(err)
 	end
-	function reader:readline()
-		return readline()
-	end
 
-	function reader:readchunks(sz)
+	local function readsize(sz)
 		return function()
 			if sz == 0 then return end
 			local s, err, partial = skt:receive(sz)
@@ -32,25 +28,32 @@ return function(skt)
 		end
 	end
 
-	local function readall(prefix)
-		local s, err, partial = skt:receive(16384)
-		--print(s and #s or nil, prefix and #prefix or nil, err, partial and #partial or nil)
-		if s then
-			return readall(s)
-		elseif err == 'timeout' then
-			return readall(partial)
-		elseif err == 'closed' then
-			return partial
+	local function readall()
+		local done
+		return function()
+			local s, err, partial = skt:receive('*a')
+			if s then
+				return s
+			elseif err == 'timeout' then
+				return partial
+			elseif done then
+				return
+			elseif err == 'closed' then
+				done = true
+				return partial
+			else
+				error(err)
+			end
 		end
-		error(err)
-	end
-	local done
-	function reader:readall()
-		if done then return end
-		done = true
-		return readall()
 	end
 
-	return reader
+	return {
+		readline = readline,
+		readsize = readsize,
+		readall = readall,
+	}
 end
 
+if not ... then require'http_client_test' end
+
+return new

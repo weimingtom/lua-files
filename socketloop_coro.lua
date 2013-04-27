@@ -1,13 +1,8 @@
---scheduler for Lua coroutines using luasocket.
+--scheduler for symmetric coroutines (coro threads) using luasocket.
 --raises errors on everything except read() and write() which have luasocket semantics.
 local socket = require'socket'
+local coro = require'coro'
 local glue = require'glue'
-
---assert the result of coroutine.resume(). on error, raise an error with the traceback of the not-yet unwinded stack.
-local function assert_resume(thread, ok, ...)
-	if ok then return ... end
-	error(debug.traceback(thread, ...))
-end
 
 local function new()
 	local loop = {}
@@ -15,8 +10,8 @@ local function new()
 	local read, write = {}, {} --{skt: thread}
 
 	local function wait(rwt,skt)
-		rwt[skt] = coroutine.running()
-		coroutine.yield()
+		rwt[skt] = coro.current
+		coro.transfer(loop.thread)
 		rwt[skt] = nil
 	end
 
@@ -42,7 +37,7 @@ local function new()
 	end
 
 	--wrap a luasocket socket object into an object that performs socket operations asynchronously.
-	--the socket is memorized along with the calling thread and control is given to the loop thread.
+	--the socket is memorized along with the calling thread and control is given to loop.thread.
 	--next time dispatch() is called, for any loaded sockets their calling thread is resumed.
 	function loop.wrap(skt)
 		local o = {socket = skt}
@@ -61,23 +56,25 @@ local function new()
 			assert(skt:bind(locaddr, locport))
 		end
 		local res, err = skt:connect(address, port)
+		if res then return loop.wrap(skt) end
 		if err ~= 'timeout' then
-			return res ~= nil and loop.wrap(skt) or res,err
+			return res, err
 		end
-		wait(write,skt)
+		wait(write, skt)
 		local res, err = skt:connect(address, port)
 		if res or err == 'already connected' then
 			return loop.wrap(skt)
 		else
-			return res ~= nil and loop.wrap(skt) or res,err
+			if res then return loop.wrap(skt) end
+			return res, err
 		end
 	end
 
 	local function wake(skt,rwt)
 		local thread = rwt[skt]
 		if not thread then return end
-		assert_resume(thread, coroutine.resume(thread))
-		--thread yielded back here either because it asked for a read or write or because it finished execution.
+		coro.transfer(thread)
+		--thread transfered back here either because it asked for a read or write or because it finished execution.
 		--finishing execution implies closing the connection.
 		if not read[skt] and not write[skt] then
 			skt:close()
@@ -89,6 +86,7 @@ local function new()
 		if not next(read) and not next(write) then return end
 		local reads, writes, err = glue.keys(read), glue.keys(write)
 		reads, writes, err = socket.select(reads, writes, timeout)
+		loop.thread = coro.current
 		for i=1,#reads do wake(reads[i], read) end
 		for i=1,#writes do wake(writes[i], write) end
 		return true
@@ -102,33 +100,36 @@ local function new()
 		end
 	end
 
-	--create a coroutine and run it. return it while suspended in the first socket call.
-	--dispatch() will manage it next.
-	function loop.newthread(handler,...)
-		local thread = coroutine.create(handler)
-		assert_resume(thread, coroutine.resume(thread, ...))
+	--create a coro thread set up to transfer control to the loop thread on finish, and run it.
+	--return it while suspended in the first socket call. dispatch() will manage it next.
+	function loop.newthread(f, val)
+		local loop_thread = loop.thread
+		local thread = coro.create(f, loop_thread)
+		loop.thread = coro.current
+		coro.transfer(thread, val)
+		loop.thread = loop_thread
+		return thread
 	end
 
 	function loop.newserver(host, port, handler)
 		local server_skt = socket.tcp()
 		server_skt:settimeout(0)
 		assert(server_skt:bind(host, port))
-		assert(server_skt:listen(1024*16))
+		assert(server_skt:listen(16384))
 		server_skt = loop.wrap(server_skt)
-		local function server()
+		coro.transfer(coro.create(function()
 			while true do
 				local client_skt = server_skt:accept()
 				loop.newthread(handler, client_skt)
 			end
-		end
-		loop.newthread(server)
+		end))
 	end
 
 	return loop
 end
 
 if not ... then
-	socketloop_lib = 'socketloop'
+	socketloop_lib = 'socketloop_coro'
 	require'socketloop_test'
 end
 

@@ -1,13 +1,15 @@
---readbuffer: buffered reading
+--readbuffer interface for use with string-based network protocols like http.
+--based on the function read(size) -> s | nil which should return a string of upto `size` bytes
+--or nil on eof (i.e. connection closed).
 
 local function readbuffer(read, bufsize)
 
-	bufsize = bufsize or 65536
+	bufsize = bufsize or 16384
 	local buf = ''
 
 	local function load()
 		local size = bufsize - #buf
-		_G.assert(size > 0, 'buffer overflow')
+		assert(size > 0, 'buffer overflow')
 		local s = read(size)
 		if s then
 			buf = buf .. s

@@ -4,10 +4,10 @@ local glue = require'glue'
 
 --escape all characters except `unreserved`, `sub-delims` and the characters
 --in the unreserved list, plus the characters in the reserved list
+local function esc(c)
+	return ('%%%02x'):format(c:byte())
+end
 local function escape(s, reserved, unreserved)
-	local function esc(c)
-		return ('%%%02x'):format(c:byte())
-	end
 	s = s:gsub('[^A-Za-z0-9%-%._~!%$&\'%(%)%*%+,;=' .. (unreserved or '').. ']', esc)
 	if reserved and reserved ~= '' then
 		s = s:gsub('[' .. reserved .. ']', esc)
@@ -57,7 +57,7 @@ local function unescape(s)
 end
 
 --[segment[/segment...]]
-local function parsepath(s)
+local function parse_path(s)
 	local t = {}
 	for s in glue.gsplit(s, '/') do
 		t[#t+1] = unescape(s)
@@ -67,7 +67,7 @@ end
 
 --var[=[val]]&|;...
 --argument order is not retained neither are the values of duplicate keys
-local function parsequery(s)
+local function parse_query(s)
 	local t = {}
 	for s in glue.gsplit(s, '[&;]+') do
 		local k,v = s:match'^([^=]*)=?(.*)$'
@@ -86,7 +86,7 @@ local function parse(s, t)
 	s = s:gsub('#(.*)', function(s) t.fragment = unescape(s) return '' end)
 	s = s:gsub('%?(.*)', function(s)
 		t.query = unescape(s) --convenience field: unusable if args names/values contain & or =
-		t.args = parsequery(s)
+		t.args = parse_query(s)
 		return ''
 	end)
 	s = s:gsub('^([a-zA-Z%+%-%.]*):', function(s) t.scheme = unescape(s) return '' end)
@@ -99,11 +99,69 @@ local function parse(s, t)
 		end
 	end
 	if s ~= '' then
-		t.segments = parsepath(s)
+		t.segments = parse_path(s)
 		t.path = unescape(s) --convenience field: unusable if path segments contain /
 	end
 	return t
 end
+
+--[[TODO:
+https://github.com/fire/luasocket/blob/master/src/url.lua
+--build a path from a base path and a relative path
+local function absolute_path(base_path, relative_path)
+    if string.sub(relative_path, 1, 1) == "/" then return relative_path end
+    local path = string.gsub(base_path, "[^/]*$", "")
+    path = path .. relative_path
+    path = string.gsub(path, "([^/]*%./)", function (s)
+        if s ~= "./" then return s else return "" end
+    end)
+    path = string.gsub(path, "/%.$", "/")
+    local reduced
+    while reduced ~= path do
+        reduced = path
+        path = string.gsub(reduced, "([^/]*/%.%./)", function (s)
+            if s ~= "../../" then return "" else return s end
+        end)
+    end
+    path = string.gsub(reduced, "([^/]*/%.%.)$", function (s)
+        if s ~= "../.." then return "" else return s end
+    end)
+    return path
+end
+
+--build an absolute URL from a base and a relative URL according to RFC 2396
+local function absolute(base_url, relative_url)
+	if type(base_url) == 'table' then
+		base_parsed = base_url
+		base_url = build(base_parsed)
+	else
+		base_parsed = parse(base_url)
+	end
+	local relative_parsed = parse(relative_url)
+   if not base_parsed then return relative_url
+   elseif not relative_parsed then return base_url
+   elseif relative_parsed.scheme then return relative_url
+   else
+        relative_parsed.scheme = base_parsed.scheme
+        if not relative_parsed.authority then
+            relative_parsed.authority = base_parsed.authority
+            if not relative_parsed.path then
+                relative_parsed.path = base_parsed.path
+                if not relative_parsed.params then
+                    relative_parsed.params = base_parsed.params
+                    if not relative_parsed.query then
+                        relative_parsed.query = base_parsed.query
+                    end
+                end
+            else
+                relative_parsed.path = absolute_path(base_parsed.path or "",
+                    relative_parsed.path)
+            end
+        end
+        return build(relative_parsed)
+    end
+end
+]]
 
 if not ... then require 'uri_test' end
 

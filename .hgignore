@@ -2,3 +2,4 @@ syntax: glob
 bin/plugins
 bin/libvlc*
 *.zip
+lxsh/

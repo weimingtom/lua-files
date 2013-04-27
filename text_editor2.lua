@@ -1,5 +1,6 @@
 --[[
 composable text editor featuring:
+
 - tabs and indentation:
 	- tabsize - expand tabs when positioning the text and jump through tabs when moving the caret.
 	- smart tabs - write tabs for indentation, but write spaces for alignment (inside the line).
@@ -31,12 +32,13 @@ composable text editor featuring:
 	* syntax highlighting with embedded lexers (js and css in html etc.)
 	- autodetect lexer to use based on file extension
 - sessions:
-	- save all open buffers along with view, caret and selection state.
+	* save and restore all open buffers along with view, caret and selection state.
 	- per-project sessions.
 - customization:
 	- global, local (per-project), per-filetype, per-user config files (like scite).
 	- reload config on the fly on saving the config file.
 	- custom key bindings.
+
 ]]
 
 local glue = require'glue'

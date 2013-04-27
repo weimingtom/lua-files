@@ -50,12 +50,18 @@ local function writer()
 	end
 end
 
-local src = gen(100000)
-local write = writer()
-zlib.deflate(reader(src), write)
-local dst = write()
-local write = writer()
-zlib.inflate(reader(dst), write)
-local src2 = write()
-assert(src == src2)
-print(string.format('size: %dK, ratio: %d%%', #src/1024, #dst / #src * 100))
+local function test(format)
+	local src = gen(100000)
+	local write = writer()
+	zlib.deflate(reader(src), write, nil, format)
+	local dst = write()
+	local write = writer()
+	zlib.inflate(reader(dst), write, nil, format)
+	local src2 = write()
+	assert(src == src2)
+	print(string.format('size: %dK, ratio: %d%%', #src/1024, #dst / #src * 100))
+end
+test'gzip'
+test'zlib'
+test'deflate'
+

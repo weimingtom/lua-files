@@ -1,5 +1,6 @@
 --zlib binding
 local ffi = require'ffi'
+local glue = require'glue'
 require'zlib_h'
 local C = ffi.load'zlib'
 local M = {C = C}
@@ -25,17 +26,33 @@ end
 local deflate = flate(C.deflate)
 local inflate = flate(C.inflate)
 
-local function init_deflate(finally, level)
+--FUN TIME: windowBits is range 8..15 (default = 15) but can also be -8..15 for raw deflate with no zlib header
+--or trailer and can also be greater than 15 which reads/writes a gzip header and trailer instead of a zlib wrapper.
+--so I added a format parameter which can be 'deflate', 'zlib', 'gzip' (default = 'zlib') to cover all the cases
+--so that windowBits can express only the window bits in the initial 8..15 range.
+--additionally for inflate, windowBits can be 0 which means use the value in the zlib header of the compressed stream.
+
+local function init_deflate(finally, format, level, windowBits, memLevel, strategy)
 	level = level or -1
+	windowBits = windowBits or 15
+	if format == 'gzip' then windowBits = windowBits + 16 end
+	if format == 'deflate' then windowBits = -windowBits end
+	memLevel = memLevel or 8
+	strategy = strategy or C.Z_DEFAULT_STRATEGY
+
 	local strm = ffi.new'z_stream'
-	check(C.deflateInit_(strm, level, M.version(), ffi.sizeof(strm)))
+	check(C.deflateInit2_(strm, level, C.Z_DEFLATED, windowBits, memLevel, strategy, M.version(), ffi.sizeof(strm)))
 	finally(function() check(C.deflateEnd(strm)) end)
 	return strm, deflate
 end
 
-local function init_inflate(finally)
+local function init_inflate(finally, format, windowBits)
+	windowBits = windowBits or 15
+	if format == 'gzip' then windowBits = windowBits + 16 end
+	if format == 'deflate' then windowBits = -windowBits end
+
 	local strm = ffi.new'z_stream'
-	check(C.inflateInit_(strm, M.version(), ffi.sizeof(strm)))
+	check(C.inflateInit2_(strm, windowBits, M.version(), ffi.sizeof(strm)))
 	finally(function() check(C.inflateEnd(strm)) end)
 	return strm, inflate
 end
@@ -82,8 +99,8 @@ local function inflate_deflate(init)
 	end
 end
 
-M.inflate = inflate_deflate(init_inflate)
-M.deflate = inflate_deflate(init_deflate)
+M.inflate = inflate_deflate(init_inflate) --inflate(read, write[, bufsize][, windowBits])
+M.deflate = inflate_deflate(init_deflate) --deflate(read, write[, bufsize][, level])
 
 --utility functions
 
@@ -128,8 +145,6 @@ function M.gzopen(filename, mode, bufsize)
 	if bufsize then C.gzbuffer(gzfile, bufsize) end
 	return gzfile
 end
-
-local gzfile = {}
 
 local flush_enum = {
 	none    = C.Z_NO_FLUSH,
