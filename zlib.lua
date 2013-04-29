@@ -198,7 +198,7 @@ function M.gzoffset(gzfile)
 	return checkminus1(C.gzoffset(gzfile))
 end
 
-ffi.metatype('gzFile_', {__index = {
+ffi.metatype('gzFile_s', {__index = {
 	close = M.gzclose,
 	read = M.gzread,
 	write = M.gzwrite,

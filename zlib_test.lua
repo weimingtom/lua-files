@@ -64,4 +64,3 @@ end
 test'gzip'
 test'zlib'
 test'deflate'
-

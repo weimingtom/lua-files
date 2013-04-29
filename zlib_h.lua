@@ -40,10 +40,11 @@ enum {
      Z_DEFLATED            =  8,
 /* The deflate compression method (the only one supported in this version) */
      Z_NULL                =  0,  /* for initializing zalloc, zfree, opaque */
+     Z_MAX_WBITS           =  15 /* 32K LZ77 window */
 };
 
-typedef struct {int unused;} gzFile_;
-typedef gzFile_* gzFile;
+typedef struct {int unused;} gzFile_s;
+typedef gzFile_s* gzFile;
 
 typedef void*    (* z_alloc_func)( void* opaque, unsigned items, unsigned size );
 typedef void     (* z_free_func) ( void* opaque, void* address );
