@@ -252,7 +252,7 @@ function M.unzip_read_cdata(file, buf, sz)
 end
 
 function M.unzip_tell(file)
-	return C.unztell64(file)
+	return tonumber(C.unztell64(file))
 end
 
 function M.unzip_eof(file)
@@ -269,7 +269,7 @@ function M.unzip_get_local_extra_field(file, buf, sz)
 end
 
 function M.unzip_get_offset(file)
-	return C.unzGetOffset64(file)
+	return tonumber(C.unzGetOffset64(file))
 end
 
 function M.unzip_set_offset(file)
@@ -279,12 +279,15 @@ end
 --unzip hi-level API
 
 function M.unzip_files(file)
-	local more = M.unzip_first_file(file)
+	M.unzip_first_file(file)
+	local first = true
 	return function()
-		if not more then return end
-		local info = M.unzip_get_file_info(file)
-		more = M.unzip_next_file(file)
-		return info
+		if first then
+			first = false
+		elseif not M.unzip_next_file(file) then
+			return
+		end
+		return M.unzip_get_file_info(file)
 	end
 end
 

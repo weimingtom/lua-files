@@ -17,12 +17,14 @@ z:add_file{filename = 'dir1/file2.txt'}
 z:write(hello_again)
 z:close_file()
 
-z:close('global comment')
+z:close('one dir, two files')
 
 
 local z = zip.open(filename)
 pp(z:get_global_info())
+
 for info in z:files() do
+	print(z:get_offset())
 	pp(info)
 end
 
