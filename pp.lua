@@ -2,12 +2,12 @@
 local pf = require'pformat'
 local glue = require'glue'
 
-local function pp(v, write, indent, parents, quote, onerror, depth, wwrapper)
+local function pretty(v, write, indent, parents, quote, onerror, depth, wwrapper)
 	if pf.is_serializable(v) then
 		pf.pwrite(v, write, quote)
 	elseif getmetatable(v) and getmetatable(v).__pwrite then
 		wwrapper = wwrapper or function(v)
-			pp(v, write, nil, parents, quote, onerror, -1, wwrapper)
+			pretty(v, write, nil, parents, quote, onerror, -1, wwrapper)
 		end
 		getmetatable(v).__pwrite(v, write, wwrapper)
 	elseif type(v) == 'table' then
@@ -28,15 +28,15 @@ local function pp(v, write, indent, parents, quote, onerror, depth, wwrapper)
 				if pf.is_identifier(k) then
 					write(k); write'='
 				else
-					write'['; pp(k, write, indent, parents, quote, onerror, depth + 1, wwrapper); write']='
+					write'['; pretty(k, write, indent, parents, quote, onerror, depth + 1, wwrapper); write']='
 				end
-				pp(v, write, indent, parents, quote, onerror, depth + 1, wwrapper)
+				pretty(v, write, indent, parents, quote, onerror, depth + 1, wwrapper)
 			end
 		end
 		for k,v in ipairs(v) do
 			if first then first = false else write',' end
 			if indent then write'\n'; write(indent:rep(depth)) end
-			pp(v, write, indent, parents, quote, onerror, depth + 1, wwrapper)
+			pretty(v, write, indent, parents, quote, onerror, depth + 1, wwrapper)
 		end
 		if indent then write'\n'; write(indent:rep(depth-1)) end
 		write'}'
@@ -48,19 +48,19 @@ local function pp(v, write, indent, parents, quote, onerror, depth, wwrapper)
 end
 
 local function to_sink(v, write, indent, parents, quote, onerror)
-	return pp(v, write, indent, parents, quote, onerror, 1)
+	return pretty(v, write, indent, parents, quote, onerror, 1)
 end
 
 local function to_string(v, indent, parents, quote, onerror)
 	local buf = {}
-	pp(v, function(s) buf[#buf+1] = s end, indent, parents, quote, onerror, 1)
+	pretty(v, function(s) buf[#buf+1] = s end, indent, parents, quote, onerror, 1)
 	return table.concat(buf)
 end
 
 local function to_file(file, v, indent, parents, quote, onerror)
 	local f = assert(io.open(file, 'wb'))
 	f:write'return '
-	pp(v, function(s) f:write(s) end, indent, parents, quote, onerror, 1)
+	pretty(v, function(s) f:write(s) end, indent, parents, quote, onerror, 1)
 	f:close()
 end
 

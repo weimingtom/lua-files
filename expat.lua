@@ -87,9 +87,9 @@ local cbdecoders = {
 	unknown = function(_, name, info) return ffi.string(name), info end,
 }
 
-local parse = {}
+local parser = {}
 
-function parse.read(read, callbacks)
+function parser.read(read, callbacks)
 	local cbt = {}
 	local function cb(cbtype, callback, decode)
 		local cb = ffi.cast(cbtype, function(...) return callback(decode(...)) end)
@@ -130,7 +130,7 @@ function parse.read(read, callbacks)
 	end)
 end
 
-function parse.path(file, callbacks)
+function parser.path(file, callbacks)
 	glue.fcall(function(finally)
 		local f = assert(io.open(file, 'rb'))
 		finally(function() f:close() end)
@@ -142,28 +142,28 @@ function parse.path(file, callbacks)
 				return nil, 0
 			end
 		end
-		parse.read(read, callbacks)
+		parser.read(read, callbacks)
 	end)
 end
 
-function parse.string(s, callbacks)
+function parser.string(s, callbacks)
 	local function read()
 		return s, #s
 	end
-	parse.read(read, callbacks)
+	parser.read(read, callbacks)
 end
 
-function parse.cdata(cdata, callbacks, options)
+function parser.cdata(cdata, callbacks, options)
 	local function read()
 		return cdata, options.size
 	end
-	parse.read(read, callbacks)
+	parser.read(read, callbacks)
 end
 
-local function parse_to_callbacks(t, callbacks)
+local function parse(t, callbacks)
 	for k,v in pairs(t) do
-		if parse[k] then
-			parse[k](v, callbacks, t)
+		if parser[k] then
+			parser[k](v, callbacks, t)
 			return
 		end
 	end
@@ -179,7 +179,6 @@ local function maketree_callbacks(known_tags)
 			t.cdata = s
 		end,
 		start_tag = function(s, attrs)
-
 			if skip then skip = skip + 1; return end
 			if known_tags and not known_tags[s] then skip = 1; return end
 
@@ -189,7 +188,6 @@ local function maketree_callbacks(known_tags)
 			t.parent.tags[t.tag] = t
 		end,
 		end_tag = function(s)
-
 			if skip then
 				skip = skip - 1
 				if skip == 0 then skip = nil end
@@ -201,9 +199,9 @@ local function maketree_callbacks(known_tags)
 	}, root
 end
 
-local function parse_to_tree(t, known_tags)
+local function treeparse(t, known_tags)
 	local callbacks, root = maketree_callbacks(known_tags)
-	parse_to_callbacks(t, callbacks)
+	parse(t, callbacks)
 	return root
 end
 
@@ -222,8 +220,8 @@ end
 if not ... then require'expat_test' end
 
 return {
-	parse = parse_to_callbacks,
-	treeparse = parse_to_tree,
+	parse = parse,
+	treeparse = treeparse,
 	children = children,
 	C = C,
 }
