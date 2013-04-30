@@ -14,7 +14,7 @@ local function escape_byte_short(c)
 	return string.format('\\%d', c:byte())
 end
 local function quote_string(s, quote)
-	s = s:gsub('.', escapes)
+	s = s:gsub('[\\\t\n\r]', escapes)
 	s = s:gsub(quote, '\\%1')
 	s = s:gsub('[^\32-\126][0-9]', escape_byte)
 	s = s:gsub('[^\32-\126]', escape_byte_short)
