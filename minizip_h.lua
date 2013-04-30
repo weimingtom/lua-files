@@ -1,15 +1,19 @@
---combined result of cpp zip.h and cpp unzip.h (only 64bit variant zip functions kept)
+--combined result of cpp zip.h and cpp unzip.h (only base functions without the wrappers)
 local ffi = require'ffi'
 ffi.cdef[[
 enum {
-	ZIP_OK = 0,
-	ZIP_EOF = 0,
-	ZIP_ERRNO = -1,
-	ZIP_PARAMERROR = -102,
-	ZIP_BADZIPFILE = -103,
-	ZIP_INTERNALERROR = -104,
+	UNZ_OK                          = 0,
+	UNZ_EOF                         = 0,
+	UNZ_ERRNO                       = -1,
+	UNZ_END_OF_LIST_OF_FILE         = -100,
+	UNZ_PARAMERROR                  = -102,
+	UNZ_BADZIPFILE                  = -103,
+	UNZ_INTERNALERROR               = -104,
+	UNZ_CRCERROR                    = -105
+};
 
-	APPEND_STATUS_CREATE = 0,
+enum {
+	APPEND_STATUS_CREATE        = 0,
 	APPEND_STATUS_CREATEAFTER   = 1,
 	APPEND_STATUS_ADDINZIP      = 2
 };
@@ -68,17 +72,6 @@ int zipRemoveExtraInfoBlock (char* pData, int* dataLen, short sHeader);
 typedef struct {int unused;} unzFile_s;
 typedef unzFile_s* unzFile;
 
-enum {
-	UNZ_OK                          = 0,
-	UNZ_END_OF_LIST_OF_FILE         = -100,
-	UNZ_ERRNO                       = -1,
-	UNZ_EOF                         = 0,
-	UNZ_PARAMERROR                  = -102,
-	UNZ_BADZIPFILE                  = -103,
-	UNZ_INTERNALERROR               = -104,
-	UNZ_CRCERROR                    = -105
-};
-
 /* tm_unz contain date/time info */
 typedef tm_zip tm_unz;
 
@@ -91,13 +84,6 @@ typedef struct unz_global_info64_s
     uint32_t size_comment;         /* size of the global comment of the zipfile */
 } unz_global_info64;
 
-typedef struct unz_global_info_s
-{
-    uint32_t number_entry;         /* total number of entries in
-                                     the central dir on this disk */
-    uint32_t size_comment;         /* size of the global comment of the zipfile */
-} unz_global_info;
-
 /* unz_file_info contain information about a file in the zipfile */
 typedef struct unz_file_info64_s
 {
@@ -107,8 +93,8 @@ typedef struct unz_file_info64_s
     uint32_t compression_method;   /* compression method              2 bytes */
     uint32_t dosDate;              /* last mod file date in Dos fmt   4 bytes */
     uint32_t crc;                  /* crc-32                          4 bytes */
-    uint64_t compressed_size;   /* compressed size                 8 bytes */
-    uint64_t uncompressed_size; /* uncompressed size               8 bytes */
+    uint64_t compressed_size;      /* compressed size                 8 bytes */
+    uint64_t uncompressed_size;    /* uncompressed size               8 bytes */
     uint32_t size_filename;        /* filename length                 2 bytes */
     uint32_t size_file_extra;      /* extra field length              2 bytes */
     uint32_t size_file_comment;    /* file comment length             2 bytes */
@@ -119,27 +105,6 @@ typedef struct unz_file_info64_s
 
     tm_unz tmu_date;
 } unz_file_info64;
-
-typedef struct unz_file_info_s
-{
-    uint32_t version;              /* version made by                 2 bytes */
-    uint32_t version_needed;       /* version needed to extract       2 bytes */
-    uint32_t flag;                 /* general purpose bit flag        2 bytes */
-    uint32_t compression_method;   /* compression method              2 bytes */
-    uint32_t dosDate;              /* last mod file date in Dos fmt   4 bytes */
-    uint32_t crc;                  /* crc-32                          4 bytes */
-    uint32_t compressed_size;      /* compressed size                 4 bytes */
-    uint32_t uncompressed_size;    /* uncompressed size               4 bytes */
-    uint32_t size_filename;        /* filename length                 2 bytes */
-    uint32_t size_file_extra;      /* extra field length              2 bytes */
-    uint32_t size_file_comment;    /* file comment length             2 bytes */
-
-    uint32_t disk_num_start;       /* disk number start               2 bytes */
-    uint32_t internal_fa;          /* internal file attributes        2 bytes */
-    uint32_t external_fa;          /* external file attributes        4 bytes */
-
-    tm_unz tmu_date;
-} unz_file_info;
 
 int unzStringFileNameCompare (const char* fileName1, const char* fileName2, int iCaseSensitivity);
 unzFile unzOpen64 (const void *path);

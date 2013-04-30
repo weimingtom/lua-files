@@ -32,24 +32,27 @@ local inflate = flate(C.inflate)
 --so that windowBits can express only the window bits in the initial 8..15 range.
 --additionally for inflate, windowBits can be 0 which means use the value in the zlib header of the compressed stream.
 
-local function init_deflate(finally, format, level, windowBits, memLevel, strategy)
-	level = level or -1
-	windowBits = windowBits or 15
+local function format_windowBits(format, windowBits)
 	if format == 'gzip' then windowBits = windowBits + 16 end
 	if format == 'deflate' then windowBits = -windowBits end
+	return windowBits
+end
+
+local function init_deflate(finally, format, level, method, windowBits, memLevel, strategy)
+	level = level or C.Z_DEFAULT_COMPRESSION
+	method = method or C.Z_DEFLATED
+	windowBits = format_windowBits(format, windowBits or C.Z_MAX_WBITS)
 	memLevel = memLevel or 8
 	strategy = strategy or C.Z_DEFAULT_STRATEGY
 
 	local strm = ffi.new'z_stream'
-	check(C.deflateInit2_(strm, level, C.Z_DEFLATED, windowBits, memLevel, strategy, M.version(), ffi.sizeof(strm)))
+	check(C.deflateInit2_(strm, level, method, windowBits, memLevel, strategy, M.version(), ffi.sizeof(strm)))
 	finally(function() check(C.deflateEnd(strm)) end)
 	return strm, deflate
 end
 
 local function init_inflate(finally, format, windowBits)
-	windowBits = windowBits or 15
-	if format == 'gzip' then windowBits = windowBits + 16 end
-	if format == 'deflate' then windowBits = -windowBits end
+	windowBits = format_windowBits(format, windowBits or C.Z_MAX_WBITS)
 
 	local strm = ffi.new'z_stream'
 	check(C.inflateInit2_(strm, windowBits, M.version(), ffi.sizeof(strm)))
@@ -99,8 +102,8 @@ local function inflate_deflate(init)
 	end
 end
 
-M.inflate = inflate_deflate(init_inflate) --inflate(read, write[, bufsize][, windowBits])
-M.deflate = inflate_deflate(init_deflate) --deflate(read, write[, bufsize][, level])
+M.inflate = inflate_deflate(init_inflate) --inflate(read, write[, bufsize][, format][, windowBits])
+M.deflate = inflate_deflate(init_deflate) --deflate(read, write[, bufsize][, format][, level][, windowBits][, memLevel][, strategy])
 
 --utility functions
 
@@ -120,7 +123,7 @@ function M.uncompress_cdata(data, size, sz, buf)
 	sz = ffi.new('unsigned long[1]', sz)
 	buf = buf or ffi.new('uint8_t[?]', sz[0])
 	check(C.uncompress(buf, sz, data, size))
-	return buf, sz[0], buf
+	return buf, sz[0]
 end
 
 function M.uncompress(s, sz, buf)
