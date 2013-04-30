@@ -175,8 +175,8 @@ function M.unzip_next_file(file)
 	return checkeol(C.unzGoToNextFile(file)) == 0 or nil
 end
 
-function M.unzip_locate_file(file, filename, case_sensitive)
-	return checkeol(C.unzLocateFile(file, filename, case_sensitive and 1 or 2)) == 0
+function M.unzip_locate_file(file, filename, case_insensitive)
+	return checkeol(C.unzLocateFile(file, filename, case_insensitive and 2 or 1)) == 0
 end
 
 function M.unzip_get_file_pos(file)
@@ -291,11 +291,16 @@ function M.unzip_files(file)
 	end
 end
 
-function M.unzip_uncompress(file)
-	local sz = M.unzip_get_file_size(file)
-	local buf = ffi.new('char[?]', sz)
-	assert(M.unzip_read_cdata(file, buf, sz) == sz)
-	return ffi.string(buf, sz)
+function M.unzip_extract(file, filename)
+	assert(M.unzip_locate_file(file, filename), 'file not found')
+	M.unzip_open_file(file)
+	return glue.fcall(function(finally)
+		finally(function() M.unzip_close_file(file) end)
+		local sz = M.unzip_get_file_size(file)
+		local buf = ffi.new('char[?]', sz)
+		assert(M.unzip_read_cdata(file, buf, sz) == sz)
+		return ffi.string(buf, sz)
+	end)
 end
 
 ffi.metatype('unzFile_s', {__index = {
@@ -321,7 +326,7 @@ ffi.metatype('unzFile_s', {__index = {
 	set_offset = M.unzip_set_offset,
 	--hi-level API
 	files = M.unzip_files,
-	uncompress = M.unzip_uncompress,
+	extract = M.unzip_extract,
 }})
 
 function M.open(filename, mode)
