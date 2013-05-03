@@ -45,5 +45,5 @@ void clipper_set_reverse_solution(clipper_t clipper, int reverse);
 ]]
 
 return {
-	lib = clipper,
+	C = clipper,
 }

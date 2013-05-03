@@ -17,7 +17,7 @@ assert(c2.c == 2)
 assert(c2.init == c1.init)
 
 --polymorphism
-function c1:before_init(...) print('c1 before_init',...); self.b = ...; assert(self.b == 'o'); return b end
+function c1:before_init(...) print('c1 before_init',...); self.b = ...; assert(self.b == 'o'); return self.b end
 function c1:after_init() print('c1 after_init') end
 function c2:before_init(...) print('c2 before_init',...); return ... end
 function c2:after_init() print('c2 after_init') end

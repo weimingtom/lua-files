@@ -1,4 +1,4 @@
-require'vgext_h_amanith'
+require'amanithvg_h_ext'
 local API = require'openvg'
 local ffi = require'ffi'
 local C = ffi.load'libAmanithVG'

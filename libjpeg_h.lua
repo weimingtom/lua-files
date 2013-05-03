@@ -1,7 +1,8 @@
 --result of `cpp jpeglib.h` from libjpeg-turbo 1.2.1 (JPEG_LIB_VERSION = 62 in jconfig.h)
 --made a few typedefs for useful structs and callbacks
 local ffi = require'ffi'
-require'stdio_h_types'
+require'stdio_h'
+
 ffi.cdef[[
 enum {
 	JPEG_SUSPENDED,     /* Suspended due to lack of input data */

@@ -1,4 +1,4 @@
---result of `cpp cairo-script-interpreter.h` from cairo 1.12.3
+--result of `cpp cairo-win32.h` from cairo 1.12.3
 local ffi = require'ffi'
 require'cairo_h'
 require'winapi.winusertypes' --HDC, HFONT

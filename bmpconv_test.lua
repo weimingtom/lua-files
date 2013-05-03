@@ -196,7 +196,7 @@ local function benchmark()
 	end
 end
 
---test_nyi()
---test_conversions()
+test_nyi()
+test_conversions()
 benchmark()
 

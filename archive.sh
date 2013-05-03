@@ -1,31 +1,52 @@
-# create zip files andd upload them to google code.
+# create zip files and upload them to google code.
+
+# NOTE: upload.py doesn't support overwriting existing files,
+# so be sure to delete the old files from google code first.
 
 P=lua-files
-DATE=`date +%F`
+DATE=-latest
+#DATE=`date +%F`
 
-(cd .. || exit 1
+archive() {
+	local module=$1; shift
+	local zipfile=$P/$module$DATE.zip
+	echo "archiving $module..."
+	(
+	cd .. || exit 1
+	rm -f $zipfile
+	zip -9 -r $zipfile "$@"
+	)
+	upload $module
+}
 
-rm $P/*.zip
+upload() {
+	local module=$1
+	echo "uploading $module..."
+	python -uB upload.py -s $module -p $P -ucosmin.apreutesei -w$(cat password.txt) $module$DATE.zip
+}
 
-zip -9 -r $P/$P-$DATE.zip $P \
-	-x $P/upload.py \
-	-x $P/.\* \
-	-x $P/_attic/\* \
-	-x $P/media/\* \
-	-x $P/wiki/\* \
-	-x $P/bin/plugins/\* \
-	-x $P/bin/libvlc\*.dll
+archive_sources() {
+	archive $P $P \
+		-x $P/upload.py \
+		-x $P/.\* \
+		-x $P/_attic/\* \
+		-x $P/media/\* \
+		-x $P/wiki/\* \
+		-x $P/bin/plugins/\* \
+		-x $P/bin/libvlc\*.dll
+}
 
-zip -r $P/$P-media-$DATE.zip $P/media \
-	-x $P/media/.\*
+archive_media() {
+	archive $P-media $P/media \
+		-x $P/media/.\*
+}
 
-zip -r $P/$P-vlc-$DATE.zip $P/bin/libvlc*.dll $P/bin/plugins \
-	-x $P/bin/plugins/plugins.dat
+archive_vlc() {
+	archive $P-vlc $P/bin/libvlc*.dll $P/bin/plugins \
+		-x $P/bin/plugins/plugins.dat
+}
 
-)
+archive_sources
+#archive_media
+#archive_vlc
 
-for f in $P $P-media $P-vlc
-do
-	echo "uploading $f..."
-	#python -uB upload.py -s $f -p $P -ucosmin.apreutesei -wxxx $f-$DATE.zip
-done

@@ -20,7 +20,8 @@ local panel = winapi.Panel{
 do
 	local self = panel
 	self.vlc_inst = vlc.libvlc_new(0, nil)
-	self.vlc_m = vlc.libvlc_media_new_path(self.vlc_inst, [[x:\trash\utorrent\The Wire Season 4 Episode 07 - Unto Others.avi]])
+	self.vlc_m = vlc.libvlc_media_new_path(self.vlc_inst,
+		[[x:\trash\utorrent\2 stupid dogs\1993-1994 - Season 1\103-a Hollywood's Ark [Moonsong].avi]])
 	self.vlc_mp = vlc.libvlc_media_player_new_from_media(self.vlc_m)
 	vlc.libvlc_media_release(self.vlc_m)
 	vlc.libvlc_media_player_set_hwnd(self.vlc_mp, self.hwnd)

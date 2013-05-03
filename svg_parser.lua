@@ -561,7 +561,7 @@ local function gradient(t, ct)
 	}
 	for _,t in ipairs(children) do
 		if t.tag == 'stop' then
-			--TODO:  For radial gradients, offset represents a percentage distance from (fx,fy) to the
+			--TODO: for radial gradients, offset represents a percentage distance from (fx,fy) to the
 			--edge of the outermost/largest circle.
 			o[#o+1] = clamp(length(t.attrs.offset or '0', 1, ct), 0, 1)
 			o[#o+1] = alpha_color(t.style.stop_color, t.style.stop_opacity)

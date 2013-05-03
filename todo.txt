@@ -1,21 +1,128 @@
-TODO:
+STABLE
+-----------------------------------------------------------------------
+libb64
+sha2
+md5
+hmac
+murmurhash3			(not used)
+pmurhash				(not used)
+zlib
 
-http_headers_test
+tuple
+coro					test is demo
+oo						not used; use it in winapi, adding overriding hooks
+pformat				merge in pp?
+pp						poor API; slow on expat.treeparse output; not binary stable; doesn't sort keys
+expat					test is demo
+minizip				poor API (stateful); remove zip64 default; look at python API
 
-image libs -> bmpconv ?
+cairo
+vlc					plain C, no wrapper
+openvg				incomplete, but good for C level
+amanithvg			needs demo
+
+affine2d 			needs test unit
+math_eq2
+math_eq3				review for precision
+
+obj_loader
+obj_parser
+
+cairo_player		better keyboard/mouse state
+clipper				finish the binding and make a demo
+fps_function		?
+freetype				stub (only minimal binding to load a ft_face)
+
+gl
+glu
+glu_lua				incomplete (only matrix stuff)
+glut					incomplete (only teapot)
+glue					remove max, min, sum? glue.shift ok?
+
+im_boxblur
+im_boxblur_lua
+im_stackblur
+
+bmpconv				needs demo + review multithreading
+imagefile			?
+libjpeg				review bmpconv integration; finish multiscan reading; needs demo
+libpng				review bmpconv integration; cdata source and string source are NYI; needs demo for conv. options
+giflib				review bmpconv integration
+nanojpeg				unused
+
+path					oh yeah... can we merge any files? can we rename it? can we split geometry lib from path lib?
+
+pdf_inspect			?
+pdfgen				incomplete; can we use a minimal libharu subset if there is such a thing?
+hpdf_, hpdf_h		??
+
+http					review/test; body writer/formatter
+http_client			unfinished: needs i/o api from connect
+http_date
+http_headers		test is demo
+readbuffer			finish it (reimplement based on cdata?)
+uri					todo: absolute_path, absolute
 
 
-pp ?
+WINAPI EXTENSIONS
+-----------------------------------------------------------------------
+wglpanel
+cairopanel
+amanithvgpanel
 
 
-todo
-----
-- readbuffer
-- clipper
-- openvg
+TODO
+-----------------------------------------------------------------------
+sg_2d
+sg_base
+sg_cache
+sg_cairo
+sg_cairo_draw
+sg_cairo_player
+sg_cairo_trace
 
-uncharted
----------
+sg_gl
+sg_gl_debug
+sg_gl_mesh			broken imagefile integration
+sg_gl_obj
+sg_gl_player
+sg_gl_shape
+sg_gl_test
+
+sg_pdf				?
+
+socketloop
+socketloop_coro
+socketloop_dummy
+socketreader
+
+stddef_h
+stdint_h
+stdio_h
+stdio
+stdlib_h
+systypes_h
+
+streams
+
+strict
+
+svg_parser		incomplete (check if it still complies with path semantics)
+
+
+text_editor
+
+unit
+
+uuid				no linux
+
+
+TODO
+-----------------------------------------------------------------------
+
+
+UNCHARTED
+-----------------------------------------------------------------------
 - bzip2
 - an image library:
 	- IM: http://www.tecgraf.puc-rio.br/im/
@@ -28,28 +135,13 @@ uncharted
 - .NET - luainterface: http://code.google.com/p/luainterface/
 - wxlua again? http://wxlua.sourceforge.net/screenshots.php
 - CLucene
+- http server
+- LuaUnit https://github.com/luaforge/luaunit
 
-http
-----
-- http_headers tests
-- http gzip/deflate filters
-- http formatter
-- http client:
-	- keep-alive
-- http server:
-	- keep-alive
-	- FastCGI interface?
 
-quality
--------
+QUALITY
+-----------------------------------------------------------------------
 - separate cdata and string APIs with consistent naming
 - unit testing for all input variations:
 	string, cdata, filename, file descriptor, file stream, read function
-- expat tests
-
-other
------
-- LuaUnit https://github.com/luaforge/luaunit
-- LuaZip (uses zzip which is GPL)
--
 

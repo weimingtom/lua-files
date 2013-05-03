@@ -1,9 +1,8 @@
-require'vgext_h_amanith'
 local ffi = require'ffi'
 local glue = require'glue'
 
 local function bind(C)
-	local M = setmetatable({C = C}, {__index = function(t,k) t[k] = C[k]; return C[k] end})
+	local M = setmetatable({C = C}, {__index = C})
 
 	function M.vgGetString(...)
 		return ffi.string(C.vgGetString(...))

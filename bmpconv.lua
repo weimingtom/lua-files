@@ -1,8 +1,8 @@
 --pixel format upsampling, resampling and downsampling for luajit.
 --supports all conversions between packed 8 bit-per-channel gray and rgb pixel formats + cmyk to all.
 --supports different input/output orientations, namely top-down and bottom-up, and different strides.
---can split up the conversion to multiple threads taking advantage of multiple cpu cores.
---todo: 16bit rgb (565,4444,5551)? bw-1? alpha-1,4,8? linear-rgb? premultiplied-alpha? xyz? cie?
+--TODO: 16bit rgb (565,4444,5551)? bw-1? alpha-1,4,8? linear-rgb? premultiplied-alpha? xyz? cie?
+--TODO: can split up the conversion to multiple threads taking advantage of multiple cpu cores.
 
 --conversion functions: these must run in lanes, so don't drag any upvalues with them
 
@@ -235,7 +235,7 @@ local function convert(src, fmt, opt)
 	assert(supported(src.pixel, fmt.pixel))
 
 	--see if there's a dest. buffer, or we can overwrite src. or we need to alloc. one
-	if opt.data then
+	if opt and opt.data then
 		assert(opt.size >= src.h * fmt.stride)
 		dst.size = opt.size
 		dst.data = opt.data

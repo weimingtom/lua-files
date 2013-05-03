@@ -136,15 +136,15 @@ local function checkz(ret) assert(ret == 0) end
 local function checkminus1(ret) assert(ret ~= -1); return ret end
 local function ptr(o) return o ~= nil and o or nil end
 
-function M.gzclose(gzfile)
+function M.close(gzfile)
 	checkz(C.gzclose(gzfile))
 	ffi.gc(gzfile, nil)
 end
 
-function M.gzopen(filename, mode, bufsize)
+function M.open(filename, mode, bufsize)
 	local gzfile = ptr(C.gzopen(filename, mode or 'r'))
 	if not gzfile then return nil, string.format('errno %d', ffi.errno()) end
-	ffi.gc(gzfile, M.gzclose)
+	ffi.gc(gzfile, M.close)
 	if bufsize then C.gzbuffer(gzfile, bufsize) end
 	return gzfile
 end
@@ -159,27 +159,34 @@ local flush_enum = {
 	trees   = C.Z_TREES,
 }
 
-function M.gzflush(gzfile, flush)
+function M.flush(gzfile, flush)
 	checkz(C.gzflush(gzfile, flush_enum[flush]))
 end
 
-function M.gzread(gzfile, sz)
-	local buf = ffi.new('uint8_t[?]', sz)
-	sz = checkminus1(C.gzread(gzfile, buf, sz))
-	return ffi.string(buf, sz)
+function M.read_cdata(gzfile, buf, sz)
+	return checkminus1(C.gzread(gzfile, buf, sz))
 end
 
-function M.gzwrite(gzfile, s)
-	local sz = C.gzwrite(gzfile, s, #s)
+function M.read(gzfile, sz)
+	local buf = ffi.new('uint8_t[?]', sz)
+	return ffi.string(buf, M.read_cdata(gzfile, buf, sz))
+end
+
+function M.write_cdata(gzfile, data, sz)
+	sz = C.gzwrite(gzfile, data, sz)
 	if sz == 0 then return nil,'error' end
 	return sz
 end
 
-function M.gzeof(gzfile)
+function M.write(gzfile, s)
+	return M.write_cdata(gzfile, s, #s)
+end
+
+function M.eof(gzfile)
 	return C.gzeof(gzfile) == 1
 end
 
-function M.gzseek(gzfile, ...)
+function M.seek(gzfile, ...)
 	local narg = select('#',...)
 	local whence, offset
 	if narg == 0 then
@@ -197,36 +204,38 @@ function M.gzseek(gzfile, ...)
 	return checkminus1(C.gzseek(gzfile, offset, whence))
 end
 
-function M.gzoffset(gzfile)
+function M.offset(gzfile)
 	return checkminus1(C.gzoffset(gzfile))
 end
 
 ffi.metatype('gzFile_s', {__index = {
-	close = M.gzclose,
-	read = M.gzread,
-	write = M.gzwrite,
-	flush = M.gzflush,
-	eof = M.gzeof,
-	seek = M.gzseek,
-	offset = M.gzoffset,
+	close = M.close,
+	read = M.read,
+	write = M.write,
+	flush = M.flush,
+	eof = M.eof,
+	seek = M.seek,
+	offset = M.offset,
 }})
 
 --checksum functions
 
-function M.adler32(data, sz, adler)
+function M.adler32_cdata(data, sz, adler)
 	adler = adler or C.adler32(0, nil, 0)
-	if type(data) == 'string' then
-		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or #data, #data)
-	end
 	return tonumber(C.adler32(adler, data, sz))
 end
 
-function M.crc32b(data, sz, crc)
+function M.adler32(s, adler)
+	return M.adler32_cdata(s, #s, adler)
+end
+
+function M.crc32b_cdata(data, sz, crc)
 	crc = crc or C.crc32(0, nil, 0)
-	if type(data) == 'string' then
-		data, sz = ffi.cast('const uint8_t*', data), math.min(sz or #data, #data)
-	end
 	return tonumber(C.crc32(crc, data, sz))
+end
+
+function M.crc32b(s, crc)
+	return M.crc32b_cdata(s, #s, crc)
 end
 
 if not ... then require'zlib_test' end

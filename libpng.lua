@@ -281,7 +281,7 @@ local function load(src, opt)
 		else
 			assert(false)
 		end
-		C.png_read_update_info(png_ptr, info_ptr) --calling this twice is libpng 1.5.6+
+		C.png_read_update_info(png_ptr, info_ptr) --calling this twice is only possible in libpng 1.5.6+
 
 		--check if conversion options had the desired effect
 		assert(C.png_get_bit_depth(png_ptr, info_ptr) == 8)

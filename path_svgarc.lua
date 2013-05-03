@@ -2,8 +2,6 @@
 --  (x1, y1, radius_x, radius_y, rotation, large_arc_flag, sweep_flag, x2, y2, [matrix], [segment_max_sweep])
 --conversion to elliptic arcs adapted from antigrain library @ agg/src/agg_bezier_arc.cpp by Cosmin Apreutesei.
 
-local glue = require'glue'
-
 local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
 local elliptic_arc_point      = require'path_elliptic_arc'.point
 local elliptic_arc_hit        = require'path_elliptic_arc'.hit

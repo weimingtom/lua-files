@@ -1,5 +1,6 @@
 --result of `cpp stdlib.h` from mingw
 local ffi = require'ffi'
+
 ffi.cdef[[
 int _argc;
 char** _argv;

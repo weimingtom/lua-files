@@ -1,10 +1,12 @@
 --result of cpp stdio.h from mingw
 local ffi = require'ffi'
-require'stdio_h_types'
-require'systypes_h'
+require'ctypes'
 
 ffi.cdef[[
-typedef enum {
+typedef struct _iobuf FILE;
+typedef long long fpos_t;
+
+enum {
 	STDIN_FILENO   = 0,
 	STDOUT_FILENO  = 1,
 	STDERR_FILENO  = 2,
@@ -13,6 +15,7 @@ typedef enum {
 	SEEK_CUR       = 1,
 	SEEK_END       = 2
 };
+
 FILE* fopen (const char*, const char*);
 FILE* freopen (const char*, const char*, FILE*);
 int fflush (FILE*);

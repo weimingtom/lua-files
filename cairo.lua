@@ -1,8 +1,9 @@
 --lightweight object interface over cairo ffi binding:
--- cairo types have methods
--- pointers to objects for which cairo holds no references get a __gc
+-- cairo types get methods; note though that methods of specific backends and extensions are not added
+-- and cannot be added either after loading this module due to constraints of ffi.metatype().
+-- pointers to objects for which cairo holds no references get a __gc.
 -- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
--- functions accept/return Lua strings
+-- functions accept/return Lua strings.
 -- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to, cairo_circle, cairo_ellipse,
 --   cairo_rotate_around, cairo_skew, cairo_safe_transform, cairo_matrix_transform, cairo_matrix_invertible,
 --   cairo_matrix_safe_transform, cairo_matrix_rotate_around, cairo_matrix_skew, cairo_surface_apply_alpha.

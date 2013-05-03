@@ -2,6 +2,7 @@ local ffi = require'ffi'
 require'unit'
 
 local function benchmark(s, hash)
+	if not hash then return end
 	timediff()
 	local sz = 1024^2
 	local iter = 1024

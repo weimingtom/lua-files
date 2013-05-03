@@ -240,7 +240,7 @@ function M.unzip_open_file(file, password, raw, method, level)
 	method = method or ffi.new'uint32_t[1]'
 	level = level or ffi.new'uint32_t[1]'
 	checkz(C.unzOpenCurrentFile3(file, method, level, raw, password))
-	return method, level
+	return method[0], level[0]
 end
 
 function M.unzip_close_file(file)
@@ -299,6 +299,37 @@ function M.unzip_extract(file, filename)
 		local sz = M.unzip_get_file_size(file)
 		local buf = ffi.new('char[?]', sz)
 		assert(M.unzip_read_cdata(file, buf, sz) == sz)
+		return ffi.string(buf, sz)
+	end)
+end
+
+function M.unzip_copy_from_archive(file, src_file, filename)
+	assert(M.unzip_locate_file(src_file, filename), 'file not found')
+	local method, level = M.unzip_open_file(src_file, nil, true)
+	glue.fcall(function(finally)
+		finally(function() M.unzip_close_file(src_file) end)
+		local info = M.unzip_get_file_info(src_file)
+		assert(info.compression_method == method)
+		assert(info.filename == filename)
+		local sz = info.compressed_size
+		local buf = ffi.new('char[?]', sz)
+		assert(M.unzip_read_cdata(file, buf, sz) == sz)
+
+		M.zip_add_file{
+			filename = info.filename,
+			versionMadeBy = info.version,
+			dosDate = info.dosDate,
+			internal_fa = info.internal_fa,
+			external_fa = info.external_fa,
+			comment = info.comment,
+			method = info.compression_method,
+			level = level,
+			raw = true,
+			crc = info.crc,
+			flagBase = info.flag,
+			extrafield_local = info.extra,
+			extrafield_global = nil, --??
+		}
 		return ffi.string(buf, sz)
 	end)
 end

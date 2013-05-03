@@ -2,6 +2,9 @@
 local ffi = require'ffi'
 
 ffi.cdef[[
+enum {
+	VG_PATH_FORMAT_STANDARD = 0
+};
 typedef float VGfloat;
 typedef signed char VGbyte;
 typedef unsigned char VGubyte;

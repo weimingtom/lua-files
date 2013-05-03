@@ -10,14 +10,14 @@ test(glue.tohex(zlib.adler32'The game done changed.'), '587507ba')
 test(glue.tohex(zlib.crc32b'Game\'s the same, just got more fierce.'), '2c40120a')
 
 local function gztest(file, content)
-	local gz = zlib.gzopen(file)
+	local gz = zlib.open(file)
 	test(gz:read(#content), content)
 	test(#gz:read(1), 0)
 	test(gz:eof(), true)
 	gz:close()
 end
 
-local gz = zlib.gzopen('media/gzip/test1.txt.gz', 'w')
+local gz = zlib.open('media/gzip/test1.txt.gz', 'w')
 test(gz:write'The game done changed.', #'The game done changed.')
 gz:close()
 

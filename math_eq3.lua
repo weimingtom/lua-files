@@ -1,6 +1,6 @@
 --3rd degree equation solver using Cardano's method.
 --epsilon controls the precision of the solver.
---TODO: This solver has poor precision. Code-review it for catastrophic cancelations and alike.
+--TODO: Code-review this for catastrophic cancelations and alike.
 
 local solve_equation2 = require'math_eq2'
 
