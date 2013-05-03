@@ -17,5 +17,5 @@ function SG.type:obj_model(e)
 	mesh.ibo.data = nil
 end
 
-if not ... then require'sg_gl_test' end
+if not ... then require'sg_gl_demo' end
 

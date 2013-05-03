@@ -106,7 +106,7 @@ local function parse(file, handlers)
 	end)
 end
 
-if not ... then require'sg_gl_test' end
+if not ... then require'sg_gl_demo' end
 
 return parse
 

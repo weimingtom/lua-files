@@ -154,7 +154,7 @@ function SG:render(e)
 	self:errors_flush()
 end
 
-if not ... then require'sg_gl_test' end
+if not ... then require'sg_gl_demo' end
 
 return SG
 

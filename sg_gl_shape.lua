@@ -54,5 +54,5 @@ function SG.type:shape(e)
 	self:render_object(mesh)
 end
 
-if not ... then require'sg_gl_test' end
+if not ... then require'sg_gl_demo' end
 

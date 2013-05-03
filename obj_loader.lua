@@ -168,7 +168,7 @@ if not ... then
 --load'../media/obj/cube/cube.obj'
 --require'pp'.pp(load'media/obj/greek_vase1/greek_vase.obj')
 
-require'sg_gl_test'
+require'sg_gl_demo'
 
 end
 

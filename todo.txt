@@ -4,26 +4,25 @@ libb64
 sha2
 md5
 hmac
-murmurhash3			(not used)
-pmurhash				(not used)
+murmurhash3
+pmurhash
 zlib
-
+oo
 tuple
+cairo
 coro					test is demo
-oo						not used; use it in winapi, adding overriding hooks
 pformat				merge in pp?
 pp						poor API; slow on expat.treeparse output; not binary stable; doesn't sort keys
 expat					test is demo
 minizip				poor API (stateful); remove zip64 default; look at python API
 
-cairo
 vlc					plain C, no wrapper
 openvg				incomplete, but good for C level
 amanithvg			needs demo
 
 affine2d 			needs test unit
 math_eq2
-math_eq3				review for precision
+math_eq3				review for precision; needs more tests with non-unity first coeff.
 
 obj_loader
 obj_parser
