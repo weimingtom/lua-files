@@ -13,6 +13,7 @@ amanithvg.ini    amanithvg 4.0.0.679-eval
 libfreetype-6.dll csrc/freetype
 libharu.dll     csrc/libharu
 libjpeg.dll     csrc/libjpegturbo
+libmysql.dll    mysql Connector/C 6.1
 libpng.dll      csrc/libpng
 libvlc.dll      vlc 2.0.5 (from vlc.zip)
 libvlccore.dll  vlc 2.0.5 (from vlc.zip)

@@ -17,6 +17,4 @@ end
 
 if not ... then require'murmurhash3_test' end
 
-return {
-	hash = hash
-}
+return hash

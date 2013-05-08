@@ -6,7 +6,7 @@ function fakereceive(s, return_sizes)
 	return function(maxsize)
 		if i > #return_sizes then return end
 		local size = return_sizes[i] i = i + 1
-		assert(size <= maxsize, 'size %d > %d' % {size, maxsize})
+		assert(size <= maxsize, string.format('size %d > %d', size, maxsize))
 		local ret = s:sub(1, size)
 		s = s:sub(size + 1)
 		--print('receive', size, ret)

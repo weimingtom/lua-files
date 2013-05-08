@@ -1,7 +1,10 @@
 // NanoJPEG -- KeyJ's Tiny Baseline JPEG Decoder
 // version 1.3 (2012-03-05)
 // by Martin J. Fiedler <martin.fiedler@gmx.net>
-// modified by Cosmin Apreutesei <cosmin.apreutesei@gmail.com> (made reentrant)
+// modified by Cosmin Apreutesei <cosmin.apreutesei@gmail.com> as follows:
+//   * made reentrant
+//   * the buffer returned by njGetImage() is not freed on njDone(),
+//     instead the user must free it by calling njFreeImage().
 //
 // This software is published under the terms of KeyJ's Research License,
 // version 0.2. Usage of this software is subject to the following conditions:
@@ -718,10 +721,15 @@ nj_context_t* njInit() {
 
 void njDone(nj_context_t* nj) {
     int i;
-    for (i = 0;  i < 3;  ++i)
-        if (nj->comp[i].pixels) njFreeMem((void*) nj->comp[i].pixels);
-    if (nj->rgb) njFreeMem((void*) nj->rgb);
+    if (nj->ncomp != 1)
+        for (i = 0;  i < 3;  ++i)
+            if (nj->comp[i].pixels)
+                njFreeMem((void*) nj->comp[i].pixels);
     njFreeMem(nj);
+}
+
+void njFreeImage(unsigned char* image) {
+    njFreeMem((void*) image);
 }
 
 nj_result_t njDecode(nj_context_t* nj, const void* jpeg, const int size) {

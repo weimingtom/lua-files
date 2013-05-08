@@ -117,6 +117,5 @@ return {
 	point = point,
 	length = length,
 	split = split,
-	hit = hit,
 }
 

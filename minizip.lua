@@ -1,5 +1,6 @@
---low level minizip binding. zip standard here: http://www.pkware.com/documents/casestudies/APPNOTE.TXT
+--minizip binding. zip standard here: http://www.pkware.com/documents/casestudies/APPNOTE.TXT
 local ffi = require'ffi'
+local bit = require'bit'
 local glue = require'glue'
 require'minizip_h'
 local C = ffi.load'minizip'
@@ -30,19 +31,13 @@ local checkz   = check_function(function(ret) return ret == 0 end)
 local checkpoz = check_function(function(ret) return ret >= 0 end)
 local checkeol = check_function(function(ret) return ret == 0 or ret == C.UNZ_END_OF_LIST_OF_FILE end)
 
-local append_flags = {
-	create = C.APPEND_STATUS_CREATE,
-	create_after = APPEND_STATUS_CREATEAFTER,
-	add_files = APPEND_STATUS_ADDINZIP,
-}
-
-function M.zip_open(filename, append)
-	return ffi.gc(checkh(C.zipOpen64(filename, append_flags[append or 'create'])), M.zip_close)
-end
-
-function M.zip_close(file, global_comment)
+local function zip_close(file, global_comment)
 	checkz(C.zipClose(file, global_comment))
 	ffi.gc(file, nil)
+end
+
+local function zip_open(filename, flag)
+	return ffi.gc(checkh(C.zipOpen64(filename, flag or C.APPEND_STATUS_CREATE)), zip_close)
 end
 
 --from zlib_h.lua so we don't have to import it (you'd probably not want to change these in most cases)
@@ -56,11 +51,11 @@ local default_add_options = {
 	dosDate = 0,                          --date in DOS format
 	internal_fa = 0,                      --2 bytes bitfield. format depends on versionMadeBy.
 	external_fa = 0,                      --4 bytes bitfield. format depends on versionMadeBy.
-	extrafield_local = nil,               --cdata
-	extrafield_local_size = 0,            --autocomputed if extrafield_local is a string
-	extrafield_global = nil,              --cdata
-	extrafield_global_size = 0,           --autocomputed if extrafield_global is a string
-	comment = nil,                        --string/char*
+	local_extra = nil,                    --cdata or string
+	local_extra_size = nil,
+	file_extra = nil,                     --cdata or string
+	file_extra_size = nil,
+	comment = nil,                        --string or char*
 	method = Z_DEFLATED,                  --0 = store
 	level = Z_DEFAULT_COMPRESSION,        --0..9
 	raw = false,                          --write raw data
@@ -68,13 +63,13 @@ local default_add_options = {
 	memLevel = 8,                         --1..9 (1 = min. speed, min. memory; 9 = max. speed, max. memory)
 	strategy = Z_DEFAULT_STRATEGY,        --see zlib_h.lua
 	password = nil,                       --encrypt file with a password
-	crc = 0,                              --number; needed for encryption if a password is set
+	crc = 0,                              --number; needed if a password is set
 	versionMadeBy = 0,                    --version of the zip standard to use. look at section 4.4.2 of the standard.
-	flagBase = 0,                         --2 byte "general purpose bit flag"
-	zip64 = true,                         --enable support for files larger than 4G
+	flagBase = 0,                         --2 byte "general purpose bit flag" (except the first 3 bits)
+	zip64 = false,                        --enable support for files larger than 4G
 }
 
-function M.zip_add_file(file, t)
+local function zip_add_file(file, t)
 	if type(t) == 'string' then
 		t = glue.update({filename = t}, default_add_options)
 	else
@@ -97,62 +92,49 @@ function M.zip_add_file(file, t)
 	info.internal_fa = t.internal_fa
 	info.external_fa = t.external_fa
 
-	if type(t.extrafield_local) == 'string' then
-		t.extrafield_local_size = t.extrafield_local_size or #t.extrafield_local
-	elseif t.extrafield_local then
-		assert(t.extrafield_local_size > 0, 'extrafield_local_size missing')
-	end
-	if type(t.extrafield_global) == 'string' then
-		t.extrafield_global_size = #t.extrafield_global
-	elseif t.extrafield_global then
-		assert(t.extrafield_global_size > 0, 'extrafield_global_size missing')
-	end
+	t.local_extra_size = t.local_extra and (t.local_extra_size or #t.local_extra) or 0
+	t.file_extra_size  = t.file_extra  and (t.file_extra_size  or #t.file_extra)  or 0
 
 	checkz(C.zipOpenNewFileInZip4_64(file, t.filename, info,
-			t.extrafield_local, t.extrafield_local_size, t.extrafield_global, t.extrafield_global_size,
+			t.local_extra, t.local_extra_size, t.file_extra, t.file_extra_size,
 			t.comment, t.method, t.level, t.raw,
 			t.windowBits, t.memLevel, t.strategy,
 			t.password, t.crc, t.versionMadeBy, t.flagBase, t.zip64))
 end
 
-function M.zip_write_cdata(file, data, sz)
-	checkz(C.zipWriteInFileInZip(file, data, sz))
+local function zip_write(file, data, sz)
+	checkz(C.zipWriteInFileInZip(file, data, sz or #data))
 end
 
-function M.zip_write(file, s)
-	M.zip_write_cdata(file, s, #s)
-end
-
-function M.zip_close_file(file)
+local function zip_close_file(file)
 	checkz(C.zipCloseFileInZip(file))
 end
 
-function M.zip_close_file_raw(file, uncompressed_size, crc32)
+local function zip_close_file_raw(file, uncompressed_size, crc32)
 	checkz(C.zipCloseFileInZipRaw64(file, uncompressed_size, crc32))
 end
 
-ffi.metatype('zipFile_s', {__index = {
-	close = M.zip_close,
-	add_file = M.zip_add_file,
-	write_cdata = M.zip_write_cdata,
-	write = M.zip_write,
-	close_file = M.zip_close_file,
-	close_file_raw = M.zip_close_file_raw,
-}})
+--zip hi-level API
+
+local function zip_archive(file, t, contents)
+	zip_add_file(file, t)
+	zip_write(file, contents)
+	zip_close_file(file)
+end
 
 --unzip interface
 
-function M.unzip_open(filename)
-	return ffi.gc(checkh(C.unzOpen64(filename)), M.unzip_close)
-end
-
-function M.unzip_close(file)
+local function unzip_close(file)
 	checkz(C.unzClose(file))
 	ffi.gc(file, nil)
 end
 
+local function unzip_open(filename)
+	return ffi.gc(checkh(C.unzOpen64(filename)), unzip_close)
+end
+
 --return the number of entries in the zip file and the global comment
-function M.unzip_get_global_info(file)
+local function unzip_get_global_info(file)
 	local info = ffi.new'unz_global_info64'
 	checkz(C.unzGetGlobalInfo64(file, info))
 	local sz = info.size_comment
@@ -166,47 +148,58 @@ function M.unzip_get_global_info(file)
 	}
 end
 
-function M.unzip_first_file(file)
+local function unzip_first_file(file)
 	checkz(C.unzGoToFirstFile(file))
 	return true
 end
 
-function M.unzip_next_file(file)
+local function unzip_next_file(file)
 	return checkeol(C.unzGoToNextFile(file)) == 0 or nil
 end
 
-function M.unzip_locate_file(file, filename, case_insensitive)
+local function unzip_locate_file(file, filename, case_insensitive)
 	return checkeol(C.unzLocateFile(file, filename, case_insensitive and 2 or 1)) == 0
 end
 
-function M.unzip_get_file_pos(file)
+local function unzip_get_file_pos(file)
 	local pos = ffi.new'unz64_file_pos'
 	checkz(C.unzGetFilePos64(file, pos))
 	return pos
 end
 
-function M.unzip_goto_file_pos(file, pos)
+local function unzip_goto_file_pos(file, pos)
 	checkz(C.unzGoToFilePos64(file, pos))
 end
 
-function M.unzip_get_file_info(file)
+local levels = {
+	[6] = 1,
+	[4] = 2,
+	[2] = 9,
+}
+
+local function unzip_get_file_info(file)
 	local info = ffi.new'unz_file_info64'
+
 	checkz(C.unzGetCurrentFileInfo64(file, info, nil, 0, nil, 0, nil, 0))
+
 	local filename     = info.size_filename > 0 and ffi.new('uint8_t[?]', info.size_filename) or nil
-	local file_extra   = info.size_filename > 0 and ffi.new('uint8_t[?]', info.size_file_extra) or nil
+	local file_extra   = info.size_file_extra > 0 and ffi.new('uint8_t[?]', info.size_file_extra) or nil
 	local file_comment = info.size_file_comment > 0 and ffi.new('uint8_t[?]', info.size_file_comment) or nil
+
 	checkz(C.unzGetCurrentFileInfo64(file, info,
-								filename,     info.size_filename,
-								file_extra,   info.size_file_extra,
-								file_comment, info.size_file_comment))
+												filename,     info.size_filename,
+												file_extra,   info.size_file_extra,
+												file_comment, info.size_file_comment))
 
 	return {
 		version        = info.version,
 		version_needed = info.version_needed,
-		flag    = info.flag,
-		method  = info.compression_method,
-		dosDate = info.dosDate,
-		crc     = info.crc,
+		flagBase  = bit.band(info.flag, 0xfff8),
+		method    = info.compression_method,
+		level     = levels[bit.band(info.flag, 0x06)] or 6,
+		encrypted = bit.band(info.flag, 1) == 1,
+		dosDate   = info.dosDate,
+		crc       = info.crc,
 		compressed_size   = tonumber(info.compressed_size),
 		uncompressed_size = tonumber(info.uncompressed_size),
 		internal_fa = info.internal_fa,
@@ -219,103 +212,104 @@ function M.unzip_get_file_info(file)
 			mon  = info.tmu_date.tm_mon + 1,
 			year = info.tmu_date.tm_year,
 		},
-		filename = filename     and ffi.string(filename, info.size_filename),
-		extra    = file_extra   and ffi.string(file_extra, info.size_file_extra),
-		comment  = file_comment and ffi.string(file_comment, info.size_file_comment),
+		filename         = filename and ffi.string(filename, info.size_filename),
+		file_extra       = file_extra,
+		file_extra_size  = file_extra and info.size_file_extra,
+		comment          = file_comment and ffi.string(file_comment, info.size_file_comment),
 	}
 end
 
-function M.unzip_get_file_size(file)
-	local info = ffi.new'unz_file_info64'
-	checkz(C.unzGetCurrentFileInfo64(file, info, nil, 0, nil, 0, nil, 0))
-	return tonumber(info.uncompressed_size)
-end
-
-function M.unzip_get_zstream_pos(file)
+local function unzip_get_zstream_pos(file)
 	return tonumber(C.unzGetCurrentFileZStreamPos64(file))
 end
 
-function M.unzip_open_file(file, password, raw, method, level)
-	raw = raw or 0
-	method = method or ffi.new'uint32_t[1]'
-	level = level or ffi.new'uint32_t[1]'
-	checkz(C.unzOpenCurrentFile3(file, method, level, raw, password))
-	return method[0], level[0]
+local function unzip_open_file(file, password, raw)
+	local method = ffi.new'int[1]'
+	local level = ffi.new'int[1]'
+	checkz(C.unzOpenCurrentFile3(file, method, level, raw or 0, password))
 end
 
-function M.unzip_close_file(file)
-	checkz(C.unzCloseCurrentFile(file))
-end
-
-function M.unzip_read_cdata(file, buf, sz)
-	return checkpoz(C.unzReadCurrentFile(file, buf, sz))
-end
-
-function M.unzip_tell(file)
-	return tonumber(C.unztell64(file))
-end
-
-function M.unzip_eof(file)
-	return C.unzeof(file) == 1
-end
-
-function M.unzip_get_local_extra_field(file, buf, sz)
-	if not buf then
-		sz = sz or checkpoz(C.unzGetLocalExtrafield(file, nil, 0))
-		buf = ffi.new('char[?]', sz)
-	end
-	sz = checkpoz(C.unzGetLocalExtrafield(file, buf, sz))
+local function unzip_get_local_extra(file)
+	local sz = checkpoz(C.unzGetLocalExtrafield(file, nil, 0))
+	if sz == 0 then return end
+	local buf = ffi.new('char[?]', sz)
+	assert(checkpoz(C.unzGetLocalExtrafield(file, buf, sz)) == sz)
 	return buf, sz
 end
 
-function M.unzip_get_offset(file)
+local function unzip_close_file(file)
+	checkz(C.unzCloseCurrentFile(file))
+end
+
+local function unzip_read_cdata(file, buf, sz)
+	return checkpoz(C.unzReadCurrentFile(file, buf, sz))
+end
+
+local function unzip_read(file, sz)
+	local buf = ffi.new('uint8_t[?]', sz)
+	return ffi.string(buf, unzip_read_cdata(file, buf, sz))
+end
+
+local function unzip_tell(file)
+	return tonumber(C.unztell64(file))
+end
+
+local function unzip_eof(file)
+	return C.unzeof(file) == 1
+end
+
+local function unzip_get_offset(file)
 	return tonumber(C.unzGetOffset64(file))
 end
 
-function M.unzip_set_offset(file)
+local function unzip_set_offset(file)
 	C.unzSetOffset64(file, pos)
 end
 
 --unzip hi-level API
 
-function M.unzip_files(file)
-	M.unzip_first_file(file)
+local function unzip_files(file)
+	unzip_first_file(file)
 	local first = true
 	return function()
 		if first then
 			first = false
-		elseif not M.unzip_next_file(file) then
+		elseif not unzip_next_file(file) then
 			return
 		end
-		return M.unzip_get_file_info(file)
+		return unzip_get_file_info(file)
 	end
 end
 
-function M.unzip_extract(file, filename)
-	assert(M.unzip_locate_file(file, filename), 'file not found')
-	M.unzip_open_file(file)
+local function unzip_extract(file, filename, password)
+	assert(unzip_locate_file(file, assert(filename)), 'file not found')
+	unzip_open_file(file, password)
 	return glue.fcall(function(finally)
-		finally(function() M.unzip_close_file(file) end)
-		local sz = M.unzip_get_file_size(file)
+		finally(function() unzip_close_file(file) end)
+		local sz = unzip_get_file_info(file).uncompressed_size
 		local buf = ffi.new('char[?]', sz)
-		assert(M.unzip_read_cdata(file, buf, sz) == sz)
+		assert(unzip_read_cdata(file, buf, sz) == sz)
 		return ffi.string(buf, sz)
 	end)
 end
 
-function M.unzip_copy_from_archive(file, src_file, filename)
-	assert(M.unzip_locate_file(src_file, filename), 'file not found')
-	local method, level = M.unzip_open_file(src_file, nil, true)
+--zip+unzip interface
+
+local function copy_from_zip(file, src_file)
+	unzip_open_file(src_file, nil, true)
 	glue.fcall(function(finally)
-		finally(function() M.unzip_close_file(src_file) end)
-		local info = M.unzip_get_file_info(src_file)
-		assert(info.compression_method == method)
-		assert(info.filename == filename)
+		finally(function() unzip_close_file(src_file) end)
+		local info = unzip_get_file_info(src_file)
 		local sz = info.compressed_size
 		local buf = ffi.new('char[?]', sz)
-		assert(M.unzip_read_cdata(file, buf, sz) == sz)
+		assert(unzip_read_cdata(src_file, buf, sz) == sz)
 
-		M.zip_add_file{
+		local local_extra, local_extra_size = unzip_get_local_extra(src_file)
+		if local_extra then
+			C.zipRemoveExtraInfoBlock(local_extra, local_extra_size, 1)
+		end
+
+		zip_add_file(file, {
 			filename = info.filename,
 			versionMadeBy = info.version,
 			dosDate = info.dosDate,
@@ -323,50 +317,64 @@ function M.unzip_copy_from_archive(file, src_file, filename)
 			external_fa = info.external_fa,
 			comment = info.comment,
 			method = info.compression_method,
-			level = level,
+			level = info.level,
 			raw = true,
 			crc = info.crc,
-			flagBase = info.flag,
-			extrafield_local = info.extra,
-			extrafield_global = nil, --??
-		}
-		return ffi.string(buf, sz)
+			flagBase = info.flagBase,
+			local_extra = local_extra,
+			local_extra_size = local_extra_size,
+			file_extra = info.file_extra,
+			file_extra_size = info.file_extra_size,
+		})
+		zip_write(file, buf, sz)
+		zip_close_file_raw(file, sz, info.crc)
 	end)
 end
 
-ffi.metatype('unzFile_s', {__index = {
-	close = M.unzip_close,
-	get_global_info = M.unzip_get_global_info,
-	--file catalog
-	first_file = M.unzip_first_file,
-	next_file = M.unzip_next_file,
-	locate_file = M.unzip_locate_file,
-	get_file_pos = M.unzip_get_file_pos,
-	goto_file_pos = M.unzip_goto_file_pos,
-	get_file_info = M.unzip_get_file_info,
-	unzip_get_file_size = M.unzip_get_file_size,
-	get_zstream_pos = M.unzip_get_zstream_pos,
-	--file i/o
-	open_file = M.unzip_open_file,
-	close_file = M.unzip_close_file,
-	read = M.unzip_read,
-	tell = M.unzip_tell,
-	eof = M.unzip_eof,
-	get_local_extra_field = M.unzip_get_local_extra_field,
-	get_offset = M.unzip_get_offset,
-	set_offset = M.unzip_set_offset,
-	--hi-level API
-	files = M.unzip_files,
-	extract = M.unzip_extract,
+--user interface
+
+ffi.metatype('zipFile_s', {__index = {
+	close = zip_close,
+	add_file = zip_add_file,
+	write = zip_write,
+	close_file = zip_close_file,
+	close_file_raw = zip_close_file_raw,
+	archive = zip_archive,
+	copy_from_zip = copy_from_zip,
 }})
 
-function M.open(filename, mode)
+ffi.metatype('unzFile_s', {__index = {
+	close = unzip_close,
+	get_global_info = unzip_get_global_info,
+	--file catalog
+	first_file = unzip_first_file,
+	next_file = unzip_next_file,
+	locate_file = unzip_locate_file,
+	get_file_pos = unzip_get_file_pos,
+	goto_file_pos = unzip_goto_file_pos,
+	get_file_info = unzip_get_file_info,
+	get_zstream_pos = unzip_get_zstream_pos,
+	--file i/o
+	open_file = unzip_open_file,
+	close_file = unzip_close_file,
+	read_cdata = unzip_read_cdata,
+	read = unzip_read,
+	tell = unzip_tell,
+	eof = unzip_eof,
+	get_offset = unzip_get_offset,
+	set_offset = unzip_set_offset,
+	--hi-level API
+	files = unzip_files,
+	extract = unzip_extract,
+}})
+
+local function open(filename, mode)
 	if not mode or mode == 'r' then
-		return M.unzip_open(filename)
+		return unzip_open(filename)
 	elseif mode == 'w' then
-		return M.zip_open(filename)
+		return zip_open(filename)
 	elseif mode == 'a' then
-		return M.zip_open(filename, 'add_files')
+		return zip_open(filename, C.APPEND_STATUS_ADDINZIP)
 	else
 		error("invalid mode. nil, 'r', 'w', 'a', expected.")
 	end
@@ -374,4 +382,7 @@ end
 
 if not ... then require'minizip_test' end
 
-return M
+return {
+	open = open,
+}
+

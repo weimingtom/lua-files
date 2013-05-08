@@ -12,6 +12,8 @@ local boxblur_lua = require'im_boxblur_lua'.blur_8888
 local stackblur = require'im_stackblur'.blur_8888
 local ffi = require'ffi'
 
+--TODO: make this demo based on cairo_player and load the image using imagefile.
+--eventually, extend cairo to support loading images through the imagefile API.
 local player = require'sg_cairo_player'
 local unit = require'unit'
 

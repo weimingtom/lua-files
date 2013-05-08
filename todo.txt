@@ -1,60 +1,65 @@
 STABLE
 -----------------------------------------------------------------------
+glue
 libb64
 sha2
 md5
 hmac
 murmurhash3
 pmurhash
+crc32
 zlib
 oo
 tuple
-cairo
-coro					test is demo
-pformat				merge in pp?
-pp						poor API; slow on expat.treeparse output; not binary stable; doesn't sort keys
-expat					test is demo
-minizip				poor API (stateful); remove zip64 default; look at python API
-
-vlc					plain C, no wrapper
-openvg				incomplete, but good for C level
-amanithvg			needs demo
-
-affine2d 			needs test unit
+strict
 math_eq2
+coro
+opengl
+
+
+EASY
+-----------------------------------------------------------------------
+minizip				poor API (stateful and crashes, no cdata/string separation); look at python API
+
+expat					test is demo
+cairo					extend to support loading images through the imagefile API
+im_*blur				make blur_demo based on cairo_player not sg_cairo_player
+affine2d 			needs test unit
 math_eq3				review for precision; needs more tests with non-unity first coeff.
-
-obj_loader
-obj_parser
-
+pformat				merge in pp?
+pp						poor API; slow on expat.treeparse output; not binary stable; doesn't sort keys; see _attic/pp.wiki
+amanithvg			needs demo
 cairo_player		better keyboard/mouse state
-clipper				finish the binding and make a demo
-fps_function		?
-freetype				stub (only minimal binding to load a ft_face)
+fps_function		wtf?
+unit					wtf?
+tar					finish it
+bmp_parser        finish it
 
-gl
-glu
-glu_lua				incomplete (only matrix stuff)
-glut					incomplete (only teapot)
-glue					remove max, min, sum? glue.shift ok?
+QUALITY
+-----------------------------------------------------------------------
+- unit testing for all input variations:
+	string, cdata, filename, file descriptor, file stream, read function
 
-im_boxblur
-im_boxblur_lua
-im_stackblur
 
+HARD/IMAGE LOADING
+-----------------------------------------------------------------------
 bmpconv				needs demo + review multithreading
-imagefile			?
 libjpeg				review bmpconv integration; finish multiscan reading; needs demo
 libpng				review bmpconv integration; cdata source and string source are NYI; needs demo for conv. options
 giflib				review bmpconv integration
-nanojpeg				unused
+nanojpeg				unused; crashes bmpconv with rgb and force_copy = false
+imagefile			review integration with whoever uses it
 
-path					oh yeah... can we merge any files? can we rename it? can we split geometry lib from path lib?
+HARD/DATABASES
+-----------------------------------------------------------------------
+port fbclient to ffi
+mysql
+postgresql
+sqlite
 
-pdf_inspect			?
-pdfgen				incomplete; can we use a minimal libharu subset if there is such a thing?
-hpdf_, hpdf_h		??
 
+HARD/HTTP & SOCKET I/O (also see see https://github.com/Wiladams/LJIT2Http_Parser)
+-----------------------------------------------------------------------
 http					review/test; body writer/formatter
 http_client			unfinished: needs i/o api from connect
 http_date
@@ -63,11 +68,44 @@ readbuffer			finish it (reimplement based on cdata?)
 uri					todo: absolute_path, absolute
 
 
-WINAPI EXTENSIONS
+HARD/CLIPPER
 -----------------------------------------------------------------------
-wglpanel
-cairopanel
-amanithvgpanel
+clipper				finish the binding and make a demo
+
+
+HARD/OPENGL
+-----------------------------------------------------------------------
+obj_parser
+obj_loader			review with sg_gl_mesh
+
+
+HARD/HIGH-LEVEL
+-----------------------------------------------------------------------
+path					oh yeah... can we merge any files? can we rename it? can we split geometry lib from path lib?
+text_editor			needs lots of work
+
+
+INCOMPLETE/LOW LEVEL
+-----------------------------------------------------------------------
+vlc					plain C, no wrapper
+freetype				stub (only minimal binding to load a ft_face)
+openvg				incomplete, but good for C level
+glu_lua				incomplete (only matrix stuff)
+glut					incomplete (only teapot)
+pdf_inspect			?
+pdfgen				incomplete; can we use a minimal libharu subset if there is such a thing?
+hpdf_, hpdf_h		??
+
+
+WINAPI/EASY
+-----------------------------------------------------------------------
+wglpanel				document
+cairopanel			document
+amanithvgpanel		document
+
+WINAPI/HARD
+-----------------------------------------------------------------------
+winapi				change oo system; document it
 
 
 TODO
@@ -95,41 +133,52 @@ socketloop_coro
 socketloop_dummy
 socketreader
 
-stddef_h
-stdint_h
-stdio_h
-stdio
-stdlib_h
-systypes_h
+stdio				no error reporting; not documented
+uuid				no linux; not documented
 
 streams
-
-strict
 
 svg_parser		incomplete (check if it still complies with path semantics)
 
 
-text_editor
 
-unit
-
-uuid				no linux
-
-
-TODO
+FFI IMPEDANCE MISMATCHES: BUFFERS VS STRINGS
 -----------------------------------------------------------------------
+- we want parsers and formatters written in Lua to work on both cdata buffers and strings.
+- parsers work on reader interfaces that load buffers or return strings.
+- but parsing utilities work on strings so we must copy buffers into strings first.
+	- can't find/match/gsub on cdata buffers
+		- we could ffi-bind re2 and use that
+		- we could write iterative scanners based on string.h
+	- can't tonumber on cdata buffers
+		- strtoul in Lua: https://github.com/Wiladams/LAPHLibs/blob/master/strtoul.lua
+		- strtol is in stdlib but requires dynamic allocation for error reporting
+	- can't struct.unpack on cdata buffers
+		- struct.unpack is good for binary data of specific endianness and for mixing fixed and variable fields
+			- ffi.abi'le' and bit.bswap can be used for 32bit ints, but there's no equivalent for 16bit ints
+			- pointer arithmetic and casting can be used to walk a mixed fixed+variable structure.
+	- can't lpeg on cdata buffers
+		- lpeg can't work with partial input anyway.
+- formatting utilities work on strings also:
+	- can't string.format on cdata buffers
+		- sprintf is in stdio.h (differences from string.format?)
+	- can't struct.pack on cdata buffers
+- ffi bindings happily accept cdata buffers as well as strings for const input.
+- ffi bindings would rather write binary output to cdata buffers instead of returning strings.
+	- the consumer might be able to use a buffer as input; if unable, it's a simple matter of calling ffi.string().
+	- yet this must only happen for binary buffers, while names and such are expected to be strings.
 
 
 UNCHARTED
 -----------------------------------------------------------------------
-- bzip2
+- re2 C wrapper ?
+- bzip2, lzma
 - an image library:
 	- IM: http://www.tecgraf.puc-rio.br/im/
 	- OpenCV, DevIL etc.
 - event polling libraries
 - curl? http://luacurl.luaforge.net/
 - date/time? (see _todo/date)
-- re2 ?
 - lrexlib http://math2.org/luasearch/rex.html ?
 - .NET - luainterface: http://code.google.com/p/luainterface/
 - wxlua again? http://wxlua.sourceforge.net/screenshots.php
@@ -138,9 +187,35 @@ UNCHARTED
 - LuaUnit https://github.com/luaforge/luaunit
 
 
-QUALITY
+LUA FOR SCRIPTING
 -----------------------------------------------------------------------
-- separate cdata and string APIs with consistent naming
-- unit testing for all input variations:
-	string, cdata, filename, file descriptor, file stream, read function
+bash pros:
+	- concise:
+		- globbing
+		- pipe operator
+		- background operator
+		- arg. expansions
+bash cons:
+	- spawns a process for just about everything
+	- unsafe and error prone for almost everything
+	- operations on strings and data structures suck big time
+what's needed:
+	- getopt
+	- globbing (why, if we already have pattern matching?)
+	- input + output pipes with lanes and coroutines
+	- list dirs and files
+	- standard sources and sinks for pipes: files, strings, gzip
+	- smarties like tee etc.
+	- exec in background and get a process handle
+	- wait on a list of process handles
+	- kill a process
+	- list processes
+	- find files
+	- mv, cp, ln, mkdir, rm, chmod, chown
+	- status routines: netstat, mount, du, df, lsmod, ps etc.
+
+
+MORE PURE-LUA CODE
+-----------------------------------------------------------------------
+md5, sha1, sha256
 

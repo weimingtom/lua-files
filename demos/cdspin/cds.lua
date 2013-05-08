@@ -19,7 +19,7 @@ function Wheel:new(n, size, radius)
 		local cd_image = {type = 'shape',
 			path = {'rect', 0, 0, size, size},
 			fill = {type = 'group',
-				{type = 'image', file = {path = '../../media/demos/cdspin/cd%d.png' % i}},
+				{type = 'image', file = {path = string.format('../../media/demos/cdspin/cd%d.png', i)}},
 				self.lights[i],
 			},
 			stroke = {type = 'color', 0,0,0},
@@ -192,7 +192,7 @@ end
 
 local main = winapi.Window{
 	autoquit = true,
-	title = 'Cairo %s' % cairo.cairo_version_string(),
+	title = string.format('Cairo %s', cairo.cairo_version_string()),
 	visible = false,
 }
 

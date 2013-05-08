@@ -12,7 +12,7 @@ local declared = {}
 function _M:__index(k)
 	if declared[k] then return nil end
 	if _G[k] ~= nil then return _G[k] end
-	error('Undefined winapi global %s' % k, 2)
+	error(string.format('Undefined winapi global %s', k), 2)
 end
 
 function _M:__newindex(k,v)
@@ -21,7 +21,7 @@ function _M:__newindex(k,v)
 		declared[k] = true
 		rawset(self, k, v)
 	else
-		error('Assignment to undeclared winapi global %s' % k, 2)
+		error(string.format('Assignment to undeclared winapi global %s', k), 2)
 	end
 end
 
@@ -30,7 +30,7 @@ function findname(prefix, value)
 	for k,v in pairs(_M) do
 		if k:match('^'..prefix) and type(v) ~= 'cdata' and type(value) ~= 'cdata' and v == value then return k end
 	end
-	return tonumber(value) ~= nil and '%x' % value or value
+	return tonumber(value) ~= nil and string.format('%x', value) or value
 end
 
 --print that can be used in expressions and recurses into tables

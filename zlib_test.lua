@@ -4,10 +4,10 @@ local ffi = require'ffi'
 require'unit'
 
 test(zlib.version():match'^1.2.7', '1.2.7')
-test(zlib.uncompress(zlib.compress('aaa'), 1024), 'aaa')
+test(zlib.uncompress(zlib.compress('aaa'), nil, 1024), 'aaa')
 
 test(glue.tohex(zlib.adler32'The game done changed.'), '587507ba')
-test(glue.tohex(zlib.crc32b'Game\'s the same, just got more fierce.'), '2c40120a')
+test(glue.tohex(zlib.crc32'Game\'s the same, just got more fierce.'), '2c40120a')
 
 local function gztest(file, content)
 	local gz = zlib.open(file)

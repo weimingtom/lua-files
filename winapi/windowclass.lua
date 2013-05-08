@@ -89,7 +89,7 @@ local function name_generator(format)
 	local n = 0
 	return function()
 		n = n + 1
-		return format % n
+		return string.format(format, n)
 	end
 end
 local gen_classname = name_generator'Window%d'

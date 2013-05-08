@@ -21,10 +21,7 @@ local function digest()
 	C.MD5_Init(ctx)
 	return function(data, size)
 		if data then
-			if type(data) == 'string' then
-				size = math.min(size or #data, #data)
-			end
-			C.MD5_Update(ctx, data, size)
+			C.MD5_Update(ctx, data, size or #data)
 		else
 			C.MD5_Final(result, ctx)
 			return ffi.string(result, 16)

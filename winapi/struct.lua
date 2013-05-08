@@ -11,7 +11,7 @@ local Struct_meta = {
 local setbit = setbit --cache
 function Struct:set(cdata, field, value) --hot code
 	if type(field) ~= 'string' then
-		error('struct "%s" has no field of type "%s"' % {self.ctype, type(field)}, 5)
+		error(string.format('struct "%s" has no field of type "%s"', self.ctype, type(field)), 5)
 	end
 	local def = self.fields[field]
 	if def then
@@ -54,13 +54,13 @@ function Struct:set(cdata, field, value) --hot code
 			end
 		end
 	end
-	error('struct "%s" has no field "%s"' % {self.ctype, field}, 5)
+	error(string.format('struct "%s" has no field "%s"', self.ctype, field), 5)
 end
 
 local getbit = getbit
 function Struct:get(cdata, field, value) --hot code
 	if type(field) ~= 'string' then
-		error('struct "%s" has no field of type "%s"' % {self.ctype, type(field)}, 5)
+		error(string.format('struct "%s" has no field of type "%s"', self.ctype, type(field)), 5)
 	end
 	local def = self.fields[field]
 	if def then
@@ -89,7 +89,7 @@ function Struct:get(cdata, field, value) --hot code
 			end
 		end
 	end
-	error('struct "%s" has no field "%s"' % {self.ctype, field}, 5)
+	error(string.format('struct "%s" has no field "%s"', self.ctype, field), 5)
 end
 
 function Struct:setall(cdata, t)

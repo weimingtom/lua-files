@@ -12,7 +12,8 @@ int njDecode(nj_context_t* nj, const void* jpeg, const int size);
 int njGetWidth(nj_context_t* nj);
 int njGetHeight(nj_context_t* nj);
 int njIsColor(nj_context_t* nj);
-unsigned char* njGetImage(nj_context_t* nj);
+uint8_t* njGetImage(nj_context_t* nj);
+void njFreeImage(uint8_t* image);
 int njGetImageSize(nj_context_t* nj);
 void njDone(nj_context_t* nj);
 ]]
@@ -39,7 +40,8 @@ local function decompress(data, sz, opt)
 		img.orientation = 'top_down'
 		img.size = C.njGetImageSize(nj)
 		img.data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
-		return bmpconv.convert_best(img, opt and opt.accept, {force_copy = true})
+		ffi.gc(img.data, C.njFreeImage)
+		return bmpconv.convert_best(img, opt and opt.accept)
 	end)
 end
 

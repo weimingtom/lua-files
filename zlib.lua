@@ -1,15 +1,13 @@
 --zlib binding
 local ffi = require'ffi'
-local glue = require'glue'
 require'zlib_h'
 local C = ffi.load'zlib'
-local M = {C = C}
 
-function M.version()
+local function version()
 	return ffi.string(C.zlibVersion())
 end
 
-local function check(ret)
+local function checkz(ret)
 	if ret == 0 then return end
 	error(ffi.string(C.zError(ret)))
 end
@@ -19,7 +17,7 @@ local function flate(api)
 		local ret = api(...)
 		if ret == 0 then return true end
 		if ret == C.Z_STREAM_END then return false end
-		check(ret)
+		checkz(ret)
 	end
 end
 
@@ -38,7 +36,7 @@ local function format_windowBits(format, windowBits)
 	return windowBits
 end
 
-local function init_deflate(finally, format, level, method, windowBits, memLevel, strategy)
+local function init_deflate(format, level, method, windowBits, memLevel, strategy)
 	level = level or C.Z_DEFAULT_COMPRESSION
 	method = method or C.Z_DEFLATED
 	windowBits = format_windowBits(format, windowBits or C.Z_MAX_WBITS)
@@ -46,88 +44,90 @@ local function init_deflate(finally, format, level, method, windowBits, memLevel
 	strategy = strategy or C.Z_DEFAULT_STRATEGY
 
 	local strm = ffi.new'z_stream'
-	check(C.deflateInit2_(strm, level, method, windowBits, memLevel, strategy, M.version(), ffi.sizeof(strm)))
-	finally(function() check(C.deflateEnd(strm)) end)
+	checkz(C.deflateInit2_(strm, level, method, windowBits, memLevel, strategy, version(), ffi.sizeof(strm)))
+	ffi.gc(strm, C.deflateEnd)
 	return strm, deflate
 end
 
-local function init_inflate(finally, format, windowBits)
+local function init_inflate(format, windowBits)
 	windowBits = format_windowBits(format, windowBits or C.Z_MAX_WBITS)
 
 	local strm = ffi.new'z_stream'
-	check(C.inflateInit2_(strm, windowBits, M.version(), ffi.sizeof(strm)))
-	finally(function() check(C.inflateEnd(strm)) end)
+	checkz(C.inflateInit2_(strm, windowBits, version(), ffi.sizeof(strm)))
+	ffi.gc(strm, C.inflateEnd)
 	return strm, inflate
 end
 
 local function inflate_deflate(init)
 	return function(read, write, bufsize, ...)
-		glue.fcall(function(finally, except, ...)
-			bufsize = bufsize or 16384
+		bufsize = bufsize or 16384
 
-			local strm, flate = init(finally, ...)
+		local strm, flate = init(...)
 
-			local buf = ffi.new('uint8_t[?]', bufsize)
+		local buf = ffi.new('uint8_t[?]', bufsize)
+		strm.next_out, strm.avail_out = buf, bufsize
+		strm.next_in, strm.avail_in = nil, 0
+
+		local function flush()
+			local sz = bufsize - strm.avail_out
+			if sz == 0 then return end
+			write(buf, sz)
 			strm.next_out, strm.avail_out = buf, bufsize
-			strm.next_in, strm.avail_in = nil, 0
+		end
 
-			local function flush()
-				local sz = bufsize - strm.avail_out
-				if sz == 0 then return end
-				write(buf, sz)
-				strm.next_out, strm.avail_out = buf, bufsize
-			end
-
-			local data, size --data must be anchored as an upvalue!
-			while true do
-				if strm.avail_in == 0 then --input buffer empty: refill
-					data, size = read()
-					if not data then --eof: finish up
-						local ret
-						repeat
-							flush()
-						until not flate(strm, C.Z_FINISH)
+		local data, size --data must be anchored as an upvalue!
+		while true do
+			if strm.avail_in == 0 then --input buffer empty: refill
+				data, size = read()
+				if not data then --eof: finish up
+					local ret
+					repeat
 						flush()
-						return
-					end
-					strm.next_in, strm.avail_in = data, size or #data
-				end
-				flush()
-				if not flate(strm, C.Z_NO_FLUSH) then
+					until not flate(strm, C.Z_FINISH)
 					flush()
 					return
 				end
+				strm.next_in, strm.avail_in = data, size or #data
 			end
-		end, ...)
+			flush()
+			if not flate(strm, C.Z_NO_FLUSH) then
+				flush()
+				return
+			end
+		end
 	end
 end
 
-M.inflate = inflate_deflate(init_inflate) --inflate(read, write[, bufsize][, format][, windowBits])
-M.deflate = inflate_deflate(init_deflate) --deflate(read, write[, bufsize][, format][, level][, windowBits][, memLevel][, strategy])
+local inflate = inflate_deflate(init_inflate) --inflate(read, write[, bufsize][, format][, windowBits])
+local deflate = inflate_deflate(init_deflate) --deflate(read, write[, bufsize][, format][, level][, windowBits][, memLevel][, strategy])
 
 --utility functions
 
-function M.compress_cdata(data, size, level)
+local function compress_tobuffer(data, size, level, buf, sz)
 	level = level or -1
-	local sz = ffi.new('unsigned long[1]', C.compressBound(size))
-	local buf = ffi.new('uint8_t[?]', sz[0])
-	check(C.compress2(buf, sz, data, size, level))
-	return buf, sz[0]
-end
-
-function M.compress(s, level)
-	return ffi.string(M.compress_cdata(s, #s, level))
-end
-
-function M.uncompress_cdata(data, size, sz, buf)
 	sz = ffi.new('unsigned long[1]', sz)
-	buf = buf or ffi.new('uint8_t[?]', sz[0])
-	check(C.uncompress(buf, sz, data, size))
-	return buf, sz[0]
+	checkz(C.compress2(buf, sz, data, size, level))
+	return sz[0]
 end
 
-function M.uncompress(s, sz, buf)
-	return ffi.string(M.uncompress_cdata(s, #s, sz, buf))
+local function compress(data, size, level)
+	size = size or #data
+	local sz = C.compressBound(size)
+	local buf = ffi.new('uint8_t[?]', sz)
+	sz = compress_tobuffer(data, size, level, buf, sz)
+	return ffi.string(buf, sz)
+end
+
+local function uncompress_tobuffer(data, size, buf, sz)
+	sz = ffi.new('unsigned long[1]', sz)
+	checkz(C.uncompress(buf, sz, data, size))
+	return sz[0]
+end
+
+local function uncompress(data, size, sz)
+	local buf = ffi.new('uint8_t[?]', sz)
+	sz = uncompress_tobuffer(data, size or #data, buf, sz)
+	return ffi.string(buf, sz)
 end
 
 --gzip file access functions
@@ -136,15 +136,17 @@ local function checkz(ret) assert(ret == 0) end
 local function checkminus1(ret) assert(ret ~= -1); return ret end
 local function ptr(o) return o ~= nil and o or nil end
 
-function M.close(gzfile)
+local function gzclose(gzfile)
 	checkz(C.gzclose(gzfile))
 	ffi.gc(gzfile, nil)
 end
 
-function M.open(filename, mode, bufsize)
+local function gzopen(filename, mode, bufsize)
 	local gzfile = ptr(C.gzopen(filename, mode or 'r'))
-	if not gzfile then return nil, string.format('errno %d', ffi.errno()) end
-	ffi.gc(gzfile, M.close)
+	if not gzfile then
+		return nil, string.format('errno %d', ffi.errno())
+	end
+	ffi.gc(gzfile, gzclose)
 	if bufsize then C.gzbuffer(gzfile, bufsize) end
 	return gzfile
 end
@@ -159,34 +161,30 @@ local flush_enum = {
 	trees   = C.Z_TREES,
 }
 
-function M.flush(gzfile, flush)
+local function gzflush(gzfile, flush)
 	checkz(C.gzflush(gzfile, flush_enum[flush]))
 end
 
-function M.read_cdata(gzfile, buf, sz)
+local function gzread_tobuffer(gzfile, buf, sz)
 	return checkminus1(C.gzread(gzfile, buf, sz))
 end
 
-function M.read(gzfile, sz)
+local function gzread(gzfile, sz)
 	local buf = ffi.new('uint8_t[?]', sz)
-	return ffi.string(buf, M.read_cdata(gzfile, buf, sz))
+	return ffi.string(buf, gzread_tobuffer(gzfile, buf, sz))
 end
 
-function M.write_cdata(gzfile, data, sz)
-	sz = C.gzwrite(gzfile, data, sz)
+local function gzwrite(gzfile, data, sz)
+	sz = C.gzwrite(gzfile, data, sz or #data)
 	if sz == 0 then return nil,'error' end
 	return sz
 end
 
-function M.write(gzfile, s)
-	return M.write_cdata(gzfile, s, #s)
-end
-
-function M.eof(gzfile)
+local function gzeof(gzfile)
 	return C.gzeof(gzfile) == 1
 end
 
-function M.seek(gzfile, ...)
+local function gzseek(gzfile, ...)
 	local narg = select('#',...)
 	local whence, offset
 	if narg == 0 then
@@ -204,40 +202,44 @@ function M.seek(gzfile, ...)
 	return checkminus1(C.gzseek(gzfile, offset, whence))
 end
 
-function M.offset(gzfile)
+local function gzoffset(gzfile)
 	return checkminus1(C.gzoffset(gzfile))
 end
 
 ffi.metatype('gzFile_s', {__index = {
-	close = M.close,
-	read = M.read,
-	write = M.write,
-	flush = M.flush,
-	eof = M.eof,
-	seek = M.seek,
-	offset = M.offset,
+	close = gzclose,
+	read = gzread,
+	write = gzwrite,
+	flush = gzflush,
+	eof = gzeof,
+	seek = gzseek,
+	offset = gzoffset,
 }})
 
 --checksum functions
 
-function M.adler32_cdata(data, sz, adler)
+local function adler32(data, sz, adler)
 	adler = adler or C.adler32(0, nil, 0)
-	return tonumber(C.adler32(adler, data, sz))
+	return tonumber(C.adler32(adler, data, sz or #data))
 end
 
-function M.adler32(s, adler)
-	return M.adler32_cdata(s, #s, adler)
-end
-
-function M.crc32b_cdata(data, sz, crc)
+local function crc32(data, sz, crc)
 	crc = crc or C.crc32(0, nil, 0)
-	return tonumber(C.crc32(crc, data, sz))
-end
-
-function M.crc32b(s, crc)
-	return M.crc32b_cdata(s, #s, crc)
+	return tonumber(C.crc32(crc, data, sz or #data))
 end
 
 if not ... then require'zlib_test' end
 
-return M
+return {
+	C = C,
+	version = version,
+	inflate = inflate,
+	deflate = deflate,
+	uncompress_tobuffer = uncompress_tobuffer,
+	uncompress = uncompress,
+	compress_tobuffer = compress_tobuffer,
+	compress = compress,
+	open = gzopen,
+	adler32 = adler32,
+	crc32 = crc32,
+}

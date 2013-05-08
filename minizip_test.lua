@@ -24,23 +24,11 @@ local z = zip.open(filename)
 pp(z:get_global_info())
 
 for info in z:files() do
-	print(z:get_offset())
 	pp(info)
 end
 
-z:first_file()
-z:open_file(password)
-assert(z:uncompress() == hello)
-assert(z:eof())
-assert(z:tell() == #hello)
-z:close_file()
-
-z:next_file()
-z:open_file()
-assert(z:uncompress() == hello_again)
-assert(z:eof())
-assert(z:tell() == #hello_again)
-z:close_file()
+assert(z:extract('dir1/file1.txt', password) == hello)
+assert(z:extract'dir1/file2.txt' == hello_again)
 
 z:close()
 

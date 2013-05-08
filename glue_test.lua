@@ -35,15 +35,6 @@ test(remove({'a','b','c','d'}, 4, 2), {'a', 'b', 'c'}) --too many
 test(remove({'a','b','c','d'}, 5, 5), {'a', 'b', 'c', 'd'}) --from too far
 test(remove({}, 5, 5), {}) --from too far
 
-test(glue.min{5,2,11,3}, 2)
-test(glue.max{5,2,11,3}, 11)
-
-test(glue.sum{1,10,100,1000}, 1111)
-test(glue.sum({{count=5},{count=8},{count=2}},'count'), 15)
-
-test(glue.reverse{1,2,3},{3,2,1})
-test(glue.reverse{1,2,3,4},{4,3,2,1})
-
 local function test1(s,sep,expect)
 	local t={} for c in glue.gsplit(s,sep) do t[#t+1]=c end
 	assert(#t == #expect)

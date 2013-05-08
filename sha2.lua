@@ -43,10 +43,7 @@ local function digest_function(Context, Init, Update, Final, DIGEST_LENGTH)
 		Init(ctx)
 		return function(data, size)
 			if data then
-				if type(data) == 'string' then
-					size = math.min(size or #data, #data)
-				end
-				Update(ctx, data, size)
+				Update(ctx, data, size or #data)
 			else
 				Final(result, ctx)
 				return ffi.string(result, ffi.sizeof(result))

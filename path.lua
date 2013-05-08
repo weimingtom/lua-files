@@ -1271,12 +1271,10 @@ local conversions = {} --{command = {["conversion name"] = converter}}
 for _,s in ipairs{'line', 'curve', 'quad_curve', 'arc'} do
 	--abs. commands can be made rel.
 	conversions[s] = {
-		['to absolute'] = toggle_rel,
 	}
 
 	--rel. commands can be made abs.
 	conversions['rel_'..s] = {
-		['to relative'] = toggle_rel,
 	}
 end
 

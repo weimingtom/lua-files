@@ -35,7 +35,7 @@ function VObject:__set_vproperty(o,k,v)
 			if self['set_'..k] then --r/w property
 				self['set_'..k](o,v)
 			else --r/o property
-				error('trying to set read only property "%s"' % k, 2)
+				error(string.format('trying to set read only property "%s"', k), 2)
 			end
 		elseif self['set_'..k] then --stored property
 			if not rawget(o, '__state') then rawset(o, '__state', {}) end

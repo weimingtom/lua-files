@@ -2,7 +2,7 @@ local ffi = require'ffi'
 require'unit'
 
 local function sanity_test(hashmod)
-	local hash = require(hashmod).hash
+	local hash = require(hashmod)
 	assert(hash'hey' == 318325784)
 	assert(hash'dude' == -284915725)
 

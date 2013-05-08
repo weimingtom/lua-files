@@ -106,58 +106,7 @@ function glue.shift(t, i, n)
 	return t
 end
 
-function glue.pluck(t,key)
-	local dt={}
-	for i=1,#t do dt[#dt+1]=t[i][key] end
-	return dt
-end
-
-function glue.min(t,cmp)
-	local n=t[1]
-	if cmp then
-		for i=2,#t do if cmp(t[i], n) then n=t[i] end end
-	else
-		for i=2,#t do if t[i] < n then n=t[i] end end
-	end
-	return n
-end
-
-function glue.max(t,cmp)
-	local n=t[1]
-	if cmp then
-		for i=2,#t do if cmp(n, t[i]) then n=t[i] end end
-	else
-		for i=2,#t do if n < t[i] then n=t[i] end end
-	end
-	return n
-end
-
-function glue.sum(t,key)
-	local n=0
-	if key then
-		for i=1,#t do n=n+(t[i][key] or 0) end
-	else
-		for i=1,#t do n=n+(t[i] or 0) end
-	end
-	return n
-end
-
-function glue.reverse(t)
-	for i=1,#t/2 do
-		t[#t-i+1],t[i]=t[i],t[#t-i+1]
-	end
-	return t
-end
-
 glue.string = {}
-
-getmetatable''.__mod = function(s,v)
-	if type(v) == 'table' then
-		return format(s, unpack(v))
-	else
-		return format(s, v)
-	end
-end
 
 local function iterate_once(s, s1)
 	return s1 == nil and s or nil

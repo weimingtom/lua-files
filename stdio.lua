@@ -2,6 +2,8 @@ local ffi = require'ffi'
 require'stdio_h'
 local M = {C = ffi.C}
 
+--TODO: error reporting on these
+
 function M.readfile(file, format)
 	local f = ffi.C.fopen(file, format=='t' and 'r' or 'rb')
 	ffi.C.fseek(f, 0, ffi.C.SEEK_END)
