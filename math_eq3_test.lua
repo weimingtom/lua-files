@@ -24,6 +24,9 @@ assert_sol(1, -5,  8, -4,    1, 2) --D == 0, u ~= 0
 assert_sol(1, -5,  8, -4,    1, 2) --D == 0, u ~= 0
 assert_sol(1,  0, -7, -6,    3, -2, -1) --D < 0
 assert_sol(1, -6, -6, -7,    7) -- D > 0
+assert_sol(1,  7,  17, 15,  -3)
 assert_sol(0,  1, -7, 12,    3, 4) --2nd degree
+assert_sol(2, -4, -22, 24,   4, -3, 1)
+assert_sol(2, -4, -22, 24,   4, -3, 1)
+assert_sol(4, -3, -25, -6,   3, -1/4, -2)
 
---TODO: add more tests with non-unity first coefficient

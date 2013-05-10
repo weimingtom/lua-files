@@ -1,47 +1,13 @@
-STABLE
------------------------------------------------------------------------
-glue
-libb64
-sha2
-md5
-hmac
-murmurhash3
-pmurhash
-crc32
-zlib
-oo
-tuple
-strict
-math_eq2
-coro
-opengl
-
-
 EASY
 -----------------------------------------------------------------------
-minizip				poor API (stateful and crashes, no cdata/string separation); look at python API
-
-expat					test is demo
-cairo					extend to support loading images through the imagefile API
+affine2d 			needs test unit; needs renaming
+expat					needs test unit
 im_*blur				make blur_demo based on cairo_player not sg_cairo_player
-affine2d 			needs test unit
-math_eq3				review for precision; needs more tests with non-unity first coeff.
-pformat				merge in pp?
-pp						poor API; slow on expat.treeparse output; not binary stable; doesn't sort keys; see _attic/pp.wiki
-amanithvg			needs demo
+amanithvg			needs demo for amanithvgpanel
 cairo_player		better keyboard/mouse state
-fps_function		wtf?
-unit					wtf?
-tar					finish it
-bmp_parser        finish it
-
-QUALITY
------------------------------------------------------------------------
-- unit testing for all input variations:
-	string, cdata, filename, file descriptor, file stream, read function
 
 
-HARD/IMAGE LOADING
+IMAGE LOADING
 -----------------------------------------------------------------------
 bmpconv				needs demo + review multithreading
 libjpeg				review bmpconv integration; finish multiscan reading; needs demo
@@ -49,52 +15,21 @@ libpng				review bmpconv integration; cdata source and string source are NYI; ne
 giflib				review bmpconv integration
 nanojpeg				unused; crashes bmpconv with rgb and force_copy = false
 imagefile			review integration with whoever uses it
+cairo					support loading images through the imagefile API
 
-HARD/DATABASES
+
+HARD / C BINDINGS
 -----------------------------------------------------------------------
-port fbclient to ffi
-mysql
-postgresql
-sqlite
-
-
-HARD/HTTP & SOCKET I/O (also see see https://github.com/Wiladams/LJIT2Http_Parser)
------------------------------------------------------------------------
-http					review/test; body writer/formatter
-http_client			unfinished: needs i/o api from connect
-http_date
-http_headers		test is demo
-readbuffer			finish it (reimplement based on cdata?)
-uri					todo: absolute_path, absolute
-
-
-HARD/CLIPPER
------------------------------------------------------------------------
+mysql					header sorted out; needs lua wrappers
 clipper				finish the binding and make a demo
-
-
-HARD/OPENGL
------------------------------------------------------------------------
-obj_parser
-obj_loader			review with sg_gl_mesh
 
 
 HARD/HIGH-LEVEL
 -----------------------------------------------------------------------
 path					oh yeah... can we merge any files? can we rename it? can we split geometry lib from path lib?
+svg_parser			check if it still complies with path semantics
 text_editor			needs lots of work
-
-
-INCOMPLETE/LOW LEVEL
------------------------------------------------------------------------
-vlc					plain C, no wrapper
-freetype				stub (only minimal binding to load a ft_face)
-openvg				incomplete, but good for C level
-glu_lua				incomplete (only matrix stuff)
-glut					incomplete (only teapot)
-pdf_inspect			?
-pdfgen				incomplete; can we use a minimal libharu subset if there is such a thing?
-hpdf_, hpdf_h		??
+obj_parser/loader	review with sg_gl_mesh; there are still meshes that don't load correctly
 
 
 WINAPI/EASY
@@ -103,12 +38,8 @@ wglpanel				document
 cairopanel			document
 amanithvgpanel		document
 
-WINAPI/HARD
------------------------------------------------------------------------
-winapi				change oo system; document it
 
-
-TODO
+SCENE GRAPHS GROOMING
 -----------------------------------------------------------------------
 sg_2d
 sg_base
@@ -117,7 +48,6 @@ sg_cairo
 sg_cairo_draw
 sg_cairo_player
 sg_cairo_trace
-
 sg_gl
 sg_gl_debug
 sg_gl_mesh			broken imagefile integration
@@ -125,24 +55,53 @@ sg_gl_obj
 sg_gl_player
 sg_gl_shape
 sg_gl_test
-
 sg_pdf				?
 
-socketloop
-socketloop_coro
-socketloop_dummy
-socketreader
-
-stdio				no error reporting; not documented
-uuid				no linux; not documented
-
-streams
-
-svg_parser		incomplete (check if it still complies with path semantics)
 
 
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
 
-FFI IMPEDANCE MISMATCHES: BUFFERS VS STRINGS
+LATER / NEEDS ABANDONING
+-----------------------------------------------------------------------
+opengl				opengl is dead. move everything to angle/ES2 and learn GLSL
+unit					try LuaUnit https://github.com/luaforge/luaunit
+
+
+LATER / NEEDS BETTER API
+-----------------------------------------------------------------------
+minizip				poor API (stateful and crashes, no cdata/string separation); look at python API
+pformat				merge in pp?
+pp						poor API; slow on expat.treeparse output; doesn't sort keys = not binary stable; make it indent by default
+
+
+LATER / MORE BINDINGS
+-----------------------------------------------------------------------
+time.lua 			review it and add it (and embed or remove xsys)
+tar					finish it, read + write; tests
+bmp_parser        finish it; tests; demo
+sqlite				many ffi bindings available; choose one
+fbclient				port it? isn't firebird dead yet?
+postgresql
+re2 + cre2
+bzip2
+lzma
+md5, sha1, sha256 in Lua
+vlc					plain C, no wrapper
+freetype				stub (only minimal binding to load a ft_face)
+an image library:
+	- IM: http://www.tecgraf.puc-rio.br/im/
+	- OpenCV, DevIL etc.
+event polling libraries?
+lrexlib http://math2.org/luasearch/rex.html ?
+luaInterface (.NET): http://code.google.com/p/luainterface/
+luaCOM
+wxlua again? http://wxlua.sourceforge.net/screenshots.php
+CLucene
+
+
+LATER / FFI CDATA BUFFERS VS STRINGS
 -----------------------------------------------------------------------
 - we want parsers and formatters written in Lua to work on both cdata buffers and strings.
 - parsers work on reader interfaces that load buffers or return strings.
@@ -169,25 +128,36 @@ FFI IMPEDANCE MISMATCHES: BUFFERS VS STRINGS
 	- yet this must only happen for binary buffers, while names and such are expected to be strings.
 
 
-UNCHARTED
+LATER / STREAMS
 -----------------------------------------------------------------------
-- re2 C wrapper ?
-- bzip2, lzma
-- an image library:
-	- IM: http://www.tecgraf.puc-rio.br/im/
-	- OpenCV, DevIL etc.
-- event polling libraries
-- curl? http://luacurl.luaforge.net/
-- date/time? (see _todo/date)
-- lrexlib http://math2.org/luasearch/rex.html ?
-- .NET - luainterface: http://code.google.com/p/luainterface/
-- wxlua again? http://wxlua.sourceforge.net/screenshots.php
-- CLucene
-- http server
-- LuaUnit https://github.com/luaforge/luaunit
+stdio				no error reporting; not documented (used by nanojpeg and obj_loader)
+- we want all parsers to only work on reader interfaces that return a cdata, size pair or a string.
+	- tier1: expat, libjpeg, libpng, zlib, libb64, md5, sha2
+		- tier2: svg_parser, obj_parser
 
 
-LUA FOR SCRIPTING
+LATER / URI, SOCKET LOOPS, HTTP PARSER & CLIENT
+-----------------------------------------------------------------------
+uri					todo: absolute_path, absolute_uri, multiple values on the same key => array of values
+http					review/test; body writer/formatter
+http_client			unfinished: needs i/o api from connect
+http_date
+http_headers		needs test unit
+readbuffer			finish it (reimplement based on cdata?)
+socketloop
+socketloop_coro
+socketloop_dummy
+socketreader
+curl? http://luacurl.luaforge.net/
+c http_parser? https://github.com/Wiladams/LJIT2Http_Parser
+
+
+LATER / WINAPI
+-----------------------------------------------------------------------
+winapi				change oo system; document it
+
+
+LATER / LUA FOR SCRIPTING
 -----------------------------------------------------------------------
 bash pros:
 	- concise:
@@ -213,9 +183,4 @@ what's needed:
 	- find files
 	- mv, cp, ln, mkdir, rm, chmod, chown
 	- status routines: netstat, mount, du, df, lsmod, ps etc.
-
-
-MORE PURE-LUA CODE
------------------------------------------------------------------------
-md5, sha1, sha256
 

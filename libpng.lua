@@ -4,7 +4,7 @@ local bit = require'bit'
 local glue = require'glue'
 local bmpconv = require'bmpconv'
 require'libpng_h'
-require'stdio_h'
+require'stdio_h' --for C.fopen()
 local C = ffi.load'libpng'
 
 local PNG_LIBPNG_VER_STRING = '1.5.10'
@@ -84,9 +84,11 @@ local function load(src, opt)
 		elseif src.path then
 			local f = ffi.C.fopen(src.path, 'rb')
 			glue.assert(f ~= nil, 'could not open file %s', src.path)
+			ffi.gc(f, ffi.C.fclose)
 			finally(function()
 				C.png_init_io(png_ptr, nil)
 				ffi.C.fclose(f)
+				ffi.gc(f, nil)
 			end)
 			C.png_init_io(png_ptr, f)
 		elseif src.stream then

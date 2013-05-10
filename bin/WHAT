@@ -32,6 +32,12 @@ socket_core.dll csrc/luasocket
 vararg.dll      csrc/vararg
 zlib.dll        csrc/zlib
 
+
+NOT INCLUDED
+-------------------------------------------------
+plugins/        VLC plugins dir. for libvlc.dll
+
+
 TODO
 -------------------------------------------------
 

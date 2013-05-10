@@ -1,6 +1,6 @@
---3rd degree equation solver using Cardano's method.
+--3rd degree equation solver using the trigonometric method, see http://en.wikipedia.org/wiki/Cubic_function.
 --epsilon controls the precision of the solver.
---TODO: Code-review this for catastrophic cancelations and alike.
+--TODO: review this code for catastrophic cancelations and alike.
 
 local solve_equation2 = require'math_eq2'
 

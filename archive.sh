@@ -1,4 +1,5 @@
 # create zip files and upload them to google code.
+# be sure to put your password in password.txt first.
 
 # NOTE: upload.py doesn't support overwriting existing files,
 # so be sure to delete the old files from google code first.
@@ -41,12 +42,6 @@ archive_media() {
 		-x $P/media/.\*
 }
 
-archive_vlc() {
-	archive $P-vlc $P/bin/libvlc*.dll $P/bin/plugins \
-		-x $P/bin/plugins/plugins.dat
-}
-
 archive_sources
 #archive_media
-#archive_vlc
 

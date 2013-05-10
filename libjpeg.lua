@@ -2,9 +2,9 @@
 local ffi = require'ffi'
 local bit = require'bit'
 local glue = require'glue'
-local stdio = require'stdio'
 local bmpconv = require'bmpconv'
 require'libjpeg_h'
+require'stdio_h' --for C.fopen()
 local C = ffi.load'libjpeg'
 
 local LIBJPEG_VERSION = 62
@@ -170,9 +170,11 @@ local function load(src, opt)
 		elseif src.path then
 			local f = ffi.C.fopen(src.path, 'rb')
 			glue.assert(f ~= nil, 'could not open file %s', src.path)
+			ffi.gc(f, ffi.C.fclose)
 			finally(function()
 				C.jpeg_stdio_src(cinfo, nil)
 				ffi.C.fclose(f)
+				ffi.gc(f, nil)
 			end)
 			C.jpeg_stdio_src(cinfo, f)
 		elseif src.string then
