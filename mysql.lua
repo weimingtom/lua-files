@@ -289,22 +289,22 @@ local field_type_names = {
 	[C.MYSQL_TYPE_TIMESTAMP] = 'timestamp',
 	[C.MYSQL_TYPE_LONGLONG] = 'bigint',
 	[C.MYSQL_TYPE_INT24] = 'mediumint',
-	[C.MYSQL_TYPE_DATE] = 'date',
+	[C.MYSQL_TYPE_DATE] = 'date', --pre mysql 5.0, storage = 4 bytes
 	[C.MYSQL_TYPE_TIME] = 'time',
 	[C.MYSQL_TYPE_DATETIME] = 'datetime',
 	[C.MYSQL_TYPE_YEAR] = 'year',
-	[C.MYSQL_TYPE_NEWDATE] = 'newdate',
+	[C.MYSQL_TYPE_NEWDATE] = 'newdate', --mysql 5.0+, storage = 3 bytes
 	[C.MYSQL_TYPE_VARCHAR] = 'varchar',
 	[C.MYSQL_TYPE_BIT] = 'bit',
-	[C.MYSQL_TYPE_TIMESTAMP2] = 'timestamp2',
-	[C.MYSQL_TYPE_DATETIME2] = 'datetime2',
-	[C.MYSQL_TYPE_TIME2] = 'time2',
-	[C.MYSQL_TYPE_NEWDECIMAL] = 'newdecimal', --Precision math DECIMAL or NUMERIC
+	[C.MYSQL_TYPE_TIMESTAMP2] = 'timestamp2', --mysql 5.6+, can store fractional seconds
+	[C.MYSQL_TYPE_DATETIME2] = 'datetime2', --mysql 5.6+, can store fractional seconds
+	[C.MYSQL_TYPE_TIME2] = 'time2',  --mysql 5.6+, can store fractional seconds
+	[C.MYSQL_TYPE_NEWDECIMAL] = 'newdecimal', --mysql 5.0+, Precision math DECIMAL or NUMERIC
 	[C.MYSQL_TYPE_ENUM] = 'enum',
 	[C.MYSQL_TYPE_SET] = 'set',
-	[C.MYSQL_TYPE_TINY_BLOB] = 'tiny_blob',
-	[C.MYSQL_TYPE_MEDIUM_BLOB] = 'medium_blob',
-	[C.MYSQL_TYPE_LONG_BLOB] = 'long_blob',
+	[C.MYSQL_TYPE_TINY_BLOB] = 'tinyblob',
+	[C.MYSQL_TYPE_MEDIUM_BLOB] = 'mediumblob',
+	[C.MYSQL_TYPE_LONG_BLOB] = 'longblob',
 	[C.MYSQL_TYPE_BLOB] = 'text', --TEXT or BLOB
 	[C.MYSQL_TYPE_VAR_STRING] = 'varchar', --VARCHAR or VARBINARY
 	[C.MYSQL_TYPE_STRING] = 'char', --CHAR or BINARY
@@ -312,9 +312,9 @@ local field_type_names = {
 }
 
 local binary_field_type_names = {
-	[C.MYSQL_TYPE_BLOB] = 'blob', --TEXT or BLOB
-	[C.MYSQL_TYPE_VAR_STRING] = 'varbinary', --VARCHAR or VARBINARY
-	[C.MYSQL_TYPE_STRING] = 'binary', --CHAR or BINARY
+	[C.MYSQL_TYPE_BLOB] = 'blob',
+	[C.MYSQL_TYPE_VAR_STRING] = 'varbinary',
+	[C.MYSQL_TYPE_STRING] = 'binary',
 }
 
 local field_type_flag_names = {
@@ -372,50 +372,54 @@ end
 
 --row data
 
+local function number(data, sz)
+	return tonumber(ffi.string(data, sz))
+end
 
+local function time(data, sz)
+
+end
 
 local field_decoders = {
-	[C.MYSQL_TYPE_DECIMAL] = 'decimal',
-	[C.MYSQL_TYPE_TINY] = 'tiny',
-	[C.MYSQL_TYPE_SHORT] = 'short',
-	[C.MYSQL_TYPE_LONG] = 'long',
-	[C.MYSQL_TYPE_FLOAT] = 'float',
-	[C.MYSQL_TYPE_DOUBLE] = 'double',
-	[C.MYSQL_TYPE_NULL] = 'null',
+	[C.MYSQL_TYPE_DECIMAL] = number,
+	[C.MYSQL_TYPE_TINY] = number,
+	[C.MYSQL_TYPE_SHORT] = number,
+	[C.MYSQL_TYPE_LONG] = number,
+	[C.MYSQL_TYPE_FLOAT] = number,
+	[C.MYSQL_TYPE_DOUBLE] = number,
+	[C.MYSQL_TYPE_NEWDECIMAL] = number,
+	--[[
 	[C.MYSQL_TYPE_TIMESTAMP] = 'timestamp',
 	[C.MYSQL_TYPE_LONGLONG] = 'longlong',
 	[C.MYSQL_TYPE_INT24] = 'int24',
 	[C.MYSQL_TYPE_DATE] = 'date',
 	[C.MYSQL_TYPE_TIME] = 'time',
 	[C.MYSQL_TYPE_DATETIME] = 'datetime',
-	[C.MYSQL_TYPE_YEAR] = 'year',
 	[C.MYSQL_TYPE_NEWDATE] = 'newdate',
-	[C.MYSQL_TYPE_VARCHAR] = 'varchar',
-	[C.MYSQL_TYPE_BIT] = 'bit',
 	[C.MYSQL_TYPE_TIMESTAMP2] = 'timestamp2',
 	[C.MYSQL_TYPE_DATETIME2] = 'datetime2',
 	[C.MYSQL_TYPE_TIME2] = 'time2',
-	[C.MYSQL_TYPE_NEWDECIMAL] = 'newdecimal',
+	]]
+	[C.MYSQL_TYPE_YEAR] = number,
+	[C.MYSQL_TYPE_VARCHAR] = 'varchar',
+	[C.MYSQL_TYPE_BIT] = 'bit',
 	[C.MYSQL_TYPE_ENUM] = 'enum',
 	[C.MYSQL_TYPE_SET] = 'set',
-	[C.MYSQL_TYPE_TINY_BLOB] = 'tiny_blob',
-	[C.MYSQL_TYPE_MEDIUM_BLOB] = 'medium_blob',
-	[C.MYSQL_TYPE_LONG_BLOB] = 'long_blob',
-	[C.MYSQL_TYPE_BLOB] = 'blob',
-	[C.MYSQL_TYPE_VAR_STRING] = 'var_string',
-	[C.MYSQL_TYPE_STRING] = 'string',
 	[C.MYSQL_TYPE_GEOMETRY] = 'geometry',
 }
 
 function res.fetch_row(res)
-	local n = C.mysql_num_fields(res)
-	local row = C.mysql_fetch_row(res)
-	local sz = C.mysql_fetch_lengths(res)
+	local values = C.mysql_fetch_row(res)
+	if not values then return end --TODO: check for error
+	local sizes = C.mysql_fetch_lengths(res)
+	local field_count = C.mysql_num_fields(res)
 	local fields = C.mysql_fetch_fields(res)
 	local t = {}
-	for i=0,n-1 do
-		local decoder = assert(field_decoders[fields[i].type])
-		t[#t+1] = decoder(row[i], sz[i])
+	for i=0,field_count-1 do
+		if values[i] ~= nil then
+			local decoder = field_decoders[fields[i].type] or ffi.string
+			t[i+1] = decoder(values[i], sizes[i])
+		end
 	end
 	return t
 end
@@ -481,7 +485,80 @@ print('conn:autocommit       ', conn:autocommit(true))
 
 --queries
 print('conn:escape           ', conn:escape("'escape me'"))
-print('conn:query            ', conn:query('select * from resumes'))
+print('conn:query            ')
+--TODO: spatial fields
+conn:query'drop table if exists binding_test'
+conn:query[[
+create table binding_test (
+	fdecimal decimal(8,2),
+	fnumeric numeric(6,4),
+	ftinyint tinyint,
+	fsmallint smallint,
+	finteger integer,
+	ffloat float,
+	fdouble double,
+	freal real,
+	fbigint bigint,
+	fmediumint mediumint,
+	fdate date,
+	ftime time(0),
+	ftime2 time(6),
+	fdatetime datetime(0),
+	fdatetime2 datetime(6),
+	ftimestamp timestamp(0),
+	ftimestamp2 timestamp(6),
+	fyear year,
+	fbit bit(64),
+	fenum enum('yes', 'no'),
+	fset set('e1', 'e2', 'e3'),
+	ftinyblob tinyblob,
+	fmediumblob mediumblob,
+	flongblob longblob,
+	ftext text,
+	fblob blob,
+	fvarchar varchar(200),
+	fvarbinary varbinary(200),
+	fchar char(200),
+	fbinary binary(20)
+);
+
+insert into binding_test set
+	fdecimal = '42.12',
+	fnumeric = 42.1234,
+	ftinyint = '42',
+	fsmallint = 42,
+	finteger = '42',
+	ffloat = 42.3,
+	fdouble = '42.33',
+	freal = 42.333,
+	fbigint = '420',
+	fmediumint = 440,
+	fdate = '2013-10-05',
+	ftime = '21:30:15',
+	ftime2 = '21:30:16.123456',
+	fdatetime = '2013-10-05 21:30:17',
+	fdatetime2 = '2013-10-05 21:30:18.123456',
+	ftimestamp = '2013-10-05 21:30:19',
+	ftimestamp2 = '2013-10-05 21:30:20.123456',
+	fyear = 2013,
+	fbit = 42,
+	fenum = 'yes',
+	fset = ('e3,e2'),
+	ftinyblob = 'tiny tiny blob',
+	fmediumblob = 'medium blob',
+	flongblob = 'loong blob',
+	ftext = 'just a text',
+	fblob = 'bloob',
+	fvarchar = 'just a varchar',
+	fvarbinary = 'a varbinary',
+	fchar = 'a char',
+	fbinary = 'a binary char'
+;
+
+insert into binding_test values ();
+
+select * from binding_test;
+]]
 
 --query info
 print('conn:field_count      ', conn:field_count())
@@ -491,12 +568,16 @@ print('conn:errno            ', conn:errno())
 print('conn:sqlstate         ', conn:sqlstate())
 print('conn:warning_count    ', conn:warning_count())
 print('conn:info             ', conn:info())
-print('conn:more_results     ', conn:more_results()) --TODO: next_results
+for i=1,3 do
+	print('conn:more_results     ', conn:more_results()); assert(conn:more_results())
+	print('conn:next_result      ', conn:next_result())
+end
+assert(not conn:more_results())
 --TODO: local res = conn:use_result()
 local res = conn:store_result()
-print('conn:use_result       ', res)
-print('res:row_count         ', res:row_count()); assert(res:row_count() == 21)
-print('res:field_count       ', res:field_count()); assert(res:field_count() == 11)
+print('conn:store_result     ', res)
+print('res:row_count         ', res:row_count()); assert(res:row_count() == 2)
+print('res:field_count       ', res:field_count()); assert(res:field_count() == 30)
 print('res:eof               ', res:eof()); assert(res:eof() == true)
 print('res:fields            ')
 local fields = res:fields()
@@ -509,6 +590,16 @@ for k in glue.sortedpairs(fields[1]) do
 	print(table.concat(t, '\t'))
 end
 print('res:field_info        ', pformat(res:field_info(1), '   '))
+local function fetch_row()
+	print('res:fetch_row         ')
+	local row = assert(res:fetch_row())
+	for i,f in ipairs(fields) do
+		print('   '..pad(f.name, 20)..tostring(row[i]))
+	end
+end
+fetch_row()
+fetch_row()
+assert(res:fetch_row() == nil)
 
 print('res:free              ', res:free())
 --query results

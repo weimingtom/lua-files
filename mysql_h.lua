@@ -1,4 +1,6 @@
---result of `cpp mysql.h` plus lots of cleanup and errors from errmsg.h; mysql 5.6.11
+--result of `cpp mysql.h` plus lots of cleanup plus errors from errmsg.h; MySQL Connector/C 6.1
+--NOTE that MySQL Connector/C is GPL software. Could this file be considered "derived work" then?
+
 local ffi = require'ffi'
 
 ffi.cdef[[
