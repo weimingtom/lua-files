@@ -1,7 +1,7 @@
---result of `cpp stdlib.h` from mingw
+--result of `cpp stdlib.h` from mingw adjusted for windows
 local ffi = require'ffi'
 
-ffi.cdef[[
+ffi.cdef([[
 int _argc;
 char** _argv;
 int* __p___argc(void);
@@ -115,12 +115,14 @@ void _Exit(int);
 typedef struct { long long quot, rem; } lldiv_t;
 lldiv_t lldiv (long long, long long);
 long long llabs(long long);
-long long strtoll (const char* __restrict__, char** __restrict, int);
-unsigned long long strtoull (const char* __restrict__, char** __restrict__, int);
+long long strtoll (const char* __restrict__, char** __restrict, int) ]] ..
+	(ffi.os == 'Windows' and ' asm("_strtoi64")' or '') .. [[ ;
+unsigned long long strtoull (const char* __restrict__, char** __restrict__, int) ]] ..
+	(ffi.os == 'Windows' and ' asm("_strtoui64")' or '') .. [[ ;
 long long atoll (const char *);
 long long wtoll (const wchar_t *);
 char* lltoa (long long, char *, int);
 char* ulltoa (unsigned long long , char *, int);
 wchar_t* lltow (long long, wchar_t *, int);
 wchar_t* ulltow (unsigned long long, wchar_t *, int);
-]]
+]])

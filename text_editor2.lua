@@ -6,6 +6,8 @@ composable text editor featuring:
 	- smart tabs - write tabs for indentation, but write spaces for alignment (inside the line).
 	- space tabs - always write spaces when pressing tab.
 	* smart space tabs - the number of spaces is such that the caret aligns to the closest upper/lower text.
+	* tab stops, like in word processors
+	* automatic table formatting - keep everything aligned while typing inside the aligned "cells" of the table
 	* jump through spaces - jump left/right through spaces as if they were tabs or smart space tabs.
 	- preserve indentation - pressing enter moves caret down at the same indentation as current line.
 - carets:
@@ -38,7 +40,11 @@ composable text editor featuring:
 	- global, local (per-project), per-filetype, per-user config files (like scite).
 	- reload config on the fly on saving the config file.
 	- custom key bindings.
-
+- find/replace macros:
+	- make a table based on separators (see automatic table formatting above)
+- bookmarks:
+	- how to manage writing code and browsing the same code (but different parts of it) at the same time? split view?
+		- idea: simple shortcut to go back to where the cursor was last time you were typign
 ]]
 
 local glue = require'glue'

@@ -1,4 +1,4 @@
---result of `cpp mysql.h` plus lots of cleanup plus errors from errmsg.h; MySQL Connector/C 6.1
+--result of `cpp mysql.h` plus lots of cleanup plus errors from errmsg.h; by Cosmin Apreutesei; MySQL Connector/C 6.1
 --NOTE that MySQL Connector/C is GPL software. Could this file be considered "derived work" then?
 
 local ffi = require'ffi'
@@ -11,6 +11,7 @@ typedef unsigned long long my_ulonglong;
 enum {
 	MYSQL_PORT = 3306,
 	MYSQL_ERRMSG_SIZE = 512,
+
 	// status return codes
 	MYSQL_NO_DATA = 100,
 	MYSQL_DATA_TRUNCATED = 101
@@ -18,72 +19,73 @@ enum {
 
 // -------------------------------------------------------------------------------- error constants
 
-enum {
-	CR_UNKNOWN_ERROR = 2000,
-	CR_SOCKET_CREATE_ERROR = 2001,
-	CR_CONNECTION_ERROR = 2002,
-	CR_CONN_HOST_ERROR = 2003,
-	CR_IPSOCK_ERROR = 2004,
-	CR_UNKNOWN_HOST = 2005,
-	CR_SERVER_GONE_ERROR = 2006,
-	CR_VERSION_ERROR = 2007,
-	CR_OUT_OF_MEMORY = 2008,
-	CR_WRONG_HOST_INFO = 2009,
-	CR_LOCALHOST_CONNECTION = 2010,
-	CR_TCP_CONNECTION = 2011,
-	CR_SERVER_HANDSHAKE_ERR = 2012,
-	CR_SERVER_LOST = 2013,
-	CR_COMMANDS_OUT_OF_SYNC = 2014,
-	CR_NAMEDPIPE_CONNECTION = 2015,
-	CR_NAMEDPIPEWAIT_ERROR = 2016,
-	CR_NAMEDPIPEOPEN_ERROR = 2017,
-	CR_NAMEDPIPESETSTATE_ERROR = 2018,
-	CR_CANT_READ_CHARSET = 2019,
-	CR_NET_PACKET_TOO_LARGE = 2020,
-	CR_EMBEDDED_CONNECTION = 2021,
-	CR_PROBE_SLAVE_STATUS = 2022,
-	CR_PROBE_SLAVE_HOSTS = 2023,
-	CR_PROBE_SLAVE_CONNECT = 2024,
-	CR_PROBE_MASTER_CONNECT = 2025,
-	CR_SSL_CONNECTION_ERROR = 2026,
-	CR_MALFORMED_PACKET = 2027,
-	CR_WRONG_LICENSE = 2028,
+//NOTE: added MYSQL_ prefix to these.
+enum mysql_error_code {
+	MYSQL_CR_UNKNOWN_ERROR = 2000,
+	MYSQL_CR_SOCKET_CREATE_ERROR = 2001,
+	MYSQL_CR_CONNECTION_ERROR = 2002,
+	MYSQL_CR_CONN_HOST_ERROR = 2003,
+	MYSQL_CR_IPSOCK_ERROR = 2004,
+	MYSQL_CR_UNKNOWN_HOST = 2005,
+	MYSQL_CR_SERVER_GONE_ERROR = 2006,
+	MYSQL_CR_VERSION_ERROR = 2007,
+	MYSQL_CR_OUT_OF_MEMORY = 2008,
+	MYSQL_CR_WRONG_HOST_INFO = 2009,
+	MYSQL_CR_LOCALHOST_CONNECTION = 2010,
+	MYSQL_CR_TCP_CONNECTION = 2011,
+	MYSQL_CR_SERVER_HANDSHAKE_ERR = 2012,
+	MYSQL_CR_SERVER_LOST = 2013,
+	MYSQL_CR_COMMANDS_OUT_OF_SYNC = 2014,
+	MYSQL_CR_NAMEDPIPE_CONNECTION = 2015,
+	MYSQL_CR_NAMEDPIPEWAIT_ERROR = 2016,
+	MYSQL_CR_NAMEDPIPEOPEN_ERROR = 2017,
+	MYSQL_CR_NAMEDPIPESETSTATE_ERROR = 2018,
+	MYSQL_CR_CANT_READ_CHARSET = 2019,
+	MYSQL_CR_NET_PACKET_TOO_LARGE = 2020,
+	MYSQL_CR_EMBEDDED_CONNECTION = 2021,
+	MYSQL_CR_PROBE_SLAVE_STATUS = 2022,
+	MYSQL_CR_PROBE_SLAVE_HOSTS = 2023,
+	MYSQL_CR_PROBE_SLAVE_CONNECT = 2024,
+	MYSQL_CR_PROBE_MASTER_CONNECT = 2025,
+	MYSQL_CR_SSL_CONNECTION_ERROR = 2026,
+	MYSQL_CR_MALFORMED_PACKET = 2027,
+	MYSQL_CR_WRONG_LICENSE = 2028,
 
 	/* new 4.1 error codes */
-	CR_NULL_POINTER = 2029,
-	CR_NO_PREPARE_STMT = 2030,
-	CR_PARAMS_NOT_BOUND = 2031,
-	CR_DATA_TRUNCATED = 2032,
-	CR_NO_PARAMETERS_EXISTS = 2033,
-	CR_INVALID_PARAMETER_NO = 2034,
-	CR_INVALID_BUFFER_USE = 2035,
-	CR_UNSUPPORTED_PARAM_TYPE = 2036,
+	MYSQL_CR_NULL_POINTER = 2029,
+	MYSQL_CR_NO_PREPARE_STMT = 2030,
+	MYSQL_CR_PARAMS_NOT_BOUND = 2031,
+	MYSQL_CR_DATA_TRUNCATED = 2032,
+	MYSQL_CR_NO_PARAMETERS_EXISTS = 2033,
+	MYSQL_CR_INVALID_PARAMETER_NO = 2034,
+	MYSQL_CR_INVALID_BUFFER_USE = 2035,
+	MYSQL_CR_UNSUPPORTED_PARAM_TYPE = 2036,
 
-	CR_SHARED_MEMORY_CONNECTION = 2037,
-	CR_SHARED_MEMORY_CONNECT_REQUEST_ERROR = 2038,
-	CR_SHARED_MEMORY_CONNECT_ANSWER_ERROR = 2039,
-	CR_SHARED_MEMORY_CONNECT_FILE_MAP_ERROR = 2040,
-	CR_SHARED_MEMORY_CONNECT_MAP_ERROR = 2041,
-	CR_SHARED_MEMORY_FILE_MAP_ERROR = 2042,
-	CR_SHARED_MEMORY_MAP_ERROR = 2043,
-	CR_SHARED_MEMORY_EVENT_ERROR = 2044,
-	CR_SHARED_MEMORY_CONNECT_ABANDONED_ERROR = 2045,
-	CR_SHARED_MEMORY_CONNECT_SET_ERROR = 2046,
-	CR_CONN_UNKNOW_PROTOCOL = 2047,
-	CR_INVALID_CONN_HANDLE = 2048,
-	CR_SECURE_AUTH = 2049,
-	CR_FETCH_CANCELED = 2050,
-	CR_NO_DATA = 2051,
-	CR_NO_STMT_METADATA = 2052,
-	CR_NO_RESULT_SET = 2053,
-	CR_NOT_IMPLEMENTED = 2054,
-	CR_SERVER_LOST_EXTENDED = 2055,
-	CR_STMT_CLOSED = 2056,
-	CR_NEW_STMT_METADATA = 2057,
-	CR_ALREADY_CONNECTED = 2058,
-	CR_AUTH_PLUGIN_CANNOT_LOAD = 2059,
-	CR_DUPLICATE_CONNECTION_ATTR = 2060,
-	CR_AUTH_PLUGIN_ERR = 2061
+	MYSQL_CR_SHARED_MEMORY_CONNECTION = 2037,
+	MYSQL_CR_SHARED_MEMORY_CONNECT_REQUEST_ERROR = 2038,
+	MYSQL_CR_SHARED_MEMORY_CONNECT_ANSWER_ERROR = 2039,
+	MYSQL_CR_SHARED_MEMORY_CONNECT_FILE_MAP_ERROR = 2040,
+	MYSQL_CR_SHARED_MEMORY_CONNECT_MAP_ERROR = 2041,
+	MYSQL_CR_SHARED_MEMORY_FILE_MAP_ERROR = 2042,
+	MYSQL_CR_SHARED_MEMORY_MAP_ERROR = 2043,
+	MYSQL_CR_SHARED_MEMORY_EVENT_ERROR = 2044,
+	MYSQL_CR_SHARED_MEMORY_CONNECT_ABANDONED_ERROR = 2045,
+	MYSQL_CR_SHARED_MEMORY_CONNECT_SET_ERROR = 2046,
+	MYSQL_CR_CONN_UNKNOW_PROTOCOL = 2047,
+	MYSQL_CR_INVALID_CONN_HANDLE = 2048,
+	MYSQL_CR_SECURE_AUTH = 2049,
+	MYSQL_CR_FETCH_CANCELED = 2050,
+	MYSQL_CR_NO_DATA = 2051,
+	MYSQL_CR_NO_STMT_METADATA = 2052,
+	MYSQL_CR_NO_RESULT_SET = 2053,
+	MYSQL_CR_NOT_IMPLEMENTED = 2054,
+	MYSQL_CR_SERVER_LOST_EXTENDED = 2055,
+	MYSQL_CR_STMT_CLOSED = 2056,
+	MYSQL_CR_NEW_STMT_METADATA = 2057,
+	MYSQL_CR_ALREADY_CONNECTED = 2058,
+	MYSQL_CR_AUTH_PLUGIN_CANNOT_LOAD = 2059,
+	MYSQL_CR_DUPLICATE_CONNECTION_ATTR = 2060,
+	MYSQL_CR_AUTH_PLUGIN_ERR = 2061
 };
 
 // -------------------------------------------------------------------------------- client library
@@ -100,33 +102,66 @@ MYSQL * mysql_init(MYSQL *mysql);
 
 enum mysql_protocol_type
 {
-  MYSQL_PROTOCOL_DEFAULT, MYSQL_PROTOCOL_TCP, MYSQL_PROTOCOL_SOCKET,
-  MYSQL_PROTOCOL_PIPE, MYSQL_PROTOCOL_MEMORY
+	MYSQL_PROTOCOL_DEFAULT, MYSQL_PROTOCOL_TCP, MYSQL_PROTOCOL_SOCKET,
+	MYSQL_PROTOCOL_PIPE, MYSQL_PROTOCOL_MEMORY
 };
 enum mysql_option
 {
-  MYSQL_OPT_CONNECT_TIMEOUT, MYSQL_OPT_COMPRESS, MYSQL_OPT_NAMED_PIPE,
-  MYSQL_INIT_COMMAND, MYSQL_READ_DEFAULT_FILE, MYSQL_READ_DEFAULT_GROUP,
-  MYSQL_SET_CHARSET_DIR, MYSQL_SET_CHARSET_NAME, MYSQL_OPT_LOCAL_INFILE,
-  MYSQL_OPT_PROTOCOL, MYSQL_SHARED_MEMORY_BASE_NAME, MYSQL_OPT_READ_TIMEOUT,
-  MYSQL_OPT_WRITE_TIMEOUT, MYSQL_OPT_USE_RESULT,
-  MYSQL_OPT_USE_REMOTE_CONNECTION, MYSQL_OPT_USE_EMBEDDED_CONNECTION,
-  MYSQL_OPT_GUESS_CONNECTION, MYSQL_SET_CLIENT_IP, MYSQL_SECURE_AUTH,
-  MYSQL_REPORT_DATA_TRUNCATION, MYSQL_OPT_RECONNECT,
-  MYSQL_OPT_SSL_VERIFY_SERVER_CERT, MYSQL_PLUGIN_DIR, MYSQL_DEFAULT_AUTH,
-  MYSQL_OPT_BIND,
-  MYSQL_OPT_SSL_KEY, MYSQL_OPT_SSL_CERT,
-  MYSQL_OPT_SSL_CA, MYSQL_OPT_SSL_CAPATH, MYSQL_OPT_SSL_CIPHER,
-  MYSQL_OPT_SSL_CRL, MYSQL_OPT_SSL_CRLPATH,
-  MYSQL_OPT_CONNECT_ATTR_RESET, MYSQL_OPT_CONNECT_ATTR_ADD,
-  MYSQL_OPT_CONNECT_ATTR_DELETE,
-  MYSQL_SERVER_PUBLIC_KEY,
-  MYSQL_ENABLE_CLEARTEXT_PLUGIN,
-  MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS
+	MYSQL_OPT_CONNECT_TIMEOUT, MYSQL_OPT_COMPRESS, MYSQL_OPT_NAMED_PIPE,
+	MYSQL_INIT_COMMAND, MYSQL_READ_DEFAULT_FILE, MYSQL_READ_DEFAULT_GROUP,
+	MYSQL_SET_CHARSET_DIR, MYSQL_SET_CHARSET_NAME, MYSQL_OPT_LOCAL_INFILE,
+	MYSQL_OPT_PROTOCOL, MYSQL_SHARED_MEMORY_BASE_NAME, MYSQL_OPT_READ_TIMEOUT,
+	MYSQL_OPT_WRITE_TIMEOUT, MYSQL_OPT_USE_RESULT,
+	MYSQL_OPT_USE_REMOTE_CONNECTION, MYSQL_OPT_USE_EMBEDDED_CONNECTION,
+	MYSQL_OPT_GUESS_CONNECTION, MYSQL_SET_CLIENT_IP, MYSQL_SECURE_AUTH,
+	MYSQL_REPORT_DATA_TRUNCATION, MYSQL_OPT_RECONNECT,
+	MYSQL_OPT_SSL_VERIFY_SERVER_CERT, MYSQL_PLUGIN_DIR, MYSQL_DEFAULT_AUTH,
+	MYSQL_OPT_BIND,
+	MYSQL_OPT_SSL_KEY, MYSQL_OPT_SSL_CERT,
+	MYSQL_OPT_SSL_CA, MYSQL_OPT_SSL_CAPATH, MYSQL_OPT_SSL_CIPHER,
+	MYSQL_OPT_SSL_CRL, MYSQL_OPT_SSL_CRLPATH,
+	MYSQL_OPT_CONNECT_ATTR_RESET, MYSQL_OPT_CONNECT_ATTR_ADD,
+	MYSQL_OPT_CONNECT_ATTR_DELETE,
+	MYSQL_SERVER_PUBLIC_KEY,
+	MYSQL_ENABLE_CLEARTEXT_PLUGIN,
+	MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS
 };
 int mysql_options(MYSQL *mysql, enum mysql_option option, const void *arg);
 int mysql_options4(MYSQL *mysql, enum mysql_option option, const void *arg1, const void *arg2);
 
+//NOTE: added MYSQL_ prefix to these. Also, these are bit flags not exclusive enum values.
+enum {
+	MYSQL_CLIENT_LONG_PASSWORD = 1,               /* new more secure passwords */
+	MYSQL_CLIENT_FOUND_ROWS = 2,                  /* Found instead of affected rows */
+	MYSQL_CLIENT_LONG_FLAG = 4,                   /* Get all column flags */
+	MYSQL_CLIENT_CONNECT_WITH_DB = 8,             /* One can specify db on connect */
+	MYSQL_CLIENT_NO_SCHEMA = 16,                  /* Don't allow database.table.column */
+	MYSQL_CLIENT_COMPRESS = 32,                   /* Can use compression protocol */
+	MYSQL_CLIENT_ODBC = 64,                       /* ODBC client */
+	MYSQL_CLIENT_LOCAL_FILES = 128,               /* Can use LOAD DATA LOCAL */
+	MYSQL_CLIENT_IGNORE_SPACE = 256,              /* Ignore spaces before '(' */
+	MYSQL_CLIENT_PROTOCOL_41 = 512,               /* New 4.1 protocol */
+	MYSQL_CLIENT_INTERACTIVE = 1024,              /* This is an interactive client */
+	MYSQL_CLIENT_SSL = 2048,                      /* Switch to SSL after handshake */
+	MYSQL_CLIENT_IGNORE_SIGPIPE = 4096,           /* IGNORE sigpipes */
+	MYSQL_CLIENT_TRANSACTIONS = 8192,             /* Client knows about transactions */
+	MYSQL_CLIENT_RESERVED = 16384,                /* Old flag for 4.1 protocol  */
+	MYSQL_CLIENT_SECURE_CONNECTION = (1UL << 15), /* New 4.1 authentication */
+	MYSQL_CLIENT_MULTI_STATEMENTS = (1UL << 16),  /* Enable/disable multi-stmt support */
+	MYSQL_CLIENT_MULTI_RESULTS = (1UL << 17),     /* Enable/disable multi-results */
+	MYSQL_CLIENT_PS_MULTI_RESULTS = (1UL << 18),  /* Multi-results in PS-protocol */
+	MYSQL_CLIENT_PLUGIN_AUTH = (1UL << 19),       /* Client supports plugin authentication */
+	MYSQL_CLIENT_CONNECT_ATTRS = (1UL << 20),     /* Client supports connection attributes */
+
+	/* Enable authentication response packet to be larger than 255 bytes. */
+	MYSQL_CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA = (1UL << 21),
+
+	/* Don't close the connection for a connection with expired password. */
+	MYSQL_CLIENT_CAN_HANDLE_EXPIRED_PASSWORDS = (1UL << 22),
+
+	MYSQL_CLIENT_SSL_VERIFY_SERVER_CERT = (1UL << 30),
+	MYSQL_CLIENT_REMEMBER_OPTIONS = (1UL << 31)
+};
 MYSQL * mysql_real_connect(MYSQL *mysql, const char *host,
         const char *user,
         const char *passwd,
@@ -149,8 +184,8 @@ my_bool mysql_ssl_set(MYSQL *mysql, const char *key,
 
 enum enum_mysql_set_option
 {
-  MYSQL_OPTION_MULTI_STATEMENTS_ON,
-  MYSQL_OPTION_MULTI_STATEMENTS_OFF
+	MYSQL_OPTION_MULTI_STATEMENTS_ON,
+	MYSQL_OPTION_MULTI_STATEMENTS_OFF
 };
 int mysql_set_server_option(MYSQL *mysql, enum enum_mysql_set_option option);
 
@@ -160,14 +195,14 @@ const char * mysql_character_set_name(MYSQL *mysql);
 
 typedef struct character_set
 {
-  unsigned int number;
-  unsigned int state;
-  const char *csname;
-  const char *name;
-  const char *comment;
-  const char *dir;
-  unsigned int mbminlen;
-  unsigned int mbmaxlen;
+	unsigned int number;
+	unsigned int state;
+	const char *csname;
+	const char *name;
+	const char *comment;
+	const char *dir;
+	unsigned int mbminlen;
+	unsigned int mbmaxlen;
 } MY_CHARSET_INFO;
 void mysql_get_character_set_info(MYSQL *mysql, MY_CHARSET_INFO *charset);
 
@@ -229,10 +264,6 @@ typedef MYSQL_ROWS *MYSQL_ROW_OFFSET;
 MYSQL_ROW_OFFSET mysql_row_tell(MYSQL_RES *res);
 MYSQL_ROW_OFFSET mysql_row_seek(MYSQL_RES *result, MYSQL_ROW_OFFSET offset);
 
-typedef unsigned int MYSQL_FIELD_OFFSET;
-MYSQL_FIELD_OFFSET mysql_field_tell(MYSQL_RES *res);
-MYSQL_FIELD_OFFSET mysql_field_seek(MYSQL_RES *result, MYSQL_FIELD_OFFSET offset);
-
 // -------------------------------------------------------------------------------- query field info
 
 enum enum_field_types {
@@ -260,8 +291,8 @@ enum enum_field_types {
    MYSQL_TYPE_GEOMETRY=255
 };
 
-//NOTE: added MYSQL_ prefix to these
-enum enum_field_type_flags {
+//NOTE: added MYSQL_ prefix to these. Also, these are bit flags, not exclusive enum values.
+enum {
 	MYSQL_NOT_NULL_FLAG = 1,     /* Field can't be NULL */
 	MYSQL_PRI_KEY_FLAG = 2,      /* Field is part of a primary key */
 	MYSQL_UNIQUE_KEY_FLAG = 4,   /* Field is part of a unique key */
@@ -288,32 +319,30 @@ enum enum_field_type_flags {
 };
 
 typedef struct st_mysql_field {
-  char *name;
-  char *org_name;
-  char *table;
-  char *org_table;
-  char *db;
-  char *catalog;
-  char *def;
-  unsigned long length;
-  unsigned long max_length;
-  unsigned int name_length;
-  unsigned int org_name_length;
-  unsigned int table_length;
-  unsigned int org_table_length;
-  unsigned int db_length;
-  unsigned int catalog_length;
-  unsigned int def_length;
-  unsigned int flags;
-  unsigned int decimals;
-  unsigned int charsetnr;
-  enum enum_field_types type;
-  void *extension;
+	char *name;
+	char *org_name;
+	char *table;
+	char *org_table;
+	char *db;
+	char *catalog;
+	char *def;
+	unsigned long length;
+	unsigned long max_length;
+	unsigned int name_length;
+	unsigned int org_name_length;
+	unsigned int table_length;
+	unsigned int org_table_length;
+	unsigned int db_length;
+	unsigned int catalog_length;
+	unsigned int def_length;
+	unsigned int flags;
+	unsigned int decimals;
+	unsigned int charsetnr;
+	enum enum_field_types type;
+	void *extension;
 } MYSQL_FIELD;
 
-MYSQL_FIELD *mysql_fetch_field(MYSQL_RES *result);
 MYSQL_FIELD *mysql_fetch_field_direct(MYSQL_RES *res, unsigned int fieldnr);
-MYSQL_FIELD *mysql_fetch_fields(MYSQL_RES *res);
 
 // -------------------------------------------------------------------------------- reflection
 
@@ -326,16 +355,45 @@ MYSQL_RES *mysql_list_processes(MYSQL *mysql);
 int mysql_kill(MYSQL *mysql, unsigned long pid);
 
 enum mysql_enum_shutdown_level {
-  SHUTDOWN_DEFAULT           = 0,
-  SHUTDOWN_WAIT_CONNECTIONS  = 1,
-  SHUTDOWN_WAIT_TRANSACTIONS = 2,
-  SHUTDOWN_WAIT_UPDATES      = 8,
-  SHUTDOWN_WAIT_ALL_BUFFERS  = 16,
-  SHUTDOWN_WAIT_CRITICAL_BUFFERS = 17,
-  KILL_QUERY                 = 254,
-  KILL_CONNECTION            = 255
+	SHUTDOWN_DEFAULT           = 0,
+	SHUTDOWN_WAIT_CONNECTIONS  = 1,
+	SHUTDOWN_WAIT_TRANSACTIONS = 2,
+	SHUTDOWN_WAIT_UPDATES      = 8,
+	SHUTDOWN_WAIT_ALL_BUFFERS  = 16,
+	SHUTDOWN_WAIT_CRITICAL_BUFFERS = 17,
+	KILL_QUERY                 = 254,
+	KILL_CONNECTION            = 255
 };
 int mysql_shutdown(MYSQL *mysql, enum mysql_enum_shutdown_level shutdown_level); // needs SHUTDOWN priviledge
+
+//NOTE: added MYSQL_ prefix. not really enum values either, just bit flags.
+enum {
+	MYSQL_REFRESH_GRANT       = 1,    /* Refresh grant tables */
+	MYSQL_REFRESH_LOG         = 2,    /* Start on new log file */
+	MYSQL_REFRESH_TABLES      = 4,    /* close all tables */
+	MYSQL_REFRESH_HOSTS       = 8,    /* Flush host cache */
+	MYSQL_REFRESH_STATUS      = 16,   /* Flush status variables */
+	MYSQL_REFRESH_THREADS     = 32,   /* Flush thread cache */
+	MYSQL_REFRESH_SLAVE       = 64,   /* Reset master info and restart slave thread */
+	MYSQL_REFRESH_MASTER      = 128,  /* Remove all bin logs in the index and truncate the index */
+	MYSQL_REFRESH_ERROR_LOG   = 256,  /* Rotate only the erorr log */
+	MYSQL_REFRESH_ENGINE_LOG  = 512,  /* Flush all storage engine logs */
+	MYSQL_REFRESH_BINARY_LOG  = 1024, /* Flush the binary log */
+	MYSQL_REFRESH_RELAY_LOG   = 2048, /* Flush the relay log */
+	MYSQL_REFRESH_GENERAL_LOG = 4096, /* Flush the general log */
+	MYSQL_REFRESH_SLOW_LOG    = 8192, /* Flush the slow query log */
+
+	/* The following can't be set with mysql_refresh() */
+	MYSQL_REFRESH_READ_LOCK   = 16384, /* Lock tables for read */
+	MYSQL_REFRESH_FAST        = 32768, /* Intern flag */
+
+	/* RESET (remove all queries) from query cache */
+	MYSQL_REFRESH_QUERY_CACHE      = 65536,
+	MYSQL_REFRESH_QUERY_CACHE_FREE = 0x20000L,  /* pack query cache */
+	MYSQL_REFRESH_DES_KEY_FILE     = 0x40000L,
+	MYSQL_REFRESH_USER_RESOURCES   = 0x80000L,
+	MYSQL_REFRESH_FOR_EXPORT       = 0x100000L, /* FLUSH TABLES ... FOR EXPORT */
+};
 int mysql_refresh(MYSQL *mysql, unsigned int refresh_options);                   // needs RELOAD priviledge
 int mysql_dump_debug_info(MYSQL *mysql);                                         // needs SUPER priviledge
 
@@ -344,51 +402,17 @@ int mysql_dump_debug_info(MYSQL *mysql);                                        
 typedef struct MYSQL_STMT_ MYSQL_STMT;
 
 MYSQL_STMT * mysql_stmt_init(MYSQL *mysql);
-my_bool mysql_stmt_free_result(MYSQL_STMT *stmt);
+my_bool mysql_stmt_close(MYSQL_STMT * stmt);
 
 int mysql_stmt_prepare(MYSQL_STMT *stmt, const char *query, unsigned long length);
 int mysql_stmt_execute(MYSQL_STMT *stmt);
-my_bool mysql_stmt_close(MYSQL_STMT * stmt);
+
+int mysql_stmt_next_result(MYSQL_STMT *stmt);
+int mysql_stmt_store_result(MYSQL_STMT *stmt);
+my_bool mysql_stmt_free_result(MYSQL_STMT *stmt);
 
 int mysql_stmt_fetch(MYSQL_STMT *stmt);
-int mysql_stmt_next_result(MYSQL_STMT *stmt);
 my_bool mysql_stmt_reset(MYSQL_STMT * stmt);
-int mysql_stmt_store_result(MYSQL_STMT *stmt);
-
-// -------------------------------------------------------------------------------- prepared statements / bindings
-
-unsigned long mysql_stmt_param_count(MYSQL_STMT * stmt);
-
-typedef struct NET_ NET;
-typedef struct st_mysql_bind
-{
-  unsigned long *length;
-  my_bool *is_null;
-  void *buffer;
-  my_bool *error;
-  unsigned char *row_ptr;
-  void (*store_param_func)(NET *net, struct st_mysql_bind *param);
-  void (*fetch_result)(struct st_mysql_bind *, MYSQL_FIELD *,
-                       unsigned char **row);
-  void (*skip_result)(struct st_mysql_bind *, MYSQL_FIELD *,
-        unsigned char **row);
-  unsigned long buffer_length;
-  unsigned long offset;
-  unsigned long length_value;
-  unsigned int param_number;
-  unsigned int pack_length;
-  enum enum_field_types buffer_type;
-  my_bool error_value;
-  my_bool is_unsigned;
-  my_bool long_data_used;
-  my_bool is_null_value;
-  void *extension;
-} MYSQL_BIND;
-
-my_bool mysql_stmt_bind_param(MYSQL_STMT * stmt, MYSQL_BIND * bnd);
-my_bool mysql_stmt_bind_result(MYSQL_STMT * stmt, MYSQL_BIND * bnd);
-
-// -------------------------------------------------------------------------------- prepared statements / query results
 
 my_ulonglong mysql_stmt_num_rows(MYSQL_STMT *stmt);
 my_ulonglong mysql_stmt_affected_rows(MYSQL_STMT *stmt);
@@ -399,10 +423,6 @@ unsigned int mysql_stmt_errno(MYSQL_STMT * stmt);
 const char *mysql_stmt_error(MYSQL_STMT * stmt);
 const char *mysql_stmt_sqlstate(MYSQL_STMT * stmt);
 
-int mysql_stmt_fetch_column(MYSQL_STMT *stmt, MYSQL_BIND *bind_arg,
-                                    unsigned int column,
-                                    unsigned long offset);
-
 void mysql_stmt_data_seek(MYSQL_STMT *stmt, my_ulonglong offset);
 
 MYSQL_ROW_OFFSET mysql_stmt_row_seek(MYSQL_STMT *stmt, MYSQL_ROW_OFFSET offset);
@@ -410,9 +430,9 @@ MYSQL_ROW_OFFSET mysql_stmt_row_tell(MYSQL_STMT *stmt);
 
 enum enum_stmt_attr_type
 {
-  STMT_ATTR_UPDATE_MAX_LENGTH,
-  STMT_ATTR_CURSOR_TYPE,
-  STMT_ATTR_PREFETCH_ROWS
+	STMT_ATTR_UPDATE_MAX_LENGTH,
+	STMT_ATTR_CURSOR_TYPE,
+	STMT_ATTR_PREFETCH_ROWS
 };
 my_bool mysql_stmt_attr_set(MYSQL_STMT *stmt, enum enum_stmt_attr_type attr_type, const void *attr);
 my_bool mysql_stmt_attr_get(MYSQL_STMT *stmt, enum enum_stmt_attr_type attr_type, void *attr);
@@ -424,6 +444,56 @@ my_bool mysql_stmt_send_long_data(MYSQL_STMT *stmt,
 
 MYSQL_RES *mysql_stmt_result_metadata(MYSQL_STMT *stmt);
 MYSQL_RES *mysql_stmt_param_metadata(MYSQL_STMT *stmt);
+
+// -------------------------------------------------------------------------------- prepared statements / bindings
+
+enum enum_mysql_timestamp_type
+{
+  MYSQL_TIMESTAMP_NONE= -2, MYSQL_TIMESTAMP_ERROR= -1,
+  MYSQL_TIMESTAMP_DATE= 0, MYSQL_TIMESTAMP_DATETIME= 1, MYSQL_TIMESTAMP_TIME= 2
+};
+typedef struct st_mysql_time
+{
+  unsigned int  year, month, day, hour, minute, second;
+  unsigned long second_part;  /**< microseconds */
+  my_bool       neg;
+  enum enum_mysql_timestamp_type time_type;
+} MYSQL_TIME;
+
+unsigned long mysql_stmt_param_count(MYSQL_STMT * stmt);
+
+typedef struct NET_ NET;
+typedef struct st_mysql_bind
+{
+	unsigned long *length;
+	my_bool *is_null;
+	void *buffer;
+	my_bool *error;
+	unsigned char *row_ptr;
+	void (*store_param_func)(NET *net, struct st_mysql_bind *param);
+	void (*fetch_result)(struct st_mysql_bind *, MYSQL_FIELD *,
+							  unsigned char **row);
+	void (*skip_result)(struct st_mysql_bind *, MYSQL_FIELD *,
+		  unsigned char **row);
+	unsigned long buffer_length;
+	unsigned long offset;
+	unsigned long length_value;
+	unsigned int param_number;
+	unsigned int pack_length;
+	enum enum_field_types buffer_type;
+	my_bool error_value;
+	my_bool is_unsigned;
+	my_bool long_data_used;
+	my_bool is_null_value;
+	void *extension;
+} MYSQL_BIND;
+
+my_bool mysql_stmt_bind_param(MYSQL_STMT * stmt, MYSQL_BIND * bnd);
+my_bool mysql_stmt_bind_result(MYSQL_STMT * stmt, MYSQL_BIND * bnd);
+
+int mysql_stmt_fetch_column(MYSQL_STMT *stmt, MYSQL_BIND *bind_arg,
+                                    unsigned int column,
+                                    unsigned long offset);
 
 // -------------------------------------------------------------------------------- LOAD DATA LOCAL INFILE hooks
 
@@ -444,6 +514,7 @@ my_bool mysql_read_query_result(MYSQL *mysql);
 void mysql_debug(const char *debug);
 
 // -------------------------------------------------------------------------------- present but not documented
+
 int     mysql_server_init(int argc, char **argv, char **groups);
 void    mysql_server_end(void);
 char *get_tty_password(const char *opt_message);
@@ -451,11 +522,22 @@ void myodbc_remove_escape(MYSQL *mysql, char *name);
 my_bool mysql_embedded(void);
 int mysql_send_query(MYSQL *mysql, const char *q, unsigned long length);
 
-// -------------------------------------------------------------------------------- redundant or deprecated
+// -------------------------------------------------------------------------------- redundant functions
+
 my_bool mysql_thread_init(void);
 void    mysql_thread_end(void);
 const char *mysql_errno_to_sqlstate(unsigned int mysql_errno);
 unsigned long mysql_hex_string(char *to, const char *from, unsigned long from_length);
+
+// redundant ways to get field info
+MYSQL_FIELD *mysql_fetch_field(MYSQL_RES *result);
+MYSQL_FIELD *mysql_fetch_fields(MYSQL_RES *res);
+typedef unsigned int MYSQL_FIELD_OFFSET;
+MYSQL_FIELD_OFFSET mysql_field_tell(MYSQL_RES *res);
+MYSQL_FIELD_OFFSET mysql_field_seek(MYSQL_RES *result, MYSQL_FIELD_OFFSET offset);
+
+// -------------------------------------------------------------------------------- deprecated functions
+
 unsigned long mysql_escape_string(char *to, const char *from, unsigned long from_length);
 int mysql_query(MYSQL *mysql, const char *q);
 
