@@ -2,7 +2,6 @@
 local ffi = require'ffi'
 local bit = require'bit'
 require'mysql_h'
-require'stdlib_h'
 local C = ffi.load'libmysql'
 local M = {C = C}
 
@@ -283,14 +282,14 @@ end
 --TODO: MYSQL_RES *mysql_list_fields(MYSQL *mysql, const char *table, const char *wild);
 
 local function result_function(func)
-	return function(mysql, ...)
-		local res = checkh(mysql, func(mysql, ...))
+	return function(mysql)
+		local res = checkh(mysql, func(mysql))
 		return ffi.gc(res, C.mysql_free_result)
 	end
 end
 
-conn.store_result = result_function(C.mysql_store_result) --use only if conn:field_count() > 0
-conn.use_result = result_function(C.mysql_use_result) --use only if conn:field_count() > 0
+conn.store_result = result_function(C.mysql_store_result)
+conn.use_result = result_function(C.mysql_use_result)
 
 local res = {} --result methods
 
@@ -417,10 +416,12 @@ end
 
 --row data
 
+ffi.cdef('double strtod(const char*, char**);')
 local function parse_number(data, sz)
 	return ffi.C.strtod(data, nil)
 end
 
+ffi.cdef('int64_t strtoll(const char*, char**, int) ' ..(ffi.os == 'Windows' and ' asm("_strtoi64")' or '') .. ';')
 local function parse_number64(data, sz)
 	return ffi.C.strtoll(data, nil, 10)
 end
@@ -511,12 +512,12 @@ function res.fetch_row(res, mode)
 end
 
 function res.rows(res, mode)
-	local done
+	local i = 0
 	return function()
-		if done then return end
 		local row = res:fetch_row(mode)
-		done = not row
-		return row
+		if not row then return end
+		i = i + 1
+		return i, row
 	end
 end
 
@@ -576,6 +577,11 @@ local function stcheckbool(stmt, ret)
 	sterror(stmt)
 end
 
+local function stcheckh(stmt, ret)
+	if ret ~= NULL then return ret end
+	sterror(stmt)
+end
+
 function conn.prepare(mysql, query)
 	local stmt = checkh(mysql, C.mysql_stmt_init(mysql))
 	ffi.gc(stmt, C.mysql_stmt_close)
@@ -609,18 +615,6 @@ function stmt.free_result(stmt)
 	stcheckbool(stmt, C.mysql_stmt_free_result(stmt))
 end
 
-function stmt.fetch_row(stmt)
-	local ret = C.mysql_stmt_fetch(stmt)
-	if ret == 0 then return true end
-	if ret == C.MYSQL_NO_DATA then return false end
-	if ret == C.MYSQL_DATA_TRUNCATED then return true, 'truncated' end
-	sterror(stmt)
-end
-
-function stmt.reset(stmt)
-	stcheckz(stmt, C.mysql_stmt_reset(stmt))
-end
-
 function stmt.row_count(stmt)
 	return tonumber(C.mysql_stmt_num_rows(stmt))
 end
@@ -640,6 +634,30 @@ function stmt.sqlstate(stmt)
 	return cstring(C.mysql_stmt_sqlstate(stmt))
 end
 
+function stmt.result_metadata(stmt)
+	local res = stcheckh(stmt, C.mysql_stmt_result_metadata(stmt))
+	return ffi.gc(res, C.mysql_free_result)
+end
+
+function stmt.result_fields(stmt)
+	local res = stmt:result_metadata()
+	local fields = res:fields()
+	res:free()
+	return fields
+end
+
+function stmt.fetch_row(stmt)
+	local ret = C.mysql_stmt_fetch(stmt)
+	if ret == 0 then return true end
+	if ret == C.MYSQL_NO_DATA then return false end
+	if ret == C.MYSQL_DATA_TRUNCATED then return true, 'truncated' end
+	sterror(stmt)
+end
+
+function stmt.reset(stmt)
+	stcheckz(stmt, C.mysql_stmt_reset(stmt))
+end
+
 function stmt.seek(stmt, row_number) --use in conjunction with stmt:row_count()
 	C.mysql_stmt_data_seek(res, row_number-1)
 end
@@ -647,24 +665,42 @@ end
 stmt.row_seek = C.mysql_stmt_row_seek
 stmt.row_tell = C.mysql_stmt_row_tell
 
---[[
-enum enum_stmt_attr_type
-{
-	STMT_ATTR_UPDATE_MAX_LENGTH,
-	STMT_ATTR_CURSOR_TYPE,
-	STMT_ATTR_PREFETCH_ROWS
-};
-my_bool mysql_stmt_attr_set(MYSQL_STMT *stmt, enum enum_stmt_attr_type attr_type, const void *attr);
-my_bool mysql_stmt_attr_get(MYSQL_STMT *stmt, enum enum_stmt_attr_type attr_type, void *attr);
+function stmt.send_long_data(stmt, param_number, data, size)
+	stcheckz(stmt, C.mysql_stmt_send_long_data(stmt, param_number, data, size))
+end
 
-my_bool mysql_stmt_send_long_data(MYSQL_STMT *stmt,
-                                          unsigned int param_number,
-                                          const char *data,
-                                          unsigned long length);
+function stmt.update_max_length(stmt)
+	local attr = ffi.new'my_bool[1]'
+	stcheckz(stmt, C.mysql_stmt_attr_get(stmt, C.STMT_ATTR_UPDATE_MAX_LENGTH, attr))
+	return attr[0] == 1
+end
 
-MYSQL_RES *mysql_stmt_result_metadata(MYSQL_STMT *stmt);
-MYSQL_RES *mysql_stmt_param_metadata(MYSQL_STMT *stmt);
-]]
+function stmt.set_update_max_length(stmt, yes)
+	local attr = ffi.new('my_bool[1]', yes)
+	stcheckz(stmt, C.mysql_stmt_attr_set(stmt, C.STMT_ATTR_CURSOR_TYPE, attr))
+end
+
+function stmt.cursor_type(stmt)
+	local attr = ffi.new'uint32_t[1]'
+	stcheckz(stmt, C.mysql_stmt_attr_get(stmt, C.STMT_ATTR_CURSOR_TYPE, attr))
+	return attr[0]
+end
+
+function stmt.set_cursor_type(stmt, cursor_type)
+	local attr = ffi.new('uint32_t[1]', enum(cursor_type, 'MYSQL_'))
+	stcheckz(stmt, C.mysql_stmt_attr_set(stmt, C.STMT_ATTR_CURSOR_TYPE, attr))
+end
+
+function stmt.prefetch_rows(stmt)
+	local attr = ffi.new'uint32_t[1]'
+	stcheckz(stmt, C.mysql_stmt_attr_get(stmt, C.STMT_ATTR_PREFETCH_ROWS, attr))
+	return attr[0]
+end
+
+function stmt.set_prefetch_rows(stmt, n)
+	local attr = ffi.new('uint32_t[1]', n)
+	stcheckz(stmt, C.mysql_stmt_attr_set(stmt, C.STMT_ATTR_PREFETCH_ROWS, attr))
+end
 
 --statement bindings
 
@@ -748,7 +784,6 @@ local time_struct_types = {
 local bind = {} --bind buffer methods
 local bind_meta = {__index = bind}
 
---t: type, length (for input var types), value (optional)
 local function bind_buffer(defs, bind_buffer_types)
 	local self = setmetatable({}, bind_meta)
 	self.field_count = #defs
@@ -791,10 +826,11 @@ local function bind_check_range(self, i)
 	assert(i >= 1 and i <= self.field_count, 'index out of bounds')
 end
 
+--TODO: accept diffent input types eg. for date, bitfields etc.
 function bind:set(i, value, size)
 	bind_check_range(self, i)
 
-	if value == nil then
+	if value == nil or value == NULL then
 		self.null_flags[i-1] = true
 		return
 	end
@@ -861,6 +897,7 @@ end
 
 function bind:is_null(i) --returns true if the field is null
 	bind_check_range(self, i)
+	local btype = self.buffer[i-1].buffer_type
 	return btype == C.MYSQL_TYPE_NULL or self.null_flags[i-1] == 1
 end
 
@@ -875,9 +912,9 @@ function stmt.bind_params(stmt, params)
 	return bb
 end
 
-function stmt.bind_fields(stmt, fields)
-	assert(C.mysql_stmt_field_count(stmt) == #fields, 'wrong number of fields')
-	local bb = bind_buffer(fields, bind_buffer_types_output)
+function stmt.bind_result(stmt, defs)
+	assert(C.mysql_stmt_field_count(stmt) == #defs, 'wrong number of fields')
+	local bb = bind_buffer(defs, bind_buffer_types_output)
 	stcheckz(stmt, C.mysql_stmt_bind_result(stmt, bb.buffer))
 	return bb
 end

@@ -71,6 +71,17 @@ local function write_function(f, write, quote)
 	write'loadstring('; write_string(string.dump(f), write, quote); write')'
 end
 
+local int64, uint64, longlong, ulongulong
+local function is_int64(v)
+	if type(v) ~= 'cdata' then return false end
+	local ffi = require'ffi'
+	int64 = int64 or ffi.new'int64_t'
+	uint64 = uint64 or ffi.new'uint64_t'
+	longlong = longlong or ffi.new'long long'
+	ulongulong = ulongulong or ffi.new'unsigned long long'
+	return ffi.istype(v, int64) or ffi.istype(v, uint64) or ffi.istype(v, longlong) or ffi.istype(v, ulongulong)
+end
+
 local function pformat(v, quote)
 	quote = quote or "'"
 	if v == nil or type(v) == 'boolean' then
@@ -79,15 +90,18 @@ local function pformat(v, quote)
 		return format_number(v)
 	elseif type(v) == 'string' then
 		return format_string(v, quote)
-	elseif type(v) == 'function' and is_dumpable(v) then
+	elseif is_dumpable(v) then
 		return format_function(v)
+	elseif is_int64(v) then
+		return tostring(v)
+	else
+		error('unserializable', 0)
 	end
 end
 
-local serializabe_types = glue.index{'nil', 'boolean', 'string', 'number', 'function'}
 local function is_serializable(v)
-	return serializabe_types[type(v)] and
-				(type(v) ~= 'function' or is_dumpable(v))
+	return type(v) == 'nil' or type(v) == 'boolean' or type(v) == 'string'
+				or type(v) == 'number' or is_dumpable(v) or is_int64(v)
 end
 
 local function pwrite(v, write, quote)
@@ -98,9 +112,19 @@ local function pwrite(v, write, quote)
 		write_number(v, write)
 	elseif type(v) == 'string' then
 		write_string(v, write, quote)
-	elseif type(v) == 'function' then
+	elseif is_dumpable(v) then
 		write_function(v, write, quote)
+	elseif is_int64(v) then
+		write(tostring(v))
+	else
+		error('unserializable', 0)
 	end
+end
+
+if not ... then
+local ffi = require'ffi'
+local n = ffi.new('int64_t', 12345)
+print(pformat(n))
 end
 
 return {

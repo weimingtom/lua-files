@@ -411,9 +411,7 @@ int mysql_stmt_next_result(MYSQL_STMT *stmt);
 int mysql_stmt_store_result(MYSQL_STMT *stmt);
 my_bool mysql_stmt_free_result(MYSQL_STMT *stmt);
 
-int mysql_stmt_fetch(MYSQL_STMT *stmt);
-my_bool mysql_stmt_reset(MYSQL_STMT * stmt);
-
+MYSQL_RES *mysql_stmt_result_metadata(MYSQL_STMT *stmt);
 my_ulonglong mysql_stmt_num_rows(MYSQL_STMT *stmt);
 my_ulonglong mysql_stmt_affected_rows(MYSQL_STMT *stmt);
 my_ulonglong mysql_stmt_insert_id(MYSQL_STMT *stmt);
@@ -423,10 +421,22 @@ unsigned int mysql_stmt_errno(MYSQL_STMT * stmt);
 const char *mysql_stmt_error(MYSQL_STMT * stmt);
 const char *mysql_stmt_sqlstate(MYSQL_STMT * stmt);
 
+int mysql_stmt_fetch(MYSQL_STMT *stmt);
+my_bool mysql_stmt_reset(MYSQL_STMT * stmt);
+
 void mysql_stmt_data_seek(MYSQL_STMT *stmt, my_ulonglong offset);
 
-MYSQL_ROW_OFFSET mysql_stmt_row_seek(MYSQL_STMT *stmt, MYSQL_ROW_OFFSET offset);
 MYSQL_ROW_OFFSET mysql_stmt_row_tell(MYSQL_STMT *stmt);
+MYSQL_ROW_OFFSET mysql_stmt_row_seek(MYSQL_STMT *stmt, MYSQL_ROW_OFFSET offset);
+
+//NOTE: added MYSQL_ prefix to these.
+enum enum_cursor_type
+{
+  MYSQL_CURSOR_TYPE_NO_CURSOR= 0,
+  MYSQL_CURSOR_TYPE_READ_ONLY= 1,
+  MYSQL_CURSOR_TYPE_FOR_UPDATE= 2,
+  MYSQL_CURSOR_TYPE_SCROLLABLE= 4
+};
 
 enum enum_stmt_attr_type
 {
@@ -441,9 +451,6 @@ my_bool mysql_stmt_send_long_data(MYSQL_STMT *stmt,
                                           unsigned int param_number,
                                           const char *data,
                                           unsigned long length);
-
-MYSQL_RES *mysql_stmt_result_metadata(MYSQL_STMT *stmt);
-MYSQL_RES *mysql_stmt_param_metadata(MYSQL_STMT *stmt);
 
 // -------------------------------------------------------------------------------- prepared statements / bindings
 
@@ -524,21 +531,22 @@ int mysql_send_query(MYSQL *mysql, const char *q, unsigned long length);
 
 // -------------------------------------------------------------------------------- redundant functions
 
-my_bool mysql_thread_init(void);
-void    mysql_thread_end(void);
-const char *mysql_errno_to_sqlstate(unsigned int mysql_errno);
-unsigned long mysql_hex_string(char *to, const char *from, unsigned long from_length);
+my_bool mysql_thread_init(void); //called anyway
+void    mysql_thread_end(void);  //called anyway
+const char *mysql_errno_to_sqlstate(unsigned int mysql_errno); //use mysql_sqlstate
+unsigned long mysql_hex_string(char *to, const char *from, unsigned long from_length); //bad taste
 
-// redundant ways to get field info
+// redundant ways to get field info (we use use mysql_field_count and mysql_fetch_field_direct)
 MYSQL_FIELD *mysql_fetch_field(MYSQL_RES *result);
 MYSQL_FIELD *mysql_fetch_fields(MYSQL_RES *res);
 typedef unsigned int MYSQL_FIELD_OFFSET;
 MYSQL_FIELD_OFFSET mysql_field_tell(MYSQL_RES *res);
 MYSQL_FIELD_OFFSET mysql_field_seek(MYSQL_RES *result, MYSQL_FIELD_OFFSET offset);
+MYSQL_RES *mysql_stmt_param_metadata(MYSQL_STMT *stmt);
 
 // -------------------------------------------------------------------------------- deprecated functions
 
-unsigned long mysql_escape_string(char *to, const char *from, unsigned long from_length);
-int mysql_query(MYSQL *mysql, const char *q);
+unsigned long mysql_escape_string(char *to, const char *from, unsigned long from_length); //use mysql_real_escape_string
+int mysql_query(MYSQL *mysql, const char *q); //use mysql_real_query
 
 ]]

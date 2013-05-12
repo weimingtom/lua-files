@@ -3,6 +3,114 @@ local glue = require'glue'
 local pformat = require'pp'.pformat
 local ffi = require'ffi'
 
+local function assert_deepequal(t1, t2) --assert the equality of two values
+	assert(type(t1) == type(t2), type(t1)..' ~= '..type(t2))
+	if type(t1) == 'table' then
+		for k,v in pairs(t1) do assert_deepequal(t2[k], v) end
+		for k,v in pairs(t2) do assert_deepequal(t1[k], v) end
+	end
+end
+
+local function fit(s,n)
+	return #s > n and (s:sub(1,n-3) .. '...') or s
+end
+
+local function leftalign(s,n)
+	s = tostring(s)
+	s = s..(' '):rep(n - #s)
+	return fit(s,n)
+end
+
+local function rightalign(s,n)
+	s = tostring(s)
+	s = (' '):rep(n - #s)..s
+	return fit(s,n)
+end
+
+local function centeralign(s,n)
+	s = tostring(s)
+	local total = n - #s
+	local left = math.floor(total / 2)
+	local right = math.ceil(total / 2)
+	s = (' '):rep(left)..s..(' '):rep(right)
+	return fit(s,n)
+end
+
+local function print_table(fields, rows)
+	local max_sizes = {}
+	for i=1,#rows do
+		for j=1,#fields do
+			max_sizes[j] = math.max(max_sizes[j] or 0, #tostring(rows[i][j]))
+		end
+	end
+
+	local totalsize = 0
+	for j=1,#fields do
+		max_sizes[j] = math.max(max_sizes[j] or 0, #fields[j])
+		totalsize = totalsize + max_sizes[j] + 3
+	end
+
+	print()
+	local s, ps = '', ''
+	for j=1,#fields do
+		s = s .. centeralign(fields[j], max_sizes[j]) .. ' | '
+		ps = ps .. ('-'):rep(max_sizes[j]) .. ' + '
+	end
+	print(s)
+	print(ps)
+
+	for i=1,#rows do
+		local s = ''
+		for j=1,#fields do
+			local val = rows[i][j]
+			local align = type(rows[i][j]) == 'number' and rightalign or leftalign
+			s = s .. align(val, max_sizes[j]) .. ' | '
+		end
+		print(s)
+	end
+	print()
+end
+
+local function invert_table(fields, rows)
+	local ft, rt = {'field'}, {}
+	for i=1,#rows do
+		ft[i+1] = tostring(i)
+	end
+	for j=1,#fields do
+		local row = {fields[j]}
+		for i=1,#rows do
+			row[i+1] = rows[i][j]
+		end
+		rt[j] = row
+	end
+	return ft, rt
+end
+
+local function print_result(res)
+	local fields = {}
+	for i,field in res:fields() do
+		fields[i] = field.name
+	end
+	local rows = {}
+	for i,row in res:rows() do
+		rows[i] = row
+	end
+	print_table(fields, rows)
+end
+
+local function print_fields(fields_iter)
+	local fields = {'name', 'type', 'type_flag', 'length', 'max_length', 'decimals', 'charsetnr',
+							'org_name', 'table', 'org_table', 'db', 'catalog', 'def', 'extension'}
+	local rows = {}
+	for i,field in fields_iter do
+		rows[i] = {}
+		for j=1,#fields do
+			rows[i][j] = field[fields[j]]
+		end
+	end
+	print_table(fields, rows)
+end
+
 --client library
 
 print('mysql.thread_safe()   ', '->', pformat(mysql.thread_safe()))
@@ -89,7 +197,8 @@ create table binding_test (
 	fvarchar varchar(200),
 	fvarbinary varbinary(200),
 	fchar char(200),
-	fbinary binary(20)
+	fbinary binary(20),
+	fnull integer
 );
 
 insert into binding_test set
@@ -124,7 +233,8 @@ insert into binding_test set
 	fvarchar = 'just a varchar',
 	fvarbinary = 'a varbinary',
 	fchar = 'a char',
-	fbinary = 'a binary char'
+	fbinary = 'a binary char',
+	fnull = null
 ;
 
 insert into binding_test values ();
@@ -152,41 +262,10 @@ assert(not conn:more_results())
 local res = conn:store_result() --TODO: local res = conn:use_result()
 print('conn:store_result()   ', '->', res)
 print('res:row_count()       ', '->', pformat(res:row_count())); assert(res:row_count() == 2)
-print('res:field_count()     ', '->', pformat(res:field_count())); assert(res:field_count() == 32)
+print('res:field_count()     ', '->', pformat(res:field_count())); assert(res:field_count() == 33)
 print('res:eof()             ', '->', pformat(res:eof())); assert(res:eof() == true)
-print('res:fields()          ', '->')
-
-print()
-local function pad(s,n) s = tostring(s); return s..(' '):rep(n - #s) end
-local info_keys = {'name', 'type', 'type_flag', 'length', 'max_length', 'decimals', 'charsetnr',
-							'org_name', 'table', 'org_table', 'db', 'catalog', 'def', 'extension'}
-local t = {}
-for i,k in ipairs(info_keys) do
-	t[i] = pad(k,  20)
-end
-print('    '..table.concat(t))
-print(('-'):rep(4 + #info_keys * 20))
-for n,field in res:fields() do
-	local t = {}
-	for i,k in ipairs(info_keys) do
-		t[i] = pad(field[k],  20)
-	end
-	print(pad(n, 4)..table.concat(t))
-end
-
-print()
-print('res:field_info(       ', 1, ')', '->', pformat(res:field_info(1), '   '))
-
-print()
-local function fetch_row()
-	print('res:fetch_row()       ', '->')
-	local row = assert(res:fetch_row())
-	for i,field in res:fields() do
-		local v = row[i]
-		print('   '..pad(field.name, 20)..(type(row[i]) == 'cdata' and tostring(v) or pformat(v)))
-	end
-	return row
-end
+print('res:fields()          ', '->') print_fields(res:fields())
+print('res:field_info(1)     ', '->', pformat(res:field_info(1)))
 
 local test_values = {
 	fdecimal = '42.12',
@@ -194,7 +273,7 @@ local test_values = {
 	ftinyint = 42,
 	fsmallint = 42,
 	finteger = 42,
-	ffloat = ffi.cast('float', 42.33),
+	ffloat = tonumber(ffi.cast('float', 42.33)),
 	fdouble = 42.33,
 	freal = 42.33,
 	fbigint = 420LL,
@@ -220,18 +299,25 @@ local test_values = {
 	fvarchar = 'just a varchar',
 	fvarbinary = 'a varbinary',
 	fchar = 'a char',
-	fbinary = 'a binary char\0\0\0\0\0\0\0'
+	fbinary = 'a binary char\0\0\0\0\0\0\0',
+	fnull = nil,
 }
 
 --first row: test values
-local row = fetch_row()
-require'unit'
+local row = assert(res:fetch_row())
+print('res:fetch_row()       ', '->', pformat(row))
+
+print()
 for i,field in res:fields() do
-	test(row[i], test_values[field.name])
+	assert_deepequal(row[i], test_values[field.name])
+	local v = row[i]
+	print(rightalign(i, 4) .. '  ' .. leftalign(field.name, 20) .. pformat(v))
 end
+print()
 
 --second row: all nulls
 local row = assert(res:fetch_row())
+print('res:fetch_row()       ', '->', pformat(row))
 assert(#row == 0)
 for i in res:fields() do
 	assert(row[i] == nil)
@@ -242,91 +328,113 @@ print('res:free()            ', res:free())
 
 --reflection
 
-local function print_res(res)
-	local n = res:field_count()
-	local r = res:row_count()
-	for row in res:rows() do
-		local t = {}
-		for i=1,n do
-			t[#t+1] = pad(tostring(row[i]), 20)
-		end
-		print('   '..table.concat(t))
-	end
-end
-print('res:list_dbs()        '); print_res(conn:list_dbs())
-print('res:list_tables()     '); print_res(conn:list_tables())
-print('res:list_processes()  '); print_res(conn:list_processes())
+print('res:list_dbs()        ', '->'); print_result(conn:list_dbs())
+print('res:list_tables()     ', '->'); print_result(conn:list_tables())
+print('res:list_processes()  ', '->'); print_result(conn:list_processes())
 
 --prepared statements
+
+local bind_defs = {
+	{type = 'decimal', size = 20}, --TODO: truncation
+	{type = 'numeric', size = 20},
+	{type = 'tinyint'},
+	{type = 'smallint'},
+	{type = 'integer'},
+	{type = 'float'},
+	{type = 'double'},
+	{type = 'real'},
+	{type = 'bigint'},
+	{type = 'mediumint'},
+	{type = 'date'},
+	{type = 'time'},
+	{type = 'time'},
+	{type = 'datetime'},
+	{type = 'datetime'},
+	{type = 'timestamp'},
+	{type ='timestamp'},
+	{type = 'year'},
+	{type = 'bit'},
+	{type = 'bit'},
+	{type = 'bit'},
+	{type = 'enum', size = 200},
+	{type = 'set', size = 200},
+	{type = 'tinyblob', size = 200},
+	{type = 'mediumblob', size = 200},
+	{type = 'longblob', size = 200},
+	{type = 'text', size = 200},
+	{type = 'blob', size = 200},
+	{type = 'varchar', size = 200},
+	{type = 'varbinary', size = 200},
+	{type = 'char', size = 200},
+	{type = 'binary', size = 200},
+	{type = 'integer'},
+}
+
+--preparation phase
 
 local fields = {'fdecimal', 'fnumeric', 'ftinyint', 'fsmallint', 'finteger', 'ffloat', 'fdouble',
 					'freal', 'fbigint', 'fmediumint', 'fdate', 'ftime', 'ftime2', 'fdatetime', 'fdatetime2',
 					'ftimestamp', 'ftimestamp2', 'fyear', 'fbit2', 'fbit22', 'fbit64', 'fenum', 'fset',
-					'ftinyblob', 'fmediumblob', 'flongblob', 'ftext', 'fblob', 'fvarchar', 'fvarbinary', 'fchar', 'fbinary'}
-local query = 'select '.. table.concat(fields, ', ')..' from binding_test'
+					'ftinyblob', 'fmediumblob', 'flongblob', 'ftext', 'fblob', 'fvarchar', 'fvarbinary', 'fchar', 'fbinary',
+					'fnull'}
 
+local query = 'select '.. table.concat(fields, ', ')..' from binding_test'
 local stmt = conn:prepare(query)
 
-local bind_fields = {
-	fdecimal = {type = 'decimal', size = 20}, --TODO: truncation
-	fnumeric = {type = 'numeric', size = 20},
-	ftinyint = {type = 'tinyint'},
-	fsmallint = {type = 'smallint'},
-	finteger = {type = 'integer'},
-	ffloat = {type = 'float'},
-	fdouble = {type = 'double'},
-	freal = {type = 'real'},
-	fbigint = {type = 'bigint'},
-	fmediumint = {type = 'mediumint'},
-	fdate = {type = 'date'},
-	ftime = {type = 'time'},
-	ftime2 = {type = 'time'},
-	fdatetime = {type = 'datetime'},
-	fdatetime2 = {type = 'datetime'},
-	ftimestamp = {type = 'timestamp'},
-	ftimestamp2 = {type ='timestamp'},
-	fyear = {type = 'year'},
-	fbit2 = {type = 'bit'},
-	fbit22 = {type = 'bit'},
-	fbit64 = {type = 'bit'},
-	fenum = {type = 'enum', size = 200},
-	fset = {type = 'set', size = 200},
-	ftinyblob = {type = 'tinyblob', size = 200},
-	fmediumblob = {type = 'mediumblob', size = 200},
-	flongblob = {type = 'longblob', size = 200},
-	ftext = {type = 'text', size = 200},
-	fblob = {type = 'blob', size = 200},
-	fvarchar = {type = 'varchar', size = 200},
-	fvarbinary = {type = 'varbinary', size = 200},
-	fchar = {type = 'char', size = 200},
-	fbinary = {type = 'binary', size = 200},
-}
-local bind_fields_t = {}
-for i,name in ipairs(fields) do
-	table.insert(bind_fields_t, assert(bind_fields[name]))
-end
-local bind = stmt:bind_fields(bind_fields_t)
-print('stmt:bind_fields      ', pformat(bind_fields_t, '   '), '->', pformat(bind, '   '))
-
 print('conn:prepare(         ', pformat(query), ')', '->', stmt)
+print('stmt:field_count()    ', '->', pformat(stmt:field_count())); assert(stmt:field_count() == #bind_defs)
+--we can get the fields and their types before execution so we can create create our bind structures.
+--max. length is not computed though, but will be computed after binding.
+print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
+
+--binding phase
+
+local bind = stmt:bind_result(bind_defs)
+print('stmt:bind_result      ', pformat(bind_defs), '->', pformat(bind))
+--max. length is computed now, so we can allocate our buffers.
+--this can only mean that by now the query already ran on the server even if we didn't yet call exec().
+print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
+
+--execution and loading
+
 print('stmt:exec()           ', stmt:exec())
 print('stmt:store_result()   ', stmt:store_result())
-print('stmt:fetch_row()      ', stmt:fetch_row())
-print('bind:is_truncated(    ', 1, ')', '->', bind:is_truncated(1)); assert(bind:is_truncated(1) == false)
 
+--result info
+
+print('stmt:row_count()      ', '->', pformat(stmt:row_count()))
+print('stmt:affected_rows()  ', '->', pformat(stmt:affected_rows()))
+print('stmt:insert_id()      ', '->', pformat(stmt:insert_id()))
+print('stmt:sqlstate()       ', '->', pformat(stmt:sqlstate()))
+
+--result data (different API since we don't get a result object)
+
+print('stmt:fetch_row()      ', stmt:fetch_row())
+print('bind:is_truncated(1)  ', '->', pformat(bind:is_truncated(1))); assert(bind:is_truncated(1) == false)
+print('bind:is_null(1)       ', '->', pformat(bind:is_null(1))); assert(bind:is_null(1) == false)
+print('bind:get(1)           ', '->', pformat(bind:get(1))); assert(bind:get(1) == test_values.fdecimal)
+print('for i=1,bind.field_count do bind:get(i)', '->')
+
+print()
 for i=1,bind.field_count do
 	local v = bind:get(i)
-	test(v, test_values[fields[i]])
-	v = type(v) == 'cdata' and tostring(v) or pformat(v)
-	print(pad(i, 4) .. pad(fields[i], 20) .. v)
+	assert_deepequal(v, test_values[fields[i]])
+	assert(bind:is_truncated(i) == false)
+	assert(bind:is_null(i) == (fields[i] == 'fnull'))
+	print(rightalign(i, 4) .. '  ' .. leftalign(fields[i], 20) .. pformat(v))
 end
+print()
+
 
 print('stmt:free_result()    ', stmt:free_result())
 local next_result = stmt:next_result()
-print('stmt:next_result()    ', '->', next_result); assert(next_result == false)
+print('stmt:next_result()    ', '->', pformat(next_result)); assert(next_result == false)
 
 print('stmt:reset()          ', stmt:reset())
 print('stmt:close()          ', stmt:close())
 
+local q = 'drop table binding_test'
+print('conn:query(           ', pformat(q), ')', conn:query(q))
+print('conn:commit()         ', conn:commit())
 print('conn:close()          ', conn:close())
 
