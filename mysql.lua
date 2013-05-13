@@ -934,7 +934,7 @@ function bind:get_time(i)
 	bind_check_range(self, i)
 	assert(tonumber(self.buffer[i-1].buffer_type) == C.MYSQL_TYPE_TIME, 'invalid type')
 	local tm = self.data[i]
-	return tm.hour, tm.minute, tm.seccond, tm.second_part
+	return tm.hour, tm.minute, tm.second, tm.second_part
 end
 
 function bind:set_time(i, hour, min, sec, frac)
@@ -948,7 +948,7 @@ function bind:get_datetime(i)
 	local btype = tonumber(self.buffer[i-1].buffer_type)
 	assert(btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP, 'invalid type')
 	local tm = self.data[i]
-	return tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.seccond, tm.second_part
+	return tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second, tm.second_part
 end
 
 function bind:set_datetime(i, year, month, day, hour, min, sec, frac)
