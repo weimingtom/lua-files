@@ -227,7 +227,7 @@ local function control_points(path)
 
 		elseif s == 'symm_quad_curve' or s == 'symm_curve' then
 
-			local kind = s:match'quad' and 'quad' or 'cubic'
+			local kind = s:find'quad' and 'quad' or 'cubic'
 			local p1x, p1y = cpx, cpy
 			local c3x, c3y = i+1, i+2
 			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
@@ -277,7 +277,7 @@ local function control_points(path)
 
 		elseif s == 'smooth_quad_curve' or s == 'smooth_curve' then
 
-			local kind = s:match'quad' and 'quad' or 'cubic'
+			local kind = s:find'quad' and 'quad' or 'cubic'
 			local p1x, p1y = cpx, cpy
 			local clen, c3x, c3y = i+1, i+2, i+3
 			local p3x, p3y = path_pt(c3x, c3y, rel, cpx, cpy)
@@ -384,7 +384,7 @@ local function control_points(path)
 
 			local p1x, p1y = cpx, cpy
 			local ccx, ccy, crx, cry, cstart_angle, csweep_angle, crotation
-			if s:match'elliptic' then
+			if s:find'elliptic' then
 				ccx, ccy, crx, cry, cstart_angle, csweep_angle, crotation = i+1, i+2, i+3, i+4, i+5, i+6, i+7
 			else
 				ccx, ccy, crx, cry, cstart_angle, csweep_angle = i+1, i+2, i+3, i+3, i+4, i+5
@@ -426,7 +426,7 @@ local function control_points(path)
 			chain(px2, move_angles)
 			chain(py2, move_angles)
 
-			if s:match'^line_' then
+			if s:find'^line_' then
 				cpx, cpy = px2, py2
 			else
 				spx, spy, cpx, cpy = px1, py1, px2, py2

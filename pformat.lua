@@ -37,7 +37,7 @@ local keywords = glue.index{
 }
 local function is_identifier(v)
 	return type(v) == 'string' and not keywords[v]
-				and v:match('^[a-zA-Z_][a-zA-Z_0-9]*$') ~= nil
+				and v:find('^[a-zA-Z_][a-zA-Z_0-9]*$') ~= nil
 end
 
 local hasinf = math.huge == math.huge - 1
@@ -71,15 +71,13 @@ local function write_function(f, write, quote)
 	write'loadstring('; write_string(string.dump(f), write, quote); write')'
 end
 
-local int64, uint64, longlong, ulongulong
+local int64, uint64
 local function is_int64(v)
 	if type(v) ~= 'cdata' then return false end
 	local ffi = require'ffi'
 	int64 = int64 or ffi.new'int64_t'
 	uint64 = uint64 or ffi.new'uint64_t'
-	longlong = longlong or ffi.new'long long'
-	ulongulong = ulongulong or ffi.new'unsigned long long'
-	return ffi.istype(v, int64) or ffi.istype(v, uint64) or ffi.istype(v, longlong) or ffi.istype(v, ulongulong)
+	return ffi.istype(v, int64) or ffi.istype(v, uint64)
 end
 
 local function pformat(v, quote)

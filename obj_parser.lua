@@ -19,7 +19,7 @@ local function readlines(file, callback)
 			else
 				line_str = s
 			end
-			if s:match'\\$' then
+			if s:find'\\$' then
 				more = true
 			else
 				more = false

@@ -1135,7 +1135,7 @@ local function extract_subpath(path, i, j)
 				end
 				i = nexti
 				if not i then return t end
-			elseif s:match'symm_' or s:match'smooth_' then --unsmooth a smooth curve.
+			elseif s:find'symm_' or s:find'smooth_' then --unsmooth a smooth curve.
 				append_cmd(t, to_cusp(cpx, cpy, tkind, tx, ty, abs_cmd(cpx, cpy, cmd(path, i))))
 				i = next_cmd(path, i)
 				if not i then return t end

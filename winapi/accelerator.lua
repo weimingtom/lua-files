@@ -21,7 +21,7 @@ FALT      = 0x10
 
 function ACCEL(t)
 	if type(t) == 'table' then
-		local is_char = type(t.key) == 'string' and not t.key:match'^VK_'
+		local is_char = type(t.key) == 'string' and not t.key:find'^VK_'
 		t = {
 			key = is_char and wcs(t.key:upper())[0] or flags(t.key),
 			fVirt = bit.bor(flags(t.modifiers), FVIRTKEY),

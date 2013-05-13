@@ -20,7 +20,6 @@ cairo					support loading images through the imagefile API
 
 HARD / C BINDINGS
 -----------------------------------------------------------------------
-mysql					todo: prepared statements
 clipper				finish the binding and make a demo
 
 

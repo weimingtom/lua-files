@@ -88,18 +88,21 @@ local option_encoders = {
 
 function M.connect(t, ...)
 	local host, user, pass, db, charset, port
-	local unix_socket, client_flag, flags, options, attrs
+	local unix_socket, flags, options, attrs
+	local key, cert, ca, capath, cipher
 	if type(t) == 'string' then
 		host, user, pass, db, charset, port = t, ...
 	else
 		host, user, pass, db, charset, port = t.host, t.user, t.pass, t.db, t.charset, t.port
-		unix_socket, client_flag, flags, options, attrs = t.unix_socket, t.client_flag, t.flags, t.options, t.attrs
+		unix_socket, flags, options, attrs = t.unix_socket, t.flags, t.options, t.attrs
+		key, cert, ca, capath, cipher = t.key, t.cert, t.ca, t.capath, t.cipher
 	end
-	assert(host, 'missing host')
 	port = port or 0
-	client_flag = client_flag or 0
 
-	if flags then
+	local client_flag = 0
+	if type(flags) == 'number' then
+		client_flag = flags
+	elseif flags then
 		for k,v in pairs(flags) do
 			local flag = enum(k, 'MYSQL_') --'CLIENT_*' or mysql.C.MYSQL_CLIENT_* enum
 			client_flag = v and bit.bor(client_flag, flag) or bit.band(client_flag, bit.bnot(flag))
@@ -122,6 +125,10 @@ function M.connect(t, ...)
 		for k,v in pairs(attrs) do
 			assert(C.mysql_options4(mysql, C.MYSQL_OPT_CONNECT_ATTR_ADD, k, v) == 0)
 		end
+	end
+
+	if key then
+		checkz(mysql, C.mysql_ssl_set(mysql, key, cert, ca, capath, cipher))
 	end
 
 	checkh(mysql, C.mysql_real_connect(mysql, host, user, pass, db, port, unix_socket, client_flag))
@@ -148,10 +155,6 @@ end
 
 function conn.change_user(mysql, user, pass, db)
 	checkz(mysql, C.mysql_change_user(mysql, user, pass, db))
-end
-
-function conn.set_ssl(mysql, key, cert, ca, cpath, cipher)
-	checkz(mysql, C.mysql_ssl_set(mysql, key, cert, ca, cpath, cipher))
 end
 
 function conn.set_multiple_statements(mysql, yes)
@@ -182,16 +185,11 @@ function conn.charset_info(mysql)
 	}
 end
 
-local ping_results = {
-	[C.MYSQL_CR_COMMANDS_OUT_OF_SYNC] = 'sync',
-	[C.MYSQL_CR_SERVER_GONE_ERROR] = 'gone',
-}
 function conn.ping(mysql)
 	local ret = C.mysql_ping(mysql)
 	if ret == 0 then return true end
-	local err = ping_errors[ret]
-	if not err then myerror(mysql) end
-	return false, err
+	if ret == C.MYSQL_CR_SERVER_GONE_ERROR then return false end
+	myerror(mysql)
 end
 
 conn.thread_id = C.mysql_thread_id
@@ -220,7 +218,7 @@ end
 
 function conn.commit(mysql) checkz(mysql, C.mysql_commit(mysql)) end
 function conn.rollback(mysql) checkz(mysql, C.mysql_rollback(mysql)) end
-function conn.autocommit(mysql, yes) checkz(mysql, C.mysql_autocommit(mysql, yes == nil or yes)) end
+function conn.set_autocommit(mysql, yes) checkz(mysql, C.mysql_autocommit(mysql, yes == nil or yes)) end
 
 --queries
 
@@ -279,8 +277,6 @@ function conn.more_results(mysql)
 	return C.mysql_more_results(mysql) == 1
 end
 
---TODO: MYSQL_RES *mysql_list_fields(MYSQL *mysql, const char *table, const char *wild);
-
 local function result_function(func)
 	return function(mysql)
 		local res = checkh(mysql, func(mysql))
@@ -305,7 +301,7 @@ end
 res.field_count = C.mysql_num_fields
 
 function res.eof(res)
-	return C.mysql_eof(res) == 1
+	return C.mysql_eof(res) ~= 0
 end
 
 --field info
@@ -368,6 +364,7 @@ local field_flag_names = {
 }
 
 function res.field_info(res, i)
+	assert(i >= 1 and i <= res:field_count(), 'index out of range')
 	local info = C.mysql_fetch_field_direct(res, i-1)
 	local type_flag = tonumber(info.type)
 	local t = {
@@ -399,6 +396,7 @@ end
 
 --convenience name fetcher for fields (less garbage)
 function res.field_name(res, i)
+	assert(i >= 1 and i <= res:field_count(), 'index out of range')
 	local info = C.mysql_fetch_field_direct(res, i-1)
 	return cstring(info.name, info.name_length)
 end
@@ -495,38 +493,85 @@ local field_decoders = {
 	[C.MYSQL_TYPE_BIT] = parse_bit,
 }
 
-function res.fetch_row(res, mode)
+local function fetch_buffers(res)
 	local values = C.mysql_fetch_row(res)
-	if values == NULL then return end --TODO: check error. how to reach for the mysql object?
+	if values == NULL then
+		if res.conn ~= NULL then --buffered read: check for errors
+			myerror(res.conn)
+		end
+		return
+	end
 	local sizes = C.mysql_fetch_lengths(res)
 	local field_count = C.mysql_num_fields(res)
 	local fields = C.mysql_fetch_fields(res)
-	local t = {}
+	return values, sizes, field_count, fields
+end
+
+local function decode_value(i, values, sizes, fields, decode)
+	if values[i] == NULL then return nil end
+	local decoder = decode and field_decoders[tonumber(fields[i].type)] or ffi.string
+	return decoder(values[i], sizes[i])
+end
+
+local function mode_flags(mode)
+	local numeric = not mode or mode:find'n'
+	local assoc   = mode and mode:find'a'
+	local packed  = mode and (numeric or assoc)
+	local decode  = not mode or not mode:find's'
+	return packed, numeric, assoc, decode
+end
+
+function res.fetch(res, mode, t)
+	t = t or {}
+	local packed, numeric, assoc, decode = mode_flags(mode)
+	local values, sizes, field_count, fields = fetch_buffers(res)
+	if not values then return nil end
+
 	for i=0,field_count-1 do
-		if values[i] ~= NULL then
-			local decoder = mode ~= '*s' and field_decoders[tonumber(fields[i].type)] or ffi.string
-			t[i+1] = decoder(values[i], sizes[i])
+		local v = decode_value(i, values, sizes, fields, decode)
+		if numeric then
+			t[i+1] = v
+		end
+		if assoc then
+			local k = ffi.string(fields[i].name, fields[i].name_length)
+			t[k] = v
 		end
 	end
-	return t
-end
 
-function res.rows(res, mode)
-	local i = 0
-	return function()
-		local row = res:fetch_row(mode)
-		if not row then return end
-		i = i + 1
-		return i, row
+	if packed then
+		return t
+	else
+		return true, unpack(t)
 	end
 end
 
-function res.seek(res, row_number) --use in conjunction with res:row_count()
-	C.mysql_data_seek(res, row_number-1)
+function res.rows(res, mode, t)
+	local packed = mode_flags(mode)
+	local i = 0
+	res:seek(1)
+	local function pass(t, ...)
+		if not t then return end
+		i = i + 1
+		if packed then
+			return i, t
+		else
+			return i, ...
+		end
+	end
+	return function()
+		return pass(res:fetch(mode, t))
+	end
 end
 
 res.tell = C.mysql_row_tell
-res.seek = C.mysql_row_seek
+
+function res.seek(res, where) --use in conjunction with res:row_count()
+	if type(where) == 'number' then
+		C.mysql_data_seek(res, where-1)
+	else
+		C.mysql_row_seek(res, where)
+	end
+end
 
 --reflection
 
@@ -551,8 +596,18 @@ function conn.shutdown(mysql, level)
 	checkz(mysql, C.mysql_shutdown(mysql, enum(level)))
 end
 
-function conn.refresh(mysql, options) --options are 'REFRESH_*' or mysql.C.MYSQL_REFRESH_* enums
-	checkz(mysql, C.mysql_refresh(mysql, enum(options, 'MYSQL_')))
+function conn.refresh(mysql, t) --options are 'REFRESH_*' or mysql.C.MYSQL_REFRESH_* enums
+	local options = 0
+	if type(t) == 'number' then
+		options = t
+	else
+		for k,v in pairs(t) do
+			if v then
+				options = bit.bor(options, enum(k, 'MYSQL_'))
+			end
+		end
+	end
+	checkz(mysql, C.mysql_refresh(mysql, options))
 end
 
 function conn.dump_debug_info(mysql)
@@ -646,7 +701,7 @@ function stmt.result_fields(stmt)
 	return fields
 end
 
-function stmt.fetch_row(stmt)
+function stmt.fetch(stmt)
 	local ret = C.mysql_stmt_fetch(stmt)
 	if ret == 0 then return true end
 	if ret == C.MYSQL_NO_DATA then return false end
@@ -658,15 +713,18 @@ function stmt.reset(stmt)
 	stcheckz(stmt, C.mysql_stmt_reset(stmt))
 end
 
-function stmt.seek(stmt, row_number) --use in conjunction with stmt:row_count()
-	C.mysql_stmt_data_seek(res, row_number-1)
+stmt.tell = C.mysql_stmt_row_tell
+
+function stmt.seek(stmt, where) --use in conjunction with stmt:row_count()
+	if type(where) == 'number' then
+		C.mysql_stmt_data_seek(stmt, where-1)
+	else
+		C.mysql_stmt_row_seek(stmt, where)
+	end
 end
 
-stmt.row_seek = C.mysql_stmt_row_seek
-stmt.row_tell = C.mysql_stmt_row_tell
-
 function stmt.send_long_data(stmt, param_number, data, size)
-	stcheckz(stmt, C.mysql_stmt_send_long_data(stmt, param_number, data, size))
+	stcheckz(stmt, C.mysql_stmt_send_long_data(stmt, param_number, data, size or #data))
 end
 
 function stmt.update_max_length(stmt)
@@ -793,7 +851,7 @@ local function bind_buffer(defs, bind_buffer_types)
 	self.null_flags = ffi.new('my_bool[?]', #defs) --null flag buffers, one for each field
 	self.error_flags = ffi.new('my_bool[?]', #defs) --error (truncation) flag buffers, one for each field
 	for i,def in ipairs(defs) do
-		local btype = assert(bind_buffer_types[def.type], 'invalid type')
+		local btype = assert(bind_buffer_types[def.type:lower()], 'invalid type')
 		local data
 		if number_types[btype] then
 			data = ffi.new(number_types[btype])
@@ -826,7 +884,6 @@ local function bind_check_range(self, i)
 	assert(i >= 1 and i <= self.field_count, 'index out of bounds')
 end
 
---TODO: accept diffent input types eg. for date, bitfields etc.
 function bind:set(i, value, size)
 	bind_check_range(self, i)
 

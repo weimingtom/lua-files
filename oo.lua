@@ -80,10 +80,10 @@ function object:setproperty(k,v)
 			if not rawget(self, 'state') then rawset(self, 'state', {}) end
 			rawget(self, 'set_'..k)(self, v) --if the setter breaks, the property is not updated
 			self.state[k] = v
-		elseif k:match'^before_' then --install before hook
+		elseif k:find'^before_' then --install before hook
 			local method_name = k:match'^before_(.*)'
 			self:beforehook(method_name, v)
-		elseif k:match'^after_' then --install after hook
+		elseif k:find'^after_' then --install after hook
 			local method_name = k:match'^after_(.*)'
 			self:afterhook(method_name, v)
 		else
@@ -181,7 +181,7 @@ function object:inspect()
 			supers[#supers+1] = source
 		end
 		if sources[k] == src then
-			if type(k) == 'string' and k:match'^[gs]et_' then
+			if type(k) == 'string' and k:find'^[gs]et_' then
 				local what, prop = k:match'^([gs])et_(.*)'
 				props_t[prop] = (props_t[prop] or '')..what
 			else

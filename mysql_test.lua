@@ -92,7 +92,7 @@ local function print_result(res)
 		fields[i] = field.name
 	end
 	local rows = {}
-	for i,row in res:rows() do
+	for i,row in res:rows'n' do
 		rows[i] = row
 	end
 	print_table(fields, rows)
@@ -155,7 +155,7 @@ print('conn:ssl_cipher()     ', '->', pformat(conn:ssl_cipher()))
 
 print('conn:commit()         ', conn:commit())
 print('conn:rollback()       ', conn:rollback())
-print('conn:autocommit()     ', conn:autocommit(true))
+print('conn:set_autocommit() ', conn:set_autocommit(true))
 
 --queries
 
@@ -303,26 +303,57 @@ local test_values = {
 	fnull = nil,
 }
 
---first row: test values
-local row = assert(res:fetch_row())
-print('res:fetch_row()       ', '->', pformat(row))
-
-print()
+--first row: fetch as array and test values
+local row = assert(res:fetch'n')
+print("res:fetch'n'          ", '->', pformat(row))
 for i,field in res:fields() do
 	assert_deepequal(row[i], test_values[field.name])
-	local v = row[i]
-	print(rightalign(i, 4) .. '  ' .. leftalign(field.name, 20) .. pformat(v))
+end
+
+--first row again: fetch as assoc. array and test values
+print('res:seek(1)           ', '->', res:seek(1))
+local row = assert(res:fetch'a')
+print("res:fetch'a'         ", '->', pformat(row))
+for i,field in res:fields() do
+	assert_deepequal(row[field.name], test_values[field.name])
+end
+
+--first row again: fetch unpacked and test values
+print('res:seek(1)           ', '->', res:seek(1))
+local function pack(_, ...)
+	local t = {}
+	for i=1,select('#', ...) do
+		t[i] = select(i, ...)
+	end
+	return t
+end
+local row = pack(res:fetch())
+print("res:fetch()           ", '-> packed: ', pformat(row))
+for i,field in res:fields() do
+	assert_deepequal(row[i], test_values[field.name])
+end
+
+--first row again: print its values parsed and unparsed for comparison
+res:seek(1)
+local row = assert(res:fetch'n')
+res:seek(1)
+local row_s = assert(res:fetch'ns')
+print()
+print(rightalign('', 4) .. '  ' .. leftalign('field', 20) .. leftalign('unparsed', 40) .. '  ' .. 'parsed')
+print(('-'):rep(4 + 2 + 20 + 40 + 40))
+for i,field in res:fields() do
+	print(rightalign(i, 4) .. '  ' .. leftalign(field.name, 20) .. leftalign(pformat(row_s[i]), 40) .. '  ' .. pformat(row[i]))
 end
 print()
 
 --second row: all nulls
-local row = assert(res:fetch_row())
-print('res:fetch_row()       ', '->', pformat(row))
+local row = assert(res:fetch'n')
+print("res:fetch'n'          ", '->', pformat(row))
 assert(#row == 0)
-for i in res:fields() do
+for i=1,res:field_count() do
 	assert(row[i] == nil)
 end
-assert(not res:fetch_row())
+assert(not res:fetch'n')
 
 print('res:free()            ', res:free())
 
@@ -409,7 +440,7 @@ print('stmt:sqlstate()       ', '->', pformat(stmt:sqlstate()))
 
 --result data (different API since we don't get a result object)
 
-print('stmt:fetch_row()      ', stmt:fetch_row())
+print('stmt:fetch()          ', stmt:fetch())
 print('bind:is_truncated(1)  ', '->', pformat(bind:is_truncated(1))); assert(bind:is_truncated(1) == false)
 print('bind:is_null(1)       ', '->', pformat(bind:is_null(1))); assert(bind:is_null(1) == false)
 print('bind:get(1)           ', '->', pformat(bind:get(1))); assert(bind:get(1) == test_values.fdecimal)

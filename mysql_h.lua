@@ -1,4 +1,4 @@
---result of `cpp mysql.h` plus lots of cleanup plus errors from errmsg.h; by Cosmin Apreutesei; MySQL Connector/C 6.1
+--result of `cpp mysql.h` plus lots of cleanup and defines from other headers; by Cosmin Apreutesei; MySQL Connector/C 6.1
 --NOTE that MySQL Connector/C is GPL software. Could this file be considered "derived work" then?
 
 local ffi = require'ffi'
@@ -19,7 +19,7 @@ enum {
 
 // -------------------------------------------------------------------------------- error constants
 
-//NOTE: added MYSQL_ prefix to these.
+// NOTE: added MYSQL_ prefix to these.
 enum mysql_error_code {
 	MYSQL_CR_UNKNOWN_ERROR = 2000,
 	MYSQL_CR_SOCKET_CREATE_ERROR = 2001,
@@ -129,7 +129,7 @@ enum mysql_option
 int mysql_options(MYSQL *mysql, enum mysql_option option, const void *arg);
 int mysql_options4(MYSQL *mysql, enum mysql_option option, const void *arg1, const void *arg2);
 
-//NOTE: added MYSQL_ prefix to these. Also, these are bit flags not exclusive enum values.
+// NOTE: added MYSQL_ prefix to these. Also, these are bit flags not exclusive enum values.
 enum {
 	MYSQL_CLIENT_LONG_PASSWORD = 1,               /* new more secure passwords */
 	MYSQL_CLIENT_FOUND_ROWS = 2,                  /* Found instead of affected rows */
@@ -242,9 +242,17 @@ const char * mysql_info(MYSQL *mysql);
 int mysql_next_result(MYSQL *mysql);
 my_bool mysql_more_results(MYSQL *mysql);
 
-typedef struct MYSQL_RES_ MYSQL_RES;
+// NOTE: normally we would've made this an opaque handle, but we need to expose
+// the connection handle from it so we can report errors for unbuffered reads.
+typedef struct st_mysql_res {
+	my_ulonglong __row_count;
+	void *__fields;
+	void *__data;
+	void *__data_cursor;
+	void *__lengths;
+	MYSQL *conn;  /* for unbuffered reads */
+} MYSQL_RES;
 
-MYSQL_RES *mysql_list_fields(MYSQL *mysql, const char *table, const char *wild);
 MYSQL_RES *mysql_store_result(MYSQL *mysql);
 MYSQL_RES *mysql_use_result(MYSQL *mysql);
 void mysql_free_result(MYSQL_RES *result);
@@ -291,7 +299,7 @@ enum enum_field_types {
    MYSQL_TYPE_GEOMETRY=255
 };
 
-//NOTE: added MYSQL_ prefix to these. Also, these are bit flags, not exclusive enum values.
+// NOTE: added MYSQL_ prefix to these. Also, these are bit flags, not exclusive enum values.
 enum {
 	MYSQL_NOT_NULL_FLAG = 1,     /* Field can't be NULL */
 	MYSQL_PRI_KEY_FLAG = 2,      /* Field is part of a primary key */
@@ -366,7 +374,7 @@ enum mysql_enum_shutdown_level {
 };
 int mysql_shutdown(MYSQL *mysql, enum mysql_enum_shutdown_level shutdown_level); // needs SHUTDOWN priviledge
 
-//NOTE: added MYSQL_ prefix. not really enum values either, just bit flags.
+// NOTE: added MYSQL_ prefix. not really enum values either, just bit flags.
 enum {
 	MYSQL_REFRESH_GRANT       = 1,    /* Refresh grant tables */
 	MYSQL_REFRESH_LOG         = 2,    /* Start on new log file */
@@ -429,7 +437,7 @@ void mysql_stmt_data_seek(MYSQL_STMT *stmt, my_ulonglong offset);
 MYSQL_ROW_OFFSET mysql_stmt_row_tell(MYSQL_STMT *stmt);
 MYSQL_ROW_OFFSET mysql_stmt_row_seek(MYSQL_STMT *stmt, MYSQL_ROW_OFFSET offset);
 
-//NOTE: added MYSQL_ prefix to these.
+// NOTE: added MYSQL_ prefix to these.
 enum enum_cursor_type
 {
   MYSQL_CURSOR_TYPE_NO_CURSOR= 0,
@@ -531,10 +539,10 @@ int mysql_send_query(MYSQL *mysql, const char *q, unsigned long length);
 
 // -------------------------------------------------------------------------------- redundant functions
 
-my_bool mysql_thread_init(void); //called anyway
-void    mysql_thread_end(void);  //called anyway
-const char *mysql_errno_to_sqlstate(unsigned int mysql_errno); //use mysql_sqlstate
-unsigned long mysql_hex_string(char *to, const char *from, unsigned long from_length); //bad taste
+my_bool mysql_thread_init(void); // called anyway
+void    mysql_thread_end(void);  // called anyway
+const char *mysql_errno_to_sqlstate(unsigned int mysql_errno); // use mysql_sqlstate
+unsigned long mysql_hex_string(char *to, const char *from, unsigned long from_length); // bad taste
 
 // redundant ways to get field info (we use use mysql_field_count and mysql_fetch_field_direct)
 MYSQL_FIELD *mysql_fetch_field(MYSQL_RES *result);
@@ -546,7 +554,8 @@ MYSQL_RES *mysql_stmt_param_metadata(MYSQL_STMT *stmt);
 
 // -------------------------------------------------------------------------------- deprecated functions
 
-unsigned long mysql_escape_string(char *to, const char *from, unsigned long from_length); //use mysql_real_escape_string
-int mysql_query(MYSQL *mysql, const char *q); //use mysql_real_query
+unsigned long mysql_escape_string(char *to, const char *from, unsigned long from_length); // use mysql_real_escape_string
+int mysql_query(MYSQL *mysql, const char *q); // use mysql_real_query
+MYSQL_RES *mysql_list_fields(MYSQL *mysql, const char *table, const char *wild); // use "SHOW COLUMNS FROM table"
 
 ]]
