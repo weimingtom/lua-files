@@ -8,6 +8,8 @@ local function assert_deepequal(t1, t2) --assert the equality of two values
 	if type(t1) == 'table' then
 		for k,v in pairs(t1) do assert_deepequal(t2[k], v) end
 		for k,v in pairs(t2) do assert_deepequal(t1[k], v) end
+	else
+		assert(t1 == t2, pformat(t1) .. ' ~= ' .. pformat(t2))
 	end
 end
 
@@ -221,8 +223,8 @@ insert into binding_test set
 	ftimestamp2 = '2013-10-05 21:30:20.123456',
 	fyear = 2013,
 	fbit2 = b'10',
-	fbit22 = b'10',
-	fbit64 = b'10',
+	fbit22 = b'1000000010',
+	fbit64 = b'1000000010',
 	fenum = 'yes',
 	fset = ('e3,e2'),
 	ftinyblob = 'tiny tiny blob',
@@ -287,8 +289,8 @@ local test_values = {
 	ftimestamp2 = {year = 2013, month = 10, day = 05, hour = 21, min = 30, sec = 20, frac = 123456},
 	fyear = 2013,
 	fbit2 = 2,
-	fbit22 = 2,
-	fbit64 = 2ULL,
+	fbit22 = 514,
+	fbit64 = 514ULL,
 	fenum = 'yes',
 	fset = 'e2,e3',
 	ftinyblob = 'tiny tiny blob',
@@ -303,11 +305,13 @@ local test_values = {
 	fnull = nil,
 }
 
+local test_values1 = glue.merge({ffloat = 42.33}, test_values)
+
 --first row: fetch as array and test values
 local row = assert(res:fetch'n')
 print("res:fetch'n'          ", '->', pformat(row))
 for i,field in res:fields() do
-	assert_deepequal(row[i], test_values[field.name])
+	assert_deepequal(row[i], test_values1[field.name])
 end
 
 --first row again: fetch as assoc. array and test values
@@ -315,7 +319,7 @@ print('res:seek(1)           ', '->', res:seek(1))
 local row = assert(res:fetch'a')
 print("res:fetch'a'         ", '->', pformat(row))
 for i,field in res:fields() do
-	assert_deepequal(row[field.name], test_values[field.name])
+	assert_deepequal(row[field.name], test_values1[field.name])
 end
 
 --first row again: fetch unpacked and test values
@@ -330,7 +334,7 @@ end
 local row = pack(res:fetch())
 print("res:fetch()           ", '-> packed: ', pformat(row))
 for i,field in res:fields() do
-	assert_deepequal(row[i], test_values[field.name])
+	assert_deepequal(row[i], test_values1[field.name])
 end
 
 --first row again: print its values parsed and unparsed for comparison
@@ -447,7 +451,8 @@ print('bind:get(1)           ', '->', pformat(bind:get(1))); assert(bind:get(1) 
 print('bind:get_date(11)     ', '->', bind:get_date(11)); assert_deepequal({bind:get_date(11)}, {2013, 10, 5})
 print('bind:get_time(12)     ', '->', bind:get_time(12)); assert_deepequal({bind:get_time(12)}, {21, 30, 15, 0})
 print('bind:get_datetime(14) ', '->', bind:get_datetime(14)); assert_deepequal({bind:get_datetime(14)}, {2013, 10, 5, 21, 30, 17, 0})
-print('bind:get_datetime(16) ', '->', bind:get_datetime(15)); assert_deepequal({bind:get_datetime(16)}, {2013, 10, 5, 21, 30, 18, 123456})
+print('bind:get_datetime(16) ', '->', bind:get_datetime(16)); assert_deepequal({bind:get_datetime(16)}, {2013, 10, 5, 21, 30, 19, 0})
+print('bind:get_datetime(17) ', '->', bind:get_datetime(17)); assert_deepequal({bind:get_datetime(17)}, {2013, 10, 5, 21, 30, 20, 123456})
 print('for i=1,bind.field_count do bind:get(i)', '->')
 
 print()
