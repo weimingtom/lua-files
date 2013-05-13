@@ -163,7 +163,7 @@ local esc = "'escape me'"
 print('conn:escape(          ', pformat(esc), ')', '->', pformat(conn:escape(esc)))
 local q1 = 'drop table if exists binding_test'
 print('conn:query(           ', pformat(q1), ')', conn:query(q1))
---TODO: spatial fields
+
 conn:query[[
 create table binding_test (
 	fdecimal decimal(8,2),
@@ -382,7 +382,7 @@ local bind_defs = {
 	{type = 'datetime'},
 	{type = 'datetime'},
 	{type = 'timestamp'},
-	{type ='timestamp'},
+	{type = 'timestamp'},
 	{type = 'year'},
 	{type = 'bit'},
 	{type = 'bit'},
@@ -415,7 +415,7 @@ local stmt = conn:prepare(query)
 print('conn:prepare(         ', pformat(query), ')', '->', stmt)
 print('stmt:field_count()    ', '->', pformat(stmt:field_count())); assert(stmt:field_count() == #bind_defs)
 --we can get the fields and their types before execution so we can create create our bind structures.
---max. length is not computed though, but will be computed after binding.
+--max. length is not computed though, but it will be computed after binding.
 print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
 
 --binding phase
