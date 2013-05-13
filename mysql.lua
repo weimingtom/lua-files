@@ -421,8 +421,12 @@ end
 --row data
 
 ffi.cdef('double strtod(const char*, char**);')
-local function parse_number(data, sz)
+local function parse_number(data, sz) --using strtod to avoid string creation
 	return ffi.C.strtod(data, nil)
+end
+
+local function parse_float(data, sz)
+	return tonumber(ffi.cast('float', ffi.C.strtod(data, nil))) --because windows is missing strtof()
 end
 
 ffi.cdef('int64_t strtoll(const char*, char**, int) ' ..(ffi.os == 'Windows' and ' asm("_strtoi64")' or '') .. ';')
@@ -483,7 +487,7 @@ local field_decoders = {
 	[C.MYSQL_TYPE_TINY] = parse_number,
 	[C.MYSQL_TYPE_SHORT] = parse_number,
 	[C.MYSQL_TYPE_LONG] = parse_number,
-	[C.MYSQL_TYPE_FLOAT] = parse_number,
+	[C.MYSQL_TYPE_FLOAT] = parse_float,
 	[C.MYSQL_TYPE_DOUBLE] = parse_number,
 	[C.MYSQL_TYPE_TIMESTAMP] = parse_datetime,
 	[C.MYSQL_TYPE_LONGLONG] = parse_number64,

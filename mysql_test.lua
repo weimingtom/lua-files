@@ -305,13 +305,11 @@ local test_values = {
 	fnull = nil,
 }
 
-local test_values1 = glue.merge({ffloat = 42.33}, test_values)
-
 --first row: fetch as array and test values
 local row = assert(res:fetch'n')
 print("res:fetch'n'          ", '->', pformat(row))
 for i,field in res:fields() do
-	assert_deepequal(row[i], test_values1[field.name])
+	assert_deepequal(row[i], test_values[field.name])
 end
 
 --first row again: fetch as assoc. array and test values
@@ -319,7 +317,7 @@ print('res:seek(1)           ', '->', res:seek(1))
 local row = assert(res:fetch'a')
 print("res:fetch'a'         ", '->', pformat(row))
 for i,field in res:fields() do
-	assert_deepequal(row[field.name], test_values1[field.name])
+	assert_deepequal(row[field.name], test_values[field.name])
 end
 
 --first row again: fetch unpacked and test values
@@ -334,7 +332,7 @@ end
 local row = pack(res:fetch())
 print("res:fetch()           ", '-> packed: ', pformat(row))
 for i,field in res:fields() do
-	assert_deepequal(row[i], test_values1[field.name])
+	assert_deepequal(row[i], test_values[field.name])
 end
 
 --first row again: print its values parsed and unparsed for comparison
