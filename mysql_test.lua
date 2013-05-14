@@ -433,9 +433,6 @@ print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
 
 local bind = stmt:bind_result(bind_defs)
 print('stmt:bind_result(     ', pformat(bind_defs), ')', '->', pformat(bind))
---max. length is computed now, so we can allocate our buffers.
---this can only mean that by now the query already ran on the server even if we didn't yet call exec().
-print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
 
 --execution and loading
 
@@ -452,6 +449,11 @@ print('stmt:sqlstate()       ', '->', pformat(stmt:sqlstate()))
 --result data (different API since we don't get a result object)
 
 print('stmt:fetch()          ', stmt:fetch())
+
+--max. length is computed now, so we can allocate our buffers.
+--this can only mean that by now the query already ran on the server even if we didn't yet call exec().
+print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
+
 print('bind:is_truncated(1)  ', '->', pformat(bind:is_truncated(1))); assert(bind:is_truncated(1) == false)
 print('bind:is_null(1)       ', '->', pformat(bind:is_null(1))); assert(bind:is_null(1) == false)
 print('bind:get(1)           ', '->', pformat(bind:get(1))); assert(bind:get(1) == test_values.fdecimal)
@@ -462,15 +464,18 @@ print('bind:get_date(16)     ', '->', bind:get_date(16)); assert_deepequal({bind
 print('bind:get_date(17)     ', '->', bind:get_date(17)); assert_deepequal({bind:get_date(17)}, {2013, 10, 5, 21, 30, 20, 123456})
 print('for i=1,bind.field_count do bind:get(i)', '->')
 
-print()
-for i=1,bind.field_count do
-	local v = bind:get(i)
-	assert_deepequal(v, test_values[fields[i]])
-	assert(bind:is_truncated(i) == false)
-	assert(bind:is_null(i) == (fields[i] == 'fnull'))
-	print(rightalign(i, 4) .. '  ' .. leftalign(fields[i], 20) .. pformat(v))
+local function print_bind_buffer(bind)
+	print()
+	for i=1,bind.field_count do
+		local v = bind:get(i)
+		assert_deepequal(v, test_values[fields[i]])
+		assert(bind:is_truncated(i) == false)
+		assert(bind:is_null(i) == (fields[i] == 'fnull'))
+		print(rightalign(i, 4) .. '  ' .. leftalign(fields[i], 20) .. pformat(v))
+	end
+	print()
 end
-print()
+print_bind_buffer(bind)
 
 print('stmt:free_result()    ', stmt:free_result())
 local next_result = stmt:next_result()
@@ -479,13 +484,8 @@ print('stmt:next_result()    ', '->', pformat(next_result)); assert(next_result 
 print('stmt:reset()          ', stmt:reset())
 print('stmt:close()          ', stmt:close())
 
-local test_values_bin = {
-	fbit2 = '10',
-	fbit22 = '1000000010',
-	fbit64 = '0000001000000000000000000000000000000000000000000000001000000010',
-}
-
 --prepared statements with parameters
+
 for i,fname in ipairs(fields) do
 	local query = 'select * from binding_test where '..fname..' = ?'
 	local stmt = conn:prepare(query)
@@ -506,18 +506,25 @@ for i,fname in ipairs(fields) do
 	else
 		local v = test_values[fname]
 		print('bind:set(             ', 1, pformat(v), ')'); bind:set(1, v); exec()
-		if fname:find'^fbit' then
-			print('bind:set_bits(        ', 1, pformat(v), ')'); bind:set_bits(1, v); exec()
-		end
 
 		if fname:find'date' or fname:find'time' then
 			print('bind:set_date(     ', 1, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac, ')')
 			bind:set_date(1, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac); exec()
 		end
 	end
-
 	print('stmt:close()          ', stmt:close())
 end
+
+--prepared statements with auto-allocated result bind buffers.
+
+local query = 'select * from binding_test'
+local stmt = conn:prepare(query)
+local bind = stmt:bind_result()
+stmt:exec()
+stmt:store_result()
+stmt:fetch()
+print_bind_buffer(bind)
+stmt:close()
 
 local q = 'drop table binding_test'
 print('conn:query(           ', pformat(q), ')', conn:query(q))

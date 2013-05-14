@@ -368,10 +368,16 @@ local field_flag_names = {
 	[C.MYSQL_NUM_FLAG]              = 'is_number',
 }
 
+local function get_field_type(info)
+	local type_flag = tonumber(info.type)
+	local field_type = field_type_names[type_flag]
+	--charsetnr 63 changes CHAR into BINARY, VARCHAR into VARBYNARY, TEXT into BLOB
+	return info.charsetnr == 63 and binary_field_type_names[type_flag] or field_type
+end
+
 function res.field_info(res, i)
 	assert(i >= 1 and i <= res:field_count(), 'index out of range')
 	local info = C.mysql_fetch_field_direct(res, i-1)
-	local type_flag = tonumber(info.type)
 	local t = {
 		name       = cstring(info.name, info.name_length),
 		org_name   = cstring(info.org_name, info.org_name_length),
@@ -384,22 +390,24 @@ function res.field_info(res, i)
 		max_length = info.max_length,
 		decimals   = info.decimals,
 		charsetnr  = info.charsetnr,
-		type_flag  = type_flag,
-		type       = field_type_names[type_flag],
+		type_flag  = tonumber(info.type),
+		type       = get_field_type(info),
 		flags      = info.flags,
 		extension  = ptr(info.extension),
 	}
-	if info.charsetnr == 63 then --BINARY not CHAR, VARBYNARY not VARCHAR, BLOB not TEXT
-		local bin_type = binary_field_type_names[type_flag]
-		if bin_type then t.type = bin_type end
-	end
 	for flag, name in pairs(field_flag_names) do
 		t[name] = bit.band(flag, info.flags) ~= 0
 	end
 	return t
 end
 
---convenience name fetcher for fields (less garbage)
+--convenience field type fetcher (less garbage)
+function res.field_type(res, i)
+	assert(i >= 1 and i <= res:field_count(), 'index out of range')
+	return get_field_type(C.mysql_fetch_field_direct(res, i-1))
+end
+
+--convenience field name fetcher (less garbage)
 function res.field_name(res, i)
 	assert(i >= 1 and i <= res:field_count(), 'index out of range')
 	local info = C.mysql_fetch_field_direct(res, i-1)
@@ -702,8 +710,13 @@ end
 function stmt.result_fields(stmt)
 	local res = stmt:result_metadata()
 	local fields = res:fields()
-	res:free()
-	return fields
+	return function()
+		local i, info = fields()
+		if not i then
+			res:free()
+		end
+		return i, info
+	end
 end
 
 function stmt.fetch(stmt)
@@ -739,7 +752,7 @@ function stmt.update_max_length(stmt)
 end
 
 function stmt.set_update_max_length(stmt, yes)
-	local attr = ffi.new('my_bool[1]', yes)
+	local attr = ffi.new('my_bool[1]', yes == nil or yes)
 	stcheckz(stmt, C.mysql_stmt_attr_set(stmt, C.STMT_ATTR_CURSOR_TYPE, attr))
 end
 
@@ -876,6 +889,7 @@ local function bind_buffer(defs, bind_buffer_types)
 	self.lengths = ffi.new('uint32_t[?]', #defs) --length buffers, one for each field
 	self.null_flags = ffi.new('my_bool[?]', #defs) --null flag buffers, one for each field
 	self.error_flags = ffi.new('my_bool[?]', #defs) --error (truncation) flag buffers, one for each field
+	self.todo = {} --field indices left to be allocated in the future
 
 	for i,def in ipairs(defs) do
 		local stype = def.type:lower()
@@ -903,11 +917,13 @@ local function bind_buffer(defs, bind_buffer_types)
 			data = ffi.new('uint8_t[?]', def.size)
 			size = def.size
 		else
+			--these can be allocated after max_length is available.
+			self.todo[i] = true
 			size = 0
 		end
 		self.null_flags[i-1] = true
 		self.data[i] = data
-		self.lengths[i-1] = size
+		self.lengths[i-1] = 0
 		self.buffer[i-1].buffer_type = btype
 		self.buffer[i-1].buffer = data
 		self.buffer[i-1].buffer_length = size
@@ -920,6 +936,18 @@ end
 
 local function bind_check_range(self, i)
 	assert(i >= 1 and i <= self.field_count, 'index out of bounds')
+end
+
+--realloc a buffer using supplied size.
+--NOTE: only available for var-sized fields but no error is raised if used on a fixed-sized field.
+function bind:realloc(i, size)
+	bind_check_range(self, i)
+	local data = size > 0 and ffi.new('uint8_t[?]', size) or nil
+	self.null_flags[i-1] = true
+	self.data[i] = data
+	self.lengths[i-1] = 0
+	self.buffer[i-1].buffer = data
+	self.buffer[i-1].buffer_length = size
 end
 
 function bind:get_date(i)
@@ -955,15 +983,6 @@ function bind:set_date(i, year, month, day, hour, min, sec, frac)
 	tm.minute      = time and math.max(0, math.min(min   or 0, 59)) or 0
 	tm.second      = time and math.max(0, math.min(sec   or 0, 59)) or 0
 	tm.second_part = time and math.max(0, math.min(frac  or 0, 999999)) or 0
-	self.null_flags[i-1] = false
-end
-
-function bind:set_bits(i, v)
-	bind_check_range(self, i)
-	local btype = tonumber(self.buffer[i-1].buffer_type)
-	local unsigned = self.buffer[i-1].is_unsigned == 1 --unsigned is only used for input bit types
-	assert(btype == C.MYSQL_TYPE_LONGLONG and unsigned, 'not a bit type')
-	self.data[i][0] = v
 	self.null_flags[i-1] = false
 end
 
@@ -1033,27 +1052,26 @@ function bind:is_truncated(i) --returns true if the field value was truncated
 	return self.error_flags[i-1] == 1
 end
 
+function stmt.result_bind_defs(stmt, bufsize)
+	local defs = {}
+	local field_count = stmt:field_count()
+	local res = stmt:result_metadata()
+	for i=1,field_count do
+		defs[i] = {type = res:field_type(i), size = bufsize}
+	end
+	res:free()
+	return defs
+end
+
 function stmt.bind_params(stmt, params)
 	local bb = bind_buffer(params, bind_buffer_types_input)
 	stcheckz(stmt, C.mysql_stmt_bind_param(stmt, bb.buffer))
 	return bb
 end
 
-local function gen_result_defs(stmt)
-	local n = stmt:field_count()
-	local res = stmt:result_metadata()
-	for i=1,n do
-		local info = C.mysql_fetch_field_direct(res, i-1)
-		type_flag = info.type
-	end
-	res:free()
-end
-
-function stmt.bind_result(stmt, defs)
-	if not defs then
-		defs = gen_result_defs(stmt)
-	end
-	assert(stmt:field_count() == #defs, 'wrong number of fields')
+function stmt.bind_result(stmt, defs, bufsize)
+	defs = defs or stmt:result_bind_defs(bufsize or 200)
+	assert(stmt:field_count() == #defs, 'wrong number of field definitions')
 	local bb = bind_buffer(defs, bind_buffer_types_output)
 	stcheckz(stmt, C.mysql_stmt_bind_result(stmt, bb.buffer))
 	return bb
@@ -1061,8 +1079,8 @@ end
 
 --publish methods
 
-if not rawget(_G, '__MYSQL') then
-_G.__MYSQL = true
+if not rawget(_G, '__MYSQL__') then
+_G.__MYSQL__ = true
 ffi.metatype('MYSQL', {__index = conn})
 ffi.metatype('MYSQL_RES', {__index = res})
 ffi.metatype('MYSQL_STMT', {__index = stmt})
