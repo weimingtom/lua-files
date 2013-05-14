@@ -5,21 +5,20 @@ require'mysql_h'
 local C = ffi.load'libmysql'
 local M = {C = C}
 
---error reporting
-
 --we compare NULL pointers against NULL instead of nil for compatibility with luaffi.
 local NULL = ffi.cast('void*', nil)
 
-local function cstring(data)
-	if data == NULL or data[0] == 0 then return end
+local function ptr(p) --convert NULLs to nil
+	if p == NULL then return nil end
+	return p
+end
+
+local function cstring(data) --convert null-term non-empty C strings to lua strings
+	if data == NULL or data[0] == 0 then return nil end
 	return ffi.string(data)
 end
 
-local int64 = ffi.new'int64_t'
-local uint64 = ffi.new'uint64_t'
-local function is_int64(v)
-	return type(v) == 'cdata' and ffi.istype(v, int64) or ffi.istype(v, uint64)
-end
+--error reporting
 
 local function myerror(mysql)
 	local err = cstring(C.mysql_error(mysql))
@@ -250,10 +249,10 @@ end
 
 conn.field_count = C.mysql_field_count
 
-local minus1_64bit = ffi.cast('uint64_t', ffi.cast('int64_t', -1))
+local minus1_uint64 = ffi.cast('uint64_t', ffi.cast('int64_t', -1))
 function conn.affected_rows(mysql)
 	local n = C.mysql_affected_rows(mysql)
-	if n == minus1_64bit then myerror(mysql) end
+	if n == minus1_uint64 then myerror(mysql) end
 	return tonumber(n)
 end
 
@@ -388,7 +387,7 @@ function res.field_info(res, i)
 		type_flag  = type_flag,
 		type       = field_type_names[type_flag],
 		flags      = info.flags,
-		extension  = info.extension ~= NULL and info.extension or nil,
+		extension  = ptr(info.extension),
 	}
 	if info.charsetnr == 63 then --BINARY not CHAR, VARBYNARY not VARCHAR, BLOB not TEXT
 		local bin_type = binary_field_type_names[type_flag]
@@ -435,9 +434,10 @@ local function parse_number64(data, sz)
 end
 
 local function parse_bit(data, sz)
- 	local n = data[0] --bit fields always come in little-endian byte order
-	if sz > 6 then --we can cover up to 6 bytes with Lua numbers
-		n = ffi.cast('uint64_t', n)
+ 	data = ffi.cast('uint8_t*', data) --force unsigned
+	local n = data[0] --this is the msb: bit fields always come in big endian byte order
+	if sz > 6 then --we can cover up to 6 bytes with only Lua numbers
+		n = ffi.new('uint64_t', n)
 	end
 	for i=1,sz-1 do
 		n = n * 256 + data[i]
@@ -483,7 +483,7 @@ local function parse_datetime(data, sz)
 	return {year = year, month = month, day = day, hour = hour, min = min, sec = sec, frac = frac}
 end
 
-local field_decoders = {
+local field_decoders = { --other field types not present here are returned as strings, unparsed
 	[C.MYSQL_TYPE_TINY] = parse_number,
 	[C.MYSQL_TYPE_SHORT] = parse_number,
 	[C.MYSQL_TYPE_LONG] = parse_number,
@@ -503,73 +503,68 @@ local field_decoders = {
 	[C.MYSQL_TYPE_BIT] = parse_bit,
 }
 
-local function fetch_buffers(res)
+local function mode_flags(mode)
+	local assoc   = mode and mode:find'a'
+	local numeric = not mode or not assoc or mode:find'n'
+	local decode  = not mode or not mode:find's'
+	local packed  = mode and mode:find'[an]'
+	local fetch_fields = assoc or decode --if assoc we need field_name, if decode we need field_type
+	return numeric, assoc, decode, packed, fetch_fields
+end
+
+local function fetch_row(res, numeric, assoc, decode, field_count, fields, t)
 	local values = C.mysql_fetch_row(res)
 	if values == NULL then
 		if res.conn ~= NULL then --buffered read: check for errors
 			myerror(res.conn)
 		end
-		return
+		return nil
 	end
 	local sizes = C.mysql_fetch_lengths(res)
-	local field_count = C.mysql_num_fields(res)
-	local fields = C.mysql_fetch_fields(res)
-	return values, sizes, field_count, fields
-end
-
-local function decode_value(i, values, sizes, fields, decode)
-	if values[i] == NULL then return nil end
-	local decoder = decode and field_decoders[tonumber(fields[i].type)] or ffi.string
-	return decoder(values[i], sizes[i])
-end
-
-local function mode_flags(mode)
-	local numeric = not mode or mode:find'n'
-	local assoc   = mode and mode:find'a'
-	local packed  = mode and (numeric or assoc)
-	local decode  = not mode or not mode:find's'
-	return packed, numeric, assoc, decode
+	for i=0,field_count-1 do
+		local v = values[i]
+		if v ~= NULL then
+			local decoder = decode and field_decoders[tonumber(fields[i].type)] or ffi.string
+			v = decoder(values[i], sizes[i])
+			if numeric then
+				t[i+1] = v
+			end
+			if assoc then
+				local k = ffi.string(fields[i].name, fields[i].name_length)
+				t[k] = v
+			end
+		end
+	end
+	return t
 end
 
 function res.fetch(res, mode, t)
-	t = t or {}
-	local packed, numeric, assoc, decode = mode_flags(mode)
-	local values, sizes, field_count, fields = fetch_buffers(res)
-	if not values then return nil end
-
-	for i=0,field_count-1 do
-		local v = decode_value(i, values, sizes, fields, decode)
-		if numeric then
-			t[i+1] = v
-		end
-		if assoc then
-			local k = ffi.string(fields[i].name, fields[i].name_length)
-			t[k] = v
-		end
-	end
-
+	local numeric, assoc, decode, packed, fetch_fields = mode_flags(mode)
+	local field_count = C.mysql_num_fields(res)
+	local fields = fetch_fields and C.mysql_fetch_fields(res)
+	local row = fetch_row(res, numeric, assoc, decode, field_count, fields, t or {})
 	if packed then
-		return t
+		return row
 	else
-		return true, unpack(t)
+		return true, unpack(row)
 	end
 end
 
 function res.rows(res, mode, t)
-	local packed = mode_flags(mode)
+	local numeric, assoc, decode, packed, fetch_fields = mode_flags(mode)
+	local field_count = C.mysql_num_fields(res)
+	local fields = fetch_fields and C.mysql_fetch_fields(res)
 	local i = 0
 	res:seek(1)
-	local function pass(t, ...)
-		if not t then return end
+	return function()
+		local row = fetch_row(res, numeric, assoc, decode, field_count, fields, t or {})
+		if not row then return end
 		i = i + 1
 		if packed then
-			return i, t
+			return i, row
 		else
-			return i, ...
+			return i, unpack(row)
 		end
-	end
-	return function()
-		return pass(res:fetch(mode, t))
 	end
 end
 
@@ -686,7 +681,7 @@ end
 
 function stmt.affected_rows(stmt)
 	local n = C.mysql_stmt_affected_rows(stmt)
-	if n == minus1_64bit then sterror(stmt) end
+	if n == minus1_uint64 then sterror(stmt) end
 	return tonumber(n)
 end
 
@@ -772,7 +767,9 @@ end
 
 --statement bindings
 
+--see http://dev.mysql.com/doc/refman/5.7/en/c-api-prepared-statement-type-codes.html
 local bind_buffer_types_input = {
+	--conversion-free types
 	tinyint    = C.MYSQL_TYPE_TINY,
 	smallint   = C.MYSQL_TYPE_SHORT,
 	integer    = C.MYSQL_TYPE_LONG,
@@ -790,9 +787,25 @@ local bind_buffer_types_input = {
 	binary     = C.MYSQL_TYPE_BLOB,
 	varbinary  = C.MYSQL_TYPE_BLOB,
 	null       = C.MYSQL_TYPE_NULL,
+	--conversion types (can only use one of the above C types)
+	mediumint  = C.MYSQL_TYPE_LONG,
+	real       = C.MYSQL_TYPE_DOUBLE,
+	decimal    = C.MYSQL_TYPE_BLOB,
+	numeric    = C.MYSQL_TYPE_BLOB,
+	year       = C.MYSQL_TYPE_SHORT,
+	tinyblob   = C.MYSQL_TYPE_BLOB,
+	tinytext   = C.MYSQL_TYPE_BLOB,
+	mediumblob = C.MYSQL_TYPE_BLOB,
+	mediumtext = C.MYSQL_TYPE_BLOB,
+	longblob   = C.MYSQL_TYPE_BLOB,
+	longtext   = C.MYSQL_TYPE_BLOB,
+	bit        = C.MYSQL_TYPE_LONGLONG, --MYSQL_TYPE_BIT is not available for input params
+	set        = C.MYSQL_TYPE_BLOB,
+	enum       = C.MYSQL_TYPE_BLOB,
 }
 
 local bind_buffer_types_output = {
+	--conversion-free types
 	tinyint    = C.MYSQL_TYPE_TINY,
 	smallint   = C.MYSQL_TYPE_SHORT,
 	mediumint  = C.MYSQL_TYPE_INT24,      --int32
@@ -821,8 +834,10 @@ local bind_buffer_types_output = {
 	longblob   = C.MYSQL_TYPE_LONG_BLOB,
 	longtext   = C.MYSQL_TYPE_LONG_BLOB,
 	bit        = C.MYSQL_TYPE_BIT,
-	set        = C.MYSQL_TYPE_BLOB, --undocumented
-	enum       = C.MYSQL_TYPE_BLOB, --undocumented
+	--conversion types (can only use one of the above C types)
+	null       = C.MYSQL_TYPE_TINY,
+	set        = C.MYSQL_TYPE_BLOB,
+	enum       = C.MYSQL_TYPE_BLOB,
 }
 
 local number_types = {
@@ -863,31 +878,32 @@ local function bind_buffer(defs, bind_buffer_types)
 	self.error_flags = ffi.new('my_bool[?]', #defs) --error (truncation) flag buffers, one for each field
 
 	for i,def in ipairs(defs) do
-		local btype = assert(bind_buffer_types[def.type:lower()], 'invalid type')
-		local size = def.size
-		local data = def.data
-		if not data then
-			if number_types[btype] then
-				data = ffi.new(number_types[btype])
-				size = 0 --size is ignored for number types
-			elseif time_types[btype] then
-				data = ffi.new'MYSQL_TIME'
-				data.time_type = time_struct_types[btype]
-				size = 0 -- size is ignored for time types
-			elseif btype == C.MYSQL_TYPE_NULL then
-				data = nil
+		local stype = def.type:lower()
+		local btype = assert(bind_buffer_types[stype], 'invalid type')
+		local data, size
+		if stype == 'bit' then
+			if btype == C.MYSQL_TYPE_LONGLONG then --for input: use unsigned int64
+				data = ffi.new'uint64_t[1]'
+				self.buffer[i-1].is_unsigned = 1
 				size = 0
-			elseif btype == C.MYSQL_TYPE_BIT then
+			elseif btype == C.MYSQL_TYPE_BIT then --for output: use mysql conversion-free type
 				data = ffi.new('uint8_t[?]', 8)
-				size = 8 --bit types can be up to 64 bits
-			else
-				if size then
-					data = ffi.new('uint8_t[?]', size)
-				else
-					data = nil
-					size = 0
-				end
+				size = 8
 			end
+		elseif number_types[btype] then
+			data = ffi.new(number_types[btype])
+			size = ffi.sizeof(data)
+		elseif time_types[btype] then
+			data = ffi.new'MYSQL_TIME'
+			data.time_type = time_struct_types[btype]
+			size = ffi.sizeof(data)
+		elseif btype == C.MYSQL_TYPE_NULL then
+			size = 0
+		elseif def.size and def.size > 0 then
+			data = ffi.new('uint8_t[?]', def.size)
+			size = def.size
+		else
+			size = 0
 		end
 		self.null_flags[i-1] = true
 		self.data[i] = data
@@ -906,112 +922,82 @@ local function bind_check_range(self, i)
 	assert(i >= 1 and i <= self.field_count, 'index out of bounds')
 end
 
-local function set_date(tm, year, month, day)
-	--mysql says we should normalize the values
-	tm.year   = math.max(0, math.min(year  or 0, 9999))
-	tm.month  = math.max(1, math.min(month or 1, 12))
-	tm.day    = math.max(1, math.min(day   or 1, 31))
-end
-
-local function set_time(tm, hour, min, sec, frac)
-	--mysql says we should normalize the values
-	tm.hour   = math.max(0, math.min(hour  or 0, 59))
-	tm.minute = math.max(0, math.min(min   or 0, 59))
-	tm.second = math.max(0, math.min(sec   or 0, 59))
-	tm.second_part = math.max(0, frac or 0)
-end
-
 function bind:get_date(i)
 	bind_check_range(self, i)
-	assert(tonumber(self.buffer[i-1].buffer_type) == C.MYSQL_TYPE_DATE, 'invalid type')
+	local btype = tonumber(self.buffer[i-1].buffer_type)
+	local date = btype == C.MYSQL_TYPE_DATE or btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP
+	local time = btype == C.MYSQL_TYPE_TIME or btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP
+	assert(date or time, 'not a date/time type')
+	if self.null_flags[i-1] == 1 then return nil end
 	local tm = self.data[i]
-	return tm.year, tm.month, tm.day
+	return
+		date and tm.year or nil,
+		date and tm.month or nil,
+		date and tm.day or nil,
+		time and tm.hour or nil,
+		time and tm.minute or nil,
+		time and tm.second or nil,
+		time and tm.second_part or nil
 end
 
-function bind:set_date(i, year, month, day)
+function bind:set_date(i, year, month, day, hour, min, sec, frac)
 	bind_check_range(self, i)
-	assert(tonumber(self.buffer[i-1].buffer_type) == C.MYSQL_TYPE_DATE, 'invalid type')
-	set_date(self.data[i], year, month, day)
-end
-
-function bind:get_time(i)
-	bind_check_range(self, i)
-	assert(tonumber(self.buffer[i-1].buffer_type) == C.MYSQL_TYPE_TIME, 'invalid type')
 	local tm = self.data[i]
-	return tm.hour, tm.minute, tm.second, tm.second_part
+	local btype = tonumber(self.buffer[i-1].buffer_type)
+	local date = btype == C.MYSQL_TYPE_DATE or btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP
+	local time = btype == C.MYSQL_TYPE_TIME or btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP
+	assert(date or time, 'not a date/time type')
+	local tm = self.data[i]
+	tm.year        = date and math.max(0, math.min(year  or 0, 9999)) or 0
+	tm.month       = date and math.max(1, math.min(month or 0, 12)) or 0
+	tm.day         = date and math.max(1, math.min(day   or 0, 31)) or 0
+	tm.hour        = time and math.max(0, math.min(hour  or 0, 59)) or 0
+	tm.minute      = time and math.max(0, math.min(min   or 0, 59)) or 0
+	tm.second      = time and math.max(0, math.min(sec   or 0, 59)) or 0
+	tm.second_part = time and math.max(0, math.min(frac  or 0, 999999)) or 0
+	self.null_flags[i-1] = false
 end
 
-function bind:set_time(i, hour, min, sec, frac)
-	bind_check_range(self, i)
-	assert(tonumber(self.buffer[i-1].buffer_type) == C.MYSQL_TYPE_TIME, 'invalid type')
-	set_time(self.data[i], hour, min, sec, frac)
-end
-
-function bind:get_datetime(i)
+function bind:set_bits(i, v)
 	bind_check_range(self, i)
 	local btype = tonumber(self.buffer[i-1].buffer_type)
-	assert(btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP, 'invalid type')
-	local tm = self.data[i]
-	return tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second, tm.second_part
+	local unsigned = self.buffer[i-1].is_unsigned == 1 --unsigned is only used for input bit types
+	assert(btype == C.MYSQL_TYPE_LONGLONG and unsigned, 'not a bit type')
+	self.data[i][0] = v
+	self.null_flags[i-1] = false
 end
 
-function bind:set_datetime(i, year, month, day, hour, min, sec, frac)
+function bind:set(i, v, size)
 	bind_check_range(self, i)
-	local btype = tonumber(self.buffer[i-1].buffer_type)
-	assert(btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP, 'invalid type')
-	set_date(self.data[i], year, month, day)
-	set_time(self.data[i], hour, min, sec, frac)
-end
-
-function bind:set(i, value, size)
-	bind_check_range(self, i)
-
-	if value == nil or value == NULL then
+	v = ptr(v)
+	if v == nil then
 		self.null_flags[i-1] = true
 		return
 	end
-
 	local btype = tonumber(self.buffer[i-1].buffer_type)
-
 	if btype == C.MYSQL_TYPE_NULL then
-		error('attempt to set a null type field')
-	elseif number_types[btype] then
-		self.data[i][0] = value
+		error('attempt to set a null type param')
+	elseif number_types[btype] then --this includes bit type which is LONGLONG
+		self.data[i][0] = v
+		self.null_flags[i-1] = false
 	elseif time_types[btype] then
-		set_date(self.data[i], value.year, value.month, value.day)
-		set_time(self.data[i], value.hour, value.min, value.sec, value.frac)
-	elseif btype == C.MYSQL_TYPE_BIT then
-		elseif type(value) == 'string' then -- bits as '010101...' in little-endian
-			local n = 0
-			for i=1,#value do
-				n = n * 2 + (value:byte(i) == ('1'):byte(1) and 1 or 0)
-			end
-		if type(value) == 'number' or is_int64(value) then --number or int64 or uint64 in CPU-endian
-			local n = 0
-			error'NYI'
-		else
-			error('invalid bit value')
-		end
-	else --var-sized types
-		size = size or #value
-		local bsize = self.buffer[i-1].buffer_length
+		self:set_date(i, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac)
+	else --var-sized types and raw bit blobs
+		size = size or #v
+		local bsize = tonumber(self.buffer[i-1].buffer_length)
 		assert(bsize >= size, 'string too long')
-		ffi.copy(data, value, size)
+		ffi.copy(self.data[i], v, size)
 		self.lengths[i-1] = size
+		self.null_flags[i-1] = false
 	end
-
-	self.null_flags[i-1] = false
 end
 
 function bind:get(i)
 	bind_check_range(self, i)
-
 	local btype = tonumber(self.buffer[i-1].buffer_type)
-
 	if btype == C.MYSQL_TYPE_NULL or self.null_flags[i-1] == 1 then
 		return nil
 	end
-
 	if number_types[btype] then
 		return self.data[i][0] --ffi converts these to lua numbers except for 64 bit types.
 	elseif time_types[btype] then
@@ -1055,10 +1041,12 @@ end
 
 local function gen_result_defs(stmt)
 	local n = stmt:field_count()
-	local result_fields = stmt:result_fields()
+	local res = stmt:result_metadata()
 	for i=1,n do
-		error'auto defs NYI'
+		local info = C.mysql_fetch_field_direct(res, i-1)
+		type_flag = info.type
 	end
+	res:free()
 end
 
 function stmt.bind_result(stmt, defs)

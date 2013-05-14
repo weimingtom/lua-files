@@ -224,7 +224,7 @@ insert into binding_test set
 	fyear = 2013,
 	fbit2 = b'10',
 	fbit22 = b'1000000010',
-	fbit64 = b'1000000010',
+	fbit64 = b'0000001000000000000000000000000000000000000000000000001000000010',
 	fenum = 'yes',
 	fset = ('e3,e2'),
 	ftinyblob = 'tiny tiny blob',
@@ -289,8 +289,8 @@ local test_values = {
 	ftimestamp2 = {year = 2013, month = 10, day = 05, hour = 21, min = 30, sec = 20, frac = 123456},
 	fyear = 2013,
 	fbit2 = 2,
-	fbit22 = 514,
-	fbit64 = 514ULL,
+	fbit22 = 2 * 2^8 + 2,
+	fbit64 = 2ULL * 2^(64-8) + 2 * 2^8 + 2,
 	fenum = 'yes',
 	fset = 'e2,e3',
 	ftinyblob = 'tiny tiny blob',
@@ -356,6 +356,15 @@ for i=1,res:field_count() do
 	assert(row[i] == nil)
 end
 assert(not res:fetch'n')
+
+--all rows again: test iterator
+res:seek(1)
+local n = 0
+for i,row in res:rows'nas' do
+	n = n + 1
+	assert(i == n)
+end
+print("for i,row in res:rows'nas' do <count-rows>", '->', n); assert(n == 2)
 
 print('res:free()            ', res:free())
 
@@ -423,7 +432,7 @@ print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
 --binding phase
 
 local bind = stmt:bind_result(bind_defs)
-print('stmt:bind_result      ', pformat(bind_defs), '->', pformat(bind))
+print('stmt:bind_result(     ', pformat(bind_defs), ')', '->', pformat(bind))
 --max. length is computed now, so we can allocate our buffers.
 --this can only mean that by now the query already ran on the server even if we didn't yet call exec().
 print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
@@ -447,10 +456,10 @@ print('bind:is_truncated(1)  ', '->', pformat(bind:is_truncated(1))); assert(bin
 print('bind:is_null(1)       ', '->', pformat(bind:is_null(1))); assert(bind:is_null(1) == false)
 print('bind:get(1)           ', '->', pformat(bind:get(1))); assert(bind:get(1) == test_values.fdecimal)
 print('bind:get_date(11)     ', '->', bind:get_date(11)); assert_deepequal({bind:get_date(11)}, {2013, 10, 5})
-print('bind:get_time(12)     ', '->', bind:get_time(12)); assert_deepequal({bind:get_time(12)}, {21, 30, 15, 0})
-print('bind:get_datetime(14) ', '->', bind:get_datetime(14)); assert_deepequal({bind:get_datetime(14)}, {2013, 10, 5, 21, 30, 17, 0})
-print('bind:get_datetime(16) ', '->', bind:get_datetime(16)); assert_deepequal({bind:get_datetime(16)}, {2013, 10, 5, 21, 30, 19, 0})
-print('bind:get_datetime(17) ', '->', bind:get_datetime(17)); assert_deepequal({bind:get_datetime(17)}, {2013, 10, 5, 21, 30, 20, 123456})
+print('bind:get_date(12)     ', '->', bind:get_date(12)); assert_deepequal({bind:get_date(12)}, {nil, nil, nil, 21, 30, 15, 0})
+print('bind:get_date(14)     ', '->', bind:get_date(14)); assert_deepequal({bind:get_date(14)}, {2013, 10, 5, 21, 30, 17, 0})
+print('bind:get_date(16)     ', '->', bind:get_date(16)); assert_deepequal({bind:get_date(16)}, {2013, 10, 5, 21, 30, 19, 0})
+print('bind:get_date(17)     ', '->', bind:get_date(17)); assert_deepequal({bind:get_date(17)}, {2013, 10, 5, 21, 30, 20, 123456})
 print('for i=1,bind.field_count do bind:get(i)', '->')
 
 print()
@@ -463,13 +472,52 @@ for i=1,bind.field_count do
 end
 print()
 
-
 print('stmt:free_result()    ', stmt:free_result())
 local next_result = stmt:next_result()
 print('stmt:next_result()    ', '->', pformat(next_result)); assert(next_result == false)
 
 print('stmt:reset()          ', stmt:reset())
 print('stmt:close()          ', stmt:close())
+
+local test_values_bin = {
+	fbit2 = '10',
+	fbit22 = '1000000010',
+	fbit64 = '0000001000000000000000000000000000000000000000000000001000000010',
+}
+
+--prepared statements with parameters
+for i,fname in ipairs(fields) do
+	local query = 'select * from binding_test where '..fname..' = ?'
+	local stmt = conn:prepare(query)
+	print('conn:prepare(         ', pformat(query), ')')
+	local param_bind_def = {bind_defs[i]}
+
+	local bind = stmt:bind_params(param_bind_def)
+	print('stmt:bind_params      ', pformat(param_bind_def))
+
+	local function exec()
+		print('stmt:exec()           ', stmt:exec())
+		print('stmt:store_result()   ', stmt:store_result())
+		print('stmt:row_count()      ', '->', stmt:row_count()); assert(stmt:row_count() == 1)
+	end
+
+	if fname == 'fnull' then
+		--how to test this? and why would we ever wanna have a null-only param?
+	else
+		local v = test_values[fname]
+		print('bind:set(             ', 1, pformat(v), ')'); bind:set(1, v); exec()
+		if fname:find'^fbit' then
+			print('bind:set_bits(        ', 1, pformat(v), ')'); bind:set_bits(1, v); exec()
+		end
+
+		if fname:find'date' or fname:find'time' then
+			print('bind:set_date(     ', 1, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac, ')')
+			bind:set_date(1, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac); exec()
+		end
+	end
+
+	print('stmt:close()          ', stmt:close())
+end
 
 local q = 'drop table binding_test'
 print('conn:query(           ', pformat(q), ')', conn:query(q))
