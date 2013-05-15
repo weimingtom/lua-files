@@ -170,7 +170,7 @@ bash cons:
 	- operations on strings and data structures suck big time
 what's needed:
 	- getopt
-	- globbing (why, if we already have pattern matching?)
+	- globbing (why, if we already have pattern matching? '.' is '?' and '.-' is '*')
 	- input + output pipes with lanes and coroutines
 	- list dirs and files
 	- standard sources and sinks for pipes: files, strings, gzip
@@ -182,4 +182,3 @@ what's needed:
 	- find files
 	- mv, cp, ln, mkdir, rm, chmod, chown
 	- status routines: netstat, mount, du, df, lsmod, ps etc.
-

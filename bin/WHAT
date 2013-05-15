@@ -29,6 +29,7 @@ plugins/*       vlc 2.0.5 plugins dir from vlc.zip
 pmurhash.dll    csrc/pmurhash
 sha2.dll        csrc/sha2
 socket_core.dll csrc/luasocket
+struct.dll      csrc/struct
 vararg.dll      csrc/vararg
 zlib.dll        csrc/zlib
 
