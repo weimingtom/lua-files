@@ -1,7 +1,7 @@
 --DPB (Database Parameter Block) structure: encode the options for connecting to a database
 --encode(dpb_options_t) -> DPB encoded string.
 --pass the encoded DPB to isc_attach_database() to connect to a database.
---NOTE: options that take no arguments themselves must be encoded with encode_zero() instead of encode_none()!!
+--NOTE: options that take no arguments themselves must be encoded with encode_zero() instead of encode_none().
 
 local pb = require 'fbclient_pb'
 

@@ -1,7 +1,65 @@
 --fbclient2: a ffi binding of firebird's client library.
 --based on firebird's latest ibase.h with the help of the Interbase 6 API Guide.
---NOTE: all attachments involved in a multi-database transaction should run on the same OS thread.
+--NOTE: all connections involved in a multi-database transaction should run on the same OS thread.
 --NOTE: avoid sharing a connection between two threads, although fbclient itself is thread-safe from v2.5 on.
+--TODO: tie attachments to gc? how about transactions, statements, blobs handles? (make ref. tables weak then?)
+--TODO: info API or at least some re-wrapping
+--TODO: salvage any tests?
+--[=[
+
+fbclient.caller() -> caller
+
+fbclient.connect(db[, user[, pass[, charset]]]) -> conn
+fbclient.connect(options_t) -> conn; options_t: role, client_library, dpb
+fbclient.create_db(db[, user[, pass[, charset[, db_charset[, page_size]]]]]]) -> conn
+fbclient.create_db_sql(db[, options_t]); options_t: client_library
+
+conn:clone() -> conn
+conn:close()
+conn:drop_db()
+conn:cancel_operation()
+conn:version_info()
+
+fbclient.start_transaction({[conn] = true | options_t, ..}; options_t: access, isolation, lock_timeout, tpb
+conn:start_transaction([access], [isolation], [lock_timeout]) -> tran
+conn:start_transaction(options_t) -> tran; options_t: access, isolation, lock_timeout, tpb
+conn:start_transaction_sql(sql) -> tran
+tran:commit()
+tran:rollback()
+tran:commit_retaining()
+tran:rollback_retaining()
+tran:exec_immediate(sql[, conn])
+conn:commit_all()
+conn:rollback_all()
+
+tran:prepare(sql[, conn]) -> stmt
+stmt:set_cursor_name(name)
+stmt:run()
+stmt:fetch()
+stmt:close()
+stmt:type() -> s
+
+
+stmt:close_all_blobs()
+stmt:close_cursor()
+conn:close_all_statements()
+tran:close_all_statements()
+
+--sugar
+
+stmt:setparams(p1,...) -> stmt
+stmt:getvalues() -> v1,...
+stmt:getvalues(f1,...) -> v1,...
+stmt:row() -> row_t                   --TODO: mode ?
+stmt:exec(p1,...) -> iter() -> v1, ...
+tran:exec_on(conn, sql, p1,...) -> iter() -> v1, ...
+tran:exec(sql, ...) -> iter() -> v1, ...
+
+conn:exec(sql, ...)
+conn:exec_immediate(sql)
+
+
+]=]
 
 local ffi = require'ffi'
 require'fbclient_h'
@@ -11,19 +69,32 @@ local tpb_encode = require'fbclient_tpb'
 
 local M = {}
 
---library functions
+--helpers
 
-function M.ib_version(C) --returns major, minor
-	return
-		C.isc_get_client_major_version(),
-		C.isc_get_client_minor_version()
+local function count(t, limit) --count the elements in t optionally upto some limit
+	local n = 0
+	for _ in pairs(t) do
+		n = n + 1
+		if n == limit then break end
+	end
+	return n
 end
 
---caller object
+local function deepcopy(t) --deepcopy table t without cycle detection
+	local dt = {}
+	for k,v in pairs(t) do
+		dt[k] = type(t) == 'table' and deepcopy(v) or v
+	end
+	return dt
+end
 
---given a ffi library object, return a caller object through which to make error-handled calls to fbclient.
-function M.caller(C)
-	local sv  = ffi.new'ISC_STATUS[20]' --status vector, required by all firebird calls
+--caller object through which to make error-handled calls to fbclient
+
+function M.caller(client_library)
+	client_library = client_library or 'fbclient'
+	local C = ffi.load(client_library)
+
+	local sv  = ffi.new'ISC_STATUS[20]' --status vector, required by most firebird calls
 	local psv = ffi.new('ISC_STATUS*[1]', ffi.cast('ISC_STATUS*', sv)) --pointer to it
 	local msgsize = 2048
 	local msg = ffi.new('uint8_t[?]', msgsize) --message buffer, for error reporting
@@ -79,15 +150,26 @@ function M.caller(C)
 		error(string.format('%s() error: %s\n%s', fname, err, errlist))
 	end
 
+	local function ib_version() --returns major, minor
+		return
+			C.isc_get_client_major_version(),
+			C.isc_get_client_minor_version()
+	end
+
 	return {
+		client_library = client_library,
 		C = C,
+		--error-handled API callers
 		pcall = pcall,
 		call = call,
+		--error reporting API
 		status = status,
 		sqlcode = sqlcode,
 		sqlstate = sqlstate,
 		sqlerror = sqlerror,
 		errors = errors,
+		--client library info API
+		ib_version,
 	}
 end
 
@@ -96,40 +178,17 @@ end
 local conn = {}
 local conn_meta = {__index = conn}
 
-local function attach(attach_function, sql, t, ...)
-	--process arguments
-	local dbname, user, pass, charset
-	local role, dpb_t, client_library
-	local dpb_s, dpb
-	if sql then
-		client_library = t
-	else
-		if type(t) == 'string' then
-			dbname, user, pass, charset = t, ...
-		else
-			dbname, user, pass, charset = t.db, t.user, t.pass, t.charset
-			role, dpb_t, client_library = t.role, t.dpb, t.client_library
-		end
-		dpb = {}
-		dpb.isc_dpb_user_name = user
-		dpb.isc_dpb_password = pass
-		dpb.isc_dpb_lc_ctype = charset
-		dpb.isc_dpb_sql_role_name = role
-		glue.update(dpb, dpb_t)
-		dpb_s = dpb_encode(dpb)
-	end
-
+local function attach(client_library, attach_function, sql, db, dpb)
 	--caller object
-	local C = ffi.load(client_library or 'fbclient')
-	local caller = M.caller(C)
+	local caller = M.caller(client_library)
 
 	--connection handle
 	local dbh = ffi.new'isc_db_handle[1]'
-
 	if sql then
-		caller.call(attach_function, dbh, nil, #sql, sql, dialect, nil)
+		caller.call(attach_function, dbh, nil, #sql, sql, 3, nil)
 	else
-		caller.call(attach_function, #dbname, dbname, dbh, dpb_s and #dpb_s or 0, dpb_s)
+		local dpb_s = dpb_encode(dpb)
+		caller.call(attach_function, #db, db, dbh, dpb_s and #dpb_s or 0, dpb_s)
 	end
 
 	--connection object
@@ -137,39 +196,89 @@ local function attach(attach_function, sql, t, ...)
 	cn.dbh = dbh
 	cn.caller = caller
 	cn.call = caller.call
-	cn.statement_handle_pool = {}
-	cn.transactions = {}   --keep track of transactions spanning this attachment
-	cn.statements = {}     --keep track of statements made against this attachment
-	if dbname then
-		cn.database = dbname --for cloning
+	cn.spool_limit = 0   --fb 2.5+ only: enable recycling of statement handles
+	cn.spool = {}        --statement handle pool to reuse statement objects
+	cn.transactions = {} --keep track of transactions spanning this attachment
+	cn.statements = {}   --keep track of statements made against this attachment
+	if db then
+		cn.db = db --for cloning
 		cn.dpb = glue.update({}, dpb) --for cloning
-		cn.allow_cloning = true
+		cn.clonable = true
 	end
 	return cn
 end
 
+local function attach_args(create, t, ...)
+	local db, user, pass, charset --common args, available as both positional args and explicit table args
+	local db_charset, page_size --additional common args available for db creation only
+	local role, client_library, user_dpb --special needs args, only available as table args
+	assert(t, 'invalid arguments')
+	if type(t) == 'string' then
+		db, user, pass, charset, db_charset, page_size = t, ...
+	else
+		db, user, pass, charset, db_charset, page_size = t.db, t.user, t.pass, t.charset, t.db_charset, t.page_size
+		role, client_library, user_dpb = t.role, t.client_library, t.dpb
+	end
+	local dpb = {}
+	dpb.isc_dpb_user_name = user
+	dpb.isc_dpb_password = pass
+	dpb.isc_dpb_lc_ctype = charset
+	dpb.isc_dpb_sql_role_name = role
+	if create then
+		dpb.isc_dpb_set_db_charset = db_charset
+		dpb.isc_dpb_page_size = page_size
+	end
+	glue.merge(dpb, user_dpb) --user's dpb shouldn't overwrite its own explicit args.
+	if create and not dpb.isc_dpb_sql_dialect then
+		dpb.isc_dpb_sql_dialect = 3
+	end
+	return client_library, db, dpb
+end
+
 function M.connect(...)
-	return attach('isc_attach_database', nil, ...)
+	local client_library, db, dpb = attach_args(nil, ...)
+	return attach(client_library, 'isc_attach_database', nil, db, dpb)
 end
 
 function M.create_db(...)
-	return attach('isc_create_database', nil, ...)
+	local client_library, db, dpb = attach_args(true, ...)
+	return attach(client_library, 'isc_create_database', nil, db, dpb)
 end
 
-function M.create_db_sql(sql, client_library) --create a db using the CREATE DATABASE statement
-	return attach('isc_dsql_execute_immediate', sql, client_library)
+function M.create_db_sql(sql, t) --CREATE DATABASE statement
+	local client_library = t and t.client_library
+	return attach(client_library, 'isc_dsql_execute_immediate', sql, nil, nil)
 end
 
-function db_drop(fbapi, sv, dbh)
-	self.call('isc_drop_database', dbh)
+--create a new connection using the same arguments those of a running connection
+function conn:clone()
+	assert(self.clonable, 'not clonable')
+	local dpb = deepcopy(self.dpb)
+	return attach(self.caller.client_library, 'isc_attach_database', nil, self.db, dpb)
 end
-
 
 function conn:close()
-	for tr in pairs(self.transactions) do
-		tr:rollback()
-	end
+	self:rollback_all()
 	self.call('isc_detach_database', self.dbh)
+end
+
+function conn:drop_db()
+	self:rollback_all()
+	self.call('isc_drop_database', self.dbh)
+end
+
+local fb_cancel_operation_codes = {
+	fb_cancel_disable = 1, --disable any pending fb_cancel_raise
+	fb_cancel_enable  = 2, --enable any pending fb_cancel_raise
+	fb_cancel_raise   = 3, --cancel any request on db_handle ASAP (at the next rescheduling point),
+								  --and return an error in the status_vector.
+	fb_cancel_abort   = 4,
+}
+
+--NOTE: don't call this from the main thread (where the signal handler is registered).
+function conn:cancel_operation(opt)
+	opt = glue.assert(fb_cancel_operation_codes[opt or 'fb_cancel_raise'], 'invalid option %s', opt)
+	self.call('fb_cancel_operation', self.dbh, opt)
 end
 
 function conn:version_info()
@@ -186,14 +295,14 @@ end
 local tran = {}
 local tran_meta = {__index = tran}
 
-local function wrap_tran(trh, call, connections)
+local function wrap_tran(trh, call, connections) --wrap a transaction handle into a tran object
 	local tr = setmetatable({}, tran_meta)
 	tr.trh = trh
 	tr.call = call
 	tr.connections = connections
 	tr.statements = {} --keep track of statements made on this transaction
 	local n = 0
-	for conn in pairs(connections) do
+	for conn in pairs(connections) do --register transaction to all connections
 		conn.transactions[tr] = true
 		n = n + 1
 	end
@@ -203,45 +312,94 @@ local function wrap_tran(trh, call, connections)
 	return tr
 end
 
---start a transaction spawning multiple connections.
---when no options are provided, {isc_tpb_write=true,isc_tpb_concurrency=true,isc_tpb_wait=true} is assumed by Firebird.
-function M.start_transaction(t)
-	local n = 0
-	for _ in pairs(t) do n = n + 1 end
+--start a transaction spawning multiple connections using a table {[conn] = true | tpb_t, ...}.
+--tpb_t defaults to {isc_tpb_write = true, isc_tpb_concurrency = true, isc_tpb_wait = true}.
+local function start_tran(t)
+	local n = count(t)
+	assert(n > 0, 'no connections')
 	local teb = ffi.new('ISC_TEB[?]', n)
 	local pin = {} --pin tpb strings to prevent garbage collecting
 	local connections = {}
 	local i = 0
-	for conn, opts in pairs(t) do
-		if opts == true then opts = nil end --true was just a key holder
+	for conn, tpb in pairs(t) do
+		local tpb_s = tpb_encode(tpb ~= true and tpb or nil)
 		teb[i].teb_database = conn.dbh
-		local tpb_str = tpb_encode(opts)
-		teb[i].teb_tpb_length = tpb_str and #tpb_str or 0
-		teb[i].teb_tpb = tpb_str
-		pin[tpb_str] = true
+		teb[i].teb_tpb_length = tpb_s and #tpb_s or 0
+		teb[i].teb_tpb = tpb_s
+		pin[tpb_s] = true
 		connections[conn] = true
 		i = i + 1
 	end
-	assert(i > 0, 'no connections')
 	local call = next(t).call --any caller would do
 	local trh = ffi.new'isc_tr_handle[1]'
 	call('isc_start_multiple', trh, n, teb)
-	--transaction object
 	return wrap_tran(trh, call, connections)
 end
 
-function conn:start_transaction(opts)
-	if type(opts) == 'string' then
-		--opts is a SET TRANSACTION SQL statement which we can execute with dsql_execute_immediate() to get its handle.
-		--NOTE: you could make this support input parameters, but it doesn't worth the trouble.
-		local trh = ffi.new'isc_tr_handle[1]'
-		self.call('isc_dsql_execute_immediate', self.dbh, trh, #opts, opts, 3, nil)
-		--transaction object
-		return wrap_tran(trh, self.call, {[self] = true})
+local function tran_args(t, ...)
+	if not t then return true end --tran args are optional
+	local access, isolation, lock_timeout --common args, available as both positional args and explicit table args
+	local user_tpb --special needs args, only available as table args
+	if type(t) == 'string' then
+		access, isolation, lock_timeout = t, ...
 	else
-		--opts is missing or is a table specifying transaction options
-		return M.start_transaction({[self] = opts or true})
+		access, isolation, lock_timeout, user_tpb = t.access, t.isolation, t.lock_timeout, t.tpb
 	end
+	local tpb = {}
+	glue.assert(not access or access == 'read' or access == 'write', 'invalid argument')
+	glue.assert(not isolation
+					or isolation == 'consistency'
+					or isolation == 'concurrency'
+					or isolation == 'read commited'
+					or isolation == 'read commited no record version', 'invalid argument')
+	tpb.isc_tpb_read = access == 'read' or nil
+	tpb.isc_tpb_write = access == 'write' or nil
+	tpb.isc_tpb_consistency = isolation == 'consistency' or nil
+	tpb.isc_tpb_concurrency = isolation == 'concurrency' or nil
+	tpb.isc_tpb_read_committed = isolation == 'read commited' or isolation == 'read commited no record version' or nil
+	tpb.isc_tpb_rec_version = isolation == 'read commited' or nil
+	tpb.isc_tpb_wait = lock_timeout and lock_timeout > 0 or nil
+	tpb.isc_tpb_nowait = lock_timeout == 0 or nil
+	tpb.isc_tpb_lock_timeout = lock_timeout and lock_timeout > 0 and lock_timeout or nil
+	glue.merge(tpb, user_tpb)
+	return tpb
+end
+
+function M.start_transaction(t)
+	local dt = {}
+	for conn, opt in pairs(t) do
+		dt[conn] = tran_args(opt)
+	end
+	return start_tran(dt)
+end
+
+function conn:start_transaction(...)
+	return start_tran({[self] = tran_args(...)})
+end
+
+function conn:start_transaction_sql(sql) --SET TRANSACTION statement
+	local trh = ffi.new'isc_tr_handle[1]'
+	self.call('isc_dsql_execute_immediate', self.dbh, trh, #sql, sql, 3, nil)
+	return wrap_tran(trh, self.call, {[self] = true})
+end
+
+local function tran_close(self, close_function)
+	self:close_all_statements()
+	self.call(close_function, self.trh)
+	local conn = next(self.connections)
+	while conn do
+		conn.transactions[self] = nil
+		self.connections[conn] = nil
+		conn = next(self.connections)
+	end
+end
+
+function tran:commit()
+	tran_close(self, 'isc_commit_transaction')
+end
+
+function tran:rollback()
+	tran_close(self, 'isc_rollback_transaction')
 end
 
 function tran:commit_retaining()
@@ -250,14 +408,6 @@ end
 
 function tran:rollback_retaining()
 	self.call('isc_rollback_retaining', self.trh)
-end
-
-function tran:commit()
-	self.call('isc_commit_transaction', self.trh)
-end
-
-function tran:rollback()
-	self.call('isc_rollback_transaction', self.trh)
 end
 
 local function check_conn(tr, conn)
@@ -270,9 +420,21 @@ local function check_conn(tr, conn)
 	end
 end
 
-function tran:exec(sql, conn) --note: this can be made to support input parameters and result values.
+function tran:exec_immediate(sql, conn)
 	conn = check_conn(self, conn)
 	self.call('isc_dsql_execute_immediate', conn.dbh, self.trh, #sql, sql, 3, nil)
+end
+
+function conn:commit_all()
+	while next(self.transactions) do
+		next(self.transactions):commit()
+	end
+end
+
+function conn:rollback_all()
+	while next(self.transactions) do
+		next(self.transactions):rollback()
+	end
 end
 
 --statements
@@ -310,13 +472,13 @@ local sqlsubtype_names = glue.index{
 
 --computes buflen for a certain sqltype,sqllen pair.
 local function sqldata_buflen(sqltype, sqllen)
-	local buflen = sqllen
 	if sqltype == 'SQL_VARYING' then
-		buflen = sqllen + SHORT_SIZE
+		return sqllen + SHORT_SIZE
 	elseif sqltype == 'SQL_NULL' then
-		buflen = 0
+		return 0
+	else
+		return sqllen
 	end
-	return buflen
 end
 
 --this does three things:
@@ -384,49 +546,53 @@ end
 local stmt = {} --statement methods
 local stmt_meta = {__index = stmt}
 
-function tran:prepare(sql, conn, sth)
+function tran:prepare(sql, conn)
 	conn = check_conn(self, conn)
 
-	--statement handle (deallocated automatically when connection closes)
-	if not sth then
+	--grab a handle from the statement handle pool of the connection, or make a new one.
+	local sth = next(conn.spool)
+	if sth then
+		conn.spool[sth] = nil
+	else
 		sth = ffi.new'isc_stmt_handle[1]'
+		--using isc_dsql_alloc_statement2 deallocates the statement automatically when connection closes.
 		self.call('isc_dsql_alloc_statement2', conn.dbh, sth)
 	end
 
-	--alloc an output XSQLDA for to 10 columns to avoid a second describe call. one xsqlvar is 152 bytes.
-	local outx = XSQLDA(10)
+	--alloc the XSQLDA for getting fields.
+	local xfields = XSQLDA(20) --one xsqlvar is 152 bytes
 
 	--prepare statement, which gets us the number of output columns.
-	self.call('isc_dsql_prepare', self.trh, sth, #sql, sql, 3, outx)
+	self.call('isc_dsql_prepare', self.trh, sth, #sql, sql, 3, xfields)
 
-	--see if outx is long enough to keep all columns, and if not, reallocate and re-describe.
-	local alloc, used = outx.sqln, outx.sqld
+	--see if xfields is long enough to keep all fields, and if not, reallocate and re-describe.
+	local alloc, used = xfields.sqln, xfields.sqld
 	if alloc < used then
-		outx = XSQLDA(used)
-		self.call('isc_dsql_describe', sth, 1, outx)
+		xfields = XSQLDA(used)
+		self.call('isc_dsql_describe', sth, 1, xfields)
 	end
 
-	--alloc an input XSQLDA for zero params.
-	local inx = XSQLDA(0)
-	self.call('isc_dsql_describe_bind', sth, 1, inx)
+	--alloc the XSQLDA for setting params.
+	local xparams = XSQLDA(6)
+	self.call('isc_dsql_describe_bind', sth, 1, xparams)
 
-	--see if inx is long enough to keep all parameters, and if not, reallocate and re-describe.
-	local alloc, used = inx.sqln, inx.sqld
+	--see if xparams is long enough to keep all params, and if not, reallocate and re-describe.
+	local alloc, used = xparams.sqln, xparams.sqld
 	if alloc < used then
-		inx = XSQLDA(used)
-		self.call('isc_dsql_describe_bind', sth, 1, inx)
+		xparams = XSQLDA(used)
+		self.call('isc_dsql_describe_bind', sth, 1, xparams)
 	end
 
 	--alloc xsqlvar buffers
-	local fields = alloc_xsqlvars(outx)
-	local params = alloc_xsqlvars(inx)
+	local fields = alloc_xsqlvars(xfields)
+	local params = alloc_xsqlvars(xparams)
 
 	--statement object
 	local st = setmetatable({}, stmt_meta)
 	st.sth = sth
 	st.call = self.call
-	st.fields_xsqlda = outx
-	st.params_xsqlda = inx
+	st.fields_xsqlda = xfields
+	st.params_xsqlda = xparams
 	st.fields = fields
 	st.params = params
 
@@ -436,38 +602,209 @@ function tran:prepare(sql, conn, sth)
 	st.tran = self
 	st.conn = conn
 
+	--make and record the decision on how the statement should be executed and results be fetched.
+	--NOTE: there's no official way to do this, I just did what made sense, it may be wrong.
+	st.expect_output = #st.fields > 0
+	st.expect_cursor = false
+	if st.expect_output then
+		local sttype = st:type()
+		st.expect_cursor = sttype == 'select' or sttype == 'select for update'
+	end
+
 	return st
 end
 
-function stmt:exec()
-	self.call('isc_dsql_execute', self.trh, self.sth, 1, self.params_xsqlda)
-end
-
-function stmt:set_cursor_name(fbapi, sv, sth, cursor_name) --call it on a prepared statement
+function stmt:set_cursor_name(cursor_name) --call it on a prepared statement
 	self.self.call('isc_dsql_set_cursor_name', self.sth, cursor_name, 0)
 end
 
-function stmt:exec_returning()
-	self.call('isc_dsql_execute2', self.trh, self.sth, 1, self.fields_xsqlda, self.params_xsqlda)
+function stmt:run()
+	self:close_all_blobs()
+	self:close_cursor()
+	if self.expect_output and not self.expect_cursor then
+		self.call('isc_dsql_execute2', self.tran.trh, self.sth, 1, self.fields_xsqlda, self.params_xsqlda)
+		self.already_fetched = true
+	else
+		self.call('isc_dsql_execute', self.tran.trh, self.sth, 1, self.params_xsqlda)
+		self.cursor_open = self.expect_cursor
+	end
+	return self
 end
 
-function stmt:fetch() --note that only select statements return a cursor to fetch from
-	local status = self.call('isc_dsql_fetch', self.sth, 1, self.fields_xsqlda)
-	assert(status == 0 or status == 100)
-	return status == 0
+function stmt:fetch()
+	self:close_all_blobs()
+	local fetched = self.already_fetched or false
+	if fetched then
+		self.already_fetched = nil
+	elseif self.cursor_open then
+		local status = self.call('isc_dsql_fetch', self.sth, 1, self.fields_xsqlda)
+		assert(status == 0 or status == 100, 'isc_dsql_fetch() error')
+		fetched = status == 0
+		if not fetched then
+			self:close_cursor()
+		end
+	end
+	return fetched
 end
 
-function stmt:free()
-	self.call('isc_dsql_free_statement', self.sth, 2)
+function stmt:close_all_blobs()
+	--TODO
 end
 
-function stmt:unprepare() --unprepare statement without freeing its handle, so it can be reused
-	self.call('isc_dsql_free_statement', self.sth, 4)
-	return self.sth
+function stmt:close_cursor()
+	if self.cursor_open then
+		self.call('isc_dsql_free_statement', self.sth, 1) --close
+		self.cursor_open = nil
+	end
 end
 
-function stmt:free_cursor() --frees a cursor created by dsql_set_cursor_name()
-	self.call('isc_dsql_free_statement', self.sth, 1)
+function stmt:close()
+	self:close_all_blobs()
+	self:close_cursor()
+
+	--try unpreparing the statement handle instead of freeing it, and drop it into the handle pool.
+	if count(self.conn.spool, self.conn.spool_limit) < self.conn.spool_limit then
+		self.call('isc_dsql_free_statement', self.sth, 4) --unprepare
+		self.conn.spool[self.sth] = true
+	else
+		self.call('isc_dsql_free_statement', self.sth, 2) --free
+	end
+
+	--unregister from tran and conn
+	self.conn.statements[self] = nil
+	self.tran.statements[self] = nil
+end
+
+local stmt_codes = {'select', 'insert', 'update', 'delete', 'ddl', 'get segment', 'put segment', 'execute procedure',
+							'start transaction', 'commit', 'rollback', 'select for update', 'set generator', 'savepoint'}
+
+function stmt:type()
+	local isc_info_end = 1
+	local isc_info_sql_stmt_type = 21
+	local opts = string.char(isc_info_sql_stmt_type)
+	--info_code + body_length (16bit little endian) + max. 4 body entries + isc_info_end
+	local buf = ffi.new('uint8_t[?]', 8)
+	self.call('isc_dsql_sql_info', self.sth, #opts, opts, ffi.sizeof(buf), buf)
+	local info_code, szlo, szhi, stype = buf[0], buf[1], buf[2], buf[3]
+	assert(info_code == isc_info_sql_stmt_type, 'invalid response')
+	local sz = szlo + szhi * 256
+	assert(sz >= 1 and sz <= 4, 'invalid response')
+	assert(buf[3 + sz] == isc_info_end)
+	return assert(stmt_codes[stype], 'unknown statement type')
+end
+
+function conn:close_all_statements()
+	while next(self.statements) do
+		next(self.statements):close()
+	end
+end
+
+function tran:close_all_statements()
+	while next(self.statements) do
+		next(self.statements):close()
+	end
+end
+
+--hi-level API
+
+function stmt:setparams(...)
+	for i,p in ipairs(self.params) do
+		p:set(select(i,...))
+	end
+	return self
+end
+
+function stmt:getvalues(...) -- name,descr = st:getvalues('name', 'descr')
+	if not ... then
+		local t = {}
+		for i,col in ipairs(self.fields) do
+			t[i] = col:get()
+		end
+		return unpack(t,1,#self.fields)
+	else
+		local t,n = {},select('#',...)
+		for i=1,n do
+			t[i] = self.fields[select(i,...)]:get()
+		end
+		return unpack(t,1,n)
+	end
+end
+
+function stmt:row()
+	local t = {}
+	for i,col in ipairs(self.fields) do
+		local name = col.column_alias_name
+		glue.assert(name, 'column %d does not have an alias name', i)
+		local val = col:get()
+		t[name] = val
+	end
+	return t
+end
+
+local function statement_exec_iter(st,i)
+	if st:fetch() then
+		return i+1, st:values()
+	end
+end
+
+function stmt:exec(...)
+	self:setparams(...)
+	self:run()
+	return statement_exec_iter,self,0
+end
+
+local function transaction_exec_iter(st)
+	if st:fetch() then
+		return st, st:values()
+	else
+		st:close()
+	end
+end
+
+local function null_iter() end
+
+function tran:exec_on(conn, sql, ...)
+	local st = self:prepare(sql, conn)
+	st:setparams(...)
+	st:run()
+	if st.expect_output then
+		return transaction_exec_iter,st
+	else
+		st:close()
+		return null_iter
+	end
+end
+
+function tran:exec(sql, ...)
+	return self:exec_on(next(self.connections), sql, ...)
+end
+
+local function attachment_exec_iter(st)
+	if st:fetch() then
+		return st, st:values()
+	else
+		st.transaction:commit() --commit() closes all statements automatically
+	end
+end
+
+--ATTN: if you break the iteration before fetching all the result rows the
+--transaction, statement and fetch cursor all remain open until you close the attachment!
+function conn:exec(sql, ...)
+	local tr = self:start_transaction_ex()
+	local st = tr:prepare_on(self,sql)
+	st:setparams(...)
+	st:run()
+	if st.expect_output then
+		return attachment_exec_iter,st
+	else
+		st.transaction:commit()
+	end
+end
+
+function conn:exec_immediate(sql)
+	local tr = self:start_transaction()
+	tr:exec_immediate_on(self, sql)
+	tr:commit()
 end
 
 
@@ -476,56 +813,14 @@ end
 require'fbclient_errcodes'
 local fb = M
 local cn = fb.connect('localhost:x:/work/fbclient/lua/fbclient/gazolin.fdb', 'SYSDBA', 'masterkey')
-pp(cn:version_info())
-local tr1 = cn:start_transaction()
-local tr2 = cn:start_transaction'SET TRANSACTION'
+--pp(cn:version_info())
+local tr1 = cn:start_transaction('read')
+--pp(tr1)
+local tr2 = cn:start_transaction_sql'SET TRANSACTION'
 tr1:exec('select * from rdb$database')
 local st = tr2:prepare('select * from rdb$database')
-pp(st)
-st:free()
+--pp(st)
+st:exec()
+st:close()
 cn:close()
 
---[[
-
-
-function db_info(fbapi, sv, dbh, opts, info_buf_len)
-	local info = require 'fbclient.db_info' --this is a runtime dependency so as to not bloat the library!
-	local opts, max_len = info.encode(opts)
-	info_buf_len = math.min(MAX_SHORT, info_buf_len or max_len)
-	local info_buf = alien.buffer(info_buf_len)
-	self.call('isc_database_info', dbh, #opts, opts, info_buf_len, info_buf)
-	return info.decode(info_buf, info_buf_len, fbapi)
-end
-
-local fb_cancel_operation_enum = {
-	fb_cancel_disable = 1, --disable any pending fb_cancel_raise
-	fb_cancel_enable  = 2, --enable any pending fb_cancel_raise
-	fb_cancel_raise   = 3, --cancel any request on db_handle ASAP (at the next rescheduling point), and return an error in the status_vector.
-	fb_cancel_abort   = 4,
-}
-
---ATTN: don't call this from the main thread (where the signal handler is registered)!
-function db_cancel_operation(fbapi, sv, dbh, opt)
-	asserts(type(sql)=='string', 'arg#1 string expected, got %s',type(sql))
-	opts = asserts(fb_cancel_operation_enum[opts or 'fb_cancel_raise'], 'invalid option %s', opt)
-	self.call('fb_cancel_operation', dbh, opts)
-end
-
-function tr_info(fbapi, sv, trh, opts, info_buf_len)
-	local info = require 'fbclient.tr_info' --this is a runtime dependency so as to not bloat the library!
-	local opts, max_len = info.encode(opts)
-	info_buf_len = math.min(MAX_SHORT, info_buf_len or max_len)
-	local info_buf = alien.buffer(info_buf_len)
-	self.call('isc_transaction_info', trh, #opts, opts, info_buf_len, info_buf)
-	return info.decode(info_buf, info_buf_len)
-end
-
-function dsql_info(fbapi, sv, sth, opts, info_buf_len)
-	local info = require 'fbclient.sql_info' --this is a runtime dependency so as to not bloat the library!
-	local opts, max_len = info.encode(opts)
-	info_buf_len = math.min(MAX_SHORT, info_buf_len or max_len)
-	local info_buf = alien.buffer(info_buf_len)
-	self.call('isc_dsql_sql_info', sth, #opts, opts, info_buf_len, info_buf)
-	return info.decode(info_buf, info_buf_len)
-end
-]]
