@@ -1,4 +1,5 @@
 --mysql low level binding per mySQL 5.7 manual by Cosmin Apreutesei.
+--TODO: add '*t' to convert date & times, otherwise get them as raw strings, same for bit fields (add '*b').
 local ffi = require'ffi'
 local bit = require'bit'
 require'mysql_h'
@@ -1011,7 +1012,7 @@ function bind:set(i, v, size)
 	end
 end
 
-function bind:get(i)
+function bind:get(i, mode)
 	bind_check_range(self, i)
 	local btype = tonumber(self.buffer[i-1].buffer_type)
 	if btype == C.MYSQL_TYPE_NULL or self.null_flags[i-1] == 1 then
@@ -1021,13 +1022,32 @@ function bind:get(i)
 		return self.data[i][0] --ffi converts these to lua numbers except for 64 bit types.
 	elseif time_types[btype] then
 		local t = self.data[i]
+		local decode = not mode or not mode:find's'
 		if t.time_type == C.MYSQL_TIMESTAMP_TIME then
-			return {hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
+			if decode then
+				return {hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
+			elseif t.second_part ~= 0 then
+				return string.format('%02d:%02d:%02d.%d', t.hour, t.minute, t.second, t.second_part)
+			else
+				return string.format('%02d:%02d:%02d', t.hour, t.minute, t.second)
+			end
 		elseif t.time_type == C.MYSQL_TIMESTAMP_DATE then
-			return {year = t.year, month = t.month, day = t.day}
+			if decode then
+				return {year = t.year, month = t.month, day = t.day}
+			else
+				return string.format('%04d-%02d-%02d', t.year, t.month, t.day)
+			end
 		elseif t.time_type == C.MYSQL_TIMESTAMP_DATETIME then
-			return {year = t.year, month = t.month, day = t.day,
-						hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
+			if decode then
+				return {year = t.year, month = t.month, day = t.day,
+							hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
+			elseif t.second_part ~= 0 then
+				return string.format('%04d-%02d-%02d %02d:%02d:%02d.%d',
+					t.year, t.month, t.day, t.hour, t.minute, t.second, t.second_part)
+			else
+				return string.format('%04d-%02d-%02d %02d:%02d:%02d',
+					t.year, t.month, t.day, t.hour, t.minute, t.second)
+			end
 		else
 			return nil --invalid time
 		end
@@ -1087,5 +1107,10 @@ ffi.metatype('MYSQL_STMT', {__index = stmt})
 end
 
 if not ... then require'mysql_test' end
+
+M.conn = conn
+M.res = res
+M.stmt = stmt
+M.bind = bind
 
 return M
