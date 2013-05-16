@@ -11,11 +11,13 @@ fbclient.caller() -> caller
 
 fbclient.connect(db[, user[, pass[, charset]]]) -> conn
 fbclient.connect(options_t) -> conn; options_t: role, client_library, dpb
+
 fbclient.create_db(db[, user[, pass[, charset[, db_charset[, page_size]]]]]]) -> conn
 fbclient.create_db_sql(db[, options_t]); options_t: client_library
 
 conn:clone() -> conn
 conn:close()
+
 conn:drop_db()
 conn:cancel_operation()
 conn:version_info()
@@ -24,11 +26,14 @@ fbclient.start_transaction({[conn] = true | options_t, ..}; options_t: access, i
 conn:start_transaction([access], [isolation], [lock_timeout]) -> tran
 conn:start_transaction(options_t) -> tran; options_t: access, isolation, lock_timeout, tpb
 conn:start_transaction_sql(sql) -> tran
+
 tran:commit()
 tran:rollback()
 tran:commit_retaining()
 tran:rollback_retaining()
+
 tran:exec_immediate(sql[, conn])
+
 conn:commit_all()
 conn:rollback_all()
 
@@ -46,6 +51,13 @@ conn:close_all_statements()
 tran:close_all_statements()
 
 --sugar
+
+stmt.fields[i]
+stmt.fields.<name>
+stmt.params[i]
+stmt.params.<name>
+	:get() -> v
+	:set(v)
 
 stmt:setparams(p1,...) -> stmt
 stmt:getvalues() -> v1,...
@@ -457,17 +469,17 @@ local sqltype_names = glue.index{
 	SQL_NULL        = 32766, --Firebird 2.5+
 }
 
-local sqlsubtype_names = glue.index{
-	isc_blob_untyped    = 0,
-	isc_blob_text       = 1,
-	isc_blob_blr        = 2,
-	isc_blob_acl        = 3,
-	isc_blob_ranges     = 4,
-	isc_blob_summary    = 5,
-	isc_blob_format     = 6,
-	isc_blob_tra        = 7,
-	isc_blob_extfile    = 8,
-	isc_blob_debug_info = 9,
+local sqlsubtype_names = glue.index{ --isc_blob_*
+	untyped    = 0,
+	text       = 1,
+	blr        = 2,
+	acl        = 3,
+	ranges     = 4,
+	summary    = 5,
+	format     = 6,
+	tra        = 7,
+	extfile    = 8,
+	debug_info = 9,
 }
 
 --computes buflen for a certain sqltype,sqllen pair.
@@ -510,7 +522,7 @@ local function XSQLVAR(x)
 		sqllen = x.sqllen,         --max. size of the *contents* of the SQLDATA buffer
 		buflen = buflen,           --size of the SQLDATA buffer
 		subtype = subtype,         --how is a blob encoded
-		allow_null = allow_null,   --should we allocate an sqlind buffer or not
+		allow_null = allow_null,   --should we allow nulls?
 		sqldata_buf = sqldata_buf, --pinned SQLDATA buffer
 		sqlind_buf = sqlind_buf,   --pinned SQLIND buffer
 		column_name = sqlname,
