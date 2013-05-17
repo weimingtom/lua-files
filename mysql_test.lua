@@ -172,7 +172,7 @@ create table binding_test (
 	fnumeric numeric(6,4),
 	ftinyint tinyint,
 	fsmallint smallint,
-	finteger integer,
+	finteger int,
 	ffloat float,
 	fdouble double,
 	freal real,
@@ -200,7 +200,7 @@ create table binding_test (
 	fvarbinary varbinary(200),
 	fchar char(200),
 	fbinary binary(20),
-	fnull integer
+	fnull int
 );
 
 insert into binding_test set
@@ -381,7 +381,7 @@ local bind_defs = {
 	{type = 'numeric', size = 20},
 	{type = 'tinyint'},
 	{type = 'smallint'},
-	{type = 'integer'},
+	{type = 'int'},
 	{type = 'float'},
 	{type = 'double'},
 	{type = 'real'},
@@ -409,7 +409,7 @@ local bind_defs = {
 	{type = 'varbinary', size = 200},
 	{type = 'char', size = 200},
 	{type = 'binary', size = 200},
-	{type = 'integer'},
+	{type = 'int'},
 }
 
 --preparation phase
