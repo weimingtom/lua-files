@@ -443,6 +443,7 @@ end
 local query = 'select * from binding_test'
 local stmt = conn:prepare(query)
 local bind = stmt:bind_result()
+pp(stmt:bind_result_types())
 stmt:exec()
 stmt:store_result()
 stmt:fetch()

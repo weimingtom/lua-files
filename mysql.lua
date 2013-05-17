@@ -898,7 +898,7 @@ local function parse_type(s) -- "varchar(200)" -> "varchar", 200; "decimal(10,4)
 	local t,sz = s:match'^%s*([^%(]+)%s*%(%s*(%d+)[^%)]*%)%s*$'
 	if not t then return s end
 	sz = assert(tonumber(sz), 'invalid type')
-	if t == 'decimal' or t == 'numeric' then --make room for sthe dot and the minus sign
+	if t == 'decimal' or t == 'numeric' then --make room for the dot and the minus sign
 		sz = sz + 2
 	end
 	return t, sz, unsigned
@@ -1076,23 +1076,22 @@ function bind:is_truncated(i) --returns true if the field value was truncated
 	return self.error_flags[i-1] == 1
 end
 
-local max_sizes = {
-	decimal    = 255, --arbitrary
-	char       = 255,
-	binary     = 255,
-	varchar    = 255,
-	varbinary  = 255,
-	tinyblob   = 255,
-	tinytext   = 255,
-	blob       = 65535,
-	text       = 65535,
-	mediumblob = 65535,
-	mediumtext = 16777215,
-	longblob   = 4294967295,
-	longtext   = 4294967295,
-	bit        = 64,
-	set        = 16384, --arbitrary
-	enum       = 16384, --arbitrary
+local varsize_types = {
+	char       = true,
+	binary     = true,
+	varchar    = true,
+	varbinary  = true,
+	tinyblob   = true,
+	tinytext   = true,
+	blob       = true,
+	text       = true,
+	mediumblob = true,
+	mediumtext = true,
+	longblob   = true,
+	longtext   = true,
+	bit        = true,
+	set        = true,
+	enum       = true,
 }
 
 function stmt.bind_result_types(stmt, maxsize)
@@ -1101,10 +1100,10 @@ function stmt.bind_result_types(stmt, maxsize)
 	local res = stmt:result_metadata()
 	for i=1,field_count do
 		local ftype, size, unsigned, decimals = res:field_type(i)
-		size = math.min(size, maxsize or max_sizes[ftype] or 0)
 		if ftype == 'decimal' then
 			ftype = string.format('%s(%d,%d)', ftype, size-2, decimals)
-		elseif max_sizes[ftype] then
+		elseif varsize_types[ftype] then
+			size = math.min(size, maxsize or 65535)
 			ftype = string.format('%s(%d)', ftype, size)
 		end
 		ftype = unsigned and 'unsigned '..ftype or ftype
