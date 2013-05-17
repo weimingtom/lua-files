@@ -891,13 +891,17 @@ local time_struct_types = {
 local bind = {} --bind buffer methods
 local bind_meta = {__index = bind}
 
-local function parse_type(s) -- "varchar(200)" -> "varchar", 200; "decimal(10,4)" -> "decimal", 10
+local function parse_type(s) -- "varchar(200)" -> "varchar", 200; "decimal(10,4)" -> "decimal", 12
 	s = s:lower()
 	local unsigned, rest = s:match('^unsigned (.*)')
 	if unsigned then s = rest end
 	local t,sz = s:match'^%s*([^%(]+)%s*%(%s*(%d+)[^%)]*%)%s*$'
 	if not t then return s end
-	return t, tonumber(sz), unsigned
+	sz = assert(tonumber(sz), 'invalid type')
+	if t == 'decimal' or t == 'numeric' then --make room for sthe dot and the minus sign
+		sz = sz + 2
+	end
+	return t, sz, unsigned
 end
 
 local function bind_buffer(types, bind_buffer_types)
@@ -1099,7 +1103,7 @@ function stmt.bind_result_types(stmt, maxsize)
 		local ftype, size, unsigned, decimals = res:field_type(i)
 		size = math.min(size, maxsize or max_sizes[ftype] or 0)
 		if ftype == 'decimal' then
-			ftype = string.format('%s(%d,%d)', ftype, size, decimals)
+			ftype = string.format('%s(%d,%d)', ftype, size-2, decimals)
 		elseif max_sizes[ftype] then
 			ftype = string.format('%s(%d)', ftype, size)
 		end
