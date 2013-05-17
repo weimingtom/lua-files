@@ -939,7 +939,6 @@ local function bind_buffer(types, bind_buffer_types)
 			size = 0
 		else
 			assert(size, 'missing size')
-			if stype == 'decimal' then size = size + 2 end --add space for minus sign and dot
 			data = size > 0 and ffi.new('uint8_t[?]', size) or nil
 		end
 		self.null_flags[i-1] = true
