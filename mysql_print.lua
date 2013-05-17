@@ -7,19 +7,16 @@ end
 local align = {}
 
 function align.left(s,n)
-	s = tostring(s)
 	s = s..(' '):rep(n - #s)
 	return ellipsis(s,n)
 end
 
 function align.right(s,n)
-	s = tostring(s)
 	s = (' '):rep(n - #s)..s
 	return ellipsis(s,n)
 end
 
 function align.center(s,n)
-	s = tostring(s)
 	local total = n - #s
 	local left = math.floor(total / 2)
 	local right = math.ceil(total / 2)
@@ -31,13 +28,13 @@ local function fit(s,n,al)
 	return align[al or 'left'](s,n)
 end
 
-local function print_table(fields, rows, minsize, print)
+local function print_table(fields, rows, aligns, minsize, print)
 	print = print or _G.print
 	minsize = minsize or math.huge
 	local max_sizes = {}
 	for i=1,#rows do
 		for j=1,#fields do
-			max_sizes[j] = math.min(minsize, math.max(max_sizes[j] or 0, #tostring(rows[i][j])))
+			max_sizes[j] = math.min(minsize, math.max(max_sizes[j] or 0, #rows[i][j]))
 		end
 	end
 
@@ -60,8 +57,7 @@ local function print_table(fields, rows, minsize, print)
 		local s = ''
 		for j=1,#fields do
 			local val = rows[i][j]
-			local align = type(rows[i][j]) == 'number' and 'right' or 'left'
-			s = s .. fit(val, max_sizes[j], align) .. ' | '
+			s = s .. fit(val, max_sizes[j], aligns and aligns[j]) .. ' | '
 		end
 		print(s)
 	end
@@ -84,7 +80,32 @@ local function invert_table(fields, rows, minsize)
 end
 
 local function format_cell(v)
-	return v == nil and 'NULL' or v
+	if v == nil then
+		return 'NULL'
+	elseif type(v) == 'table' then
+		local date, time
+		if v.year then
+			date = string.format('%04d-%02d-%02d', t.year, t.month, t.day)
+		end
+		if v.frac then
+			time = string.format('%02d:%02d:%02d.%d', t.hour, t.minute, t.second, t.second_part)
+		elseif v.sec then
+			time = string.format('%02d:%02d:%02d', t.hour, t.minute, t.second)
+		end
+		if date and time then
+			return date .. ' ' .. time
+		else
+			return assert(date or time)
+		end
+	else
+		return tostring(v)
+	end
+end
+
+local function cell_align(current_align, cell_value)
+	if current_align == 'left' then return 'left' end
+	if type(cell_value) == 'number' or type(cell_value) == 'cdata' then return 'right' end
+	return 'left'
 end
 
 local function print_result(res, minsize, print)
@@ -93,33 +114,37 @@ local function print_result(res, minsize, print)
 		fields[i] = field.name
 	end
 	local rows = {}
+	local aligns = {} --deduced from values
 	for i,row in res:rows'n' do
 		local t = {}
-		for j=1,#row do
+		for j=1,#fields do
 			t[j] = format_cell(row[j])
+			aligns[j] = cell_align(aligns[j], row[j])
 		end
 		rows[i] = t
 	end
-	print_table(fields, rows, minsize, print)
+	print_table(fields, rows, aligns, minsize, print)
 end
 
 local function print_statement(stmt, minsize, print)
-	stmt:store_result()
 	local res = stmt:bind_result()
 	local fields = {}
 	for i,field in stmt:result_fields() do
 		fields[i] = field.name
 	end
 	local rows = {}
+	local aligns = {}
 	while stmt:fetch() do
 		local row = {}
 		for i=1,#fields do
-			row[i] = format_cell(res:get(i, 's'))
+			local v = res:get(i, 's')
+			row[i] = format_cell(v)
+			aligns[i] = cell_align(aligns[i], v)
 		end
 		rows[#rows+1] = row
 	end
 	stmt:close()
-	print_table(fields, rows, minsize, print)
+	print_table(fields, rows, aligns, minsize, print)
 end
 
 return {

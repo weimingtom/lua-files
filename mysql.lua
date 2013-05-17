@@ -1,5 +1,4 @@
 --mysql low level binding per mySQL 5.7 manual by Cosmin Apreutesei.
---TODO: add '*t' to convert date & times, otherwise get them as raw strings, same for bit fields (add '*b').
 local ffi = require'ffi'
 local bit = require'bit'
 require'mysql_h'
@@ -316,7 +315,7 @@ local field_type_names = {
 	[C.MYSQL_TYPE_DECIMAL]     = 'decimal',    --DECIMAL or NUMERIC
 	[C.MYSQL_TYPE_TINY]        = 'tinyint',
 	[C.MYSQL_TYPE_SHORT]       = 'smallint',
-	[C.MYSQL_TYPE_LONG]        = 'integer',
+	[C.MYSQL_TYPE_LONG]        = 'int',
 	[C.MYSQL_TYPE_FLOAT]       = 'float',
 	[C.MYSQL_TYPE_DOUBLE]      = 'double',     --DOUBLE or REAL
 	[C.MYSQL_TYPE_NULL]        = 'null',
@@ -369,11 +368,20 @@ local field_flag_names = {
 	[C.MYSQL_NUM_FLAG]              = 'is_number',
 }
 
-local function get_field_type(info)
+local function field_type_name(info)
 	local type_flag = tonumber(info.type)
 	local field_type = field_type_names[type_flag]
 	--charsetnr 63 changes CHAR into BINARY, VARCHAR into VARBYNARY, TEXT into BLOB
-	return info.charsetnr == 63 and binary_field_type_names[type_flag] or field_type
+	field_type = info.charsetnr == 63 and binary_field_type_names[type_flag] or field_type
+	return field_type
+end
+
+--convenience field type fetcher (less garbage)
+function res.field_type(res, i)
+	assert(i >= 1 and i <= res:field_count(), 'index out of range')
+	local info = C.mysql_fetch_field_direct(res, i-1)
+	local unsigned = bit.bor(info.flags, C.MYSQL_UNSIGNED_FLAG) == 1
+	return field_type_name(info), info.length, unsigned, info.decimals
 end
 
 function res.field_info(res, i)
@@ -392,7 +400,7 @@ function res.field_info(res, i)
 		decimals   = info.decimals,
 		charsetnr  = info.charsetnr,
 		type_flag  = tonumber(info.type),
-		type       = get_field_type(info),
+		type       = field_type_name(info),
 		flags      = info.flags,
 		extension  = ptr(info.extension),
 	}
@@ -400,12 +408,6 @@ function res.field_info(res, i)
 		t[name] = bit.band(flag, info.flags) ~= 0
 	end
 	return t
-end
-
---convenience field type fetcher (less garbage)
-function res.field_type(res, i)
-	assert(i >= 1 and i <= res:field_count(), 'index out of range')
-	return get_field_type(C.mysql_fetch_field_direct(res, i-1))
 end
 
 --convenience field name fetcher (less garbage)
@@ -429,16 +431,22 @@ end
 --row data
 
 ffi.cdef('double strtod(const char*, char**);')
-local function parse_number(data, sz) --using strtod to avoid string creation
+local function parse_int(data, sz) --using strtod to avoid string creation
 	return ffi.C.strtod(data, nil)
 end
 
 local function parse_float(data, sz)
+	--TODO: how are nan, -inf and +inf represented by mysql?
 	return tonumber(ffi.cast('float', ffi.C.strtod(data, nil))) --because windows is missing strtof()
 end
 
+local function parse_double(data, sz)
+	--TODO: how are nan, -inf and +inf represented by mysql?
+	return ffi.C.strtod(data, nil)
+end
+
 ffi.cdef('int64_t strtoll(const char*, char**, int) ' ..(ffi.os == 'Windows' and ' asm("_strtoi64")' or '') .. ';')
-local function parse_number64(data, sz)
+local function parse_int64(data, sz)
 	return ffi.C.strtoll(data, nil, 10)
 end
 
@@ -493,14 +501,14 @@ local function parse_datetime(data, sz)
 end
 
 local field_decoders = { --other field types not present here are returned as strings, unparsed
-	[C.MYSQL_TYPE_TINY] = parse_number,
-	[C.MYSQL_TYPE_SHORT] = parse_number,
-	[C.MYSQL_TYPE_LONG] = parse_number,
+	[C.MYSQL_TYPE_TINY] = parse_int,
+	[C.MYSQL_TYPE_SHORT] = parse_int,
+	[C.MYSQL_TYPE_LONG] = parse_int,
 	[C.MYSQL_TYPE_FLOAT] = parse_float,
-	[C.MYSQL_TYPE_DOUBLE] = parse_number,
+	[C.MYSQL_TYPE_DOUBLE] = parse_double,
 	[C.MYSQL_TYPE_TIMESTAMP] = parse_datetime,
-	[C.MYSQL_TYPE_LONGLONG] = parse_number64,
-	[C.MYSQL_TYPE_INT24] = parse_number,
+	[C.MYSQL_TYPE_LONGLONG] = parse_int64, --TODO: parse_uint64 based on unsigned flag
+	[C.MYSQL_TYPE_INT24] = parse_int,
 	[C.MYSQL_TYPE_DATE] = parse_date,
 	[C.MYSQL_TYPE_TIME] = parse_time,
 	[C.MYSQL_TYPE_DATETIME] = parse_datetime,
@@ -508,7 +516,7 @@ local field_decoders = { --other field types not present here are returned as st
 	[C.MYSQL_TYPE_TIMESTAMP2] = parse_datetime,
 	[C.MYSQL_TYPE_DATETIME2] = parse_datetime,
 	[C.MYSQL_TYPE_TIME2] = parse_time,
-	[C.MYSQL_TYPE_YEAR] = parse_number,
+	[C.MYSQL_TYPE_YEAR] = parse_int,
 	[C.MYSQL_TYPE_BIT] = parse_bit,
 }
 
@@ -786,7 +794,8 @@ local bind_buffer_types_input = {
 	--conversion-free types
 	tinyint    = C.MYSQL_TYPE_TINY,
 	smallint   = C.MYSQL_TYPE_SHORT,
-	integer    = C.MYSQL_TYPE_LONG,
+	int        = C.MYSQL_TYPE_LONG,
+	integer    = C.MYSQL_TYPE_LONG,       --alias of int
 	bigint     = C.MYSQL_TYPE_LONGLONG,
 	float      = C.MYSQL_TYPE_FLOAT,
 	double     = C.MYSQL_TYPE_DOUBLE,
@@ -823,7 +832,8 @@ local bind_buffer_types_output = {
 	tinyint    = C.MYSQL_TYPE_TINY,
 	smallint   = C.MYSQL_TYPE_SHORT,
 	mediumint  = C.MYSQL_TYPE_INT24,      --int32
-	integer    = C.MYSQL_TYPE_LONG,
+	int        = C.MYSQL_TYPE_LONG,
+	integer    = C.MYSQL_TYPE_LONG,       --alias of int
 	bigint     = C.MYSQL_TYPE_LONGLONG,
 	float      = C.MYSQL_TYPE_FLOAT,
 	double     = C.MYSQL_TYPE_DOUBLE,
@@ -881,46 +891,56 @@ local time_struct_types = {
 local bind = {} --bind buffer methods
 local bind_meta = {__index = bind}
 
-local function bind_buffer(defs, bind_buffer_types)
+local function parse_type(s) -- "varchar(200)" -> "varchar", 200; "decimal(10,4)" -> "decimal", 10
+	s = s:lower()
+	local unsigned, rest = s:match('^unsigned (.*)')
+	if unsigned then s = rest end
+	local t,sz = s:match'^%s*([^%(]+)%s*%(%s*(%d+)[^%)]*%)%s*$'
+	if not t then return s end
+	return t, tonumber(sz), unsigned
+end
+
+local function bind_buffer(types, bind_buffer_types)
 	local self = setmetatable({}, bind_meta)
 
-	self.field_count = #defs
-	self.buffer = ffi.new('MYSQL_BIND[?]', #defs)
+	self.field_count = #types
+	self.buffer = ffi.new('MYSQL_BIND[?]', #types)
 	self.data = {} --data buffers, one for each field
-	self.lengths = ffi.new('uint32_t[?]', #defs) --length buffers, one for each field
-	self.null_flags = ffi.new('my_bool[?]', #defs) --null flag buffers, one for each field
-	self.error_flags = ffi.new('my_bool[?]', #defs) --error (truncation) flag buffers, one for each field
-	self.todo = {} --field indices left to be allocated in the future
+	self.lengths = ffi.new('uint32_t[?]', #types) --length buffers, one for each field
+	self.null_flags = ffi.new('my_bool[?]', #types) --null flag buffers, one for each field
+	self.error_flags = ffi.new('my_bool[?]', #types) --error (truncation) flag buffers, one for each field
 
-	for i,def in ipairs(defs) do
-		local stype = def.type:lower()
+	for i,typedef in ipairs(types) do
+		local stype, size, unsigned = parse_type(typedef)
 		local btype = assert(bind_buffer_types[stype], 'invalid type')
-		local data, size
+		local data
 		if stype == 'bit' then
-			if btype == C.MYSQL_TYPE_LONGLONG then --for input: use unsigned int64
+			if btype == C.MYSQL_TYPE_LONGLONG then --for input: use unsigned int64 and ignore size
 				data = ffi.new'uint64_t[1]'
 				self.buffer[i-1].is_unsigned = 1
 				size = 0
 			elseif btype == C.MYSQL_TYPE_BIT then --for output: use mysql conversion-free type
-				data = ffi.new('uint8_t[?]', 8)
-				size = 8
+				size = size or 64 --if missing size, assume maximum
+				size = math.ceil(size / 8)
+				assert(size >= 1 and size <= 8, 'invalid size')
+				data = ffi.new('uint8_t[?]', size)
 			end
 		elseif number_types[btype] then
+			assert(not size, 'fixed size type')
 			data = ffi.new(number_types[btype])
 			size = ffi.sizeof(data)
 		elseif time_types[btype] then
+			assert(not size, 'fixed size type')
 			data = ffi.new'MYSQL_TIME'
 			data.time_type = time_struct_types[btype]
-			size = ffi.sizeof(data)
+			size = 0
 		elseif btype == C.MYSQL_TYPE_NULL then
+			assert(not size, 'fixed size type')
 			size = 0
-		elseif def.size and def.size > 0 then
-			data = ffi.new('uint8_t[?]', def.size)
-			size = def.size
 		else
-			--these can be allocated after max_length is available.
-			self.todo[i] = true
-			size = 0
+			assert(size, 'missing size')
+			if stype == 'decimal' then size = size + 2 end --add space for minus sign and dot
+			data = size > 0 and ffi.new('uint8_t[?]', size) or nil
 		end
 		self.null_flags[i-1] = true
 		self.data[i] = data
@@ -1012,42 +1032,23 @@ function bind:set(i, v, size)
 	end
 end
 
-function bind:get(i, mode)
+function bind:get(i)
 	bind_check_range(self, i)
 	local btype = tonumber(self.buffer[i-1].buffer_type)
 	if btype == C.MYSQL_TYPE_NULL or self.null_flags[i-1] == 1 then
 		return nil
 	end
 	if number_types[btype] then
-		return self.data[i][0] --ffi converts these to lua numbers except for 64 bit types.
+		return self.data[i][0] --ffi converts this to a number or int64 type, which maches result:fetch() decoding
 	elseif time_types[btype] then
 		local t = self.data[i]
-		local decode = not mode or not mode:find's'
 		if t.time_type == C.MYSQL_TIMESTAMP_TIME then
-			if decode then
-				return {hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
-			elseif t.second_part ~= 0 then
-				return string.format('%02d:%02d:%02d.%d', t.hour, t.minute, t.second, t.second_part)
-			else
-				return string.format('%02d:%02d:%02d', t.hour, t.minute, t.second)
-			end
+			return {hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
 		elseif t.time_type == C.MYSQL_TIMESTAMP_DATE then
-			if decode then
-				return {year = t.year, month = t.month, day = t.day}
-			else
-				return string.format('%04d-%02d-%02d', t.year, t.month, t.day)
-			end
+			return {year = t.year, month = t.month, day = t.day}
 		elseif t.time_type == C.MYSQL_TIMESTAMP_DATETIME then
-			if decode then
-				return {year = t.year, month = t.month, day = t.day,
-							hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
-			elseif t.second_part ~= 0 then
-				return string.format('%04d-%02d-%02d %02d:%02d:%02d.%d',
-					t.year, t.month, t.day, t.hour, t.minute, t.second, t.second_part)
-			else
-				return string.format('%04d-%02d-%02d %02d:%02d:%02d',
-					t.year, t.month, t.day, t.hour, t.minute, t.second)
-			end
+			return {year = t.year, month = t.month, day = t.day,
+						hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
 		else
 			return nil --invalid time
 		end
@@ -1072,27 +1073,63 @@ function bind:is_truncated(i) --returns true if the field value was truncated
 	return self.error_flags[i-1] == 1
 end
 
-function stmt.result_bind_defs(stmt, bufsize)
-	local defs = {}
+local max_sizes = {
+	decimal    = 255, --arbitrary
+	char       = 255,
+	binary     = 255,
+	varchar    = 255,
+	varbinary  = 255,
+	tinyblob   = 255,
+	tinytext   = 255,
+	blob       = 65535,
+	text       = 65535,
+	mediumblob = 65535,
+	mediumtext = 16777215,
+	longblob   = 4294967295,
+	longtext   = 4294967295,
+	bit        = 64,
+	set        = 16384, --arbitrary
+	enum       = 16384, --arbitrary
+}
+
+function stmt.bind_result_types(stmt, maxsize)
+	local types = {}
 	local field_count = stmt:field_count()
 	local res = stmt:result_metadata()
 	for i=1,field_count do
-		defs[i] = {type = res:field_type(i), size = bufsize}
+		local ftype, size, unsigned, decimals = res:field_type(i)
+		size = math.min(size, maxsize or max_sizes[ftype] or 0)
+		if ftype == 'decimal' then
+			ftype = string.format('%s(%d,%d)', ftype, size, decimals)
+		elseif max_sizes[ftype] then
+			ftype = string.format('%s(%d)', ftype, size)
+		end
+		ftype = unsigned and 'unsigned '..ftype or ftype
+		types[i] = ftype
 	end
 	res:free()
-	return defs
+	return types
 end
 
-function stmt.bind_params(stmt, params)
-	local bb = bind_buffer(params, bind_buffer_types_input)
+function stmt.bind_params(stmt, ...)
+	local types = type(...) == 'string' and {...} or ...
+	local bb = bind_buffer(types, bind_buffer_types_input)
 	stcheckz(stmt, C.mysql_stmt_bind_param(stmt, bb.buffer))
 	return bb
 end
 
-function stmt.bind_result(stmt, defs, bufsize)
-	defs = defs or stmt:result_bind_defs(bufsize or 200)
-	assert(stmt:field_count() == #defs, 'wrong number of field definitions')
-	local bb = bind_buffer(defs, bind_buffer_types_output)
+function stmt.bind_result(stmt, arg1, ...)
+	local types, maxsize
+	if type(arg1) == 'string' then
+		types = {arg1, ...}
+	elseif type(arg1) == 'number' then
+		maxsize = arg1
+	else
+		types = arg1
+	end
+	types = types or stmt:bind_result_types(maxsize)
+	assert(stmt:field_count() == #types, 'wrong number of field definitions')
+	local bb = bind_buffer(types, bind_buffer_types_output)
 	stcheckz(stmt, C.mysql_stmt_bind_result(stmt, bb.buffer))
 	return bb
 end

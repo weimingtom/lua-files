@@ -1,7 +1,14 @@
 local mysql = require'mysql'
 local glue = require'glue'
 local pformat = require'pp'.pformat
+local myprint = require'mysql_print'
 local ffi = require'ffi'
+
+--helpers
+
+local print_table = myprint.table
+local print_result = myprint.result
+local fit = myprint.fit
 
 local function assert_deepequal(t1, t2) --assert the equality of two values
 	assert(type(t1) == type(t2), type(t1)..' ~= '..type(t2))
@@ -13,104 +20,20 @@ local function assert_deepequal(t1, t2) --assert the equality of two values
 	end
 end
 
-local function fit(s,n)
-	return #s > n and (s:sub(1,n-3) .. '...') or s
-end
-
-local function leftalign(s,n)
-	s = tostring(s)
-	s = s..(' '):rep(n - #s)
-	return fit(s,n)
-end
-
-local function rightalign(s,n)
-	s = tostring(s)
-	s = (' '):rep(n - #s)..s
-	return fit(s,n)
-end
-
-local function centeralign(s,n)
-	s = tostring(s)
-	local total = n - #s
-	local left = math.floor(total / 2)
-	local right = math.ceil(total / 2)
-	s = (' '):rep(left)..s..(' '):rep(right)
-	return fit(s,n)
-end
-
-local function print_table(fields, rows)
-	local max_sizes = {}
-	for i=1,#rows do
-		for j=1,#fields do
-			max_sizes[j] = math.max(max_sizes[j] or 0, #tostring(rows[i][j]))
-		end
-	end
-
-	local totalsize = 0
-	for j=1,#fields do
-		max_sizes[j] = math.max(max_sizes[j] or 0, #fields[j])
-		totalsize = totalsize + max_sizes[j] + 3
-	end
-
-	print()
-	local s, ps = '', ''
-	for j=1,#fields do
-		s = s .. centeralign(fields[j], max_sizes[j]) .. ' | '
-		ps = ps .. ('-'):rep(max_sizes[j]) .. ' + '
-	end
-	print(s)
-	print(ps)
-
-	for i=1,#rows do
-		local s = ''
-		for j=1,#fields do
-			local val = rows[i][j]
-			local align = type(rows[i][j]) == 'number' and rightalign or leftalign
-			s = s .. align(val, max_sizes[j]) .. ' | '
-		end
-		print(s)
-	end
-	print()
-end
-
-local function invert_table(fields, rows)
-	local ft, rt = {'field'}, {}
-	for i=1,#rows do
-		ft[i+1] = tostring(i)
-	end
-	for j=1,#fields do
-		local row = {fields[j]}
-		for i=1,#rows do
-			row[i+1] = rows[i][j]
-		end
-		rt[j] = row
-	end
-	return ft, rt
-end
-
-local function print_result(res)
-	local fields = {}
-	for i,field in res:fields() do
-		fields[i] = field.name
-	end
-	local rows = {}
-	for i,row in res:rows'n' do
-		rows[i] = row
-	end
-	print_table(fields, rows)
-end
-
 local function print_fields(fields_iter)
 	local fields = {'name', 'type', 'type_flag', 'length', 'max_length', 'decimals', 'charsetnr',
 							'org_name', 'table', 'org_table', 'db', 'catalog', 'def', 'extension'}
 	local rows = {}
+	local aligns = {}
 	for i,field in fields_iter do
 		rows[i] = {}
 		for j=1,#fields do
-			rows[i][j] = field[fields[j]]
+			local v = field[fields[j]]
+			rows[i][j] = tostring(v)
+			aligns[j] = type(v) == 'number' and 'right' or 'left'
 		end
 	end
-	print_table(fields, rows)
+	print_table(fields, rows, aligns)
 end
 
 --client library
@@ -341,10 +264,10 @@ local row = assert(res:fetch'n')
 res:seek(1)
 local row_s = assert(res:fetch'ns')
 print()
-print(rightalign('', 4) .. '  ' .. leftalign('field', 20) .. leftalign('unparsed', 40) .. '  ' .. 'parsed')
+print(fit('', 4, 'right') .. '  ' .. fit('field', 20) .. fit('unparsed', 40) .. '  ' .. 'parsed')
 print(('-'):rep(4 + 2 + 20 + 40 + 40))
 for i,field in res:fields() do
-	print(rightalign(i, 4) .. '  ' .. leftalign(field.name, 20) .. leftalign(pformat(row_s[i]), 40) .. '  ' .. pformat(row[i]))
+	print(fit(tostring(i), 4, 'right') .. '  ' .. fit(field.name, 20) .. fit(pformat(row_s[i]), 40) .. '  ' .. pformat(row[i]))
 end
 print()
 
@@ -377,39 +300,39 @@ print('res:list_processes()  ', '->'); print_result(conn:list_processes())
 --prepared statements
 
 local bind_defs = {
-	{type = 'decimal', size = 20}, --TODO: truncation
-	{type = 'numeric', size = 20},
-	{type = 'tinyint'},
-	{type = 'smallint'},
-	{type = 'int'},
-	{type = 'float'},
-	{type = 'double'},
-	{type = 'real'},
-	{type = 'bigint'},
-	{type = 'mediumint'},
-	{type = 'date'},
-	{type = 'time'},
-	{type = 'time'},
-	{type = 'datetime'},
-	{type = 'datetime'},
-	{type = 'timestamp'},
-	{type = 'timestamp'},
-	{type = 'year'},
-	{type = 'bit'},
-	{type = 'bit'},
-	{type = 'bit'},
-	{type = 'enum', size = 200},
-	{type = 'set', size = 200},
-	{type = 'tinyblob', size = 200},
-	{type = 'mediumblob', size = 200},
-	{type = 'longblob', size = 200},
-	{type = 'text', size = 200},
-	{type = 'blob', size = 200},
-	{type = 'varchar', size = 200},
-	{type = 'varbinary', size = 200},
-	{type = 'char', size = 200},
-	{type = 'binary', size = 200},
-	{type = 'int'},
+	'decimal(20)', --TODO: truncation
+	'numeric(20)',
+	'tinyint',
+	'smallint',
+	'int',
+	'float',
+	'double',
+	'real',
+	'bigint',
+	'mediumint',
+	'date',
+	'time',
+	'time',
+	'datetime',
+	'datetime',
+	'timestamp',
+	'timestamp',
+	'year',
+	'bit(2)',
+	'bit(32)',
+	'bit(64)',
+	'enum(200)',
+	'set(200)',
+	'tinyblob(200)',
+	'mediumblob(200)',
+	'longblob(200)',
+	'text(200)',
+	'blob(200)',
+	'varchar(200)',
+	'varbinary(200)',
+	'char(200)',
+	'binary(200)',
+	'int',
 }
 
 --preparation phase
@@ -471,7 +394,7 @@ local function print_bind_buffer(bind)
 		assert_deepequal(v, test_values[fields[i]])
 		assert(bind:is_truncated(i) == false)
 		assert(bind:is_null(i) == (fields[i] == 'fnull'))
-		print(rightalign(i, 4) .. '  ' .. leftalign(fields[i], 20) .. pformat(v))
+		print(fit(tostring(i), 4, 'right') .. '  ' .. fit(fields[i], 20) .. pformat(v))
 	end
 	print()
 end
