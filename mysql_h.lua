@@ -362,15 +362,16 @@ MYSQL_RES *mysql_list_processes(MYSQL *mysql);
 
 int mysql_kill(MYSQL *mysql, unsigned long pid);
 
+// NOTE: added MYSQL_ prefix.
 enum mysql_enum_shutdown_level {
-	SHUTDOWN_DEFAULT           = 0,
-	SHUTDOWN_WAIT_CONNECTIONS  = 1,
-	SHUTDOWN_WAIT_TRANSACTIONS = 2,
-	SHUTDOWN_WAIT_UPDATES      = 8,
-	SHUTDOWN_WAIT_ALL_BUFFERS  = 16,
-	SHUTDOWN_WAIT_CRITICAL_BUFFERS = 17,
-	KILL_QUERY                 = 254,
-	KILL_CONNECTION            = 255
+	MYSQL_SHUTDOWN_DEFAULT           = 0,
+	MYSQL_SHUTDOWN_WAIT_CONNECTIONS  = 1,
+	MYSQL_SHUTDOWN_WAIT_TRANSACTIONS = 2,
+	MYSQL_SHUTDOWN_WAIT_UPDATES      = 8,
+	MYSQL_SHUTDOWN_WAIT_ALL_BUFFERS  = 16,
+	MYSQL_SHUTDOWN_WAIT_CRITICAL_BUFFERS = 17,
+	MYSQL_KILL_QUERY                 = 254,
+	MYSQL_KILL_CONNECTION            = 255
 };
 int mysql_shutdown(MYSQL *mysql, enum mysql_enum_shutdown_level shutdown_level); // needs SHUTDOWN priviledge
 

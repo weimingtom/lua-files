@@ -37,7 +37,7 @@ local function checkh(mysql, ret)
 end
 
 local function enum(e, prefix)
-	return type(e) == 'string' and (prefix and C[prefix..e] or C[e]) or e
+	return assert(type(e) == 'string' and (prefix and C[prefix..e] or C[e]) or e, 'invalid enum value')
 end
 
 --client library info
@@ -380,7 +380,7 @@ end
 function res.field_type(res, i)
 	assert(i >= 1 and i <= res:field_count(), 'index out of range')
 	local info = C.mysql_fetch_field_direct(res, i-1)
-	local unsigned = bit.bor(info.flags, C.MYSQL_UNSIGNED_FLAG) == 1
+	local unsigned = bit.bor(info.flags, C.MYSQL_UNSIGNED_FLAG) ~= 0
 	return field_type_name(info), info.length, unsigned, info.decimals
 end
 
@@ -417,7 +417,7 @@ function res.field_name(res, i)
 	return cstring(info.name, info.name_length)
 end
 
---convenience field iterator, shortcut of: for i=1,res:field_count() do local field = res:field_info(i) ... end
+--convenience field iterator, shortcut for: for i=1,res:field_count() do local field = res:field_info(i) ... end
 function res.fields(res)
 	local n = res:field_count()
 	local i = 0
@@ -428,7 +428,7 @@ function res.fields(res)
 	end
 end
 
---row data
+--row data fetching and parsing
 
 ffi.cdef('double strtod(const char*, char**);')
 local function parse_int(data, sz) --using strtod to avoid string creation
@@ -436,18 +436,21 @@ local function parse_int(data, sz) --using strtod to avoid string creation
 end
 
 local function parse_float(data, sz)
-	--TODO: how are nan, -inf and +inf represented by mysql?
 	return tonumber(ffi.cast('float', ffi.C.strtod(data, nil))) --because windows is missing strtof()
 end
 
 local function parse_double(data, sz)
-	--TODO: how are nan, -inf and +inf represented by mysql?
 	return ffi.C.strtod(data, nil)
 end
 
 ffi.cdef('int64_t strtoll(const char*, char**, int) ' ..(ffi.os == 'Windows' and ' asm("_strtoi64")' or '') .. ';')
 local function parse_int64(data, sz)
 	return ffi.C.strtoll(data, nil, 10)
+end
+
+ffi.cdef('uint64_t strtoull(const char*, char**, int) ' ..(ffi.os == 'Windows' and ' asm("_strtoui64")' or '') .. ';')
+local function parse_uint64(data, sz)
+	return ffi.C.strtoull(data, nil, 10)
 end
 
 local function parse_bit(data, sz)
@@ -507,7 +510,7 @@ local field_decoders = { --other field types not present here are returned as st
 	[C.MYSQL_TYPE_FLOAT] = parse_float,
 	[C.MYSQL_TYPE_DOUBLE] = parse_double,
 	[C.MYSQL_TYPE_TIMESTAMP] = parse_datetime,
-	[C.MYSQL_TYPE_LONGLONG] = parse_int64, --TODO: parse_uint64 based on unsigned flag
+	[C.MYSQL_TYPE_LONGLONG] = parse_int64,
 	[C.MYSQL_TYPE_INT24] = parse_int,
 	[C.MYSQL_TYPE_DATE] = parse_date,
 	[C.MYSQL_TYPE_TIME] = parse_time,
@@ -518,6 +521,10 @@ local field_decoders = { --other field types not present here are returned as st
 	[C.MYSQL_TYPE_TIME2] = parse_time,
 	[C.MYSQL_TYPE_YEAR] = parse_int,
 	[C.MYSQL_TYPE_BIT] = parse_bit,
+}
+
+local unsigned_decoders = {
+	[C.MYSQL_TYPE_LONGLONG] = parse_uint64,
 }
 
 local function mode_flags(mode)
@@ -541,7 +548,14 @@ local function fetch_row(res, numeric, assoc, decode, field_count, fields, t)
 	for i=0,field_count-1 do
 		local v = values[i]
 		if v ~= NULL then
-			local decoder = decode and field_decoders[tonumber(fields[i].type)] or ffi.string
+			local decoder
+			if decode then
+				local ftype = tonumber(fields[i].type)
+				local unsigned = bit.bor(fields[i].flags, C.MYSQL_UNSIGNED_FLAG) ~= 0
+				decoder = unsigned and unsigned_decoders[ftype] or field_decoders[ftype] or ffi.string
+			else
+				decoder = ffi.string
+			end
 			v = decoder(values[i], sizes[i])
 			if numeric then
 				t[i+1] = v
@@ -615,7 +629,7 @@ function conn.kill(mysql, pid)
 end
 
 function conn.shutdown(mysql, level)
-	checkz(mysql, C.mysql_shutdown(mysql, enum(level)))
+	checkz(mysql, C.mysql_shutdown(mysql, enum(level or C.MYSQL_SHUTDOWN_DEFAULT, 'MYSQL_')))
 end
 
 function conn.refresh(mysql, t) --options are 'REFRESH_*' or mysql.C.MYSQL_REFRESH_* enums
@@ -659,11 +673,12 @@ local function stcheckh(stmt, ret)
 	sterror(stmt)
 end
 
-function conn.prepare(mysql, query)
+function conn.prepare(mysql, query, ...)
 	local stmt = checkh(mysql, C.mysql_stmt_init(mysql))
 	ffi.gc(stmt, C.mysql_stmt_close)
 	stcheckz(stmt, C.mysql_stmt_prepare(stmt, query, #query))
-	return stmt
+	local params = ... and stmt:bind_params(...)
+	return stmt, params
 end
 
 local stmt = {} --statement methods
@@ -704,6 +719,7 @@ end
 
 stmt.insert_id = C.mysql_stmt_insert_id
 stmt.field_count = C.mysql_stmt_field_count
+stmt.param_count = C.mysql_stmt_param_count
 
 stmt.errno = C.mysql_stmt_errno
 
@@ -787,7 +803,7 @@ function stmt.set_prefetch_rows(stmt, n)
 	stcheckz(stmt, C.mysql_stmt_attr_set(stmt, C.STMT_ATTR_PREFETCH_ROWS, attr))
 end
 
---statement bindings
+--prepared statements i/o
 
 --see http://dev.mysql.com/doc/refman/5.7/en/c-api-prepared-statement-type-codes.html
 local bind_buffer_types_input = {
@@ -874,6 +890,14 @@ local number_types = {
 	[C.MYSQL_TYPE_DOUBLE]    = 'double[1]',
 }
 
+local uint_types = {
+	[C.MYSQL_TYPE_TINY]      = 'uint8_t[1]',
+	[C.MYSQL_TYPE_SHORT]     = 'uint16_t[1]',
+	[C.MYSQL_TYPE_LONG]      = 'uint32_t[1]',
+	[C.MYSQL_TYPE_INT24]     = 'uint32_t[1]',
+	[C.MYSQL_TYPE_LONGLONG]  = 'uint64_t[1]',
+}
+
 local time_types = {
 	[C.MYSQL_TYPE_TIME]      = true,
 	[C.MYSQL_TYPE_DATE]      = true,
@@ -891,20 +915,23 @@ local time_struct_types = {
 local bind = {} --bind buffer methods
 local bind_meta = {__index = bind}
 
-local function parse_type(s) -- "varchar(200)" -> "varchar", 200; "decimal(10,4)" -> "decimal", 12
+-- "varchar(200)" -> "varchar", 200; "decimal(10,4)" -> "decimal", 12; "int unsigned" -> "int", nil, true
+local function parse_type(s)
 	s = s:lower()
-	local unsigned, rest = s:match('^unsigned (.*)')
-	if unsigned then s = rest end
-	local t,sz = s:match'^%s*([^%(]+)%s*%(%s*(%d+)[^%)]*%)%s*$'
-	if not t then return s end
-	sz = assert(tonumber(sz), 'invalid type')
-	if t == 'decimal' or t == 'numeric' then --make room for the dot and the minus sign
-		sz = sz + 2
+	local unsigned = false
+	local rest = s:match'(.-)%s+unsigned$'
+	if rest then s, unsigned = rest, true end
+	local rest, sz = s:match'^%s*([^%(]+)%s*%(%s*(%d+)[^%)]*%)%s*$'
+	if rest then
+		s, sz = rest, assert(tonumber(sz), 'invalid type')
+		if s == 'decimal' or s == 'numeric' then --make room for the dot and the minus sign
+			sz = sz + 2
+		end
 	end
-	return t, sz, unsigned
+	return s, sz, unsigned
 end
 
-local function bind_buffer(types, bind_buffer_types)
+local function bind_buffer(bind_buffer_types, types)
 	local self = setmetatable({}, bind_meta)
 
 	self.field_count = #types
@@ -931,7 +958,8 @@ local function bind_buffer(types, bind_buffer_types)
 			end
 		elseif number_types[btype] then
 			assert(not size, 'fixed size type')
-			data = ffi.new(number_types[btype])
+			data = ffi.new(unsigned and uint_types[btype] or number_types[btype])
+			self.buffer[i-1].is_unsigned = unsigned
 			size = ffi.sizeof(data)
 		elseif time_types[btype] then
 			assert(not size, 'fixed size type')
@@ -966,6 +994,7 @@ end
 --NOTE: only available for var-sized fields but no error is raised if used on a fixed-sized field.
 function bind:realloc(i, size)
 	bind_check_range(self, i)
+	assert(ffi.istype(data, 'uint8_t[?]'), 'attempt to realloc a fixed size field')
 	local data = size > 0 and ffi.new('uint8_t[?]', size) or nil
 	self.null_flags[i-1] = true
 	self.data[i] = data
@@ -1053,7 +1082,7 @@ function bind:get(i)
 			return {year = t.year, month = t.month, day = t.day,
 						hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
 		else
-			return nil --invalid time
+			error'invalid time'
 		end
 	else
 		local sz = math.min(self.buffer[i-1].buffer_length, self.lengths[i-1])
@@ -1106,7 +1135,7 @@ function stmt.bind_result_types(stmt, maxsize)
 			size = math.min(size, maxsize or 65535)
 			ftype = string.format('%s(%d)', ftype, size)
 		end
-		ftype = unsigned and 'unsigned '..ftype or ftype
+		ftype = unsigned and ftype..' unsigned' or ftype
 		types[i] = ftype
 	end
 	res:free()
@@ -1114,24 +1143,26 @@ function stmt.bind_result_types(stmt, maxsize)
 end
 
 function stmt.bind_params(stmt, ...)
-	local types = type(...) == 'string' and {...} or ...
-	local bb = bind_buffer(types, bind_buffer_types_input)
+	local types = type(...) == 'string' and {...} or ... or {}
+	assert(stmt:param_count() == #types, 'wrong number of param types')
+	local bb = bind_buffer(bind_buffer_types_input, types)
 	stcheckz(stmt, C.mysql_stmt_bind_param(stmt, bb.buffer))
 	return bb
 end
 
 function stmt.bind_result(stmt, arg1, ...)
-	local types, maxsize
+	local types
 	if type(arg1) == 'string' then
 		types = {arg1, ...}
 	elseif type(arg1) == 'number' then
-		maxsize = arg1
-	else
+		types = stmt:bind_result_types(arg1)
+	elseif arg1 then
 		types = arg1
+	else
+		types = stmt:bind_result_types()
 	end
-	types = types or stmt:bind_result_types(maxsize)
-	assert(stmt:field_count() == #types, 'wrong number of field definitions')
-	local bb = bind_buffer(types, bind_buffer_types_output)
+	assert(stmt:field_count() == #types, 'wrong number of field types')
+	local bb = bind_buffer(bind_buffer_types_output, types)
 	stcheckz(stmt, C.mysql_stmt_bind_result(stmt, bb.buffer))
 	return bb
 end
@@ -1145,11 +1176,13 @@ ffi.metatype('MYSQL_RES', {__index = res})
 ffi.metatype('MYSQL_STMT', {__index = stmt})
 end
 
-if not ... then require'mysql_test' end
+--publish classes (for introspection, not extending)
 
 M.conn = conn
 M.res = res
 M.stmt = stmt
 M.bind = bind
+
+if not ... then require'mysql_test' end
 
 return M

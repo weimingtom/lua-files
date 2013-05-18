@@ -82,127 +82,117 @@ print('conn:commit()         ', conn:commit())
 print('conn:rollback()       ', conn:rollback())
 print('conn:set_autocommit() ', conn:set_autocommit(true))
 
---queries
+--test types and values
 
-local esc = "'escape me'"
-print('conn:escape(          ', pformat(esc), ')', '->', pformat(conn:escape(esc)))
-local q1 = 'drop table if exists binding_test'
-print('conn:query(           ', pformat(q1), ')', conn:query(q1))
+local test_fields = {
+	'fdecimal',
+	'fnumeric',
+	'ftinyint',
+	'futinyint',
+	'fsmallint',
+	'fusmallint',
+	'finteger',
+	'fuinteger',
+	'ffloat',
+	'fdouble',
+	'fdouble2',
+	'fdouble3',
+	'fdouble4',
+	'freal',
+	'fbigint',
+	'fubigint',
+	'fmediumint',
+	'fumediumint',
+	'fdate',
+	'ftime',
+	'ftime2',
+	'fdatetime',
+	'fdatetime2',
+	'ftimestamp',
+	'ftimestamp2',
+	'fyear',
+	'fbit2',
+	'fbit22',
+	'fbit64',
+	'fenum',
+	'fset',
+	'ftinyblob',
+	'fmediumblob',
+	'flongblob',
+	'ftext',
+	'fblob',
+	'fvarchar',
+	'fvarbinary',
+	'fchar',
+	'fbinary',
+	'fnull',
+}
 
-conn:query[[
-create table binding_test (
-	fdecimal decimal(8,2),
-	fnumeric numeric(6,4),
-	ftinyint tinyint,
-	fsmallint smallint,
-	finteger int,
-	ffloat float,
-	fdouble double,
-	freal real,
-	fbigint bigint,
-	fmediumint mediumint,
-	fdate date,
-	ftime time(0),
-	ftime2 time(6),
-	fdatetime datetime(0),
-	fdatetime2 datetime(6),
-	ftimestamp timestamp(0) null,
-	ftimestamp2 timestamp(6) null,
-	fyear year,
-	fbit2 bit(2),
-	fbit22 bit(22),
-	fbit64 bit(64),
-	fenum enum('yes', 'no'),
-	fset set('e1', 'e2', 'e3'),
-	ftinyblob tinyblob,
-	fmediumblob mediumblob,
-	flongblob longblob,
-	ftext text,
-	fblob blob,
-	fvarchar varchar(200),
-	fvarbinary varbinary(200),
-	fchar char(200),
-	fbinary binary(20),
-	fnull int
-);
+local field_indices = glue.index(test_fields)
 
-insert into binding_test set
-	fdecimal = '42.12',
-	fnumeric = 42.1234,
-	ftinyint = '42',
-	fsmallint = 42,
-	finteger = '42',
-	ffloat = 42.33,
-	fdouble = '42.33',
-	freal = 42.33,
-	fbigint = '420',
-	fmediumint = 440,
-	fdate = '2013-10-05',
-	ftime = '21:30:15',
-	ftime2 = '21:30:16.123456',
-	fdatetime = '2013-10-05 21:30:17',
-	fdatetime2 = '2013-10-05 21:30:18.123456',
-	ftimestamp = '2013-10-05 21:30:19',
-	ftimestamp2 = '2013-10-05 21:30:20.123456',
-	fyear = 2013,
-	fbit2 = b'10',
-	fbit22 = b'1000000010',
-	fbit64 = b'0000001000000000000000000000000000000000000000000000001000000010',
-	fenum = 'yes',
-	fset = ('e3,e2'),
-	ftinyblob = 'tiny tiny blob',
-	fmediumblob = 'medium blob',
-	flongblob = 'loong blob',
-	ftext = 'just a text',
-	fblob = 'bloob',
-	fvarchar = 'just a varchar',
-	fvarbinary = 'a varbinary',
-	fchar = 'a char',
-	fbinary = 'a binary char',
-	fnull = null
-;
-
-insert into binding_test values ();
-
-select * from binding_test;
-]]
-
---query info
-
-print('conn:field_count()    ', '->', pformat(conn:field_count()))
-print('conn:affected_rows()  ', '->', pformat(conn:affected_rows()))
-print('conn:insert_id()      ', '->', conn:insert_id())
-print('conn:errno()          ', '->', pformat(conn:errno()))
-print('conn:sqlstate()       ', '->', pformat(conn:sqlstate()))
-print('conn:warning_count()  ', '->', pformat(conn:warning_count()))
-print('conn:info()           ', '->', pformat(conn:info()))
-for i=1,3 do
-print('conn:more_results()   ', '->', pformat(conn:more_results())); assert(conn:more_results())
-print('conn:next_result()    ', '->', pformat(conn:next_result()))
-end
-assert(not conn:more_results())
-
---query results
-
-local res = conn:store_result() --TODO: local res = conn:use_result()
-print('conn:store_result()   ', '->', res)
-print('res:row_count()       ', '->', pformat(res:row_count())); assert(res:row_count() == 2)
-print('res:field_count()     ', '->', pformat(res:field_count())); assert(res:field_count() == 33)
-print('res:eof()             ', '->', pformat(res:eof())); assert(res:eof() == true)
-print('res:fields()          ', '->') print_fields(res:fields())
-print('res:field_info(1)     ', '->', pformat(res:field_info(1)))
+local field_types = {
+	fdecimal = 'decimal(8,2)',
+	fnumeric = 'numeric(6,4)',
+	ftinyint = 'tinyint',
+	futinyint = 'tinyint unsigned',
+	fsmallint = 'smallint',
+	fusmallint = 'smallint unsigned',
+	finteger = 'int',
+	fuinteger = 'int unsigned',
+	ffloat = 'float',
+	fdouble = 'double',
+	fdouble2 = 'double',
+	fdouble3 = 'double',
+	fdouble4 = 'double',
+	freal = 'real',
+	fbigint = 'bigint',
+	fubigint = 'bigint unsigned',
+	fmediumint = 'mediumint',
+	fumediumint = 'mediumint unsigned',
+	fdate = 'date',
+	ftime = 'time(0)',
+	ftime2 = 'time(6)',
+	fdatetime = 'datetime(0)',
+	fdatetime2 = 'datetime(6)',
+	ftimestamp = 'timestamp(0) null',
+	ftimestamp2 = 'timestamp(6) null',
+	fyear = 'year',
+	fbit2 = 'bit(2)',
+	fbit22 = 'bit(22)',
+	fbit64 = 'bit(64)',
+	fenum = "enum('yes', 'no')",
+	fset = "set('e1', 'e2', 'e3')",
+	ftinyblob = 'tinyblob',
+	fmediumblob = 'mediumblob',
+	flongblob = 'longblob',
+	ftext = 'text',
+	fblob = 'blob',
+	fvarchar = 'varchar(200)',
+	fvarbinary = 'varbinary(200)',
+	fchar = 'char(200)',
+	fbinary = 'binary(20)',
+	fnull = 'int'
+}
 
 local test_values = {
 	fdecimal = '42.12',
 	fnumeric = '42.1234',
 	ftinyint = 42,
+	futinyint = 255,
 	fsmallint = 42,
+	fusmallint = 65535,
 	finteger = 42,
+	fuinteger = 2^32-1,
 	ffloat = tonumber(ffi.cast('float', 42.33)),
 	fdouble = 42.33,
+	fdouble2 = nil, --null from mysql 5.1.24+
+	fdouble3 = nil, --null from mysql 5.1.24+
+	fdouble4 = nil, --null from mysql 5.1.24+
 	freal = 42.33,
 	fbigint = 420LL,
+	fubigint = 0ULL - 1,
 	fmediumint = 440,
+	fumediumint = 2^24-1,
 	fdate = {year = 2013, month = 10, day = 05},
 	ftime = {hour = 21, min = 30, sec = 15, frac = 0},
 	ftime2 = {hour = 21, min = 30, sec = 16, frac = 123456},
@@ -227,6 +217,146 @@ local test_values = {
 	fbinary = 'a binary char\0\0\0\0\0\0\0',
 	fnull = nil,
 }
+
+local set_values = {
+	fdecimal = "'42.12'",
+	fnumeric = "42.1234",
+	ftinyint = "'42'",
+	futinyint = "'255'",
+	fsmallint = "42",
+	fusmallint = "65535",
+	finteger = "'42'",
+	fuinteger = tostring(2^32-1),
+	ffloat = "42.33",
+	fdouble = "'42.33'",
+	fdouble2 = "0/0",
+	fdouble3 = "1/0",
+	fdouble4 = "-1/0",
+	freal = "42.33",
+	fbigint = "'420'",
+	fubigint = tostring(0ULL-1):sub(1,-4), --remove 'ULL'
+	fmediumint = "440",
+	fumediumint = tostring(2^32-1),
+	fdate = "'2013-10-05'",
+	ftime = "'21:30:15'",
+	ftime2 = "'21:30:16.123456'",
+	fdatetime = "'2013-10-05 21:30:17'",
+	fdatetime2 = "'2013-10-05 21:30:18.123456'",
+	ftimestamp = "'2013-10-05 21:30:19'",
+	ftimestamp2 = "'2013-10-05 21:30:20.123456'",
+	fyear = "2013",
+	fbit2 = "b'10'",
+	fbit22 = "b'1000000010'",
+	fbit64 = "b'0000001000000000000000000000000000000000000000000000001000000010'",
+	fenum = "'yes'",
+	fset = "('e3,e2')",
+	ftinyblob = "'tiny tiny blob'",
+	fmediumblob = "'medium blob'",
+	flongblob = "'loong blob'",
+	ftext = "'just a text'",
+	fblob = "'bloob'",
+	fvarchar = "'just a varchar'",
+	fvarbinary = "'a varbinary'",
+	fchar = "'a char'",
+	fbinary = "'a binary char'",
+	fnull = "null"
+}
+
+local bind_types = {
+	fdecimal = 'decimal(20)', --TODO: truncation
+	fnumeric = 'numeric(20)',
+	ftinyint = 'tinyint',
+	futinyint = 'tinyint unsigned',
+	fsmallint = 'smallint',
+	fusmallint = 'smallint unsigned',
+	finteger = 'int',
+	fuinteger = 'int unsigned',
+	ffloat = 'float',
+	fdouble = 'double',
+	fdouble2 = 'double',
+	fdouble3 = 'double',
+	fdouble4 = 'double',
+	freal = 'real',
+	fbigint = 'bigint',
+	fubigint = 'bigint unsigned',
+	fmediumint = 'mediumint',
+	fumediumint = 'mediumint unsigned',
+	fdate = 'date',
+	ftime = 'time',
+	ftime2 = 'time',
+	fdatetime = 'datetime',
+	fdatetime2 = 'datetime',
+	ftimestamp = 'timestamp',
+	ftimestamp2 = 'timestamp',
+	fyear = 'year',
+	fbit2 = 'bit(2)',
+	fbit22 = 'bit(22)',
+	fbit64 = 'bit(64)',
+	fenum = 'enum(200)',
+	fset = 'set(200)',
+	ftinyblob = 'tinyblob(200)',
+	fmediumblob = 'mediumblob(200)',
+	flongblob = 'longblob(200)',
+	ftext = 'text(200)',
+	fblob = 'blob(200)',
+	fvarchar = 'varchar(200)',
+	fvarbinary = 'varbinary(200)',
+	fchar = 'char(200)',
+	fbinary = 'binary(200)',
+	fnull = 'int',
+}
+
+--queries
+
+local esc = "'escape me'"
+print('conn:escape(          ', pformat(esc), ')', '->', pformat(conn:escape(esc)))
+local q1 = 'drop table if exists binding_test'
+print('conn:query(           ', pformat(q1), ')', conn:query(q1))
+
+local field_defs = ''
+for i,field in ipairs(test_fields) do
+	field_defs = field_defs .. field .. ' ' .. field_types[field] .. (i == #test_fields and '' or ', ')
+end
+
+local field_sets = ''
+for i,field in ipairs(test_fields) do
+	field_sets = field_sets .. field .. ' = ' .. set_values[field] .. (i == #test_fields and '' or ', ')
+end
+
+conn:query([[
+create table binding_test ( ]] .. field_defs .. [[ );
+
+insert into binding_test set ]] .. field_sets .. [[ ;
+
+insert into binding_test values ();
+
+select * from binding_test;
+]])
+
+--query info
+
+print('conn:field_count()    ', '->', pformat(conn:field_count()))
+print('conn:affected_rows()  ', '->', pformat(conn:affected_rows()))
+print('conn:insert_id()      ', '->', conn:insert_id())
+print('conn:errno()          ', '->', pformat(conn:errno()))
+print('conn:sqlstate()       ', '->', pformat(conn:sqlstate()))
+print('conn:warning_count()  ', '->', pformat(conn:warning_count()))
+print('conn:info()           ', '->', pformat(conn:info()))
+for i=1,3 do
+print('conn:more_results()   ', '->', pformat(conn:more_results())); assert(conn:more_results())
+print('conn:next_result()    ', '->', pformat(conn:next_result()))
+end
+assert(not conn:more_results())
+
+--query results
+
+local res = conn:store_result() --TODO: local res = conn:use_result()
+print('conn:store_result()   ', '->', res)
+print('res:row_count()       ', '->', pformat(res:row_count())); assert(res:row_count() == 2)
+print('res:field_count()     ', '->', pformat(res:field_count())); assert(res:field_count() == #test_fields)
+print('res:eof()             ', '->', pformat(res:eof())); assert(res:eof() == true)
+print('res:fields()          ', '->') print_fields(res:fields())
+print('res:field_info(1)     ', '->', pformat(res:field_info(1)))
 
 --first row: fetch as array and test values
 local row = assert(res:fetch'n')
@@ -299,63 +429,23 @@ print('res:list_processes()  ', '->'); print_result(conn:list_processes())
 
 --prepared statements
 
-local bind_defs = {
-	'decimal(20)', --TODO: truncation
-	'numeric(20)',
-	'tinyint',
-	'smallint',
-	'int',
-	'float',
-	'double',
-	'real',
-	'bigint',
-	'mediumint',
-	'date',
-	'time',
-	'time',
-	'datetime',
-	'datetime',
-	'timestamp',
-	'timestamp',
-	'year',
-	'bit(2)',
-	'bit(32)',
-	'bit(64)',
-	'enum(200)',
-	'set(200)',
-	'tinyblob(200)',
-	'mediumblob(200)',
-	'longblob(200)',
-	'text(200)',
-	'blob(200)',
-	'varchar(200)',
-	'varbinary(200)',
-	'char(200)',
-	'binary(200)',
-	'int',
-}
-
---preparation phase
-
-local fields = {'fdecimal', 'fnumeric', 'ftinyint', 'fsmallint', 'finteger', 'ffloat', 'fdouble',
-					'freal', 'fbigint', 'fmediumint', 'fdate', 'ftime', 'ftime2', 'fdatetime', 'fdatetime2',
-					'ftimestamp', 'ftimestamp2', 'fyear', 'fbit2', 'fbit22', 'fbit64', 'fenum', 'fset',
-					'ftinyblob', 'fmediumblob', 'flongblob', 'ftext', 'fblob', 'fvarchar', 'fvarbinary', 'fchar', 'fbinary',
-					'fnull'}
-
-local query = 'select '.. table.concat(fields, ', ')..' from binding_test'
+local query = 'select '.. table.concat(test_fields, ', ')..' from binding_test'
 local stmt = conn:prepare(query)
 
 print('conn:prepare(         ', pformat(query), ')', '->', stmt)
-print('stmt:field_count()    ', '->', pformat(stmt:field_count())); assert(stmt:field_count() == #bind_defs)
+print('stmt:field_count()    ', '->', pformat(stmt:field_count())); assert(stmt:field_count() == #test_fields)
 --we can get the fields and their types before execution so we can create create our bind structures.
 --max. length is not computed though, but it will be computed after binding.
 print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
 
 --binding phase
 
-local bind = stmt:bind_result(bind_defs)
-print('stmt:bind_result(     ', pformat(bind_defs), ')', '->', pformat(bind))
+local btypes = {}
+for i,field in ipairs(test_fields) do
+	btypes[i] = bind_types[field]
+end
+local bind = stmt:bind_result(btypes)
+print('stmt:bind_result(     ', pformat(btypes), ')', '->', pformat(bind))
 
 --execution and loading
 
@@ -380,21 +470,26 @@ print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
 print('bind:is_truncated(1)  ', '->', pformat(bind:is_truncated(1))); assert(bind:is_truncated(1) == false)
 print('bind:is_null(1)       ', '->', pformat(bind:is_null(1))); assert(bind:is_null(1) == false)
 print('bind:get(1)           ', '->', pformat(bind:get(1))); assert(bind:get(1) == test_values.fdecimal)
-print('bind:get_date(11)     ', '->', bind:get_date(11)); assert_deepequal({bind:get_date(11)}, {2013, 10, 5})
-print('bind:get_date(12)     ', '->', bind:get_date(12)); assert_deepequal({bind:get_date(12)}, {nil, nil, nil, 21, 30, 15, 0})
-print('bind:get_date(14)     ', '->', bind:get_date(14)); assert_deepequal({bind:get_date(14)}, {2013, 10, 5, 21, 30, 17, 0})
-print('bind:get_date(16)     ', '->', bind:get_date(16)); assert_deepequal({bind:get_date(16)}, {2013, 10, 5, 21, 30, 19, 0})
-print('bind:get_date(17)     ', '->', bind:get_date(17)); assert_deepequal({bind:get_date(17)}, {2013, 10, 5, 21, 30, 20, 123456})
+local i = field_indices.fdate
+print('bind:get_date(        ', i, ')', '->', bind:get_date(i)); assert_deepequal({bind:get_date(i)}, {2013, 10, 5})
+local i = field_indices.ftime
+print('bind:get_date(        ', i, ')', '->', bind:get_date(i)); assert_deepequal({bind:get_date(i)}, {nil, nil, nil, 21, 30, 15, 0})
+local i = field_indices.fdatetime
+print('bind:get_date(        ', '->', bind:get_date(i)); assert_deepequal({bind:get_date(i)}, {2013, 10, 5, 21, 30, 17, 0})
+local i = field_indices.ftimestamp
+print('bind:get_date(        ', '->', bind:get_date(i)); assert_deepequal({bind:get_date(i)}, {2013, 10, 5, 21, 30, 19, 0})
+local i = field_indices.ftimestamp2
+print('bind:get_date(        ', '->', bind:get_date(i)); assert_deepequal({bind:get_date(i)}, {2013, 10, 5, 21, 30, 20, 123456})
 print('for i=1,bind.field_count do bind:get(i)', '->')
 
 local function print_bind_buffer(bind)
 	print()
-	for i=1,bind.field_count do
+	for i,field in ipairs(test_fields) do
 		local v = bind:get(i)
-		assert_deepequal(v, test_values[fields[i]])
+		assert_deepequal(v, test_values[field])
 		assert(bind:is_truncated(i) == false)
-		assert(bind:is_null(i) == (fields[i] == 'fnull'))
-		print(fit(tostring(i), 4, 'right') .. '  ' .. fit(fields[i], 20) .. pformat(v))
+		assert(bind:is_null(i) == (test_values[field] == nil))
+		print(fit(tostring(i), 4, 'right') .. '  ' .. fit(field, 20) .. pformat(v))
 	end
 	print()
 end
@@ -409,11 +504,11 @@ print('stmt:close()          ', stmt:close())
 
 --prepared statements with parameters
 
-for i,fname in ipairs(fields) do
-	local query = 'select * from binding_test where '..fname..' = ?'
+for i,field in ipairs(test_fields) do
+	local query = 'select * from binding_test where '..field..' = ?'
 	local stmt = conn:prepare(query)
 	print('conn:prepare(         ', pformat(query), ')')
-	local param_bind_def = {bind_defs[i]}
+	local param_bind_def = {bind_types[field]}
 
 	local bind = stmt:bind_params(param_bind_def)
 	print('stmt:bind_params      ', pformat(param_bind_def))
@@ -424,13 +519,11 @@ for i,fname in ipairs(fields) do
 		print('stmt:row_count()      ', '->', stmt:row_count()); assert(stmt:row_count() == 1)
 	end
 
-	if fname == 'fnull' then
-		--how to test this? and why would we ever wanna have a null-only param?
-	else
-		local v = test_values[fname]
+	local v = test_values[field]
+	if v ~= nil then
 		print('bind:set(             ', 1, pformat(v), ')'); bind:set(1, v); exec()
 
-		if fname:find'date' or fname:find'time' then
+		if field:find'date' or field:find'time' then
 			print('bind:set_date(     ', 1, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac, ')')
 			bind:set_date(1, v.year, v.month, v.day, v.hour, v.min, v.sec, v.frac); exec()
 		end
@@ -443,7 +536,7 @@ end
 local query = 'select * from binding_test'
 local stmt = conn:prepare(query)
 local bind = stmt:bind_result()
-pp(stmt:bind_result_types())
+--pp(stmt:bind_result_types())
 stmt:exec()
 stmt:store_result()
 stmt:fetch()
