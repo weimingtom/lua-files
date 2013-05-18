@@ -435,8 +435,8 @@ local stmt = conn:prepare(query)
 print('conn:prepare(         ', pformat(query), ')', '->', stmt)
 print('stmt:field_count()    ', '->', pformat(stmt:field_count())); assert(stmt:field_count() == #test_fields)
 --we can get the fields and their types before execution so we can create create our bind structures.
---max. length is not computed though, but it will be computed after binding.
-print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
+--max. length is not computed though, but length is, so we can use that.
+print('stmt:fields()         ', '->'); print_fields(stmt:fields())
 
 --binding phase
 
@@ -463,9 +463,7 @@ print('stmt:sqlstate()       ', '->', pformat(stmt:sqlstate()))
 
 print('stmt:fetch()          ', stmt:fetch())
 
---max. length is computed now, so we can allocate our buffers.
---this can only mean that by now the query already ran on the server even if we didn't yet call exec().
-print('stmt:result_fields()  ', '->'); print_fields(stmt:result_fields())
+print('stmt:fields()         ', '->'); print_fields(stmt:fields())
 
 print('bind:is_truncated(1)  ', '->', pformat(bind:is_truncated(1))); assert(bind:is_truncated(1) == false)
 print('bind:is_null(1)       ', '->', pformat(bind:is_null(1))); assert(bind:is_null(1) == false)

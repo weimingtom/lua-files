@@ -741,7 +741,7 @@ function stmt.result_metadata(stmt)
 	return ffi.gc(res, C.mysql_free_result)
 end
 
-function stmt.result_fields(stmt)
+function stmt.fields(stmt)
 	local res = stmt:result_metadata()
 	local fields = res:fields()
 	return function()
@@ -945,7 +945,7 @@ end
 local function bind_buffer(bb_types, meta, types)
 	local self = setmetatable({}, meta)
 
-	self.field_count = #types
+	self.count = #types
 	self.buffer = ffi.new('MYSQL_BIND[?]', #types)
 	self.data = {} --data buffers, one for each field
 	self.lengths = ffi.new('uint32_t[?]', #types) --length buffers, one for each field
@@ -1006,7 +1006,7 @@ local function fields_bind_buffer(types)
 end
 
 local function bind_check_range(self, i)
-	assert(i >= 1 and i <= self.field_count, 'index out of bounds')
+	assert(i >= 1 and i <= self.count, 'index out of bounds')
 end
 
 --realloc a buffer using supplied size. only for varsize fields.

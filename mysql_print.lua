@@ -129,7 +129,7 @@ end
 local function print_statement(stmt, minsize, print)
 	local res = stmt:bind_result()
 	local fields = {}
-	for i,field in stmt:result_fields() do
+	for i,field in stmt:fields() do
 		fields[i] = field.name
 	end
 	local rows = {}
@@ -137,7 +137,7 @@ local function print_statement(stmt, minsize, print)
 	while stmt:fetch() do
 		local row = {}
 		for i=1,#fields do
-			local v = res:get(i, 's')
+			local v = res:get(i)
 			row[i] = format_cell(v)
 			aligns[i] = cell_align(aligns[i], v)
 		end
@@ -147,8 +147,11 @@ local function print_statement(stmt, minsize, print)
 	print_table(fields, rows, aligns, minsize, print)
 end
 
+if not ... then require'mysql_test' end
+
 return {
 	fit = fit,
+	format_cell = format_cell,
 	table = print_table,
 	result = print_result,
 	statement = print_statement,
