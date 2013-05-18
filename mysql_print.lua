@@ -82,21 +82,6 @@ end
 local function format_cell(v)
 	if v == nil then
 		return 'NULL'
-	elseif type(v) == 'table' then
-		local date, time
-		if v.year then
-			date = string.format('%04d-%02d-%02d', t.year, t.month, t.day)
-		end
-		if v.frac then
-			time = string.format('%02d:%02d:%02d.%d', t.hour, t.minute, t.second, t.second_part)
-		elseif v.sec then
-			time = string.format('%02d:%02d:%02d', t.hour, t.minute, t.second)
-		end
-		if date and time then
-			return date .. ' ' .. time
-		else
-			return assert(date or time)
-		end
 	else
 		return tostring(v)
 	end

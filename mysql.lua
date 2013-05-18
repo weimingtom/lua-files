@@ -492,20 +492,52 @@ local function parse_time_(data, sz)
 	return hour, min, sec, frac
 end
 
+local function format_date(year, month, day)
+	return string.format('%04d-%02d-%02d', year, month, day)
+end
+
+local function format_time(hour, min, sec, frac)
+	if frac and frac ~= 0 then
+		return string.format('%02d:%02d:%02d.%d', hour, min, sec, frac)
+	else
+		return string.format('%02d:%02d:%02d', hour, min, sec)
+	end
+end
+
+local function datetime_tostring(t)
+	local date, time
+	if t.year then
+		date = format_date(t.year, t.month, t.day)
+	end
+	if t.sec then
+		time = format_time(t.hour, t.min, t.sec, t.frac)
+	end
+	if date and time then
+		return date .. ' ' .. time
+	else
+		return assert(date or time)
+	end
+end
+
+local datetime_meta = {__tostring = datetime_tostring}
+local function datetime(t)
+	return setmetatable(t, datetime_meta)
+end
+
 local function parse_date(data, sz)
 	local year, month, day = parse_date_(data, sz)
-	return {year = year, month = month, day = day}
+	return datetime{year = year, month = month, day = day}
 end
 
 local function parse_time(data, sz)
 	local hour, min, sec, frac = parse_time_(data, sz)
-	return {hour = hour, min = min, sec = sec, frac = frac}
+	return datetime{hour = hour, min = min, sec = sec, frac = frac}
 end
 
 local function parse_datetime(data, sz)
 	local year, month, day = parse_date_(data, sz)
 	local hour, min, sec, frac = parse_time_(data + 11, sz - 11)
-	return {year = year, month = month, day = day, hour = hour, min = min, sec = sec, frac = frac}
+	return datetime{year = year, month = month, day = day, hour = hour, min = min, sec = sec, frac = frac}
 end
 
 local field_decoders = { --other field types not present here are returned as strings, unparsed
@@ -1095,12 +1127,12 @@ function fields:get(i)
 	elseif time_types[btype] then
 		local t = self.data[i]
 		if t.time_type == C.MYSQL_TIMESTAMP_TIME then
-			return {hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
+			return datetime{hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
 		elseif t.time_type == C.MYSQL_TIMESTAMP_DATE then
-			return {year = t.year, month = t.month, day = t.day}
+			return datetime{year = t.year, month = t.month, day = t.day}
 		elseif t.time_type == C.MYSQL_TIMESTAMP_DATETIME then
-			return {year = t.year, month = t.month, day = t.day,
-						hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
+			return datetime{year = t.year, month = t.month, day = t.day,
+								hour = t.hour, min = t.minute, sec = t.second, frac = t.second_part}
 		else
 			error'invalid time'
 		end
