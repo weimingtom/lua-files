@@ -257,7 +257,12 @@ function conn.affected_rows(mysql)
 end
 
 conn.insert_id = C.mysql_insert_id
-conn.errno = C.mysql_errno
+
+function conn.errno(conn)
+	local err = C.mysql_errno(conn)
+	if err == 0 then return end
+	return err
+end
 
 function conn.sqlstate(mysql)
 	return cstring(C.mysql_sqlstate(mysql))
@@ -721,7 +726,11 @@ stmt.insert_id = C.mysql_stmt_insert_id
 stmt.field_count = C.mysql_stmt_field_count
 stmt.param_count = C.mysql_stmt_param_count
 
-stmt.errno = C.mysql_stmt_errno
+function stmt.errno(stmt)
+	local err = C.mysql_stmt_errno(stmt)
+	if err == 0 then return end
+	return err
+end
 
 function stmt.sqlstate(stmt)
 	return cstring(C.mysql_stmt_sqlstate(stmt))
@@ -766,7 +775,7 @@ function stmt.seek(stmt, where) --use in conjunction with stmt:row_count()
 	end
 end
 
-function stmt.send_long_data(stmt, param_number, data, size)
+function stmt.write(stmt, param_number, data, size)
 	stcheckz(stmt, C.mysql_stmt_send_long_data(stmt, param_number, data, size or #data))
 end
 
@@ -803,10 +812,10 @@ function stmt.set_prefetch_rows(stmt, n)
 	stcheckz(stmt, C.mysql_stmt_attr_set(stmt, C.STMT_ATTR_PREFETCH_ROWS, attr))
 end
 
---prepared statements i/o
+--prepared statements / bind buffers
 
 --see http://dev.mysql.com/doc/refman/5.7/en/c-api-prepared-statement-type-codes.html
-local bind_buffer_types_input = {
+local bb_types_input = {
 	--conversion-free types
 	tinyint    = C.MYSQL_TYPE_TINY,
 	smallint   = C.MYSQL_TYPE_SHORT,
@@ -843,7 +852,7 @@ local bind_buffer_types_input = {
 	enum       = C.MYSQL_TYPE_BLOB,
 }
 
-local bind_buffer_types_output = {
+local bb_types_output = {
 	--conversion-free types
 	tinyint    = C.MYSQL_TYPE_TINY,
 	smallint   = C.MYSQL_TYPE_SHORT,
@@ -912,8 +921,10 @@ local time_struct_types = {
 	[C.MYSQL_TYPE_TIMESTAMP] = C.MYSQL_TIMESTAMP_DATETIME,
 }
 
-local bind = {} --bind buffer methods
-local bind_meta = {__index = bind}
+local params = {} --params bind buffer methods
+local params_meta = {__index = params}
+local fields = {} --params bind buffer methods
+local fields_meta = {__index = fields}
 
 -- "varchar(200)" -> "varchar", 200; "decimal(10,4)" -> "decimal", 12; "int unsigned" -> "int", nil, true
 local function parse_type(s)
@@ -931,8 +942,8 @@ local function parse_type(s)
 	return s, sz, unsigned
 end
 
-local function bind_buffer(bind_buffer_types, types)
-	local self = setmetatable({}, bind_meta)
+local function bind_buffer(bb_types, meta, types)
+	local self = setmetatable({}, meta)
 
 	self.field_count = #types
 	self.buffer = ffi.new('MYSQL_BIND[?]', #types)
@@ -943,7 +954,7 @@ local function bind_buffer(bind_buffer_types, types)
 
 	for i,typedef in ipairs(types) do
 		local stype, size, unsigned = parse_type(typedef)
-		local btype = assert(bind_buffer_types[stype], 'invalid type')
+		local btype = assert(bb_types[stype], 'invalid type')
 		local data
 		if stype == 'bit' then
 			if btype == C.MYSQL_TYPE_LONGLONG then --for input: use unsigned int64 and ignore size
@@ -986,13 +997,20 @@ local function bind_buffer(bind_buffer_types, types)
 	return self
 end
 
+local function params_bind_buffer(types)
+	return bind_buffer(bb_types_input, params_meta, types)
+end
+
+local function fields_bind_buffer(types)
+	return bind_buffer(bb_types_output, fields_meta, types)
+end
+
 local function bind_check_range(self, i)
 	assert(i >= 1 and i <= self.field_count, 'index out of bounds')
 end
 
---realloc a buffer using supplied size.
---NOTE: only available for var-sized fields but no error is raised if used on a fixed-sized field.
-function bind:realloc(i, size)
+--realloc a buffer using supplied size. only for varsize fields.
+function params:realloc(i, size)
 	bind_check_range(self, i)
 	assert(ffi.istype(data, 'uint8_t[?]'), 'attempt to realloc a fixed size field')
 	local data = size > 0 and ffi.new('uint8_t[?]', size) or nil
@@ -1003,7 +1021,9 @@ function bind:realloc(i, size)
 	self.buffer[i-1].buffer_length = size
 end
 
-function bind:get_date(i)
+fields.realloc = params.realloc
+
+function fields:get_date(i)
 	bind_check_range(self, i)
 	local btype = tonumber(self.buffer[i-1].buffer_type)
 	local date = btype == C.MYSQL_TYPE_DATE or btype == C.MYSQL_TYPE_DATETIME or btype == C.MYSQL_TYPE_TIMESTAMP
@@ -1021,7 +1041,7 @@ function bind:get_date(i)
 		time and tm.second_part or nil
 end
 
-function bind:set_date(i, year, month, day, hour, min, sec, frac)
+function params:set_date(i, year, month, day, hour, min, sec, frac)
 	bind_check_range(self, i)
 	local tm = self.data[i]
 	local btype = tonumber(self.buffer[i-1].buffer_type)
@@ -1039,7 +1059,7 @@ function bind:set_date(i, year, month, day, hour, min, sec, frac)
 	self.null_flags[i-1] = false
 end
 
-function bind:set(i, v, size)
+function params:set(i, v, size)
 	bind_check_range(self, i)
 	v = ptr(v)
 	if v == nil then
@@ -1064,7 +1084,7 @@ function bind:set(i, v, size)
 	end
 end
 
-function bind:get(i)
+function fields:get(i)
 	bind_check_range(self, i)
 	local btype = tonumber(self.buffer[i-1].buffer_type)
 	if btype == C.MYSQL_TYPE_NULL or self.null_flags[i-1] == 1 then
@@ -1094,13 +1114,13 @@ function bind:get(i)
 	end
 end
 
-function bind:is_null(i) --returns true if the field is null
+function fields:is_null(i) --returns true if the field is null
 	bind_check_range(self, i)
 	local btype = self.buffer[i-1].buffer_type
 	return btype == C.MYSQL_TYPE_NULL or self.null_flags[i-1] == 1
 end
 
-function bind:is_truncated(i) --returns true if the field value was truncated
+function fields:is_truncated(i) --returns true if the field value was truncated
 	bind_check_range(self, i)
 	return self.error_flags[i-1] == 1
 end
@@ -1145,7 +1165,7 @@ end
 function stmt.bind_params(stmt, ...)
 	local types = type(...) == 'string' and {...} or ... or {}
 	assert(stmt:param_count() == #types, 'wrong number of param types')
-	local bb = bind_buffer(bind_buffer_types_input, types)
+	local bb = params_bind_buffer(types)
 	stcheckz(stmt, C.mysql_stmt_bind_param(stmt, bb.buffer))
 	return bb
 end
@@ -1162,7 +1182,7 @@ function stmt.bind_result(stmt, arg1, ...)
 		types = stmt:bind_result_types()
 	end
 	assert(stmt:field_count() == #types, 'wrong number of field types')
-	local bb = bind_buffer(bind_buffer_types_output, types)
+	local bb = fields_bind_buffer(types)
 	stcheckz(stmt, C.mysql_stmt_bind_result(stmt, bb.buffer))
 	return bb
 end
@@ -1181,7 +1201,8 @@ end
 M.conn = conn
 M.res = res
 M.stmt = stmt
-M.bind = bind
+M.params = params
+M.fields = fields
 
 if not ... then require'mysql_test' end
 
