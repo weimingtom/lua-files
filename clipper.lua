@@ -214,7 +214,8 @@ function clipper:get_bounds(r)
 	return r.x1, r.y1, r.x2, r.y2
 end
 
-function clipper:execute(clip_type, subj_fill_type, clip_fill_type)
+function clipper:execute(clip_type, subj_fill_type, clip_fill_type, reverse)
+	C.clipper_set_reverse_solution(self, reverse and 1 or 0)
 	local out = C.clipper_execute(self,
 						clip_types[clip_type],
 						fill_types[subj_fill_type or 'even_odd'],
@@ -223,12 +224,6 @@ function clipper:execute(clip_type, subj_fill_type, clip_fill_type)
 end
 
 clipper.clear = C.clipper_clear
-
-function clipper:get_reverse_solution()
-	return C.clipper_get_reverse_solution(self) == 1
-end
-
-clipper.set_reverse_solution = C.clipper_set_reverse_solution
 
 if not rawget(_G, '__CLIPPER__') then
 ffi.metatype('clipper_polygon', {__index = polygon})

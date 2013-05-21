@@ -66,10 +66,10 @@ function player:on_render(cr)
 		return p
 	end
 
-	local p1 = random_polys(10)
+	local p1 = random_polys(20)
 	draw_polys(p1, 0.7, 0.7, 1, 0.2, 0.7, 0.7, 1, 0.5)
 
-	local p2 = random_polys(10)
+	local p2 = random_polys(20)
 	draw_polys(p2, 0.7, 1, 0.7, 0.2, 0.7, 1, 0.7, 0.5)
 
 	local cl = clipper.new()
