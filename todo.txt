@@ -18,11 +18,6 @@ imagefile			review integration with whoever uses it
 cairo					support loading images through the imagefile API
 
 
-HARD / C BINDINGS
------------------------------------------------------------------------
-clipper				finish the binding and make a demo
-
-
 HARD/HIGH-LEVEL
 -----------------------------------------------------------------------
 path					oh yeah... can we merge any files? can we rename it? can we split geometry lib from path lib?
