@@ -7,7 +7,7 @@ local gl = require'winapi.gl11'
 local main = winapi.Window{
 	autoquit = true,
 	visible = false,
-	title = 'WGLPanel test'
+	title = 'WGLPanel demo'
 }
 
 local panel = winapi.WGLPanel{
@@ -24,15 +24,7 @@ function main:init()
 	panel:settimer(1/60, panel.invalidate)
 end
 
-local function pm(which)
-	local ffi = require'ffi'
-	local m = ffi.new'float[16]'
-	gl.glGetFloatv(which, m)
-	print'-----------------------'
-	for i=0,3 do print(string.format('%.3f\t%.3f\t%.3f\t%.3f\t', m[i*4+0], m[i*4+1], m[i*4+2], m[i*4+3])) end
-end
-
-function axes(w)
+local function axes(w)
 	gl.glBegin(gl.GL_LINES)
 	gl.glColor3d(1, 0, 0)
 	gl.glVertex3d(0, 0, 0)
@@ -46,22 +38,9 @@ function axes(w)
 	gl.glEnd()
 end
 
-function plane(w, size)
-	gl.glColor3d(1, 1, 1)
-	gl.glBegin(gl.GL_LINES)
-	w = w/2
-	for y=-w,w,size do
-		gl.glVertex3d(-w, y, 0)
-		gl.glVertex3d(w, y, 0)
-	end
-	for x=-w,w,size do
-		gl.glVertex3d(x, -w, 0)
-		gl.glVertex3d(x, w, 0)
-	end
-	gl.glEnd()
-end
-
-function cube(w)
+local r = 30
+local function cube(w)
+	r = r + .1
 	gl.glPushMatrix()
 	gl.glScaled(w, w, 1)
 	gl.glRotated(r,1,0,0)
@@ -106,25 +85,15 @@ function panel:set_viewport()
 	gl.glScaled(1, w/h, 1)
 end
 
-r = 1
 function panel:on_render()
-	r = r + 1
-
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_SRC_ALPHA)
 	gl.glDisable(gl.GL_DEPTH_TEST)
 	gl.glDisable(gl.GL_CULL_FACE)
 	gl.glDisable(gl.GL_LIGHTING)
-
 	gl.glMatrixMode(gl.GL_MODELVIEW)
 	gl.glLoadIdentity()
-
-	--axes(1)
 	gl.glTranslated(0,0,-1)
-	--gl.glRotated(r,1,0,0)
-	--gl.glTranslated(-5500,-5500,-r)
-	--plane(2000, 100)
-	--axes(1000)
 	cube(1)
 end
 

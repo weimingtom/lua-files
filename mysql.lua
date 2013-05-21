@@ -710,12 +710,11 @@ local function stcheckh(stmt, ret)
 	sterror(stmt)
 end
 
-function conn.prepare(mysql, query, ...)
+function conn.prepare(mysql, query)
 	local stmt = checkh(mysql, C.mysql_stmt_init(mysql))
 	ffi.gc(stmt, C.mysql_stmt_close)
 	stcheckz(stmt, C.mysql_stmt_prepare(stmt, query, #query))
-	local params = ... and stmt:bind_params(...)
-	return stmt, params
+	return stmt
 end
 
 local stmt = {} --statement methods

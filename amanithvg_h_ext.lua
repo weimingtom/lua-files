@@ -1,7 +1,6 @@
 --result of `cpp vgext.h` from AmanithVg/include/VG/vgext.h, file date 12/11/2010
 local ffi = require'ffi'
 require'openvg_h'
-require'vgu_h'
 
 ffi.cdef[[
 typedef enum {
@@ -11,9 +10,9 @@ typedef enum {
   VG_PARAM_TYPE_KHR_FORCE_SIZE = 0x7FFFFFFF
 } VGParamTypeKHR;
 typedef void* VGeglImageKHR;
-extern VGImage vgCreateEGLImageTargetKHR(VGeglImageKHR image);
+VGImage vgCreateEGLImageTargetKHR(VGeglImageKHR image);
 typedef VGImage (* PFNVGCREATEEGLIMAGETARGETKHRPROC) (VGeglImageKHR image);
-extern void vgIterativeAverageBlurKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGTilingMode tilingMode);
+void vgIterativeAverageBlurKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGTilingMode tilingMode);
 typedef void (* PFNVGITERATIVEAVERAGEBLURKHRPROC) (VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGTilingMode tilingMode);
 typedef enum {
   VG_BLEND_OVERLAY_KHR = 0x2010,
@@ -52,12 +51,12 @@ typedef enum {
   VGU_IMAGE_IN_USE_ERROR = 0xF010,
   VGU_ERROR_CODE_KHR_FORCE_SIZE = 0x7FFFFFFF
 } VGUErrorCodeKHR;
-extern void vgParametricFilterKHR(VGImage dst,VGImage src,VGImage blur,VGfloat strength,VGfloat offsetX,VGfloat offsetY,VGbitfield filterFlags,VGPaint highlightPaint,VGPaint shadowPaint);
-extern VGUErrorCode vguDropShadowKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint shadowColorRGBA);
-extern VGUErrorCode vguGlowKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint glowColorRGBA);
-extern VGUErrorCode vguBevelKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint highlightColorRGBA,VGuint shadowColorRGBA);
-extern VGUErrorCode vguGradientGlowKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint stopsCount,const VGfloat* glowColorRampStops);
-extern VGUErrorCode vguGradientBevelKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint stopsCount,const VGfloat* bevelColorRampStops);
+void vgParametricFilterKHR(VGImage dst,VGImage src,VGImage blur,VGfloat strength,VGfloat offsetX,VGfloat offsetY,VGbitfield filterFlags,VGPaint highlightPaint,VGPaint shadowPaint);
+VGUErrorCode vguDropShadowKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint shadowColorRGBA);
+VGUErrorCode vguGlowKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint glowColorRGBA);
+VGUErrorCode vguBevelKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint highlightColorRGBA,VGuint shadowColorRGBA);
+VGUErrorCode vguGradientGlowKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint stopsCount,const VGfloat* glowColorRampStops);
+VGUErrorCode vguGradientBevelKHR(VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint stopsCount,const VGfloat* bevelColorRampStops);
 typedef void (* PFNVGPARAMETRICFILTERKHRPROC) (VGImage dst,VGImage src,VGImage blur,VGfloat strength,VGfloat offsetX,VGfloat offsetY,VGbitfield filterFlags,VGPaint highlightPaint,VGPaint shadowPaint);
 typedef VGUErrorCode (* PFNVGUDROPSHADOWKHRPROC) (VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGfloat distance,VGfloat angle,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint shadowColorRGBA);
 typedef VGUErrorCode (* PFNVGUGLOWKHRPROC) (VGImage dst,VGImage src,VGfloat dimX,VGfloat dimY,VGuint iterative,VGfloat strength,VGbitfield filterFlags,VGbitfield allowedQuality,VGuint glowColorRGBA);
@@ -99,8 +98,8 @@ typedef enum {
   VG_RCUBIC_TO_REL_NDS = (VG_RCUBIC_TO_NDS | VG_RELATIVE),
   VG_PATH_COMMAND_NDS_FORCE_SIZE = 0x7FFFFFFF
 } VGPathCommandNds;
-extern void vgProjectiveMatrixNDS(VGboolean enable);
-extern VGUErrorCode vguTransformClipLineNDS(const VGfloat Ain,const VGfloat Bin,const VGfloat Cin,const VGfloat* matrix,const VGboolean inverse,VGfloat* Aout,VGfloat* Bout,VGfloat* Cout);
+void vgProjectiveMatrixNDS(VGboolean enable);
+VGUErrorCode vguTransformClipLineNDS(const VGfloat Ain,const VGfloat Bin,const VGfloat Cin,const VGfloat* matrix,const VGboolean inverse,VGfloat* Aout,VGfloat* Bout,VGfloat* Cout);
 typedef void (* PFNVGPROJECTIVEMATRIXNDSPROC) (VGboolean enable);
 typedef VGUErrorCode (* PFNVGUTRANSFORMCLIPLINENDSPROC) (const VGfloat Ain,const VGfloat Bin,const VGfloat Cin,const VGfloat* matrix,const VGboolean inverse,VGfloat* Aout,VGfloat* Bout,VGfloat* Cout);
 typedef enum {
@@ -147,31 +146,21 @@ typedef enum {
     VG_BLEND_EXCLUSION_MZT = 0x209D,
     VG_BLEND_MODE_MZT_FORCE_SIZE = 0x7FFFFFFF
 } VGBlendModeMzt;
-extern void* vgPrivContextCreateAM(void *_sharedContext);
-extern void vgPrivContextDestroyAM(void *_context);
-extern void* vgPrivSurfaceCreateAM(VGint width,
-              VGint height,
-              VGboolean linearColorSpace,
-              VGboolean alphaMask);
-extern void* vgPrivSurfaceCreateFromImageAM(VGImage image,
-                 VGboolean alphaMask);
-extern VGboolean vgPrivSurfaceResizeAM(void *_surface,
-               VGint width,
-               VGint height);
-extern void vgPrivSurfaceDestroyAM(void *_surface);
-extern VGint vgPrivGetSurfaceWidthAM(const void *_surface);
-extern VGint vgPrivGetSurfaceHeightAM(const void *_surface);
-extern VGboolean vgPrivMakeCurrentAM(void *_context,
-                void *_surface);
-extern VGboolean vgInitContextAM(VGint surfaceWidth,
-                                                   VGint surfaceHeight,
-                                                   VGboolean surfaceLinearColorSpace);
-extern void vgDestroyContextAM(void);
-extern VGboolean vgResizeSurfaceAM(VGint surfaceWidth,
-              VGint surfaceHeight);
-extern VGint vgGetSurfaceWidthAM(void);
-extern VGint vgGetSurfaceHeightAM(void);
-extern VGImageFormat vgGetSurfaceFormatAM(void);
-extern VGubyte* vgGetSurfacePixelsAM(void);
-extern void vgPostSwapBuffersAM(void);
+void* vgPrivContextCreateAM(void *_sharedContext);
+void vgPrivContextDestroyAM(void *_context);
+void* vgPrivSurfaceCreateAM(VGint width, VGint height, VGboolean linearColorSpace, VGboolean alphaMask);
+void* vgPrivSurfaceCreateFromImageAM(VGImage image, VGboolean alphaMask);
+VGboolean vgPrivSurfaceResizeAM(void *_surface, VGint width, VGint height);
+void vgPrivSurfaceDestroyAM(void *_surface);
+VGint vgPrivGetSurfaceWidthAM(const void *_surface);
+VGint vgPrivGetSurfaceHeightAM(const void *_surface);
+VGboolean vgPrivMakeCurrentAM(void *_context, void *_surface);
+VGboolean vgInitContextAM(VGint surfaceWidth, VGint surfaceHeight, VGboolean surfaceLinearColorSpace);
+void vgDestroyContextAM(void);
+VGboolean vgResizeSurfaceAM(VGint surfaceWidth, VGint surfaceHeight);
+VGint vgGetSurfaceWidthAM(void);
+VGint vgGetSurfaceHeightAM(void);
+VGImageFormat vgGetSurfaceFormatAM(void);
+VGubyte* vgGetSurfacePixelsAM(void);
+void vgPostSwapBuffersAM(void);
 ]]

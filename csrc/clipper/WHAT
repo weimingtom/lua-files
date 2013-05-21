@@ -1,3 +1,3 @@
-clipper 4.8.4 from http://www.angusj.com/delphi/clipper.php (Boost License)
+clipper 5.1.4 from http://www.angusj.com/delphi/clipper.php (Boost License)
 
 clipper.c and clipper.h is the wrapper I made so I can bind clipper with LuaJIT ffi.
