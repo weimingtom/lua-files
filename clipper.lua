@@ -1,9 +1,10 @@
 local ffi = require'ffi'
 local C = ffi.load'clipper'
 
+if not rawget(_G, '__CLIPPER__') then
 ffi.cdef[[
-typedef struct { int64_t x, y; } clipper_point;
-typedef struct { int64_t x1, y1, x2, y2; } clipper_rect;
+typedef struct clipper_point_st { int64_t x, y; } clipper_point;
+typedef struct clipper_rect_st { int64_t x1, y1, x2, y2; } clipper_rect;
 
 typedef enum {
 	clipper_ctIntersection,
@@ -30,44 +31,45 @@ typedef enum {
 	clipper_jtMiter
 } clipper_JoinType;
 
-typedef struct clipper_Polygon clipper_polygon_t;
-typedef struct clipper_Polygons clipper_polygons_t;
-typedef struct clipper_Clipper clipper_t;
+typedef struct clipper_Polygon clipper_polygon;
+typedef struct clipper_Polygons clipper_polygons;
+typedef struct clipper_Clipper clipper;
 
-clipper_polygon_t* clipper_create_polygon(int);
-void clipper_free_polygon(clipper_polygon_t*);
+clipper_polygon*  clipper_polygon_create(int);
+void              clipper_polygon_free        (clipper_polygon*);
+int               clipper_polygon_size        (clipper_polygon*);
+clipper_point*    clipper_polygon_get         (clipper_polygon*, int);
+int               clipper_polygon_add         (clipper_polygon*, int64_t x, int64_t y);
+clipper_polygons* clipper_polygon_simplify    (clipper_polygon*, clipper_PolyFillType);
+clipper_polygon*  clipper_polygon_clean       (clipper_polygon*, double);
+void              clipper_polygon_reverse     (clipper_polygon*);
+int               clipper_polygon_orientation (clipper_polygon*);
+double            clipper_polygon_area        (clipper_polygon*);
 
-int clipper_polygon_get_size(clipper_polygon_t*);
-clipper_point* clipper_polygon_get_data(clipper_polygon_t*);
+clipper_polygons* clipper_polygons_create(int n);
+void              clipper_polygons_free        (clipper_polygons*);
+int               clipper_polygons_size        (clipper_polygons*);
+clipper_polygon*  clipper_polygons_get         (clipper_polygons*, int);
+void              clipper_polygons_set         (clipper_polygons*, int, clipper_polygon*);
+int               clipper_polygons_add         (clipper_polygons*, clipper_polygon*);
+clipper_polygons* clipper_polygons_simplify    (clipper_polygons*, clipper_PolyFillType);
+clipper_polygons* clipper_polygons_clean       (clipper_polygons*, double);
+void              clipper_polygons_reverse     (clipper_polygons*);
+clipper_polygons* clipper_polygons_offset      (clipper_polygons*, double, clipper_JoinType, double);
 
-clipper_polygons_t* clipper_create_polygons(int n);
-void clipper_free_polygons(clipper_polygons_t*);
-
-int clipper_polygons_get_size(clipper_polygons_t*);
-clipper_polygon_t* clipper_polygons_get_data(clipper_polygons_t*);
-
-int clipper_orientation(clipper_polygon_t*);
-double clipper_area(clipper_polygon_t*);
-
-clipper_polygons_t* clipper_simplify_polygon(clipper_polygon_t*, clipper_PolyFillType fillType);
-clipper_polygons_t* clipper_simplify_polygons(clipper_polygons_t*, clipper_PolyFillType fillType);
-clipper_polygon_t* clipper_clean_polygon(clipper_polygon_t*, double);
-clipper_polygons_t* clipper_clean_polygons(clipper_polygons_t*, double);
-clipper_polygons_t* clipper_offset_polygons(clipper_polygons_t*, double, clipper_JoinType, double);
-void clipper_reverse_polygon(clipper_polygon_t*);
-void clipper_reverse_polygons(clipper_polygons_t*);
-
-clipper_t* clipper_create_clipper();
-void clipper_free_clipper(clipper_t*);
-
-int clipper_add_polygon(clipper_t*, clipper_polygon_t*, clipper_PolyType);
-int clipper_add_polygons(clipper_t*, clipper_polygons_t*, clipper_PolyType);
-void clipper_get_bounds(clipper_t*, clipper_rect*);
-clipper_polygons_t* clipper_execute(clipper_t*, clipper_ClipType, clipper_PolyFillType, clipper_PolyFillType);
-void clipper_clear(clipper_t*);
-int clipper_get_reverse_solution(clipper_t*);
-void clipper_set_reverse_solution(clipper_t*, int);
+clipper*          clipper_create();
+void              clipper_free         (clipper*);
+int               clipper_add_polygon  (clipper*, clipper_polygon*, clipper_PolyType);
+int               clipper_add_polygons (clipper*, clipper_polygons*, clipper_PolyType);
+void              clipper_get_bounds   (clipper*, clipper_rect*);
+clipper_polygons* clipper_execute      (clipper*, clipper_ClipType,
+																	clipper_PolyFillType,
+																	clipper_PolyFillType);
+void              clipper_clear        (clipper*);
+int               clipper_get_reverse_solution (clipper*);
+void              clipper_set_reverse_solution (clipper*, int);
 ]]
+end
 
 local fill_types = {
 	even_odd = C.clipper_pftEvenOdd,
@@ -89,100 +91,117 @@ local clip_types = {
 	xor          = C.clipper_ctXor
 }
 
-local polygon = {}
+local polygon_type = ffi.typeof'clipper_polygon*'
+local function is_polygon(poly)
+	return ffi.istype(polygon_type, poly)
+end
+
+local polygon = {} --polygon methods
 
 function polygon.new(n)
-	return ffi.gc(C.clipper_create_polygon(n or 0), C.clipper_free_polygon)
+	return ffi.gc(C.clipper_polygon_create(n or 0), C.clipper_polygon_free)
 end
 
 function polygon:free()
-	C.clipper_free_polygon(self)
+	C.clipper_polygon_free(self)
 	ffi.gc(self, nil)
 end
 
-function polygon:size()
-	return C.clipper_polygon_get_size(self)
+polygon.size = C.clipper_polygon_size
+
+function polygon:get(i)
+	return C.clipper_polygon_get(self, i-1)
 end
 
-function polygon:points()
-	return C.clipper_polygon_get_data(self)
+function polygon:add(x, y)
+	assert(C.clipper_polygon_add(self, x, y) == 0, 'out of memory')
 end
-
-function polygon:orientation()
-	return C.clipper_orientation(self) == 1
-end
-
-polygon.area = C.clipper_area
 
 function polygon:simplify(fill_type)
-	return ffi.gc(C.clipper_simplify_polygon(self, fill_types[fill_type or 'even_odd']),
-						C.clipper_free_polygons)
+	local out = C.clipper_polygon_simplify(self, fill_types[fill_type or 'even_odd'])
+	return ffi.gc(out, C.clipper_polygons_free)
 end
 
-function polygon:clean()
-	return ffi.gc(C.clipper_clean_polygon(self), C.clipper_free_polygon)
+function polygon:clean(d)
+	local out = C.clipper_polygon_clean(self, d or 1.415)
+	return ffi.gc(out, C.clipper_polygon_free)
 end
 
-polygon.reverse = C.clipper_reverse_polygon
+polygon.reverse = C.clipper_polygon_reverse
 
-ffi.metatype('clipper_polygon_t', {__index = polygon})
+function polygon:orientation()
+	return C.clipper_polygon_orientation(self) == 1
+end
 
+polygon.area = C.clipper_polygon_area
 
-local polygons = {}
+local polygons = {} --polygons methods
 
-function polygons.new(n)
-	return ffi.gc(C.clipper_create_polygons(n or 0), C.clipper_free_polygons)
+function polygons.new(...)
+	if is_polygon(...) then
+		local n = select('#',...)
+		local out = ffi.gc(C.clipper_polygons_create(n), C.clipper_polygons_free)
+		for i=1,n do
+			out:set(i, select(i,...))
+		end
+		return out
+	else
+		return ffi.gc(C.clipper_polygons_create(... or 0), C.clipper_polygons_free)
+	end
 end
 
 function polygons:free()
-	C.clipper_free_polygons(self)
+	C.clipper_polygons_free(self)
 	ffi.gc(self, nil)
 end
 
-function polygons:size()
-	return C.clipper_polygons_get_size(self)
+polygons.size = C.clipper_polygons_size
+
+function polygons:get(i)
+	return C.clipper_polygons_get(self, i-1)
 end
 
-function polygons:polygons()
-	return C.clipper_polygons_get_data(self)
+function polygons:set(i, poly)
+	return C.clipper_polygons_set(self, i-1, poly)
+end
+
+function polygons:add(poly)
+	assert(C.clipper_polygons_add(self, poly) == 0, 'out of memory')
 end
 
 function polygons:simplify(fill_type)
-	return ffi.gc(C.clipper_simplify_polygons(self, fill_types[fill_type or 'even_odd']),
-						C.clipper_free_polygons)
+	local out = C.clipper_polygons_simplify(self, fill_types[fill_type or 'even_odd'])
+	return ffi.gc(out, C.clipper_polygons_free)
 end
 
-function polygons:clean()
-	return ffi.gc(C.clipper_clean_polygons(self), C.clipper_free_polygons)
+function polygons:clean(d)
+	local out = C.clipper_polygons_clean(self, d or 1.415)
+	return ffi.gc(out, C.clipper_polygons_free)
 end
+
+polygons.reverse = C.clipper_polygons_reverse
 
 function polygons:offset(delta, join_type, limit)
-	return ffi.gc(C.clipper_offset_polygons(self, delta,
-						join_types[join_type or 'square'],
-						limit or 0), C.clipper_free_polygons)
+	local out = C.clipper_polygons_offset(self, delta, join_types[join_type or 'square'], limit or 0)
+	return ffi.gc(out, C.clipper_polygons_free)
 end
-
-polygons.reverse = C.clipper_reverse_polygons
-
-ffi.metatype('clipper_polygons_t', {__index = polygons})
-
 
 local clipper = {} --clipper methods
 
 function clipper.new()
-	return ffi.gc(C.clipper_create_clipper(), C.clipper_free_clipper)
+	return ffi.gc(C.clipper_create(), C.clipper_free)
 end
 
 function clipper:free()
-	C.clipper_free_clipper(self)
+	C.clipper_free(self)
 	ffi.gc(self, nil)
 end
 
-local function clipper_add(self, poly, poly_type)
-	if ffi.istype('clipper_polygon_t*', poly) then
-		C.clipper_add_polygon(self, poly, poly_type)
+local function clipper_add(self, poly, where_flag)
+	if is_polygon(poly) then
+		C.clipper_add_polygon(self, poly, where_flag)
 	else
-		C.clipper_add_polygons(self, poly, poly_type)
+		C.clipper_add_polygons(self, poly, where_flag)
 	end
 end
 
@@ -196,17 +215,28 @@ function clipper:get_bounds(r)
 end
 
 function clipper:execute(clip_type, subj_fill_type, clip_fill_type)
-	return ffi.gc(C.clipper_execute(self,
+	local out = C.clipper_execute(self,
 						clip_types[clip_type],
 						fill_types[subj_fill_type or 'even_odd'],
-						fill_types[clip_fill_type or 'even_odd']), C.clipper_free_polygons)
+						fill_types[clip_fill_type or 'even_odd'])
+	return ffi.gc(out, C.clipper_polygons_free)
 end
 
 clipper.clear = C.clipper_clear
-clipper.get_reverse_solution = C.clipper_get_reverse_solution
+
+function clipper:get_reverse_solution()
+	return C.clipper_get_reverse_solution(self) == 1
+end
+
 clipper.set_reverse_solution = C.clipper_set_reverse_solution
 
-ffi.metatype('clipper_t', {__index = clipper})
+if not rawget(_G, '__CLIPPER__') then
+ffi.metatype('clipper_polygon', {__index = polygon})
+ffi.metatype('clipper_polygons', {__index = polygons})
+ffi.metatype('clipper', {__index = clipper})
+end
+
+_G.__CLIPPER__ = true
 
 if not ... then require'clipper_demo' end
 
