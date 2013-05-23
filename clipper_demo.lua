@@ -60,8 +60,9 @@ function player:on_render(cr)
 			p:add(math.random(100, 1000) * scale, math.random(100, 600) * scale)
 		end
 
-		p = clipper.polygons(p)
-		--p = p:clean() --TODO: this crashes with clipper 5.1.5
+		p = p:clean() --test CleanPolygon()
+		p = clipper.polygons(p) --test polygons constructor
+		p = p:clean() --test CleanPolygons()
 		p = p:simplify(even_odd and 'even_odd' or 'non_zero')
 		return p
 	end

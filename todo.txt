@@ -1,6 +1,5 @@
 EASY
 -----------------------------------------------------------------------
-affine2d 			needs test unit; needs renaming
 expat					needs test unit
 im_*blur				make blur_demo based on cairo_player not sg_cairo_player
 amanithvg			needs demo for amanithvgpanel
@@ -76,10 +75,10 @@ time.lua 			review it and add it (and embed or remove xsys)
 tar					finish it, read + write; tests
 bmp_parser        finish it; tests; demo
 sqlite				many ffi bindings available; choose one
-fbclient				port it? isn't firebird dead yet?
-postgresql
-re2 + cre2
-bzip2
+fbclient				finish it. isn't firebird dead yet? :)
+postgres/libpq ?	see https://raw.github.com/malkia/ufo/master/ffi/pq.lua
+re2/re2win/cre2   re2 is mighty bloated and doesn't compile on windows natively (there's a port)
+bzip2					see https://github.com/malkia/ufo/blob/master/ffi/bz2.lua
 lzma
 md5, sha1, sha256 in Lua
 vlc					plain C, no wrapper

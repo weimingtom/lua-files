@@ -1,3 +1,6 @@
-clipper 5.1.5 from http://www.angusj.com/delphi/clipper.php (Boost License)
+Clipper HEAD taken 2013-05-22 from http://sourceforge.net/p/polyclipping/code/HEAD/tree/trunk/cpp/
+Clipper is from http://www.angusj.com/delphi/clipper.php (Boost License)
 
-clipper.c and clipper.h is the wrapper I made so I can bind clipper with LuaJIT ffi.
+clipper.c is the C wrapper I made so I can bind clipper with LuaJIT ffi.
+
+CleanPolygon() in clipper.cpp has been pached by Angus.
