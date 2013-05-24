@@ -5,7 +5,7 @@
 local glue = require'glue'
 local ffi = require'ffi'
 require'freetype_h'
-local C = ffi.load'freetype2'
+local C = ffi.load'libfreetype-6'
 local M = glue.inherit({C = C}, C)
 
 --utilities

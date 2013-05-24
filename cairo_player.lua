@@ -131,7 +131,7 @@ end
 
 function player:play()
 	main:show()
-	panel:settimer(1, panel.invalidate) --render continuously
+	panel:settimer(1000, panel.invalidate) --render continuously
 	winapi.MessageLoop()
 end
 

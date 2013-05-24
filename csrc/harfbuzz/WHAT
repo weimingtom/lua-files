@@ -1,0 +1,3 @@
+harfbuzz HEAD from May 24, 2013 from git://anongit.freedesktop.org/harfbuzz
+
+NOTE: ragel is needed to compile the .rl files after updating harfbuzz to a new version.

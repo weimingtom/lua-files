@@ -5,6 +5,7 @@ cjson.dll       csrc/lua-cjson
 clipper.dll     csrc/clipper
 expat.dll       expat-2.1.0 (static multi-threaded build)
 giflib5.dll     csrc/giflib
+harfbuzz.dll    csrc/harfbuzz
 hpdf.dll        csrc/luahpdf
 lanes/core.dll  csrc/lanes
 lfs.dll         csrc/lfs
