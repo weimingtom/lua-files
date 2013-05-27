@@ -394,10 +394,10 @@ typedef struct FT_GlyphSlotRec_
  void* other;
  FT_Slot_Internal internal;
 } FT_GlyphSlotRec;
-extern FT_Error
-FT_Init_FreeType( FT_Library *alibrary );
-extern FT_Error
-FT_Done_FreeType( FT_Library library );
+
+FT_Error FT_Init_FreeType( FT_Library *alibrary );
+FT_Error FT_Done_FreeType( FT_Library library );
+
 typedef struct FT_Parameter_
 {
  FT_ULong tag;
@@ -414,33 +414,33 @@ typedef struct FT_Open_Args_
  FT_Int num_params;
  FT_Parameter* params;
 } FT_Open_Args;
-extern FT_Error
+FT_Error
 FT_New_Face( FT_Library library,
 				const char* filepathname,
 				FT_Long face_index,
 				FT_Face *aface );
-extern FT_Error
+FT_Error
 FT_New_Memory_Face( FT_Library library,
 						 const FT_Byte* file_base,
 						 FT_Long file_size,
 						 FT_Long face_index,
 						 FT_Face *aface );
-extern FT_Error
+FT_Error
 FT_Open_Face( FT_Library library,
 				 const FT_Open_Args* args,
 				 FT_Long face_index,
 				 FT_Face *aface );
-extern FT_Error
+FT_Error
 FT_Attach_File( FT_Face face,
 					const char* filepathname );
-extern FT_Error
+FT_Error
 FT_Attach_Stream( FT_Face face,
 					  FT_Open_Args* parameters );
-extern FT_Error
+FT_Error
 FT_Reference_Face( FT_Face face );
-extern FT_Error
+FT_Error
 FT_Done_Face( FT_Face face );
-extern FT_Error
+FT_Error
 FT_Select_Size( FT_Face face,
 					FT_Int strike_index );
 typedef enum FT_Size_Request_Type_
@@ -461,28 +461,28 @@ typedef struct FT_Size_RequestRec_
  FT_UInt vertResolution;
 } FT_Size_RequestRec;
 typedef struct FT_Size_RequestRec_ *FT_Size_Request;
-extern FT_Error
+FT_Error
 FT_Request_Size( FT_Face face,
 					 FT_Size_Request req );
-extern FT_Error
+FT_Error
 FT_Set_Char_Size( FT_Face face,
 					  FT_F26Dot6 char_width,
 					  FT_F26Dot6 char_height,
 					  FT_UInt horz_resolution,
 					  FT_UInt vert_resolution );
-extern FT_Error
+FT_Error
 FT_Set_Pixel_Sizes( FT_Face face,
 						 FT_UInt pixel_width,
 						 FT_UInt pixel_height );
-extern FT_Error
+FT_Error
 FT_Load_Glyph( FT_Face face,
 				  FT_UInt glyph_index,
 				  FT_Int32 load_flags );
-extern FT_Error
+FT_Error
 FT_Load_Char( FT_Face face,
 				 FT_ULong char_code,
 				 FT_Int32 load_flags );
-extern void
+void
 FT_Set_Transform( FT_Face face,
 					  FT_Matrix* matrix,
 					  FT_Vector* delta );
@@ -495,7 +495,7 @@ typedef enum FT_Render_Mode_
  FT_RENDER_MODE_LCD_V,
  FT_RENDER_MODE_MAX
 } FT_Render_Mode;
-extern FT_Error
+FT_Error
 FT_Render_Glyph( FT_GlyphSlot slot,
 					 FT_Render_Mode render_mode );
 typedef enum FT_Kerning_Mode_
@@ -504,46 +504,46 @@ typedef enum FT_Kerning_Mode_
  FT_KERNING_UNFITTED,
  FT_KERNING_UNSCALED
 } FT_Kerning_Mode;
-extern FT_Error
+FT_Error
 FT_Get_Kerning( FT_Face face,
 					FT_UInt left_glyph,
 					FT_UInt right_glyph,
 					FT_UInt kern_mode,
 					FT_Vector *akerning );
-extern FT_Error
+FT_Error
 FT_Get_Track_Kerning( FT_Face face,
 							FT_Fixed point_size,
 							FT_Int degree,
 							FT_Fixed* akerning );
-extern FT_Error
+FT_Error
 FT_Get_Glyph_Name( FT_Face face,
 						FT_UInt glyph_index,
 						FT_Pointer buffer,
 						FT_UInt buffer_max );
-extern const char*
+const char*
 FT_Get_Postscript_Name( FT_Face face );
-extern FT_Error
+FT_Error
 FT_Select_Charmap( FT_Face face,
 						FT_Encoding encoding );
-extern FT_Error
+FT_Error
 FT_Set_Charmap( FT_Face face,
 					FT_CharMap charmap );
-extern FT_Int
+FT_Int
 FT_Get_Charmap_Index( FT_CharMap charmap );
-extern FT_UInt
+FT_UInt
 FT_Get_Char_Index( FT_Face face,
 						FT_ULong charcode );
-extern FT_ULong
+FT_ULong
 FT_Get_First_Char( FT_Face face,
 						FT_UInt *agindex );
-extern FT_ULong
+FT_ULong
 FT_Get_Next_Char( FT_Face face,
 					  FT_ULong char_code,
 					  FT_UInt *agindex );
-extern FT_UInt
+FT_UInt
 FT_Get_Name_Index( FT_Face face,
 						FT_String* glyph_name );
-extern FT_Error
+FT_Error
 FT_Get_SubGlyph_Info( FT_GlyphSlot glyph,
 							FT_UInt sub_index,
 							FT_Int *p_index,
@@ -551,48 +551,48 @@ FT_Get_SubGlyph_Info( FT_GlyphSlot glyph,
 							FT_Int *p_arg1,
 							FT_Int *p_arg2,
 							FT_Matrix *p_transform );
-extern FT_UShort
+FT_UShort
 FT_Get_FSType_Flags( FT_Face face );
-extern FT_UInt
+FT_UInt
 FT_Face_GetCharVariantIndex( FT_Face face,
 									 FT_ULong charcode,
 									 FT_ULong variantSelector );
-extern FT_Int
+FT_Int
 FT_Face_GetCharVariantIsDefault( FT_Face face,
 										  FT_ULong charcode,
 										  FT_ULong variantSelector );
-extern FT_UInt32*
+FT_UInt32*
 FT_Face_GetVariantSelectors( FT_Face face );
-extern FT_UInt32*
+FT_UInt32*
 FT_Face_GetVariantsOfChar( FT_Face face,
 								  FT_ULong charcode );
-extern FT_UInt32*
+FT_UInt32*
 FT_Face_GetCharsOfVariant( FT_Face face,
 								  FT_ULong variantSelector );
-extern FT_Long
+FT_Long
 FT_MulDiv( FT_Long a,
 			 FT_Long b,
 			 FT_Long c );
-extern FT_Long
+FT_Long
 FT_DivFix( FT_Long a,
 			 FT_Long b );
-extern FT_Fixed
+FT_Fixed
 FT_RoundFix( FT_Fixed a );
-extern FT_Fixed
+FT_Fixed
 FT_CeilFix( FT_Fixed a );
-extern FT_Fixed
+FT_Fixed
 FT_FloorFix( FT_Fixed a );
-extern void
+void
 FT_Vector_Transform( FT_Vector* vec,
 						  const FT_Matrix* matrix );
-extern void
+void
 FT_Library_Version( FT_Library library,
 						 FT_Int *amajor,
 						 FT_Int *aminor,
 						 FT_Int *apatch );
-extern FT_Bool
+FT_Bool
 FT_Face_CheckTrueTypePatents( FT_Face face );
-extern FT_Bool
+FT_Bool
 FT_Face_SetUnpatentedHinting( FT_Face face,
 									  FT_Bool value );
 ]]

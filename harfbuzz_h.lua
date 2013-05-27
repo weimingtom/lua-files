@@ -1,4 +1,4 @@
---result of cpp of hb.h, hb-ot.h and hb-ft.h from harfbuzz HEAD from May 24, 2013
+--result of cpp of hb.h, hb-ot.h, hb-ft.h and ucdn.h from harfbuzz HEAD from May 24, 2013
 local ffi = require'ffi'
 require'freetype_h'
 
@@ -1048,5 +1048,21 @@ hb_face_t * hb_ft_face_create_cached (FT_Face ft_face);
 hb_font_t * hb_ft_font_create (FT_Face ft_face, hb_destroy_func_t destroy);
 void        hb_ft_font_set_funcs (hb_font_t *font);
 FT_Face     hb_ft_font_get_face (hb_font_t *font);
+]]
+
+--ucdn.h
+
+ffi.cdef[[
+const char *ucdn_get_unicode_version(void);
+int ucdn_get_combining_class(uint32_t code);
+int ucdn_get_east_asian_width(uint32_t code);
+int ucdn_get_general_category(uint32_t code);
+int ucdn_get_bidi_class(uint32_t code);
+int ucdn_get_script(uint32_t code);
+int ucdn_get_mirrored(uint32_t code);
+uint32_t ucdn_mirror(uint32_t code);
+int ucdn_decompose(uint32_t code, uint32_t *a, uint32_t *b);
+int ucdn_compat_decompose(uint32_t code, uint32_t *decomposed);
+int ucdn_compose(uint32_t *code, uint32_t a, uint32_t b);
 ]]
 

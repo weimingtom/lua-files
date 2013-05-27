@@ -9,6 +9,7 @@ done
 gcc \
 	hb-blob.cc \
 	hb-buffer.cc \
+	hb-buffer-serialize.cc \
 	hb-common.cc \
 	hb-set.cc \
 	hb-ft.cc \

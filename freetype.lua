@@ -102,23 +102,61 @@ local Error_Names = glue.index{
 }
 
 local function checknz(result)
-	if result ~= 0 then
-		error(string.format('Freetype error %d: %s', result, Error_Names[result] or '<unknown error>'), 2)
-	end
+	if result == 0 then return end
+	error(string.format('freetype error %d: %s', result, Error_Names[result] or '<unknown error>'), 2)
 end
 
---procedural API
-
-function M.FT_Done_FreeType(ft)
-	checknz(C.FT_Done_FreeType(ft))
-	ffi.gc(ft, nil)
+local function nonzero(ret)
+	return ret ~= 0 and ret or nil
 end
+
+--wrappers
 
 function M.FT_Init_FreeType()
-	local hlib = ffi.new'FT_Library[1]'
-	checknz(C.FT_Init_FreeType(hlib))
-	hlib = hlib[0]
-	return ffi.gc(hlib, M.FT_Done_FreeType)
+	local library = ffi.new'FT_Library[1]'
+	checknz(C.FT_Init_FreeType(library))
+	library = library[0]
+	return ffi.gc(library, M.FT_Done_FreeType)
+end
+
+function M.FT_Done_FreeType(library)
+	checknz(C.FT_Done_FreeType(library))
+	ffi.gc(library, nil)
+end
+
+function M.FT_New_Face(library, filename, i)
+	local face = ffi.new'FT_Face[1]'
+	checknz(C.FT_New_Face(library, filename, i or 0, face))
+	face = face[0]
+	return ffi.gc(face, M.FT_Done_Face)
+end
+
+function M.FT_New_Memory_Face(library, file_base, file_size, face_index)
+	local face = ffi.new'FT_Face[1]'
+	checknz(C.FT_New_Memory_Face(library, file_base, file_size, face_index or 0, face))
+	face = face[0]
+	return ffi.gc(face, M.FT_Done_Face)
+end
+
+--TODO: construct FT_Args
+function M.FT_Open_Face(library, args, face_index)
+	local face = ffi.new'FT_Face[1]'
+	checknz(C.FT_Open_Face(library, args, face_index or 0, face))
+	face = face[0]
+	return ffi.gc(face, M.FT_Done_Face)
+end
+
+function M.FT_Reference_Face(face)
+	checknz(C.FT_Reference_Face(face))
+end
+
+function M.FT_Attach_File(face, filepathname)
+	checknz(C.FT_Attach_File(face, filepathname))
+end
+
+--TODO: construct FT_Args
+function M.FT_Attach_Stream(face, parameters)
+	checknz(C.FT_Attach_Stream(face, parameters))
 end
 
 function M.FT_Done_Face(face)
@@ -126,24 +164,232 @@ function M.FT_Done_Face(face)
 	ffi.gc(face, nil)
 end
 
-function M.FT_New_Face(hlib, filename, i)
-	local hface = ffi.new'FT_Face[1]'
-	checknz(C.FT_New_Face(hlib, filename, i or 0, hface))
-	hface = hface[0]
-	return ffi.gc(hface, M.FT_Done_Face)
+function M.FT_Select_Size(face, strike_index)
+	checknz(C.FT_Select_Size(face, strike_index))
 end
 
---Object API
+function M.FT_Request_Size(face, req)
+	req = req or ffi.new'FT_Size_Request'
+	checknz(C.FT_Request_Size(face, req))
+	return req
+end
+
+function M.FT_Set_Char_Size(face, char_width, char_height, horz_resolution, vert_resolution)
+	checknz(C.FT_Set_Char_Size(face, char_width, char_height or 0, horz_resolution or 0, vert_resolution or 0))
+end
+
+function M.FT_Set_Pixel_Sizes(face, pixel_width, pixel_height)
+	checknz(C.FT_Set_Pixel_Sizes(face, pixel_width, pixel_height))
+end
+
+function M.FT_Load_Glyph(face, glyph_index, load_flags) --FT_LOAD_*
+	checknz(C.FT_Load_Glyph(face, glyph_index, load_flags))
+end
+
+function M.FT_Load_Char(face, char_code, load_flags) --FT_LOAD_*
+	checknz(C.FT_Load_Char(face, char_code, load_flags))
+end
+
+function M.FT_Set_Transform(face, xx, xy, yx, yy, x0, y0)
+	local matrix = ffi.new('FT_Matrix', xx or 1, xy or 0, yx or 0, yy or 1)
+	local delta = ffi.new('FT_Vector', x0 or 0, y0 or 0)
+	C.FT_Set_Transform(face, matrix, delta)
+end
+
+function M.FT_Render_Glyph(slot, render_mode)
+	checknz(C.FT_Render_Glyph(slot, render_mode))
+end
+
+function M.FT_Get_Kerning(face, left_glyph, right_glyph, kern_mode, akerning) --FT_KERNING_*
+	akerning = akerning or ffi.new'FT_Vector'
+	checknz(C.FT_Get_Kerning(face, left_glyph, right_glyph, kern_mode, akerning))
+	return akerning.x, akerning.y
+end
+
+function M.FT_Get_Track_Kerning(face, point_size, degree, akerning)
+	akerning = akerning or ffi.new'FT_Vector'
+	checknz(C.FT_Get_Track_Kerning(face, point_size, degree, akerning))
+	return akerning.x, akerning.y
+end
+
+function M.FT_Get_Glyph_Name(face, glyph_index, buffer, buffer_max)
+	buffer = buffer or ffi.new('uint8_t[?]', buffer_max or 64)
+	local ret = C.FT_Get_Glyph_Name(face, glyph_index, buffer, buffer_max)
+	return ret ~= 0 and ffi.string(buffer) or nil
+end
+
+function M.FT_Get_Postscript_Name(face)
+	local name = C.FT_Get_Postscript_Name(face)
+	return name ~= nil and ffi.string(name) or nil
+end
+
+function M.FT_Select_Charmap(face, encoding)
+	if type(encoding) == 'string' then
+		encoding = (s:byte(1) or 32) * 2^24 + (s:byte(2) or 32) * 2^16 + (s:byte(3) or 32) * 256 + (s:byte(4) or 32)
+	end
+	checknz(C.FT_Select_Charmap(face, encoding))
+end
+
+function M.FT_Set_Charmap(face, charmap)
+	checknz(C.FT_Set_Charmap(face, charmap))
+end
+
+function M.FT_Get_Charmap_Index(charmap)
+	local ret = C.FT_Get_Charmap_Index(charmap)
+	assert(ret ~= -1)
+	return ret
+end
+
+function M.FT_Get_Char_Index(face, charcode)
+	return C.FT_Get_Char_Index(face, charcode)
+end
+
+function M.FT_Get_First_Char(face, agindex)
+	return C.FT_Get_First_Char(face, agindex)
+end
+
+function M.FT_Get_Next_Char(face, char_code, agindex)
+	return C.FT_Get_Next_Char(face, char_code, agindex)
+end
+
+local function face_chars(face) --returns iterator<charcode, glyph_index>
+	local gindex = ffi.new'FT_UInt[1]'
+	return function(_, charcode)
+		if not charcode then
+			charcode = M.FT_Get_First_Char(face, gindex)
+		else
+			charcode = M.FT_Get_Next_Char(face, charcode, gindex)
+		end
+		if gindex[0] == 0 then return end
+		return charcode, gindex[0]
+	end
+end
+
+function M.FT_Get_Name_Index(face, glyph_name)
+	return nonzero(C.FT_Get_Name_Index(face, glyph_name))
+end
+
+function M.FT_Get_SubGlyph_Info(glyph, sub_index, p_index, p_flags, p_arg1, p_arg2, p_transform)
+	p_index = p_index or ffi.new'FT_Int[1]'
+	p_flags = p_flags or ffi.new'FT_UInt[1]'
+	p_arg1  = p_arg1  or ffi.new'FT_Int[1]'
+	p_arg2  = p_arg2  or ffi.new'FT_Int[1]'
+	p_transform = p_transform or ffi.new'FT_Matrix[1]'
+	checknz(M.FT_Get_SubGlyph_Info(glyph, sub_index, p_index, p_flags, p_arg1, p_arg2, p_transform))
+	return
+		p_index[0], p_flags[0], p_arg1[0], p_arg2[0],
+		p_transform.xx, p_transform.xy, p_transform.yx, p_transform.yy
+end
+
+M.FT_Get_FSType_Flags = C.FT_Get_FSType_Flags -- returns a FS_TYPE_* mask
+
+function M.FT_Face_GetCharVariantIndex(face, charcode, variantSelector)
+	return nonzero(C.FT_Face_GetCharVariantIndex(face, charcode, variantSelector))
+end
+
+function M.FT_Face_GetCharVariantIsDefault(face, charcode, variantSelector)
+	local ret = C.FT_Face_GetCharVariantIsDefault(face, charcode, variantSelector)
+	if ret == -1 then return nil end
+	return ret == 1 --1 if found in the standard (Unicode) cmap, 0 if found in the variation selector cmap
+end
+
+local function uint_list(p)
+	if p == nil then return nil end
+	return p
+	--[[ TODO: return list of indices in a table or iterator
+	if ret == nil then return end
+		local t = {}
+		local i = 0
+		while ret[i] ~= 0 do
+			t[i+1] = ret[i]
+			i = i + 1
+		end
+		return t
+	]]
+end
+
+function M.FT_Face_GetVariantSelectors(face)
+	return uint_list(C.FT_Face_GetVariantSelectors(face))
+end
+
+function M.FT_Face_GetVariantsOfChar(face, charcode)
+	return uint_list(C.FT_Face_GetVariantsOfChar(face, charcode))
+end
+
+function M.FT_Face_GetCharsOfVariant(face, variantSelector)
+	return uint_list(C.FT_Face_GetCharsOfVariant(face, variantSelector))
+end
+
+function M.FT_Library_Version(library)
+	local v = 'FT_Int[3]'
+	C.FT_Library_Version(library, v, v+1, v+2)
+	return v[0], v[1], v[2]
+end
+
+function M.FT_Face_CheckTrueTypePatents(face)
+	return C.FT_Face_CheckTrueTypePatents(face) == 1
+end
+
+function M.FT_Face_SetUnpatentedHinting(face, value)
+	return C.FT_Face_SetUnpatentedHinting(face, value) == 1
+end
+
+--methods
 
 M.new = M.FT_Init_FreeType
 
 ffi.metatype('FT_LibraryRec', {__index = {
 	free = M.FT_Done_FreeType,
 	new_face = M.FT_New_Face,
+	new_memory_face = M.FT_New_Memory_Face,
+	open_face = M.FT_Open_Face,
+	version = M.FT_Library_Version,
 }})
 
 ffi.metatype('FT_FaceRec', {__index = {
 	free = M.FT_Done_Face,
+	reference = M.FT_Reference_Face,
+	attach_file = M.FT_Attach_File,
+	atach_stream = M.FT_Attach_Stream,
+	select_size = M.FT_Select_Size,
+	request_size = M.FT_Request_Size,
+	set_char_size = M.FT_Set_Char_Size,
+	set_pixel_sizes = M.FT_Set_Pixel_Sizes,
+	load_glyph = M.FT_Load_Glyph,
+	load_char = M.FT_Load_Char,
+	set_transform = M.FT_Set_Transform,
+	kerning = M.FT_Get_Kerning,
+	track_kerning = M.FT_Get_Track_Kerning,
+	glyph_name = M.FT_Get_Glyph_Name,
+	postscript_name = M.FT_Get_Postscript_Name,
+	select_charmap = M.FT_Select_Charmap,
+	set_charmap = M.FT_Set_Charmap,
+	char_index = M.FT_Get_Char_Index,
+	first_char = M.FT_Get_First_Char,
+	next_char = M.FT_Get_Next_Char,
+	chars = face_chars,
+	name_index = M.FT_Get_Name_Index,
+	fstype_flags = M.FT_Get_FSType_Flags,
+	--glyph variants
+	char_variant_index = M.FT_Face_GetCharVariantIndex,
+	char_variant_is_default = M.FT_Face_GetCharVariantIsDefault,
+	variant_selectors = M.FT_Face_GetVariantSelectors,
+	variants_of_char = M.FT_Face_GetVariantsOfChar,
+	chars_of_variant = M.FT_Face_GetCharsOfVariant,
+	--hinting patents BS
+	truetype_patents = M.FT_Face_CheckTrueTypePatents,
+	set_unpatended_hinting = M.FT_Face_SetUnpatentedHinting,
 }})
+
+ffi.metatype('FT_GlyphSlotRec', {__index = {
+	render = M.FT_Render_Glyph,
+	subglyph_info = M.FT_Get_SubGlyph_Info,
+}})
+
+ffi.metatype('FT_CharMapRec', {__index = {
+	index = M.FT_Get_Charmap_Index,
+}})
+
+if not ... then require'freetype_test' end
 
 return M
