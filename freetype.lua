@@ -179,11 +179,11 @@ function M.FT_Set_Char_Size(face, char_width, char_height, horz_resolution, vert
 end
 
 function M.FT_Set_Pixel_Sizes(face, pixel_width, pixel_height)
-	checknz(C.FT_Set_Pixel_Sizes(face, pixel_width, pixel_height))
+	checknz(C.FT_Set_Pixel_Sizes(face, pixel_width, pixel_height or 0))
 end
 
 function M.FT_Load_Glyph(face, glyph_index, load_flags) --FT_LOAD_*
-	checknz(C.FT_Load_Glyph(face, glyph_index, load_flags))
+	checknz(C.FT_Load_Glyph(face, glyph_index, load_flags or 0))
 end
 
 function M.FT_Load_Char(face, char_code, load_flags) --FT_LOAD_*
@@ -196,8 +196,8 @@ function M.FT_Set_Transform(face, xx, xy, yx, yy, x0, y0)
 	C.FT_Set_Transform(face, matrix, delta)
 end
 
-function M.FT_Render_Glyph(slot, render_mode)
-	checknz(C.FT_Render_Glyph(slot, render_mode))
+function M.FT_Render_Glyph(slot, render_mode) --FT_RENDER_*
+	checknz(C.FT_Render_Glyph(slot, render_mode or 0))
 end
 
 function M.FT_Get_Kerning(face, left_glyph, right_glyph, kern_mode, akerning) --FT_KERNING_*
@@ -334,6 +334,37 @@ function M.FT_Face_SetUnpatentedHinting(face, value)
 	return C.FT_Face_SetUnpatentedHinting(face, value) == 1
 end
 
+--ftbitmap.h
+
+function M.FT_Bitmap_New(library)
+	local bitmap = ffi.new'FT_Bitmap[1]'
+	C.FT_Bitmap_New(bitmap)
+	assert(bitmap[0] ~= nil)
+	bitmap = bitmap[0]
+	return ffi.gc(bitmap, function() checknz(C.FT_Bitmap_Done(library, bitmap)) end)
+end
+
+function M.FT_Bitmap_Copy(library, source, target)
+	checknz(C.FT_Bitmap_Copy(library, source, target))
+end
+
+function M.FT_Bitmap_Embolden(library, bitmap, xStrength, yStrength)
+	checknz(C.FT_Bitmap_Embolden(library, bitmap, xStrength, yStrength))
+end
+
+function M.FT_Bitmap_Convert(library, source, target, alignment)
+	checknz(C.FT_Bitmap_Convert(library, source, target, alignment))
+end
+
+function M.FT_GlyphSlot_Own_Bitmap(slot)
+	checknz(C.FT_GlyphSlot_Own_Bitmap(slot))
+end
+
+function M.FT_Bitmap_Done(library, bitmap)
+	ffi.gc(bitmap, nil)
+	checknz(C.FT_Bitmap_Done(library, bitmap))
+end
+
 --methods
 
 M.new = M.FT_Init_FreeType
@@ -344,6 +375,11 @@ ffi.metatype('FT_LibraryRec', {__index = {
 	new_memory_face = M.FT_New_Memory_Face,
 	open_face = M.FT_Open_Face,
 	version = M.FT_Library_Version,
+	--bitmaps
+	bitmap_copy = M.FT_Bitmap_Copy,
+	bitmap_embolden = M.FT_Bitmap_Embolden,
+	bitmap_convert = M.FT_Bitmap_Convert,
+	bitmap_done = M.FT_Bitmap_Done,
 }})
 
 ffi.metatype('FT_FaceRec', {__index = {
@@ -384,6 +420,8 @@ ffi.metatype('FT_FaceRec', {__index = {
 ffi.metatype('FT_GlyphSlotRec', {__index = {
 	render = M.FT_Render_Glyph,
 	subglyph_info = M.FT_Get_SubGlyph_Info,
+	--bitmaps
+	own_bitmap = M.FT_GlyphSlot_Own_Bitmap,
 }})
 
 ffi.metatype('FT_CharMapRec', {__index = {

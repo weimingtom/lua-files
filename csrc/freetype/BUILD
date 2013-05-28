@@ -1,6 +1,6 @@
 make (TODO: be more specific)
 
-copy libfreetype-6.dll to bin/freetype.dll
+copy libfreetype-6.dll to bin/freetype-6.dll
 
-strip freetype.dll
+strip freetype-6.dll
 

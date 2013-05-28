@@ -17,7 +17,6 @@ local function load_font(filename)
 			fonts[filename].cairo_font
 	end
 	local ft_face = ft_lib:new_face(filename)
-	ft.
 	local hb_font = hb.hb_ft_font_create(ft_face, nil)
 	local cairo_font = cairo.cairo_ft_font_face_create_for_ft_face(ft_face, 0)
 	fonts[filename] = {ft_face = ft_face, hb_font = hb_font, cairo_font = cairo_font}

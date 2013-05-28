@@ -96,24 +96,29 @@ function M.cairo_pop_group(...)
 	return ffi.gc(C.cairo_pop_group(...), M.cairo_pattern_destroy)
 end
 
+local function check_surface(surface)
+	assert(surface:status() == C.CAIRO_STATUS_SUCCESS, surface:status_string())
+	return surface
+end
+
 function M.cairo_surface_create_similar(...)
-	return ffi.gc(C.cairo_surface_create_similar(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_surface_create_similar(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_surface_create_similar_image(...)
-	return ffi.gc(C.cairo_surface_create_similar_image(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_surface_create_similar_image(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_surface_create_for_rectangle(...)
-	return ffi.gc(C.cairo_surface_create_for_rectangle(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_surface_create_for_rectangle(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_surface_create_for_data(...)
-	return ffi.gc(C.cairo_surface_create_for_data(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_surface_create_for_data(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_surface_create_observer(...)
-	return ffi.gc(C.cairo_surface_create_observer(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_surface_create_observer(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_surface_reference(...)
@@ -121,23 +126,23 @@ function M.cairo_surface_reference(...)
 end
 
 function M.cairo_image_surface_create(...)
-	return ffi.gc(C.cairo_image_surface_create(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_image_surface_create(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_image_surface_create_for_data(...)
-	return ffi.gc(C.cairo_image_surface_create_for_data(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_image_surface_create_for_data(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_image_surface_create_from_png(...)
-	return ffi.gc(C.cairo_image_surface_create_from_png(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_image_surface_create_from_png(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_image_surface_create_from_png_stream(...)
-	return ffi.gc(C.cairo_image_surface_create_from_png_stream(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_image_surface_create_from_png_stream(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_recording_surface_create(...)
-	return ffi.gc(C.cairo_recording_surface_create(...), M.cairo_surface_destroy)
+	return ffi.gc(check_surface(C.cairo_recording_surface_create(...)), M.cairo_surface_destroy)
 end
 
 function M.cairo_device_reference(...)

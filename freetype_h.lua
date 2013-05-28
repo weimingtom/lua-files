@@ -2,7 +2,29 @@
 local ffi = require'ffi'
 
 ffi.cdef[[
-typedef enum{
+typedef enum {
+	FT_FACE_FLAG_SCALABLE           = ( 1L <<  0 ),
+	FT_FACE_FLAG_FIXED_SIZES        = ( 1L <<  1 ),
+	FT_FACE_FLAG_FIXED_WIDTH        = ( 1L <<  2 ),
+	FT_FACE_FLAG_SFNT               = ( 1L <<  3 ),
+	FT_FACE_FLAG_HORIZONTAL         = ( 1L <<  4 ),
+	FT_FACE_FLAG_VERTICAL           = ( 1L <<  5 ),
+	FT_FACE_FLAG_KERNING            = ( 1L <<  6 ),
+	FT_FACE_FLAG_FAST_GLYPHS        = ( 1L <<  7 ),
+	FT_FACE_FLAG_MULTIPLE_MASTERS   = ( 1L <<  8 ),
+	FT_FACE_FLAG_GLYPH_NAMES        = ( 1L <<  9 ),
+	FT_FACE_FLAG_EXTERNAL_STREAM    = ( 1L << 10 ),
+	FT_FACE_FLAG_HINTER             = ( 1L << 11 ),
+	FT_FACE_FLAG_CID_KEYED          = ( 1L << 12 ),
+	FT_FACE_FLAG_TRICKY             = ( 1L << 13 ),
+};
+
+typedef enum {
+	FT_STYLE_FLAG_ITALIC  = ( 1 << 0 ),
+	FT_STYLE_FLAG_BOLD    = ( 1 << 1 ),
+};
+
+typedef enum {
 	FT_LOAD_DEFAULT                       = 0x0,
 	FT_LOAD_NO_SCALE                      = 0x1,
 	FT_LOAD_NO_HINTING                    = 0x2,
@@ -318,7 +340,7 @@ typedef struct FT_FaceRec_
 {
  FT_Long num_faces;
  FT_Long face_index;
- FT_Long face_flags;
+ FT_Long face_flags;    // FT_FACE_FLAG_*
  FT_Long style_flags;
  FT_Long num_glyphs;
  FT_String* family_name;
@@ -595,4 +617,14 @@ FT_Face_CheckTrueTypePatents( FT_Face face );
 FT_Bool
 FT_Face_SetUnpatentedHinting( FT_Face face,
 									  FT_Bool value );
+
+// ftbitmap.h
+
+void     FT_Bitmap_New      (FT_Bitmap *abitmap);
+FT_Error FT_Bitmap_Copy     (FT_Library library, const FT_Bitmap *source, FT_Bitmap *target);
+FT_Error FT_Bitmap_Embolden (FT_Library library, FT_Bitmap* bitmap, FT_Pos xStrength, FT_Pos yStrength);
+FT_Error FT_Bitmap_Convert  (FT_Library library, const FT_Bitmap *source, FT_Bitmap *target, FT_Int alignment);
+FT_Error FT_GlyphSlot_Own_Bitmap (FT_GlyphSlot slot);
+FT_Error FT_Bitmap_Done     (FT_Library library, FT_Bitmap *bitmap);
+
 ]]
