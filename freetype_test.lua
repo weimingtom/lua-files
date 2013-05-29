@@ -4,81 +4,79 @@ local pp = require'pp'
 local ft = require'freetype'
 local player = require'cairo_player'
 local cairo = require'cairo'
-local lib = ft:new()
-
-local face_flag_names = {
-	[ft.FT_FACE_FLAG_SCALABLE]            = 'SCALABLE',
-	[ft.FT_FACE_FLAG_FIXED_SIZES]         = 'FIXED_SIZES',
-	[ft.FT_FACE_FLAG_FIXED_WIDTH]         = 'FIXED_WIDTH',
-	[ft.FT_FACE_FLAG_SFNT]                = 'SFNT',
-	[ft.FT_FACE_FLAG_HORIZONTAL]          = 'HORIZONTAL',
-	[ft.FT_FACE_FLAG_VERTICAL]            = 'VERTICAL',
-	[ft.FT_FACE_FLAG_KERNING]             = 'KERNING',
-	[ft.FT_FACE_FLAG_FAST_GLYPHS]         = 'FAST_GLYPHS',
-	[ft.FT_FACE_FLAG_MULTIPLE_MASTERS]    = 'MULTIPLE_MASTERS',
-	[ft.FT_FACE_FLAG_GLYPH_NAMES]         = 'GLYPH_NAMES',
-	[ft.FT_FACE_FLAG_EXTERNAL_STREAM]     = 'EXTERNAL_STREAM',
-	[ft.FT_FACE_FLAG_HINTER]              = 'HINTER',
-	[ft.FT_FACE_FLAG_CID_KEYED]           = 'CID_KEYED',
-	[ft.FT_FACE_FLAG_TRICKY]              = 'TRICKY',
-}
-
-local style_flag_names = {
-	[ft.FT_STYLE_FLAG_ITALIC]  = 'ITALIC',
-	[ft.FT_STYLE_FLAG_BOLD]    = 'BOLD',
-}
-
-local function flags(flags, flag_names)
-	local s
-	for k,v in pairs(flag_names) do
-		s = bit.band(flags, k) ~= 0 and ((s and s..', ' or '')..v) or s
-	end
-	return s or ''
-end
-
-local function s4(i)
-	i = tonumber(i)
-	return
-		string.char(bit.band(bit.rshift(i, 24), 255)) ..
-		string.char(bit.band(bit.rshift(i, 16), 255)) ..
-		string.char(bit.band(bit.rshift(i,  8), 255)) ..
-		string.char(bit.band(bit.rshift(i,  0), 255))
-end
-
-local function pad(s, n)
-	return s..(' '):rep(n - #s)
-end
-
-local function struct(t,fields,decoders,indent)
-	indent = indent or ''
-	local s = ''
-	for i,k in ipairs(fields) do
-		s = s .. '\n   ' .. indent .. pad(k..':', 21 - #indent) .. (decoders and decoders[k] or glue.pass)(t[k])
-	end
-	return s
-end
-
-local function struct_array(t,n,fields,decoders,indent)
-	indent = indent or ''
-	local s = ''
-	for i=0,n-1 do
-		for j,k in ipairs(fields) do
-			s = s .. '\n ' .. (j == 1 and '* ' or '  ') .. indent .. pad(k..':', 21 - #indent) ..
-					(decoders and decoders[k] or glue.pass)(t[i][k])
-		end
-	end
-	return s
-end
-
-local bitmap_size_fields = {'height','width','size','x_ppem','y_ppem'}
-local charmap_fields = {'encoding','platform_id','encoding_id'}
-local charmap_decoders = {encoding = s4}
-local bbox_fields = {'xMin','yMin','xMax','yMax'}
-local metrics_fields = {'x_ppem','y_ppem','x_scale','y_scale','ascender','descender','height','max_advance'}
-local size_fields = {'metrics'}
-local size_decoders = {metrics = function(m) return struct(m, metrics_fields, nil, '   ') end}
 
 local function inspect_face(face)
+	local face_flag_names = {
+		[ft.FT_FACE_FLAG_SCALABLE]            = 'SCALABLE',
+		[ft.FT_FACE_FLAG_FIXED_SIZES]         = 'FIXED_SIZES',
+		[ft.FT_FACE_FLAG_FIXED_WIDTH]         = 'FIXED_WIDTH',
+		[ft.FT_FACE_FLAG_SFNT]                = 'SFNT',
+		[ft.FT_FACE_FLAG_HORIZONTAL]          = 'HORIZONTAL',
+		[ft.FT_FACE_FLAG_VERTICAL]            = 'VERTICAL',
+		[ft.FT_FACE_FLAG_KERNING]             = 'KERNING',
+		[ft.FT_FACE_FLAG_FAST_GLYPHS]         = 'FAST_GLYPHS',
+		[ft.FT_FACE_FLAG_MULTIPLE_MASTERS]    = 'MULTIPLE_MASTERS',
+		[ft.FT_FACE_FLAG_GLYPH_NAMES]         = 'GLYPH_NAMES',
+		[ft.FT_FACE_FLAG_EXTERNAL_STREAM]     = 'EXTERNAL_STREAM',
+		[ft.FT_FACE_FLAG_HINTER]              = 'HINTER',
+		[ft.FT_FACE_FLAG_CID_KEYED]           = 'CID_KEYED',
+		[ft.FT_FACE_FLAG_TRICKY]              = 'TRICKY',
+	}
+
+	local style_flag_names = {
+		[ft.FT_STYLE_FLAG_ITALIC]  = 'ITALIC',
+		[ft.FT_STYLE_FLAG_BOLD]    = 'BOLD',
+	}
+
+	local function flags(flags, flag_names)
+		local s
+		for k,v in pairs(flag_names) do
+			s = bit.band(flags, k) ~= 0 and ((s and s..', ' or '')..v) or s
+		end
+		return s or ''
+	end
+
+	local function s4(i)
+		i = tonumber(i)
+		return
+			string.char(bit.band(bit.rshift(i, 24), 255)) ..
+			string.char(bit.band(bit.rshift(i, 16), 255)) ..
+			string.char(bit.band(bit.rshift(i,  8), 255)) ..
+			string.char(bit.band(bit.rshift(i,  0), 255))
+	end
+
+	local function pad(s, n)
+		return s..(' '):rep(n - #s)
+	end
+
+	local function struct(t,fields,decoders,indent)
+		indent = indent or ''
+		local s = ''
+		for i,k in ipairs(fields) do
+			s = s .. '\n   ' .. indent .. pad(k..':', 21 - #indent) .. (decoders and decoders[k] or glue.pass)(t[k])
+		end
+		return s
+	end
+
+	local function struct_array(t,n,fields,decoders,indent)
+		indent = indent or ''
+		local s = ''
+		for i=0,n-1 do
+			for j,k in ipairs(fields) do
+				s = s .. '\n ' .. (j == 1 and '* ' or '  ') .. indent .. pad(k..':', 21 - #indent) ..
+						(decoders and decoders[k] or glue.pass)(t[i][k])
+			end
+		end
+		return s
+	end
+
+	local bitmap_size_fields = {'height','width','size','x_ppem','y_ppem'}
+	local charmap_fields = {'encoding','platform_id','encoding_id'}
+	local charmap_decoders = {encoding = s4}
+	local bbox_fields = {'xMin','yMin','xMax','yMax'}
+	local metrics_fields = {'x_ppem','y_ppem','x_scale','y_scale','ascender','descender','height','max_advance'}
+	local size_fields = {'metrics'}
+	local size_decoders = {metrics = function(m) return struct(m, metrics_fields, nil, '   ') end}
 	print('num_faces:           ', face.num_faces)
 	print('face_index:          ', face.face_index)
 	print('face_flags:          ', flags(face.face_flags, face_flag_names))
@@ -144,8 +142,8 @@ local function draw_charmap(cr,
 				if bitmap.width > 0 and bitmap.rows > 0 then
 
 					if bitmap.pitch % 4 ~= 0 then
-						bitmap = ft.FT_Bitmap_New(lib)
-						ft.FT_Bitmap_Convert(lib, face.glyph.bitmap, bitmap, 4)
+						bitmap = face.glyph.library:new_bitmap()
+						face.glyph.library:convert_bitmap(face.glyph.bitmap, bitmap, 4)
 						assert(bitmap.pixel_mode == ft.FT_PIXEL_MODE_GRAY)
 						assert(bitmap.pitch % 4 == 0)
 					end
@@ -163,7 +161,7 @@ local function draw_charmap(cr,
 					cr:mask_surface(image, x, y)
 
 					if face.glyph.bitmap ~= bitmap then
-						ft.FT_Bitmap_Done(lib, bitmap)
+						face.glyph.library:free_bitmap(bitmap)
 					end
 
 					image:free()
@@ -179,18 +177,20 @@ local function draw_charmap(cr,
 	end
 end
 
+local lib = ft:new()
+
 --local face = lib:new_face'media/fonts/DejaVuSerif.ttf'
 --local face = lib:new_face'media/fonts/amiri-regular.ttf'
 local face = lib:new_face'media/fonts/fireflysung.ttf'
 inspect_face(face)
 
 local bi = 0
-local msel = 2
+local msel = 1
 function player:on_render(cr)
 	cr:set_source_rgba(0,0,0,1)
 	cr:paint()
 
-	face:select_charmap(face.charmaps[0].encoding)
+	face:select_charmap(face.charmaps[msel-1].encoding)
 
 	local n = 0; for _ in face:chars() do n = n + 1 end
 	local charsize, charspace = 64, 24
@@ -199,14 +199,18 @@ function player:on_render(cr)
 	local w = self.window.client_w
 	local h = self.window.client_h
 
-	bi = self:hscrollbar(0, h - 20, w, 20, size, bi)
+	bi = self:hscrollbar{x = 0, y = h - 40, w = w, h = 40, size = size, i = bi, autohide = true}
 	local j = charsize + charspace
 	for i=1,n,linesize do
-		draw_charmap(cr, face, charsize, charspace, -bi, j, 0, 0, w - charsize, h, i, i + linesize - 1)
+		draw_charmap(cr, face, charsize, charspace, -bi, j, -charsize, 0, w, h, i, i + linesize - 1)
 		j = j + charsize + charspace
 	end
 
-	msel = self:mbutton(10, 10, 200, 32, {'Ok', 'Maybe', 'Cancel'}, msel)
+	local buttons = {}
+	for i=1,face.num_charmaps do
+		buttons[i] = 'Charmap '..i
+	end
+	msel = self:mbutton{x = 10, y = 10, w = face.num_charmaps * 80, h = 22, buttons = buttons, selected = msel}
 end
 
 player:play()

@@ -1,8 +1,9 @@
 local CPanel = require'winapi.cairopanel'
 local winapi = require'winapi'
 require'winapi.messageloop'
+require'winapi.vkcodes'
+require'winapi.keyboard'
 local cairo = require'cairo'
-local fps = require'fps_function'(2)
 local ffi = require'ffi'
 
 local main = winapi.Window{
@@ -10,7 +11,6 @@ local main = winapi.Window{
 	visible = false,
 	w = 1366, --settle on typical laptop resolution for demos
 	h = 768,
-	--state = 'maximized',
 	title = 'CairoPanel Player',
 }
 
@@ -32,6 +32,24 @@ end
 function panel:__destroy_surface(surface)
 	player.cr:free()
 end
+
+ffi.cdef'uint32_t GetTickCount();'
+local function fps_function()
+	local count_per_sec = 1
+	local frame_count, last_frame_count, last_time = 0, 0
+	return function()
+		last_time = last_time or ffi.C.GetTickCount()
+		frame_count = frame_count + 1
+
+		local time = ffi.C.GetTickCount()
+		if time - last_time > 1000 / count_per_sec then
+			last_frame_count, frame_count = frame_count, 0
+			last_time = time
+		end
+		return last_frame_count * count_per_sec
+	end
+end
+local fps = fps_function()
 
 function panel:on_render(surface)
 	main.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
@@ -93,13 +111,14 @@ panel.on_mouse_wheel = panel.on_mouse_move
 panel.on_mouse_hwheel = panel.on_mouse_move
 
 function main:WM_GETDLGCODE()
-	return winapi.DLGC_WANTALLKEYS
+	return bit.bor(winapi.DLGC_WANTALLKEYS, winapi.DLGC_WANTCHARS)
 end
 
 function main:on_key_down(vk, flags)
 	player.key_state = 'down'
 	player.key_code = vk
 	player.key_flags = flags
+	player.ctrl = bit.band(ffi.C.GetKeyState(winapi.VK_CONTROL), 0x8000) ~= 0
 	panel:invalidate()
 end
 
@@ -114,6 +133,7 @@ main.on_syskey_down = main.on_key_down
 main.on_syskey_up = main.on_key_up
 
 function main:on_key_down_char(char, flags)
+	print'here'
 	player.key_state = 'down'
 	player.key_char = char
 	player.key_flags = flags
@@ -140,38 +160,35 @@ local function inbox(x, y, bx, by, bw, bh)
 	return x >= bx and x <= bx + bw and y >= by and y <= by + bh
 end
 
-function player:hscrollbar(x, y, w, h, size, i, autohide)
+function player:hscrollbar(t)
+	local id, x, y, w, h, size, i, autohide = t.id, t.x, t.y, t.w, t.h, t.size, t.i, t.autohide
 	local mx, my = self.mouse_x, self.mouse_y
 	local down = self.mouse_buttons.lbutton
 	local cr = self.cr
 
-	if autohide and not inbox(mx, my, x, y, w, h) then return end
+	if autohide and not inbox(mx, my, x, y, w, h) then return i end
 	local bw = w^2 / size
 	local bx = x + i * (w - bw) / (size - w)
 	bx = math.min(math.max(bx, x), x + w - bw)
 
 	local hot = inbox(mx, my, bx, y, bw, h)
 
-	if down and hot and not self.vs_w then
+	if down and hot and not self.active then
+		self.active = id
 		self.vs_w = mx - bx
-	elseif not down then
-		self.vs_w = nil
-	elseif self.vs_w then
-		bx = mx - self.vs_w
+	elseif self.active == id then
+		if down then
+			bx = mx - self.vs_w
+		else
+			self.active = nil
+			self.vs_w = nil
+		end
 	end
 
 	bx = math.min(math.max(bx, x), x + w - bw)
 
 	cr:rectangle(bx, y, bw, h)
-	if hot then
-		if down then
-			cr:set_source_rgba(1, 1, 1, 0.9)
-		else
-			cr:set_source_rgba(1, 1, 1, 0.6)
-		end
-	else
-		cr:set_source_rgba(1, 1, 1, 0.3)
-	end
+	cr:set_source_rgba(1, 1, 1, hot and (down and 0.9 or 0.6) or 0.3)
 	cr:fill()
 
 	cr:rectangle(x, y, w, h)
@@ -181,59 +198,55 @@ function player:hscrollbar(x, y, w, h, size, i, autohide)
 	return (bx - x) / w * size
 end
 
-function player:vscrollbar(x, y, w, h, size, i, autohide)
+function player:vscrollbar(t)
+	local id, x, y, w, h, size, i, autohide = t.id, t.x, t.y, t.w, t.h, t.size, t.i, t.autohide
 	local mx, my = self.mouse_x, self.mouse_y
 	local down = self.mouse_buttons.lbutton
 	local cr = self.cr
 
-	if autohide and not inbox(mx, my, x, y, w, h) then return end
+	if autohide and not inbox(mx, my, x, y, w, h) then return i end
 	local bh = h^2 / size
 	local by = y + i * (h - bh) / (size - h)
 	by = math.min(math.max(by, y), y + h - bh)
 
 	local hot = inbox(mx, my, x, by, w, bh)
 
-	if down and hot and not self.vs_h then
+	if down and hot and not self.active then
+		self.active = id
 		self.vs_h = my - by
-	elseif not down then
-		self.vs_h = nil
-	elseif self.vs_h then
-		by = my - self.vs_h
+	elseif self.active == id then
+		if down then
+			by = my - self.vs_h
+		else
+			self.active = nil
+			self.vs_h = nil
+		end
 	end
 
 	by = math.min(math.max(by, y), y + h - bh)
 
 	cr:rectangle(x, by, w, bh)
-	if hot then
-		if down then
-			cr:set_source_rgba(1, 1, 1, 0.9)
-		else
-			cr:set_source_rgba(1, 1, 1, 0.6)
-		end
-	else
-		cr:set_source_rgba(1, 1, 1, 0.3)
-	end
+	cr:set_source_rgba(1, 1, 1, hot and (down and 0.9 or 0.6) or 0.3)
 	cr:fill()
 
 	cr:rectangle(x, y, w, h)
 	cr:set_source_rgba(1, 1, 1, 0.3)
-	cr:fill_preserve()
+	cr:fill()
 
 	return (by - y) / h * size
 end
 
---with this kappa the error deviation is ~ 0.0003, see http://www.tinaja.com/glib/ellipse4.pdf.
-local kappa = 4 / 3 * (math.sqrt(2) - 1) - 0.000501
-local min, max, abs = math.min, math.max, math.abs
+local kappa = 4 / 3 * (math.sqrt(2) - 1)
 
-function player:button(x1, y1, w, h, s, cut, selected)
+function player:button(t)
+	local id, x1, y1, w, h, text, cut, selected = t.id, t.x, t.y, t.w, t.h, t.text, t.cut, t.selected
 	local mx, my = self.mouse_x, self.mouse_y
 	local down = self.mouse_buttons.lbutton
 	local cr = self.cr
 
 	local rx, ry = 5, 5
-	rx = min(abs(rx), abs(w/2))
-	ry = min(abs(ry), abs(h/2))
+	rx = math.min(math.abs(rx), math.abs(w/2))
+	ry = math.min(math.abs(ry), math.abs(h/2))
 	if rx == 0 and ry == 0 then
 		rect_to_lines(write, x1, y1, w, h)
 		return
@@ -270,51 +283,172 @@ function player:button(x1, y1, w, h, s, cut, selected)
 
 	local hot = inbox(mx, my, x1, y1, w, h)
 
-	if hot or selected then
-		if down or selected then
-			cr:set_source_rgba(1, 1, 1, 0.9)
-		else
-			cr:set_source_rgba(1, 1, 1, 0.6)
+	local clicked = false
+	if hot and down and not self.active then
+		self.active = id
+	elseif self.active == id then
+		if hot then
+			clicked = not down
+			selected = clicked
+		elseif not down then
+			self.active = nil
 		end
-	else
-		cr:set_source_rgba(1, 1, 1, 0.3)
 	end
+
+	cr:set_source_rgba(1, 1, 1, (hot or selected) and ((down or selected) and 0.9 or 0.6) or 0.3)
 	cr:fill_preserve()
 
-	cr:set_source_rgba(1, 1, 1, 0.9)
+	cr:set_source_rgba(1, 1, 1, 0.3)
 	cr:set_line_width(1)
 	cr:stroke()
 
-	cr:set_font_size(16)
-	local extents = ffi.new'cairo_text_extents_t'
-	cr:text_extents(s, extents)
+	cr:set_font_size(h / 2)
+	local extents = cr:text_extents(text)
 	cr:move_to((2 * x1 + w - extents.width) / 2, (2 * y1 + h - extents.y_bearing) / 2)
 	if hot and down or selected then
 		cr:set_source_rgba(0, 0, 0, 1)
 	else
 		cr:set_source_rgba(1, 1, 1, 1)
 	end
-	cr:show_text(s)
+	cr:show_text(text)
 
-	return hot and down
+	return clicked
 end
 
-function player:mbutton(x1, y1, w, h, t, selected)
+function player:mbutton(t)
+	local id, x, y, w, h, buttons, selected = t.id, t.x, t.y, t.w, t.h, t.buttons, t.selected
 	local mx, my = self.mouse_x, self.mouse_y
 	local down = self.mouse_buttons.lbutton
 	local cr = self.cr
 
-	for i=1,#t do
-		if self:button(x1, y1, w/#t, h, t[i], #t > 1 and (i==#t and 'left' or i==1 and 'right' or 'both'), selected == i) then
+	local bwidth = w/#buttons
+	for i=1,#buttons do
+		local cut = #buttons > 1 and (i==#buttons and 'left' or i==1 and 'right' or 'both')
+		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = buttons[i],
+							cut = cut, selected = selected == i}
+		then
 			selected = i
 		end
-		x1 = x1 + w/#t
+		x = x + bwidth
 	end
 	return selected
 end
 
---if not ... then require'cairo_player_demo' end
-if not ... then require'freetype_test' end
+function player:tabs(t)
+	local id, x, y, w, h, buttons, selected = t.id, t.x, t.y, t.w, t.h, t.buttons, t.selected
+	local mx, my = self.mouse_x, self.mouse_y
+	local down = self.mouse_buttons.lbutton
+	local cr = self.cr
+
+	local bwidth = w/#buttons
+	for i=1,#buttons do
+		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = buttons[i],
+							cut = 'both', selected = selected == i}
+		then
+			selected = i
+		end
+		x = x + bwidth
+	end
+	return selected
+end
+
+function player:edit(t)
+	local id, x, y, w, h, text, tabstop = t.id, t.x, t.y, t.w, t.h, t.text, t.tabstop
+	local mx, my = self.mouse_x, self.mouse_y
+	local down = self.mouse_buttons.lbutton
+	local cr = self.cr
+	local caret_w = 2
+
+	local hot = inbox(mx, my, x, y, w, h)
+
+	cr:save()
+	cr:rectangle(x, y, w, h)
+	cr:set_source_rgba(1,1,1, 0.3 + (hot and 0.1 or 0))
+	cr:fill_preserve()
+	cr:clip()
+
+	local text_x = 0
+	local caret_pos
+	if (not self.active and ((hot and down) or not self.activate or self.activate == id)) then
+		self.active = id
+		self.focus_tab = nil
+		self.text_x = 0
+		self.caret_pos = #text
+		caret_pos = #text
+	elseif self.active == id then
+		if down and not hot then
+			self.active = nil
+			self.text_x = nil
+			self.caret_pos = nil
+		elseif self.key_state == 'down' and self.key_code == winapi.VK_TAB then
+			self.activate = self.key_flags.shift and t.prev_tab or t.next_tab
+			self.active = nil
+			self.text_x = nil
+			self.caret_pos = nil
+		else
+			text_x = self.text_x
+			caret_pos = self.caret_pos
+		end
+	end
+
+	cr:set_font_size(h * .8)
+
+	local caret_x
+	if caret_pos then
+		local vk = self.key_code
+		if self.key_state == 'down' then
+			if vk == winapi.VK_LEFT then
+				if self.ctrl then
+					local pos = text:sub(1, math.max(0, caret_pos - 1)):find('%s[^%s]*$') or 0
+					caret_pos = math.max(0, pos)
+				else
+					caret_pos = math.max(0, caret_pos - 1)
+				end
+			elseif vk == winapi.VK_RIGHT then
+				if self.ctrl then
+					local pos = text:find('%s', caret_pos + 1) or #text
+					caret_pos = math.min(#text, pos)
+				else
+					caret_pos = math.min(#text, caret_pos + 1)
+				end
+			elseif vk == winapi.VK_UP then
+			elseif vk == winapi.VK_DOWN then
+			elseif vk == winapi.VK_BACK then
+				text = text:sub(1, caret_pos - 1) .. text:sub(caret_pos + 1)
+				caret_pos = math.max(0, caret_pos - 1)
+			elseif vk == winapi.VK_DELETE then
+				text = text:sub(1, caret_pos) .. text:sub(caret_pos + 2)
+			elseif self.key_char then
+				text = text:sub(1, caret_pos) .. self.key_char .. text:sub(caret_pos + 1)
+			end
+		end
+
+		local text_w = cr:text_extents(text).x_advance
+		caret_x = cr:text_extents(text:sub(1, caret_pos) .. '\0').x_advance
+		text_x = math.min(text_x, -(caret_x + caret_w - w))
+		text_x = math.max(text_x, -caret_x)
+
+		self.caret_pos = caret_pos
+		self.text_x = text_x
+	end
+
+	cr:move_to(x + text_x, y + h * .8)
+	cr:set_source_rgba(1, 1, 1, 1)
+	cr:show_text(text)
+
+	if caret_x then
+		cr:set_source_rgba(1, 1, 1, 1)
+		cr:rectangle(x + text_x + caret_x, y, caret_w, h)
+		cr:fill()
+	end
+
+	cr:restore()
+
+	return text
+end
+
+if not ... then require'cairo_player_ui_demo' end
+--if not ... then require'freetype_test' end
 
 return player
 

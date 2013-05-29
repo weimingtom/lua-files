@@ -539,6 +539,7 @@ BOOL PostMessageW(
      WPARAM wParam,
      LPARAM lParam);
 
+HWND GetCapture(void);
 HWND SetCapture(HWND hWnd);
 BOOL ReleaseCapture(void);
 
@@ -647,6 +648,10 @@ PM_QS_SENDMESSAGE   = bit.lshift(QS_SENDMESSAGE, 16)
 function PeekMessage(hwnd, WMmin, WMmax, PM, msg)
 	msg = types.MSG(msg)
 	return C.PeekMessageW(msg, hwnd, flags(WMmin), flags(WMmax), flags(PM)) ~= 0, msg
+end
+
+function GetCapture()
+	return ptr(C.GetCapture())
 end
 
 function SetCapture(hwnd)

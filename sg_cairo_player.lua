@@ -62,12 +62,10 @@ function player:play()
 	os.exit(winapi.MessageLoop())
 end
 
-local fps = require'fps_function'(4)
-
 function player:render(user_scene)
 	scene[1] = user_scene
 	panel.scene_graph:render(scene)
-	main.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
+	main.title = string.format('Cairo %s', cairo.cairo_version_string())
 end
 
 function player:hit_test(x, y, user_scene)

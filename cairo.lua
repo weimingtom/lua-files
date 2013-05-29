@@ -1,20 +1,16 @@
---lightweight object interface over cairo ffi binding:
--- cairo types get methods; note though that methods of specific backends and extensions are not added
--- and cannot be added either after loading this module due to constraints of ffi.metatype().
--- pointers to objects for which cairo holds no references get a __gc.
--- ref-counted objects have a free() method that checks ref. count and a destroy() method that doesn't.
--- functions accept/return Lua strings.
--- additional wrappers: cairo_quad_curve_to, cairo_rel_quad_curve_to, cairo_circle, cairo_ellipse,
---   cairo_rotate_around, cairo_skew, cairo_safe_transform, cairo_matrix_transform, cairo_matrix_invertible,
---   cairo_matrix_safe_transform, cairo_matrix_rotate_around, cairo_matrix_skew, cairo_surface_apply_alpha.
+--lightweight ffi binding of cairo graphics library with garbage collection, metatype methods, accepting
+--and returning strings, accepting rgb(a) hex colors, returning multiple values instead of passing output buffers,
+--and API additions for completeness (drawing quad curves, etc).
+--note that methods of specific backends and extensions are not added and cannot be added after loading this
+--module due to constraints of ffi.metatype(). still looking for a nice way to solve this.
 
 local ffi = require'ffi'
 require'cairo_h'
 local C = ffi.load'cairo'
 local M = setmetatable({C = C}, {__index = C})
 
--- garbage collector integration
--- note: it's important for free() and destroy() to not return anything so you can use self.obj = self.obj:free().
+-- garbage collector / ref'counting integration
+-- note: free() and destroy() do not return a value as to enable the idiom self.obj = self.obj:free().
 
 local function free_ref_counted(o)
 	local n = o:get_reference_count() - 1
@@ -259,7 +255,7 @@ local function status_string(self)
 	return M.cairo_status_to_string(self:status())
 end
 
--- output args -> return values
+-- return multiple values instead of passing output buffers
 
 function M.cairo_get_matrix(cr, mt)
 	mt = mt or ffi.new'cairo_matrix_t'
@@ -315,6 +311,18 @@ M.cairo_device_to_user = point_transform_function(C.cairo_device_to_user)
 M.cairo_user_to_device = point_transform_function(C.cairo_user_to_device)
 M.cairo_user_to_device_distance = point_transform_function(C.cairo_user_to_device_distance)
 M.cairo_device_to_user_distance = point_transform_function(C.cairo_device_to_user_distance)
+
+function M.cairo_text_extents(cr, s, extents)
+	extents = extents or ffi.new'cairo_text_extents_t'
+	C.cairo_text_extents(cr, s, extents)
+	return extents
+end
+
+function M.cairo_glyph_extents(cr, glyphs, num_glyphs, extents)
+	extents = extents or ffi.new'cairo_text_extents_t'
+	C.cairo_glyph_extents(cr, glyphs, num_glyphs, extents)
+	return extents
+end
 
 -- quad beziers addition
 
@@ -421,6 +429,62 @@ function M.cairo_surface_apply_alpha(surface, alpha)
 	cr:paint()
 	cr:free()
 end
+
+-- rgba additions
+
+--[[
+--TODO: i'm not sure about adding these
+
+local Z = ('0'):byte(1)
+local function parse_rgba(r, g, b, a)
+	if type(r) == 'string' then
+		local s = r
+		local a = g or 1
+		if #r == '3' then --'rgb'[,alpha]
+			r = s:byte(1) - Z
+			g = s:byte(2) - Z
+			b = s:byte(3) - Z
+		elseif #r == '4' then --'rgba'[,alpha]
+			r = s:byte(1) - Z
+			g = s:byte(2) - Z
+			b = s:byte(3) - Z
+			a =(s:byte(4) - Z) * a
+		elseif #r == '6' then --'rrggbb'[,alpha]
+			r = (s:byte(1) - Z) * 256 + s:byte(2) - Z
+			g = (s:byte(3) - Z) * 256 + s:byte(4) - Z
+			b = (s:byte(5) - Z) * 256 + s:byte(6) - Z
+		elseif #r == '8' then --'rrggbbaa'[,alpha]
+			r = (s:byte(1) - Z) * 256 + s:byte(2) - Z
+			g = (s:byte(3) - Z) * 256 + s:byte(4) - Z
+			b = (s:byte(5) - Z) * 256 + s:byte(6) - Z
+			a =((s:byte(7) - Z) * 256 + s:byte(8) - Z) * a
+		else
+			error('invalid color')
+		end
+	else
+		a = a or 1
+	end
+	return r, g, b, a
+end
+
+function M.cairo_set_source_rgb(cr, r, g, b)
+	r, g, b = parse_rgba(r, g, b)
+	C.cairo_set_source_rgb(cr, r, g, b)
+end
+
+function M.cairo_set_source_rgba(cr, ...)
+	C.cairo_set_source_rgba(cr, parse_rgba(...))
+end
+
+function M.cairo_pattern_add_color_stop_rgb(r, g, b)
+	r, g, b = parse_rgba(r, g, b)
+	C.cairo_pattern_add_color_stop_rgb(r, g, b)
+end
+
+function M.cairo_pattern_add_color_stop_rgba(...)
+	C.cairo_pattern_add_color_stop_rgba(parse_rgba(...))
+end
+]]
 
 -- metamethods
 

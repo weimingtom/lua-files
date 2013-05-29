@@ -376,10 +376,11 @@ ffi.metatype('FT_LibraryRec', {__index = {
 	open_face = M.FT_Open_Face,
 	version = M.FT_Library_Version,
 	--bitmaps
-	bitmap_copy = M.FT_Bitmap_Copy,
-	bitmap_embolden = M.FT_Bitmap_Embolden,
-	bitmap_convert = M.FT_Bitmap_Convert,
-	bitmap_done = M.FT_Bitmap_Done,
+	new_bitmap = M.FT_Bitmap_New,
+	copy_bitmap = M.FT_Bitmap_Copy,
+	embolden_bitmap = M.FT_Bitmap_Embolden,
+	convert_bitmap = M.FT_Bitmap_Convert,
+	free_bitmap = M.FT_Bitmap_Done,
 }})
 
 ffi.metatype('FT_FaceRec', {__index = {
