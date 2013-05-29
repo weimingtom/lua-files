@@ -210,7 +210,7 @@ function player:on_render(cr)
 	for i=1,face.num_charmaps do
 		buttons[i] = 'Charmap '..i
 	end
-	msel = self:mbutton{x = 10, y = 10, w = face.num_charmaps * 80, h = 22, buttons = buttons, selected = msel}
+	msel = self:mbutton{id = 'charmap_btn', x = 10, y = 10, w = face.num_charmaps * 80, h = 22, buttons = buttons, selected = msel}
 end
 
 player:play()
