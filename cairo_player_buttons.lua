@@ -42,10 +42,11 @@ local function button_path(cr, x1, y1, w, h, cut)
 end
 
 function player:button(t)
-	local id, x1, y1, w, h, text, cut, selected = t.id, t.x, t.y, t.w, t.h or 24, t.text, t.cut, t.selected
+	local id, x, y, w, h, text, cut, selected = t.id, t.x, t.y, t.w, t.h or 24, t.text, t.cut, t.selected
+	local font_size = t.font_size or h / 2
 
 	local down = self.lbutton
-	local hot = self:hot(x1, y1, w, h)
+	local hot = self:hot(x, y, w, h)
 
 	local clicked = false
 	if not self.active and hot and down then
@@ -68,7 +69,7 @@ function player:button(t)
 	--drawing
 	local cr = self.cr
 
-	button_path(cr, x1, y1, w, h, cut)
+	button_path(cr, x, y, w, h, cut)
 
 	self:setcolor(bg_color)
 	cr:fill_preserve()
@@ -77,10 +78,8 @@ function player:button(t)
 	cr:set_line_width(self.theme.border_width)
 	cr:stroke()
 
-	cr:set_font_size(h / 2)
-	local extents = cr:text_extents(text)
-	cr:move_to((2 * x1 + w - extents.width) / 2, (2 * y1 + h - extents.y_bearing) / 2)
-
+	cr:set_font_size(font_size)
+	self:center_text(text, x, y, w, h)
 	self:setcolor(fg_color)
 	cr:show_text(text)
 

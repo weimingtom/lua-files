@@ -5,6 +5,7 @@ function player:on_render(cr)
 	self.text1 = self.text1 or 'edit me'
 	self.text2 = self.text2 or 'edit me too as I am a very long string that wants to be edited'
 	self.text3 = self.text3 or '"this is me quoting myself" - me'
+	self.percent = self.percent or 50
 
 	self.tab = self:tabs{id = 'tabs', x = 10, y = 10, w = 200, h = 24, buttons = {'tab1', 'tab2', 'tab3'}, selected = self.tab}
 
@@ -42,6 +43,8 @@ function player:on_render(cr)
 		self.text1 = self:editbox{id = 'ed1', x = 10, y = 40,  w = 200, text = self.text1, next_tab = 'ed2', prev_tab = 'ed3'}
 		self.text2 = self:editbox{id = 'ed2', x = 10, y = 70,  w = 200, text = self.text2, next_tab = 'ed3', prev_tab = 'ed1'}
 		self.text3 = self:editbox{id = 'ed3', x = 10, y = 100, w = 200, text = self.text3, next_tab = 'ed1', prev_tab = 'ed2'}
+
+		self.percent = self:slider{id = 'slider', x = 10, y = 130, w = 200, size = 100, i = self.percent, step = 10}
 
 	end
 end

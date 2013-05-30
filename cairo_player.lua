@@ -184,6 +184,13 @@ function player:setcolor(name)
 	self.cr:set_source_rgba(unpack(self.theme[name]))
 end
 
+function player:center_text(text, x, y, w, h)
+	local extents = self.cr:text_extents(text)
+	self.cr:move_to(
+		(2 * x + w - extents.width) / 2,
+		(2 * y + h - extents.y_bearing) / 2)
+end
+
 --submodule autoloader
 
 local submodules = {
@@ -194,6 +201,7 @@ local submodules = {
 	button = 'cairo_player_buttons',
 	mbutton = 'cairo_player_buttons',
 	tabs = 'cairo_player_buttons',
+	slider = 'cairo_player_slider',
 }
 
 setmetatable(player, {__index = function(_, k)

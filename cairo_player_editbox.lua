@@ -18,7 +18,7 @@ end
 function player:editbox(t)
 	local id, x, y, w, h, text = t.id, t.x, t.y, t.w, t.h or 24, t.text
 	local caret_w = t.caret_w or 2
-	local font_size = t.font_size or h * .7
+	local font_size = t.font_size or h / 2
 	local down = self.lbutton
 	local cr = self.cr
 
@@ -98,7 +98,9 @@ function player:editbox(t)
 	cr:fill_preserve()
 	cr:clip()
 
-	cr:move_to(x + text_x, y + h * .8)
+
+	local extents = cr:text_extents(text)
+	self.cr:move_to(x + text_x, (2 * y + h - extents.y_bearing) / 2)
 	self:setcolor'normal_fg'
 	cr:show_text(text)
 
