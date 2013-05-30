@@ -14,8 +14,10 @@ function ProcessMessage(msg)
 				return
 			end
 		end
-		if IsDialogMessage(window.hwnd, msg) then --make tab and arrow keys work with controls
-			return
+		if not window.__wantallkeys then --TODO: make WM_GETDLGCODE -> DLGC_WANTALLKEYS work instead
+			if IsDialogMessage(window.hwnd, msg) then --make tab and arrow keys work with controls
+				return
+			end
 		end
 	end
 	TranslateMessage(msg) --make keyboard work
