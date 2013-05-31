@@ -43,6 +43,8 @@ end
 
 function player:button(t)
 	local id, x, y, w, h, text, cut, selected = t.id, t.x, t.y, t.w, t.h or 24, t.text, t.cut, t.selected
+	x = x or self.cpx
+	y = y or self.cpy
 	local font_size = t.font_size or h / 2
 
 	local down = self.lbutton
@@ -79,10 +81,11 @@ function player:button(t)
 	cr:stroke()
 
 	cr:set_font_size(font_size)
-	self:center_text(text, x, y, w, h)
+	self:aligntext(text, x, y, w, h, 'center', 'middle')
 	self:setcolor(fg_color)
 	cr:show_text(text)
 
+	self:advance(x, y, w, h)
 	return clicked
 end
 
@@ -118,3 +121,4 @@ function player:tabs(t)
 end
 
 if not ... then require'cairo_player_ui_demo' end
+

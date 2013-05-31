@@ -17,6 +17,8 @@ end
 
 function player:editbox(t)
 	local id, x, y, w, h, text = t.id, t.x, t.y, t.w, t.h or 24, t.text
+	x = x or self.cpx
+	y = y or self.cpy
 	local caret_w = t.caret_w or 2
 	local font_size = t.font_size or h / 2
 	local down = self.lbutton
@@ -28,24 +30,21 @@ function player:editbox(t)
 
 	local text_x = 0
 	local caret_pos
-	if (not self.active and ((hot and down) or not self.activate or self.activate == id)) then
+	if (not self.active and ((hot and down) or not self.ui.activate or self.ui.activate == id)) then
 		self.active = id
-		self.focus_tab = nil
-		self.text_x = 0
+		self.ui.activation_clock = self.clock
+		self.ui.focus_tab = nil
+		self.ui.text_x = 0
 		caret_pos = find_caret_pos(cr, text, self.mousex - x)
 	elseif self.active == id then
 		if down and not hot then
 			self.active = nil
-			self.text_x = nil
-			self.caret_pos = nil
 		elseif self.key == 'tab' then
-			self.activate = self.shift and t.prev_tab or t.next_tab
 			self.active = nil
-			self.text_x = nil
-			self.caret_pos = nil
+			self.ui.activate = self.shift and t.prev_tab or t.next_tab
 		else
-			text_x = self.text_x
-			caret_pos = self.caret_pos
+			text_x = self.ui.text_x
+			caret_pos = self.ui.caret_pos
 		end
 	end
 
@@ -85,8 +84,8 @@ function player:editbox(t)
 		text_x = math.min(text_x, -(caret_x + caret_w - w))
 		text_x = math.max(text_x, -caret_x)
 
-		self.text_x = text_x
-		self.caret_pos = caret_pos
+		self.ui.text_x = text_x
+		self.ui.caret_pos = caret_pos
 	end
 
 	--drawing
@@ -100,11 +99,11 @@ function player:editbox(t)
 
 
 	local extents = cr:text_extents(text)
-	self.cr:move_to(x + text_x, (2 * y + h - extents.y_bearing) / 2)
+	self:aligntext(text, x + text_x, y, w, h, 'left', 'middle')
 	self:setcolor'normal_fg'
 	cr:show_text(text)
 
-	if caret_x then
+	if caret_x and (self.clock - self.ui.activation_clock) % 1000 < 500 then
 		self:setcolor'normal_fg'
 		cr:rectangle(x + text_x + caret_x, y, caret_w, h)
 		cr:fill()
@@ -112,6 +111,7 @@ function player:editbox(t)
 
 	cr:restore()
 
+	self:advance(x, y, w, h)
 	return text
 end
 

@@ -38,36 +38,85 @@ local panel = CPanel{
 	anchors = {left=true,right=true,top=true,bottom=true}
 }
 
-local dark_theme = {
+local themes = {}
+
+themes.dark = {
 	window_bg = {0,0,0,1},
 	faint_bg  = {1,1,1,0.2},
 	normal_bg = {1,1,1,0.3},
 	normal_fg = {1,1,1,1},
 	normal_border = {1,1,1,0.4},
-	border_width = 1,
 	hot_bg = {1,1,1,0.6},
 	hot_fg = {1,1,1,1},
 	selected_bg = {1,1,1,1},
 	selected_fg = {0,0,0,1},
+	border_width = 1,
+	scrollbar_width = 16,
 }
 
-local player = {
+themes.light = {
+	window_bg = {1,1,1,1},
+	faint_bg  = {0,0,0,0.2},
+	normal_bg = {0,0,0,0.3},
+	normal_fg = {0,0,0,1},
+	normal_border = {0,0,0,0.4},
+	hot_bg = {0,0,0,0.6},
+	hot_fg = {1,1,1,1},
+	selected_bg = {0,0,0,0.9},
+	selected_fg = {1,1,1,1},
+	border_width = 1,
+	scrollbar_width = 16,
+}
+
+themes.metro = {
+	window_bg = {1,1,1,1},
+	faint_bg  = {238/255,238/255,238/255,1},
+	normal_bg = {238/255,238/255,238/255,1},
+	normal_fg = {81/255,81/255,81/255,1},
+	normal_border = {0/255,180/255,255/255,1},
+	hot_bg = {81/255,81/255,81/255,1},
+	hot_fg = {238/255,238/255,238/255,1},
+	selected_bg = {0/255,180/255,255/255,1},
+	selected_fg = {238/255,238/255,238/255,1},
+	border_width = 1,
+	scrollbar_width = 16,
+}
+
+local player = { --we list all player properties for reference, even if the initial value is nil.
 	--window state
 	w = panel.client_w,
 	h = panel.client_h,   --client area size
+	--drwaing context and surface
+	cr = nil,             --cairo context to draw to
+	surface = nil,        --cairo surface (for creating clipped sub-surfaces)
 	--mouse state
 	mousex = 0,
 	mousey = 0,           --mouse coords
-	lbutton = false,      --mouse left button is pressed
-	rbutton = false,      --mouse right button is pressed
-	wheel_delta = 0,      --mouse wheel movement
+	click = false,        --left mouse button clicked (one-shot)
+	leftclick = false,    --right mouse button clicked (one-shot)
+	lbutton = false,      --left mouse button pressed state
+	rbutton = false,      --right mouse button pressed state
+	wheel_delta = 0,      --mouse wheel movement (one-shot)
 	--keyboard state
-	key = nil,            --key code
-	char = nil,           --char code
-	shift = false,        --shift key is pressed
-	control = false,      --control key is pressed
+	key = nil,            --key pressed: key code (one-shot)
+	char = nil,           --key pressed: char code (one-shot)
+	shift = false,        --shift key pressed state (only if key ~= nil)
+	control = false,      --control key pressed state (only if key ~= nil)
 	--UI styles
-	theme = dark_theme,
+	themes = themes,
+	theme = themes.dark,
+	--UI layouting state
+	advancex = false,
+	advancey = true,
+	cpx = 0,
+	cpy = 0,
+	paddingx = 6,
+	paddingy = 6,
+	--UI controls state
+	active = nil,
+	ui = {},              --active control state
+	--UI wall clock state
+	clock = nil,          --wall clock in milliseconds
 	--event handler stubs
 	on_render = function(self, cr) end,
 }
@@ -75,11 +124,13 @@ local player = {
 --panel events for rendering and mouse
 
 function panel:__create_surface(surface)
+	player.surface = surface
 	player.cr = surface:create_context()
 end
 
 function panel:__destroy_surface(surface)
 	player.cr:free()
+	player.surface = nil
 	player.cr = nil
 end
 
@@ -89,8 +140,9 @@ function panel:on_resized(...)
 	player.h = self.client_h
 end
 
+ffi.cdef'uint32_t GetTickCount();'
+
 local function fps_function()
-	ffi.cdef'uint32_t GetTickCount();'
 	local count_per_sec = 2
 	local frame_count, last_frame_count, last_time = 0, 0
 	return function()
@@ -109,12 +161,21 @@ local fps = fps_function()
 function panel:on_render(surface)
 	main.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
 
+	--reset the graphics context
 	player.cr:reset_clip()
 	player:setcolor'window_bg'
 	player.cr:paint()
 	player.cr:identity_matrix()
 
+	--set the wall clock
+	player.clock = ffi.C.GetTickCount()
+
+	--render the frame
 	player:on_render(player.cr)
+
+	--reset the one-shot state vars
+	player.click = false
+	player.leftclick = false
 	player.key = nil
 	player.char = nil
 	player.shift = nil
@@ -126,6 +187,8 @@ end
 function panel:on_mouse_move(x, y, buttons, wheel_delta)
 	player.mousex = x
 	player.mousey = y
+	player.click = player.lbutton and not buttons.lbutton
+	player.leftclick = player.rbutton and not buttons.rbutton
 	player.lbutton = buttons.lbutton
 	player.rbutton = buttons.rbutton
 	player.wheel_delta = wheel_delta and wheel_delta / 120 or 0
@@ -184,29 +247,54 @@ function player:setcolor(name)
 	self.cr:set_source_rgba(unpack(self.theme[name]))
 end
 
-function player:center_text(text, x, y, w, h)
+function player:aligntext(text, x, y, w, h, halign, valign)
 	local extents = self.cr:text_extents(text)
 	self.cr:move_to(
-		(2 * x + w - extents.width) / 2,
-		(2 * y + h - extents.y_bearing) / 2)
+		halign == 'center' and (2 * x + w - extents.width) / 2 or
+		halign == 'left' and x or
+		halign == 'right' and x + w - extents.width,
+		valign == 'middle' and (2 * y + h - extents.y_bearing) / 2 or
+		valign == 'top' and y or
+		valign == 'bottom' and y + h - extents.height)
+end
+
+function player:advance(x, y, w, h)
+	if self.advancex then
+		self.cpx = x + w + self.paddingx
+	end
+	if self.advancey then
+		self.cpy = y + h + self.paddingy
+	end
+end
+
+function player:pushclip(x, y, w, h)
+	self.cr:save()
+	self.cr:rectangle(x, y, w, h)
+	self.cr:clip()
+end
+
+function player:popclip()
+	self.cr:restore()
 end
 
 --submodule autoloader
 
 local submodules = {
-	editbox = 'cairo_player_editbox',
-	vscrollbar = 'cairo_player_scrollbars',
-	hscrollbar = 'cairo_player_scrollbars',
-	scrollbox = 'cairo_player_scrollbars',
-	button = 'cairo_player_buttons',
-	mbutton = 'cairo_player_buttons',
-	tabs = 'cairo_player_buttons',
-	slider = 'cairo_player_slider',
+	editbox = 'editbox',
+	vscrollbar = 'scrollbars',
+	hscrollbar = 'scrollbars',
+	scrollbox = 'scrollbars',
+	button = 'buttons',
+	mbutton = 'buttons',
+	tabs = 'buttons',
+	slider = 'slider',
+	menu = 'menu',
+	combobox = 'combobox',
 }
 
 setmetatable(player, {__index = function(_, k)
 	if submodules[k] then
-		require(submodules[k])
+		require('cairo_player.' .. submodules[k])
 		return player[k]
 	end
 end})
@@ -220,6 +308,7 @@ function player:play()
 end
 
 
-if not ... then require'cairo_player_ui_demo' end
+--if not ... then require'cairo_player_ui_demo' end
+if not ... then require'freetype_test' end
 
 return player

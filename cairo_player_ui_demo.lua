@@ -1,4 +1,5 @@
 local player = require'cairo_player'
+local glue = require'glue'
 
 function player:on_render(cr)
 	self.tab = self.tab or 1
@@ -13,9 +14,9 @@ function player:on_render(cr)
 
 		local rx, ry, rw, rh = 10, 40, 260, 120
 
-		self.vx = self:hscrollbar{id = 'hs', x = rx, y = ry + rh, w = rw, h = 16, size = rw * 2, i = self.vx or 0}
+		self.vx = self:hscrollbar{id = 'hs', x = rx, y = ry + rh, w = rw, h = 16, size = rw * 2, i = self.vx, autohide = true}
 
-		self.vy = self:vscrollbar{id = 'vs', x = rx + rw, y = ry, w = 16, h = rh, size = rh * 2, i = self.vy or 0}
+		self.vy = self:vscrollbar{id = 'vs', x = rx + rw, y = ry, w = 16, h = rh, size = rh * 2, i = self.vy, autohide = true}
 
 		cr:rectangle(rx, ry, rw, rh)
 		cr:clip()
@@ -37,16 +38,38 @@ function player:on_render(cr)
 		self.fruit = self:mbutton{id = 'fruits_btn', x = rx - self.vx, y = ry + 3*30 - self.vy, w = 260, h = 24,
 											buttons = {'apples', 'bannanas', 'cherries'}, selected = self.fruit}
 
+		cr:reset_clip()
 
 	elseif self.tab == 2 then
 
-		self.text1 = self:editbox{id = 'ed1', x = 10, y = 40,  w = 200, text = self.text1, next_tab = 'ed2', prev_tab = 'ed3'}
-		self.text2 = self:editbox{id = 'ed2', x = 10, y = 70,  w = 200, text = self.text2, next_tab = 'ed3', prev_tab = 'ed1'}
-		self.text3 = self:editbox{id = 'ed3', x = 10, y = 100, w = 200, text = self.text3, next_tab = 'ed1', prev_tab = 'ed2'}
+		self.text1 = self:editbox{id = 'ed1', x = 10, w = 200, text = self.text1, next_tab = 'ed2', prev_tab = 'ed3'}
+		self.text2 = self:editbox{id = 'ed2', x = 10, w = 200, text = self.text2, next_tab = 'ed3', prev_tab = 'ed1'}
+		self.text3 = self:editbox{id = 'ed3', x = 10, w = 200, text = self.text3, next_tab = 'ed1', prev_tab = 'ed2'}
 
-		self.percent = self:slider{id = 'slider', x = 10, y = 130, w = 200, size = 100, i = self.percent, step = 10}
+		self.percent = self:slider{id = 'slider', x = 10, w = 200, size = 100, i = self.percent, step = 10}
+
+	elseif self.tab == 3 then
+		local theme_names = glue.keys(self.themes)
+		self.tsel = self.tsel or 1
+		self.tsel = self:mbutton{id = 'theme_btn', x = 10, y = 40, w = 120, buttons = theme_names, selected = self.tsel}
+		self.theme = self.themes[theme_names[self.tsel]]
 
 	end
+
+	local menu = self:combobox{id = 'combo', x = 10, y = 200, w = 100, items = {'item1', 'item2', 'item3'},
+										selected = self.combo_item}
+
+
+	self.menu_item = self:menu{id = 'menu', x = 300, y = 10, w = 100, h = 100,
+										items = {'item1', 'item2', 'item3'}, selected = self.menu_item}
+
+	if menu then
+		menu.selected = self.combo_item
+		local clicked
+		self.combo_item, clicked = self:menu(menu)
+		if clicked then self.cmenu = nil end
+	end
+
 end
 
 player:play()

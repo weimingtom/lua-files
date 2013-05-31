@@ -36,9 +36,18 @@ local function bar_box(x, y, w, h, size, i, vertical)
 end
 
 local function scrollbar(self, t, vertical)
-	local id, x, y, w, h, size, i, autohide = t.id, t.x, t.y, t.w, t.h, t.size, t.i, t.autohide
+	local id = assert(t.id, 'id missing')
+	local x = t.x or self.cpx
+	local y = t.y or self.cpy
+	local w = assert(t.w or     vertical and self.theme.scrollbar_width, 'w missing')
+	local h = assert(t.h or not vertical and self.theme.scrollbar_width, 'h missing')
+	local size = assert(t.size, 'size missing')
+	local i = t.i or 0
 
-	if autohide and not self.active == id and not self:hot(x, y, w, h) then
+	if t.autohide and
+		((self.active and self.active ~= id) or
+		(not self.active and not self:hot(x, y, w, h)))
+	then
 		return i
 	end
 
@@ -47,19 +56,18 @@ local function scrollbar(self, t, vertical)
 
 	if not self.active and self.lbutton and hot then
 		self.active = id
-		self.grab = vertical and self.mousey - by or self.mousex - bx
+		self.ui.grab = vertical and self.mousey - by or self.mousex - bx
 	elseif self.active == id then
 		if self.lbutton then
 			if vertical then
-				by = bar_offset_clamp(self.mousey - self.grab, y, h, bh)
+				by = bar_offset_clamp(self.mousey - self.ui.grab, y, h, bh)
 				i = view_offset(by, y, h, size)
 			else
-				bx = bar_offset_clamp(self.mousex - self.grab, x, w, bw)
+				bx = bar_offset_clamp(self.mousex - self.ui.grab, x, w, bw)
 				i = view_offset(bx, x, w, size)
 			end
 		else
 			self.active = nil
-			self.grab = nil
 		end
 	end
 
@@ -74,6 +82,7 @@ local function scrollbar(self, t, vertical)
 	self:setcolor(self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
 	cr:fill()
 
+	self:advance(x, y, w, h)
 	return i
 end
 
@@ -83,6 +92,20 @@ end
 
 function player:vscrollbar(t)
 	return scrollbar(self, t, true)
+end
+
+function player:scrollbox(t)
+	local id = t.id
+	local x = t.x or self.cpx
+	local y = t.y or self.cpy
+	local w = assert(t.w, 'w missing')
+	local h = assert(t.h, 'h missing')
+	local vs = t.vscrollbar
+	local hs = t.hscrollbar
+	local vs_w = vs and not vs.autohide and (vs.w or self.theme.scollbar_width) or 0
+	local hs_h = hs and not hs.autohide and (hs.h or self.theme.scollbar_width) or 0
+
+	self:pushclip(x, y, w - vs_w, h - hs_h)
 end
 
 if not ... then require'cairo_player_ui_demo' end

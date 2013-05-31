@@ -111,12 +111,14 @@ local function inspect_face(face)
 	end
 end
 
-local function draw_charmap(cr,
+function player:charmap(
 	face, size, space,
 	x0, y0, --charmap upper left coords
 	bx1, by1, bx2, by2, --charmap screen bounding box
 	i0, i1 --glyph index range
 	)
+
+	local cr = self.cr
 
 	face:set_pixel_sizes(size)
 
@@ -157,7 +159,7 @@ local function draw_charmap(cr,
 
 					x = x + face.glyph.bitmap_left
 					y = y - face.glyph.bitmap_top
-					cr:set_source_rgba(1, 1, 1, 1)
+					self:setcolor'normal_fg'
 					cr:mask_surface(image, x, y)
 
 					if face.glyph.bitmap ~= bitmap then
@@ -186,31 +188,38 @@ inspect_face(face)
 
 local bi = 0
 local msel = 1
+local tsel = 1
+local charsize = 64
+local charspace = 24
+local linesize = 400
 function player:on_render(cr)
-	cr:set_source_rgba(0,0,0,1)
-	cr:paint()
 
-	face:select_charmap(face.charmaps[msel-1].encoding)
+	local theme_names = glue.keys(self.themes)
+	tsel = self:mbutton{id = 'theme_btn', x = 10, y = 10, w = 120, buttons = theme_names, selected = tsel}
+	self.theme = self.themes[theme_names[tsel]]
 
-	local n = 0; for _ in face:chars() do n = n + 1 end
-	local charsize, charspace = 64, 24
-	local linesize = 400
-	local size = linesize * (charsize + charspace)
-	local w = self.window.client_w
-	local h = self.window.client_h
-
-	bi = self:hscrollbar{x = 0, y = h - 40, w = w, h = 40, size = size, i = bi, autohide = true}
-	local j = charsize + charspace
-	for i=1,n,linesize do
-		draw_charmap(cr, face, charsize, charspace, -bi, j, -charsize, 0, w, h, i, i + linesize - 1)
-		j = j + charsize + charspace
-	end
+	charsize = self:slider{id = 'charsize_sl', x = 140, y = 10, w = 100, size = 200, i = charsize, min = 18}
 
 	local buttons = {}
 	for i=1,face.num_charmaps do
 		buttons[i] = 'Charmap '..i
 	end
-	msel = self:mbutton{id = 'charmap_btn', x = 10, y = 10, w = face.num_charmaps * 80, h = 22, buttons = buttons, selected = msel}
+	msel = self:mbutton{id = 'charmap_btn', x = 250, y = 10, w = face.num_charmaps * 80, h = 22, buttons = buttons, selected = msel}
+
+	face:select_charmap(face.charmaps[msel-1].encoding)
+
+	local n = 0; for _ in face:chars() do n = n + 1 end
+	local size = linesize * (charsize + charspace)
+	local w = self.w
+	local h = self.h
+
+	local j = charsize + charspace
+	for i=1,n,linesize do
+		self:charmap(face, charsize, charspace, -bi, j, -charsize, 0, w, h, i, i + linesize - 1)
+		j = j + charsize + charspace
+	end
+
+	bi = self:hscrollbar{id = 'hs', x = 0, y = h - 20, w = w, h = 20, size = size, i = bi, autohide = false}
 end
 
 player:play()
