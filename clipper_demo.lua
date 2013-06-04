@@ -3,21 +3,90 @@ local clipper = require'clipper'
 local ffi = require'ffi'
 local cairo = require'cairo'
 
-local i = 0
+local point_count = 20
+local first_poly = true
+local second_poly = true
+local result_poly = true
+local even_odd = true
+local seed = 0
+local offset = 5
+local command = 'intersection'
+local join_type = 'round'
+local miter_limit = 5
 
 function player:on_render(cr)
-	i = i + 1
-	math.randomseed(math.floor(i / 100))
 
-	local even_odd = i % 100 > 50
+	if self:button{
+		id = 'generate',
+		x = 10, y = 10, w = 160, h = 24,
+		text = 'generate',
+		theme = self.themes.red,
+	} then
+		seed = seed + 1
+	end
+
+	command = self:mbutton{
+		id = 'command',
+		x = 200, y = 10, w = 300, h = 24,
+		values = {'intersection', 'union', 'difference', 'xor'},
+		selected = command,
+	}
+
+	even_odd = self:mbutton{
+		id = 'even_odd',
+		x = 520, y = 10, w = 160, h = 24,
+		values = {true, false},
+		texts = {[true] = 'even odd', [false] = 'winding'},
+		selected = even_odd,
+	}
+
+	if self:button{id = 'first_poly', x = 700, y = 10, w = 60, h = 24, text = 'first', selected = first_poly, cut = 'right'} then
+		first_poly = not first_poly
+	end
+	if self:button{id = 'second_poly', x = 760, y = 10, w = 60, h = 24, text = 'second', selected = second_poly, cut = 'both'} then
+		second_poly = not second_poly
+	end
+	if self:button{id = 'result_poly', x = 820, y = 10, w = 60, h = 24, text = 'result', selected = result_poly, cut = 'left'} then
+		result_poly = not result_poly
+	end
+
+	point_count = self:slider{
+		id = 'point_count',
+		x = 10, y = 40, w = 160, h = 24,
+		size = 20, min = 1,
+		i = point_count,
+		text = 'points',
+	}
+
+	offset = self:slider{
+		id = 'offset',
+		x = 10, y = 100, w = 160, h = 24,
+		size = 20, min = 0,
+		i = offset,
+		text = 'offset',
+	}
+
+	join_type = self:mbutton{
+		id = 'join_type',
+		x = 10, y = 130, w = 160, h = 24,
+		values = {'round', 'square', 'miter'},
+		selected = join_type,
+	}
+
+	miter_limit = self:slider{
+		id = 'miter_limit',
+		x = 10, y = 160, w = 160, h = 24,
+		size = 100, min = 0,
+		i = miter_limit,
+		text = 'miter limit',
+	}
+
+	math.randomseed(seed)
 
 	cr:set_fill_rule(even_odd and
 		cairo.C.CAIRO_FILL_RULE_EVEN_ODD or
 		cairo.C.CAIRO_FILL_RULE_WINDING)
 	cr:set_line_width(1)
-
-	cr:set_source_rgba(0, 0, 0, 1)
-	cr:paint()
 
 	local scale = 1000000
 
@@ -67,19 +136,30 @@ function player:on_render(cr)
 		return p
 	end
 
-	local p1 = random_polys(20)
-	draw_polys(p1, 0.7, 0.7, 1, 0.2, 0.7, 0.7, 1, 0.5)
+	local p1 = random_polys(point_count)
+	local p2 = random_polys(point_count)
 
-	local p2 = random_polys(20)
-	draw_polys(p2, 0.7, 1, 0.7, 0.2, 0.7, 1, 0.7, 0.5)
+	if first_poly then
+		draw_polys(p1, 0.7, 0.7, 1, 0.2, 0.7, 0.7, 1, 0.5)
+	end
+
+	if second_poly then
+		draw_polys(p2, 0.7, 1, 0.7, 0.2, 0.7, 1, 0.7, 0.5)
+	end
 
 	local cl = clipper.new()
 	cl:add_subject(p1)
 	cl:add_clip(p2)
-	local p3 = cl:execute'intersection'
-	draw_polys(p3, 0, 1, 0, 0.5, 0, 1, 0, 1)
-	draw_polys(p3:offset(5 * scale, 'round'), 0, 1, 0, 0, 0, 1, 0, 1)
-	draw_polys(p3:offset(-5 * scale, 'round'), 0, 1, 0, 0, 0, 1, 0, 1)
+	local p3 = cl:execute(command)
+
+	if result_poly then
+		draw_polys(p3, 0, 1, 0, 0.5, 0, 1, 0, 1)
+	end
+
+	if offset > 0 then
+		draw_polys(p3:offset(offset * scale, join_type, miter_limit), 0, 1, 0, 0, 0, 1, 0, 1)
+		draw_polys(p3:offset(-offset * scale, join_type, miter_limit), 0, 1, 0, 0, 0, 1, 0, 1)
+	end
 end
 
 player:play()

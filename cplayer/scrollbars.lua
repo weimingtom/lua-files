@@ -1,5 +1,7 @@
 local player = require'cairo_player'
 
+local scroll_width = 16
+
 local function bar_size(x, w, size, i)
 	return w^2 / size
 end
@@ -37,22 +39,16 @@ end
 
 local function scrollbar(self, t, vertical)
 	local id = assert(t.id, 'id missing')
-	local x = t.x or self.cpx
-	local y = t.y or self.cpy
-	local w = assert(t.w or     vertical and self.theme.scrollbar_width, 'w missing')
-	local h = assert(t.h or not vertical and self.theme.scrollbar_width, 'h missing')
+	local x, y, w, h = self:getbox(t)
 	local size = assert(t.size, 'size missing')
 	local i = t.i or 0
 
-	if t.autohide and
-		((self.active and self.active ~= id) or
-		(not self.active and not self:hot(x, y, w, h)))
-	then
+	if t.autohide and self.active ~= id and not self:hotbox(x, y, w, h) then
 		return i
 	end
 
 	local bx, by, bw, bh = bar_box(x, y, w, h, size, i, vertical)
-	local hot = self:hot(bx, by, bw, bh)
+	local hot = self:hotbox(bx, by, bw, bh)
 
 	if not self.active and self.lbutton and hot then
 		self.active = id
@@ -72,17 +68,9 @@ local function scrollbar(self, t, vertical)
 	end
 
 	--drawing
-	local cr = self.cr
+	self:rect(x, y, w, h, 'faint_bg')
+	self:rect(bx, by, bw, bh, self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
 
-	cr:rectangle(x, y, w, h)
-	self:setcolor'faint_bg'
-	cr:fill()
-
-	cr:rectangle(bx, by, bw, bh)
-	self:setcolor(self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
-	cr:fill()
-
-	self:advance(x, y, w, h)
 	return i
 end
 
@@ -95,18 +83,36 @@ function player:vscrollbar(t)
 end
 
 function player:scrollbox(t)
-	local id = t.id
-	local x = t.x or self.cpx
-	local y = t.y or self.cpy
-	local w = assert(t.w, 'w missing')
-	local h = assert(t.h, 'h missing')
-	local vs = t.vscrollbar
-	local hs = t.hscrollbar
-	local vs_w = vs and not vs.autohide and (vs.w or self.theme.scollbar_width) or 0
-	local hs_h = hs and not hs.autohide and (hs.h or self.theme.scollbar_width) or 0
+	local id = assert(t.id, 'id missing')
+	local x, y, w, h = self:getbox(t)
+	local cx = t.cx or 0
+	local cy = t.cy or 0
+	local cw = assert(t.cw, 'cw missing')
+	local ch = assert(t.ch, 'ch missing')
+	local vscroll = t.vscroll or 'always' --auto, always, never
+	local hscroll = t.hscroll or 'always'
+	local vscroll_w = t.vscroll_w or scroll_width
+	local hscroll_h = t.hscroll_h or scroll_width
 
-	self:pushclip(x, y, w - vs_w, h - hs_h)
+	local need_vscroll = vscroll == 'always' or (vscroll == 'auto' and ch > h -
+									((hscroll == 'always' or hscroll == 'auto' and cw > w - vscroll_w) and hscroll_h or 0))
+	local need_hscroll = hscroll == 'always' or (hscroll == 'auto' and cw > w - (need_vscroll and vscroll_w or 0))
+
+	w = need_vscroll and w - vscroll_w or w
+	h = need_hscroll and h - hscroll_h or h
+
+	--drawing
+	if need_vscroll then
+		cy = -self:vscrollbar{id = id .. '_vscrollbar', x = x + w, y = y, w = vscroll_w, h = h, size = ch, i = -cy}
+	end
+	if need_hscroll then
+		cx = -self:hscrollbar{id = id .. '_hscrollbar', x = x, y = y + h, w = w, h = hscroll_h, size = cw, i = -cx}
+	end
+
+	return
+		cx, cy,     --view offset coordinates
+		x, y, w, h  --view clipping rectangle
 end
 
-if not ... then require'cairo_player_ui_demo' end
+if not ... then require'cairo_player_demo' end
 

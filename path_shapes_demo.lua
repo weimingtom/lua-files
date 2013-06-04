@@ -5,10 +5,15 @@ local bezier2_to_bezier3 = require'path_bezier2'.to_bezier3
 
 local i = 60
 function player:on_render(cr)
-	i=i+1
-	cr:identity_matrix()
-	cr:set_source_rgb(0,0,0)
-	cr:paint()
+
+	i = self:slider{
+		id = 'n',
+		x = 10, y = 10, w = self.w - 20, h = 24, text = 'i',
+		size = 360,
+		min = 0,
+		step = 1,
+		i = i,
+	}
 
 	local x1,y1
 	local function write(s,...)

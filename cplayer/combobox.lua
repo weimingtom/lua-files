@@ -1,18 +1,16 @@
 local player = require'cairo_player'
 
 function player:combobox(t)
-	local id = t.id
-	local x = t.x or self.cpx
-	local y = t.y or self.cpy
-	local w = t.w
-	local h = t.h or 24
+	local id = assert(t.id, 'id missing')
+	local x, y, w, h = self:getbox(t)
 	local items, selected = t.items, t.selected
 	local text = selected or 'pick...'
+	local font_size = t.font_size or h / 2
 
 	local menu_h = 100
 
 	local down = self.lbutton
-	local hot = self:hot(x, y, w, h)
+	local hot = self:hotbox(x, y, w, h)
 
 	if not self.active and hot and down then
 		self.active = id
@@ -32,18 +30,11 @@ function player:combobox(t)
 	end
 
 	--drawing
-	local cr = self.cr
-
-	cr:rectangle(x, y, w, h)
-	self:setcolor'faint_bg'
-	cr:fill()
-
-	self:aligntext(text, x, y, w, h, 'left', 'middle')
-	self:setcolor'normal_fg'
-	cr:show_text(text)
+	self:rect(x, y, w, h, 'faint_bg')
+	self:text(text, font_size, 'normal_fg', 'left', 'middle', x, y, w, h)
 
 	return self.cmenu
 end
 
-if not ... then require'cairo_player_ui_demo' end
+if not ... then require'cairo_player_demo' end
 

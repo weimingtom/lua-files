@@ -36,8 +36,8 @@ function player:on_render(cr)
 		cr:fill()
 	end
 
-	local x0 = self.mouse_x or self.window.client_w/2
-	local y0 = self.mouse_y or self.window.client_h/2
+	local x0 = self.mousex or self.window.client_w/2
+	local y0 = self.mousey or self.window.client_h/2
 
 	local dists = {}
 	local lens = {}

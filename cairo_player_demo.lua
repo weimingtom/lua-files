@@ -1,23 +1,121 @@
 local player = require'cairo_player'
+local glue = require'glue'
 
-math.randomseed(os.time())
+local t = {
+	tab = 'tab1',
+	text1 = 'edit me',
+	text2 = 'edit me too as I am a very long string that wants to be edited',
+	text3 = '"this is me quoting myself" - me',
+	percent = 50,
+	fruit = 'cherries',
+	theme = 'dark',
+}
 
-local c = 0
 function player:on_render(cr)
-	if c % 100 == 0 then
-		cr:identity_matrix()
-		cr:translate(500, 400)
-		c = 0
+
+	local cpx, cpy = 10, 10
+
+	--[[
+	local screenbox = self:getbox()
+	local leftbox, rightbox = screenbox:vsplit(nil, 200)
+	local topbox, bottombox = leftbox:hsplit(200, nil)
+
+	self:setbox(topbox)
+
+	self:setbox(leftbox)
+
+	self:setbox(rightbox)
+
+	self:setbox(bottombox)
+
+
+	for box in topbox:nsplit(5) do
+		self:setbox(box)
+		--
 	end
-	c = c + 1
-	local i = math.random(100)
-	cr:translate(i, i)
-	cr:rotate(i)
-	cr:set_source_rgba(i/100,i/100,0,.97)
-	cr:rectangle(0,0,100,100)
-	cr:fill_preserve()
-	cr:set_source_rgba(1-i/100,1-i/100,0,1)
-	cr:stroke()
+
+	self:autoadvance(0, 1)
+
+	self:editbox()
+	self:editbox()
+	self:editbox()
+]]
+
+
+
+	local rx, ry, rw, rh = cpx, cpy, 260, 120
+	t.vx = self:hscrollbar{id = 'hs', x = rx, y = ry + rh, w = rw, h = 16, size = rw * 2, i = t.vx, autohide = false}
+	t.vy = self:vscrollbar{id = 'vs', x = rx + rw, y = ry, w = 16, h = rh, size = rh * 2, i = t.vy, autohide = true}
+
+	cr:rectangle(rx, ry, rw, rh)
+	cr:clip()
+	cr:set_source_rgba(1,1,1,0.1)
+	cr:paint()
+
+	if self:button{id = 'apples_btn', x = rx - t.vx, y = ry - t.vy, w = 100, h = 22, text = 'go apples!'} then
+		t.fruit = 'apples'
+	end
+
+	if self:button{id = 'bannanas_btn', x = rx - t.vx, y = ry + 30 - t.vy, w = 100, h = 22, text = 'go bannanas!'} then
+		t.fruit = 'bannanas'
+	end
+
+	if self:button{id = 'undecided_btn', x = rx - t.vx, y = ry + 2*30 - t.vy, w = 100, h = 22, text = 'meh, dunno...'} then
+		t.fruit = nil
+	end
+
+	t.fruit = self:mbutton{id = 'fruits_btn', x = rx - t.vx, y = ry + 3*30 - t.vy, w = 260, h = 22,
+									values = {'apples', 'bannanas', 'cherries'}, selected = t.fruit}
+
+	cr:reset_clip()
+
+	cpy = cpy + rh + 16 + 10
+
+	t.text1 = self:editbox{id = 'ed1', x = 10, y = cpy, w = 200, h = 22, text = t.text1, next_tab = 'ed2', prev_tab = 'ed3'}
+	cpy = cpy + 22 + 10
+	t.text2 = self:editbox{id = 'ed2', x = 10, y = cpy, w = 200, h = 22, text = t.text2, next_tab = 'ed3', prev_tab = 'ed1'}
+	cpy = cpy + 22 + 10
+	t.text3 = self:editbox{id = 'ed3', x = 10, y = cpy, w = 200, h = 22, text = t.text3, next_tab = 'ed1', prev_tab = 'ed2'}
+	cpy = cpy + 22 + 10
+
+	t.percent = self:slider{id = 'slider', x = 10, y = cpy, w = 200, h = 22, size = 100, i = t.percent, step = 10}
+	cpy = cpy + 22 + 10
+
+	local theme_names = glue.keys(self.themes); table.sort(theme_names)
+	t.theme = self:mbutton{id = 'theme_btn', x = 10, y = cpy, w = 120, h = 22, values = theme_names, selected = t.theme}
+	self.theme = self.themes[t.theme]
+	cpy = cpy + 22 + 10
+
+	t.filename = self:filebox{id = 'filebox', x = 10, y = cpy, w = 200, h = 22, filename = t.filename}
+	cpy = cpy + 22 + 10
+
+	local menu = self:combobox{id = 'combo', x = 10, y = cpy, w = 100, h = 22, items = {'item1', 'item2', 'item3'},
+										selected = t.combo_item}
+	cpy = cpy + 22 + 10
+
+	t.tab = self:tabs{id = 'tabs', x = 10, y = cpy, w = 200, h = 22,
+							values = {'tab1', 'tab2', 'tab3'}, selected = t.tab}
+	cpy = cpy + 22 + 10
+
+	t.menu_item = self:menu{id = 'menu', x = 10, y = cpy, w = 100, h = 100,
+										items = {'item1', 'item2', 'item3'}, selected = t.menu_item}
+	cpy = cpy + 100 + 10
+
+	if menu then
+		menu.selected = t.combo_item
+		local clicked
+		t.combo_item, clicked = self:menu(menu)
+		if clicked then t.cmenu = nil end
+	end
+
+	local x, y, w, h
+	self.cx, self.cy, x, y, w, h =
+		self:scrollbox{id = 'scrollbox', x = 300, y = 10, w = 200, h = 200, cx = self.cx, cy = self.cy, cw = 500, ch = 500}
+
+	self.cr:rectangle(x, y, w, h)
+	self.cr:clip()
+	self:rect(300 + self.cx, 10 + self.cy, 500, 500, 'normal_bg', 'normal_border', 10)
+
 end
 
 player:play()

@@ -2,12 +2,18 @@ local player = require'cairo_player'
 local bezier2 = require'path_bezier2_ai'
 local glue = require'glue'
 
-local i=1
+local scale = 1
+
 function player:on_render(cr)
-	i=i+1/i
-	cr:identity_matrix()
-	cr:set_source_rgb(0,0,0)
-	cr:paint()
+
+	scale = self:slider{
+		id = 'scale',
+		x = 10, y = 10, w = self.w - 20, h = 24, text = 'scale',
+		size = 1,
+		min = 0,
+		step = 0.001,
+		i = scale,
+	}
 
 	local function label(x, y, ...)
 		cr:move_to(x, y)
@@ -29,7 +35,7 @@ function player:on_render(cr)
 		dots = {}
 		cr:move_to(cpx,cpy)
 		glue.append(dots, cpx, cpy)
-		bezier2(write, cpx, cpy, x2, y2, x3, y3, i)
+		bezier2(write, cpx, cpy, x2, y2, x3, y3, scale)
 		cr:set_source_rgb(1,1,1)
 		cr:set_line_width(2)
 		cr:stroke()
@@ -44,8 +50,6 @@ function player:on_render(cr)
 
 		label(cpx, cpy - 10, 'segments: %d', lines)
 	end
-
-	label(100, 40, 'scale: %f', i)
 
 	cr:translate(100,100)
 	bez(0,0,50,1000,100,0)

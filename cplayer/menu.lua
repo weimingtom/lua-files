@@ -1,11 +1,10 @@
 local player = require'cairo_player'
 
 function player:menu(t)
-	local id = t.id
-	local x = t.x or self.cpx
-	local y = t.y or self.cpy
-	local w, h, items = t.w, t.h, t.items
-	local item_h = t.item_h or 24
+	local id = assert(t.id, 'id missing')
+	local x, y, w, h = self:getbox(t)
+	local items = t.items
+	local item_h = t.item_h or 22
 	local selected = t.selected
 
 	local clicked
@@ -21,5 +20,5 @@ function player:menu(t)
 	return selected, clicked
 end
 
-if not ... then require'cairo_player_ui_demo' end
+if not ... then require'cairo_player_demo' end
 

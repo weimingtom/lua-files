@@ -42,13 +42,15 @@ local function button_path(cr, x1, y1, w, h, cut)
 end
 
 function player:button(t)
-	local id, x, y, w, h, text, cut, selected = t.id, t.x, t.y, t.w, t.h or 24, t.text, t.cut, t.selected
-	x = x or self.cpx
-	y = y or self.cpy
+	local id = assert(t.id, 'id missing')
+	local x, y, w, h = self:getbox(t)
+	local text = t.text or 'OK'
+	local cut = t.cut
+	local selected = t.selected
 	local font_size = t.font_size or h / 2
 
 	local down = self.lbutton
-	local hot = self:hot(x, y, w, h)
+	local hot = self:hotbox(x, y, w, h)
 
 	local clicked = false
 	if not self.active and hot and down then
@@ -64,41 +66,32 @@ function player:button(t)
 	end
 
 	local color_state = (selected or self.active == id and hot and down) and 'selected'
-						or ((not self.active or self.active == id) and hot and 'hot') or 'normal'
+								or ((not self.active or self.active == id) and hot and 'hot') or 'normal'
 	local bg_color = color_state..'_bg'
 	local fg_color = color_state..'_fg'
 
 	--drawing
-	local cr = self.cr
+	local old_theme = self:save_theme(t.theme)
+	button_path(self.cr, x, y, w, h, cut)
+	self:fillstroke(bg_color, 'normal_border', 1)
+	self:text(text, font_size, fg_color, 'center', 'middle', x, y, w, h)
+	self.theme = old_theme
 
-	button_path(cr, x, y, w, h, cut)
-
-	self:setcolor(bg_color)
-	cr:fill_preserve()
-
-	self:setcolor'normal_border'
-	cr:set_line_width(self.theme.border_width)
-	cr:stroke()
-
-	cr:set_font_size(font_size)
-	self:aligntext(text, x, y, w, h, 'center', 'middle')
-	self:setcolor(fg_color)
-	cr:show_text(text)
-
-	self:advance(x, y, w, h)
 	return clicked
 end
 
 function player:mbutton(t)
-	local id, x, y, w, h, buttons, selected = t.id, t.x, t.y, t.w, t.h, t.buttons, t.selected
+	local id = assert(t.id, 'id missing')
+	local x, y, w, h = self:getbox(t)
+	local values, texts, selected = t.values, t.texts, t.selected
 
-	local bwidth = w/#buttons
-	for i=1,#buttons do
-		local cut = #buttons > 1 and (i==#buttons and 'left' or i==1 and 'right' or 'both')
-		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = buttons[i],
-							cut = cut, selected = selected == i}
+	local bwidth = w/#values
+	for i,v in ipairs(values) do
+		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
+		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
+							cut = cut, selected = selected == v}
 		then
-			selected = i
+			selected = v
 		end
 		x = x + bwidth
 	end
@@ -106,19 +99,19 @@ function player:mbutton(t)
 end
 
 function player:tabs(t)
-	local id, x, y, w, h, buttons, selected = t.id, t.x, t.y, t.w, t.h, t.buttons, t.selected
+	local id, x, y, w, h, values, texts, selected = t.id, t.x, t.y, t.w, t.h, t.values, t.texts, t.selected
 
-	local bwidth = w/#buttons
-	for i=1,#buttons do
-		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = buttons[i],
-							cut = 'both', selected = selected == i}
+	local bwidth = w/#values
+	for i,v in ipairs(values) do
+		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
+							cut = 'both', selected = selected == v}
 		then
-			selected = i
+			selected = v
 		end
 		x = x + bwidth
 	end
 	return selected
 end
 
-if not ... then require'cairo_player_ui_demo' end
+if not ... then require'cairo_player_demo' end
 

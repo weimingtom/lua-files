@@ -2,12 +2,43 @@ local player = require'cairo_player'
 local svgarc = require'path_svgarc'
 local matrix = require'affine2d'
 
-local i = 0
+local world_rotation = 0
+local rotation = 0
+local scale = 1
+
 function player:on_render(cr)
-	i=i+1
+
+	world_rotation = self:slider{
+		id = 'world_rotation',
+		x = 10, y = 10, w = 300, h = 24, text = 'world rotation',
+		size = 360,
+		min = 0,
+		step = 1,
+		i = world_rotation,
+	}
+
+	rotation = self:slider{
+		id = 'rotation',
+		x = 10, y = 40, w = 300, h = 24, text = 'arc rotation',
+		size = 360,
+		min = 0,
+		step = 1,
+		i = rotation,
+	}
+
+	scale = self:slider{
+		id = 'scale',
+		x = 10, y = 70, w = 300, h = 24, text = 'scale',
+		size = 5,
+		min = 0.1,
+		step = 0.01,
+		i = scale,
+	}
+
 	cr:identity_matrix()
-	cr:set_source_rgb(0,0,0)
-	cr:paint()
+	cr:translate(400, 500)
+	cr:scale(scale, scale)
+	cr:translate(-400, -500)
 
 	local cpx, cpy
 	local function write(_, x2, y2, x3, y3, x4, y4)
@@ -19,8 +50,7 @@ function player:on_render(cr)
 	end
 
 	local world_center_x, world_center_y = 500, 400
-	local world_angle = i / 10
-	local mt = matrix():rotate_around(world_center_x, world_center_y, world_angle)
+	local mt = matrix():rotate_around(world_center_x, world_center_y, world_rotation)
 
 	local function arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, r, g, b, a)
 		cr:move_to(mt(x1, y1))
@@ -31,7 +61,7 @@ function player:on_render(cr)
 
 	cr:set_line_width(2)
 
-	local x0, y0 = self.mouse_x or 0, self.mouse_y or 0
+	local x0, y0 = cr:device_to_user(self.mousex or 0, self.mousey or 0)
 	local mind, minx, miny, mint
 	local function hit(x1, y1, rx, ry, rotation, large, sweep, x2, y2)
 
@@ -53,12 +83,11 @@ function player:on_render(cr)
 
 	--the four svg elliptical arcs from http://www.w3.org/TR/SVG/images/paths/arcs02.svg
 	local function ellipses(tx, ty, large, sweep)
-		local rotation = i/5
 		local x1, y1, rx, ry, x2, y2 = tx+125, ty+75, 100, 50, tx+125+100, ty+75+50
 		local cx, cy, crx, cry = svgarc.to_elliptic_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt)
 
 		local cmt = cr:get_matrix()
-		cr:rotate_around(world_center_x, world_center_y, math.rad(world_angle))
+		cr:rotate_around(world_center_x, world_center_y, math.rad(world_rotation))
 		cr:translate(cx, cy)
 		cr:rotate(math.rad(rotation))
 		cr:translate(-125, -125)

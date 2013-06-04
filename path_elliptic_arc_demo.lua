@@ -3,9 +3,21 @@ local arc = require'path_elliptic_arc'
 local affine = require'affine2d'
 local glue = require'glue'
 
-local i = 0
+local scale = 1
+
 function player:on_render(cr)
-	i = i + 1
+
+	scale = self:slider{
+		id = 'scale',
+		x = 10, y = 10, w = self.w - 20, h = 24, text = 'scale',
+		size = 1500,
+		min = 0.1,
+		step = 0.1,
+		i = scale,
+	}
+
+	scale = math.max(0.1, scale + scale * self.wheel_delta)
+
 	local function draw_arc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		local x1, y1 = arc.endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		cr:move_to(x1, y1)
@@ -30,14 +42,10 @@ function player:on_render(cr)
 		cr:stroke()
 	end
 
-	cr:identity_matrix()
-	cr:set_source_rgb(0,0,0)
 	cr:set_font_size(16)
-	cr:paint()
 
-	local x0, y0 = self.mouse_x or 0, self.mouse_y or 0
+	local x0, y0 = self.mousex or 0, self.mousey or 0
 	local cx, cy, rx, ry, start_angle, sweep_angle, rotation = 500, 400, 300, 200, 0, 300, 30
-	local scale = i/10
 	local mt = affine():translate(500,300):translate(-cx*scale,-cy/2*scale):scale(scale,scale)
 	mt:translate(cx,cy):rotate(-27):translate(-cx,-cy)
 	draw_arc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, nil, nil, mt); stroke(1,1,1,10)

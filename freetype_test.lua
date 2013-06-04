@@ -184,27 +184,29 @@ local lib = ft:new()
 --local face = lib:new_face'media/fonts/DejaVuSerif.ttf'
 --local face = lib:new_face'media/fonts/amiri-regular.ttf'
 local face = lib:new_face'media/fonts/fireflysung.ttf'
-inspect_face(face)
+--inspect_face(face)
 
 local bi = 0
 local msel = 1
-local tsel = 1
+local tsel = 'dark'
 local charsize = 64
 local charspace = 24
 local linesize = 400
 function player:on_render(cr)
 
 	local theme_names = glue.keys(self.themes)
-	tsel = self:mbutton{id = 'theme_btn', x = 10, y = 10, w = 120, buttons = theme_names, selected = tsel}
-	self.theme = self.themes[theme_names[tsel]]
+	tsel = self:mbutton{id = 'theme_btn', x = 10, y = 10, w = 120, values = theme_names, selected = tsel}
+	self.theme = self.themes[tsel]
 
-	charsize = self:slider{id = 'charsize_sl', x = 140, y = 10, w = 100, size = 200, i = charsize, min = 18}
+	charsize = self:slider{id = 'charsize_sl', x = 140, y = 10, w = 100, h = 22, size = 1000, i = charsize, min = 18}
 
-	local buttons = {}
+	local values, texts = {}, {}
 	for i=1,face.num_charmaps do
-		buttons[i] = 'Charmap '..i
+		texts[i] = 'Charmap '..i
+		values[i] = i
 	end
-	msel = self:mbutton{id = 'charmap_btn', x = 250, y = 10, w = face.num_charmaps * 80, h = 22, buttons = buttons, selected = msel}
+	msel = self:mbutton{id = 'charmap_btn', x = 250, y = 10, w = face.num_charmaps * 80, h = 22,
+								values = values, texts = texts, selected = msel}
 
 	face:select_charmap(face.charmaps[msel-1].encoding)
 

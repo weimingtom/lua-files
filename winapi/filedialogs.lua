@@ -89,7 +89,7 @@ local function wcsmax(maxfield)
 end
 
 local function set_filter(s)
-	if type(s) == 'table' then s = concat(s,'\0') end
+	if type(s) == 'table' then s = table.concat(s,'\0') end
 	if type(s) == 'string' then s = s..'\0' end
 	return wcs(s)
 end
