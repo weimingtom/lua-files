@@ -2,10 +2,13 @@ local glue = require'glue'
 local ffi = require'ffi'
 local pp = require'pp'
 local ft = require'freetype'
-local player = require'cairo_player'
-local cairo = require'cairo'
 
-local function inspect_face(face)
+local function inspect_face(lib, facename)
+	local face = lib:new_face(facename)
+
+	print(facename)
+	print(('-'):rep(78))
+
 	local face_flag_names = {
 		[ft.FT_FACE_FLAG_SCALABLE]            = 'SCALABLE',
 		[ft.FT_FACE_FLAG_FIXED_SIZES]         = 'FIXED_SIZES',
@@ -103,129 +106,18 @@ local function inspect_face(face)
 	face:set_pixel_sizes(16)
 	for i=0,face.num_charmaps-1 do
 		face:select_charmap(face.charmaps[i].encoding)
-		local n = 0
-		for _ in face:chars() do
-			n = n + 1
-		end
+		local n = face:char_count()
 		print(string.format('charmap %d:              %d\tentries', i, n))
 	end
-end
 
-function player:charmap(
-	face, size, space,
-	x0, y0, --charmap upper left coords
-	bx1, by1, bx2, by2, --charmap screen bounding box
-	i0, i1 --glyph index range
-	)
-
-	local cr = self.cr
-
-	face:set_pixel_sizes(size)
-
-	local i = 1
-	local ii = 1
-	for char, glyph in face:chars() do
-
-		local x = x0 + (ii - 1) * (size + space)
-		local y = y0
-
-		if not i0 or i >= i0 and i <= i1 then
-
-			if not bx1 or (x >= bx1 and x <= bx2 and y >= by1 and y <= by2) then
-
-				face:load_glyph(glyph)
-
-				face.glyph:render()
-				assert(face.glyph.format == ft.FT_GLYPH_FORMAT_BITMAP)
-
-				local bitmap = face.glyph.bitmap
-				assert(bitmap.pixel_mode == ft.FT_PIXEL_MODE_GRAY)
-
-				if bitmap.width > 0 and bitmap.rows > 0 then
-
-					if bitmap.pitch % 4 ~= 0 then
-						bitmap = face.glyph.library:new_bitmap()
-						face.glyph.library:convert_bitmap(face.glyph.bitmap, bitmap, 4)
-						assert(bitmap.pixel_mode == ft.FT_PIXEL_MODE_GRAY)
-						assert(bitmap.pitch % 4 == 0)
-					end
-
-					local image = cairo.cairo_image_surface_create_for_data(
-						bitmap.buffer,
-						cairo.CAIRO_FORMAT_A8,
-						face.glyph.bitmap.width,
-						face.glyph.bitmap.rows,
-						cairo.cairo_format_stride_for_width(cairo.CAIRO_FORMAT_A8, face.glyph.bitmap.width))
-
-					x = x + face.glyph.bitmap_left
-					y = y - face.glyph.bitmap_top
-					self:setcolor'normal_fg'
-					cr:mask_surface(image, x, y)
-
-					if face.glyph.bitmap ~= bitmap then
-						face.glyph.library:free_bitmap(bitmap)
-					end
-
-					image:free()
-
-				end
-
-			end
-
-			ii = ii + 1
-		end
-
-		i = i + 1
-	end
+	print()
+	face:free()
 end
 
 local lib = ft:new()
 
---local face = lib:new_face'media/fonts/DejaVuSerif.ttf'
---local face = lib:new_face'media/fonts/amiri-regular.ttf'
-local face = lib:new_face'media/fonts/fireflysung.ttf'
---inspect_face(face)
-
-local bi = 0
-local msel = 1
-local tsel = 'dark'
-local charsize = 64
-local charspace = 24
-local linesize = 400
-function player:on_render(cr)
-
-	local theme_names = glue.keys(self.themes)
-	tsel = self:mbutton{id = 'theme_btn', x = 10, y = 10, w = 120, values = theme_names, selected = tsel}
-	self.theme = self.themes[tsel]
-
-	charsize = self:slider{id = 'charsize_sl', x = 140, y = 10, w = 100, h = 22, size = 1000, i = charsize, min = 18}
-
-	local values, texts = {}, {}
-	for i=1,face.num_charmaps do
-		texts[i] = 'Charmap '..i
-		values[i] = i
-	end
-	msel = self:mbutton{id = 'charmap_btn', x = 250, y = 10, w = face.num_charmaps * 80, h = 22,
-								values = values, texts = texts, selected = msel}
-
-	face:select_charmap(face.charmaps[msel-1].encoding)
-
-	local n = 0; for _ in face:chars() do n = n + 1 end
-	local size = linesize * (charsize + charspace)
-	local w = self.w
-	local h = self.h
-
-	local j = charsize + charspace
-	for i=1,n,linesize do
-		self:charmap(face, charsize, charspace, -bi, j, -charsize, 0, w, h, i, i + linesize - 1)
-		j = j + charsize + charspace
-	end
-
-	bi = self:hscrollbar{id = 'hs', x = 0, y = h - 20, w = w, h = 20, size = size, i = bi, autohide = false}
-end
-
-player:play()
-
-face:free()
+inspect_face(lib, 'media/fonts/DejaVuSerif.ttf')
+inspect_face(lib, 'media/fonts/amiri-regular.ttf')
+inspect_face(lib, 'media/fonts/fireflysung.ttf')
 
 lib:free()

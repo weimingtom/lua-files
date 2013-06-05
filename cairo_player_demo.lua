@@ -78,7 +78,7 @@ function player:on_render(cr)
 	t.text3 = self:editbox{id = 'ed3', x = 10, y = cpy, w = 200, h = 22, text = t.text3, next_tab = 'ed1', prev_tab = 'ed2'}
 	cpy = cpy + 22 + 10
 
-	t.percent = self:slider{id = 'slider', x = 10, y = cpy, w = 200, h = 22, size = 100, i = t.percent, step = 10}
+	t.percent = self:slider{id = 'slider', x = 10, y = cpy, w = 200, h = 22, size = 100, i = t.percent, i1 = 100, step = 10}
 	cpy = cpy + 22 + 10
 
 	local theme_names = glue.keys(self.themes); table.sort(theme_names)

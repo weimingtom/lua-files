@@ -197,15 +197,23 @@ function player:window(t)
 		self.leftclick = self.rbutton and not buttons.rbutton
 		self.lbutton = buttons.lbutton
 		self.rbutton = buttons.rbutton
-		self.wheel_delta = wheel_delta and wheel_delta / 120 or 0
+		self.wheel_delta = self.wheel_delta + (wheel_delta and wheel_delta / 120 or 0)
 		panel:invalidate()
+	end
+
+	function panel.on_lbutton_down(panel, ...)
+		winapi.SetCapture(panel.hwnd)
+		panel.on_mouse_move(panel, ...)
+	end
+
+	function panel.on_lbutton_up(panel, ...)
+		winapi.ReleaseCapture()
+		panel.on_mouse_move(panel, ...)
 	end
 
 	panel.on_mouse_over = panel.on_mouse_move
 	panel.on_mouse_leave = panel.on_mouse_move
 	panel.on_lbutton_double_click = panel.on_mouse_move
-	panel.on_lbutton_down = panel.on_mouse_move
-	panel.on_lbutton_up = panel.on_mouse_move
 	panel.on_rbutton_double_click = panel.on_mouse_move
 	panel.on_rbutton_down = panel.on_mouse_move
 	panel.on_rbutton_up = panel.on_mouse_move
@@ -278,7 +286,7 @@ function player:fillstroke(fill_color, stroke_color, line_width)
 	elseif fill_color then
 		self:fill(fill_color)
 	elseif stroke_color then
-		self:stroke(stroke_color)
+		self:stroke(stroke_color, line_width)
 	end
 end
 
@@ -340,6 +348,7 @@ local submodules = {
 	scrollbox = 'scrollbars',
 	button = 'buttons',
 	mbutton = 'buttons',
+	togglebutton = 'buttons',
 	tabs = 'buttons',
 	slider = 'slider',
 	menu = 'menu',

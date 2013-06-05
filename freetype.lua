@@ -265,6 +265,17 @@ local function face_chars(face) --returns iterator<charcode, glyph_index>
 	end
 end
 
+local function face_char_count(face)
+	local gindex = ffi.new'FT_UInt[1]'
+	local charcode = M.FT_Get_First_Char(face, gindex)
+	local n = 0
+	while gindex[0] ~= 0 do
+		n = n + 1
+		charcode = M.FT_Get_Next_Char(face, charcode, gindex)
+	end
+	return n
+end
+
 function M.FT_Get_Name_Index(face, glyph_name)
 	return nonzero(C.FT_Get_Name_Index(face, glyph_name))
 end
@@ -405,6 +416,7 @@ ffi.metatype('FT_FaceRec', {__index = {
 	first_char = M.FT_Get_First_Char,
 	next_char = M.FT_Get_Next_Char,
 	chars = face_chars,
+	char_count = face_char_count,
 	name_index = M.FT_Get_Name_Index,
 	fstype_flags = M.FT_Get_FSType_Flags,
 	--glyph variants

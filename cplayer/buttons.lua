@@ -86,6 +86,7 @@ function player:mbutton(t)
 	local values, texts, selected = t.values, t.texts, t.selected
 
 	local bwidth = w/#values
+
 	for i,v in ipairs(values) do
 		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
 		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
@@ -96,6 +97,14 @@ function player:mbutton(t)
 		x = x + bwidth
 	end
 	return selected
+end
+
+function player:togglebutton(t)
+	if self:button(t) then
+		return not t.selected
+	else
+		return t.selected
+	end
 end
 
 function player:tabs(t)

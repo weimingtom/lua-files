@@ -7,13 +7,9 @@ local scale = 1
 
 function player:on_render(cr)
 
-	scale = self:slider{
-		id = 'scale',
-		x = 10, y = 10, w = self.w - 20, h = 24, text = 'scale',
-		size = 1500,
-		min = 0.1,
-		step = 0.1,
-		i = scale,
+	scale = self:slider{id = 'scale',
+		x = 10, y = 10, w = 400, h = 24, text = 'scale',
+		i0 = 0.1, i1 = 1500, step = 0.1, i = scale,
 	}
 
 	scale = math.max(0.1, scale + scale * self.wheel_delta)

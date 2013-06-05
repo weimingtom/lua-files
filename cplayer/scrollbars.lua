@@ -2,8 +2,8 @@ local player = require'cairo_player'
 
 local scroll_width = 16
 
-local function bar_size(x, w, size, i)
-	return w^2 / size
+local function bar_size(w, size)
+	return math.min(w^2 / size, w)
 end
 
 local function bar_offset(x, w, size, i, bw)
@@ -15,7 +15,7 @@ local function bar_offset_clamp(bx, x, w, bw)
 end
 
 local function bar_segment(x, w, size, i)
-	local bw = bar_size(x, w, size, i)
+	local bw = bar_size(w, size)
 	local bx = bar_offset(x, w, size, i, bw)
 	bx = bar_offset_clamp(bx, x, w, bw)
 	return bx, bw
@@ -23,6 +23,10 @@ end
 
 local function view_offset(bx, x, w, size)
 	return (bx - x) / w * size
+end
+
+local function view_offset_clamp(i, size, w)
+	return math.min(math.max(i, 0), size - w)
 end
 
 local function bar_box(x, y, w, h, size, i, vertical)
@@ -42,6 +46,12 @@ local function scrollbar(self, t, vertical)
 	local x, y, w, h = self:getbox(t)
 	local size = assert(t.size, 'size missing')
 	local i = t.i or 0
+
+	if vertical then
+		i = view_offset_clamp(i, size, h)
+	else
+		i = view_offset_clamp(i, size, w)
+	end
 
 	if t.autohide and self.active ~= id and not self:hotbox(x, y, w, h) then
 		return i

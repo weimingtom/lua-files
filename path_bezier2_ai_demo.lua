@@ -6,13 +6,9 @@ local scale = 1
 
 function player:on_render(cr)
 
-	scale = self:slider{
-		id = 'scale',
-		x = 10, y = 10, w = self.w - 20, h = 24, text = 'scale',
-		size = 1,
-		min = 0,
-		step = 0.001,
-		i = scale,
+	scale = self:slider{id = 'scale',
+		x = 10, y = 10, w = 400, h = 24, text = 'scale',
+		i1 = 10, i0 = 0.01, step = 0.01, i = scale,
 	}
 
 	local function label(x, y, ...)

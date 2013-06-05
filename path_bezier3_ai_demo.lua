@@ -2,24 +2,18 @@ local player = require'cairo_player'
 local bezier3 = require'path_bezier3_ai'
 local glue = require'glue'
 
-local scale = 1000
-local zoom = 1
+local scale = 1
+local zoom = 0.5
 function player:on_render(cr)
 
-	scale = self:slider{
-		id = 'scale',
-		x = 10, y = 10, w = self.w - 20, h = 24, text = 'scale',
-		size = 10000,
-		min = 1,
-		i = scale,
+	scale = self:slider{id = 'scale',
+		x = 10, y = 10, w = 400, h = 24, text = 'scale',
+		i0 = 0.1, i1 = 10, step = 0.01, i = scale,
 	}
 
-	zoom = self:slider{
-		id = 'zoom',
-		x = 10, y = 30, w = self.w - 20, h = 24, text = 'zoom',
-		size = 10,
-		min = 0.1,
-		i = zoom,
+	zoom = self:slider{id = 'zoom',
+		x = 10, y = 40, w = 400, h = 24, text = 'zoom',
+		i0 = 0.1, i1 = 10, step = 0.1, i = zoom,
 	}
 
 	local function label(x, y, ...)
@@ -54,7 +48,7 @@ function player:on_render(cr)
 		lines = 0
 		dots = {}
 		cr:move_to(cpx,cpy)
-		bezier3(write, cpx, cpy, x2, y2, x3, y3, x4, y4, scale / 1000)
+		bezier3(write, cpx, cpy, x2, y2, x3, y3, x4, y4, scale)
 		cr:set_source_rgb(1,1,1)
 		cr:set_line_width(2)
 		cr:stroke()
@@ -85,13 +79,10 @@ function player:on_render(cr)
 	local function reset()
 		cr:identity_matrix()
 		cr:translate(0, 50)
-		cr:scale(.5, .5)
 		cr:scale(zoom, zoom)
 	end
 
 	reset()
-
-	label(100, 40, 'scale: %f', scale / 1000)
 
 	cr:translate(100,100)
 	bez(0,0,150,150,250,150,400,0)

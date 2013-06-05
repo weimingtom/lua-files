@@ -3,24 +3,20 @@ local path_cairo = require'path_cairo'
 local tangent_vector = require'path_elliptic_arc'.tangent_vector
 
 local angle = 0
-local sign = 1
+local clockwise = true
 function player:on_render(cr)
 
-	angle = self:slider{
-		id = 'angle',
+	angle = self:slider{id = 'angle',
 		x = 10, y = 10, w = 200, h = 24, text = 'angle',
-		size = 360,
-		min = 0,
-		i = angle,
-	}
+		i1 = 360, i0 = 0, i = angle}
 
-	if self:button{id = 'sign', x = 10, y = 40, w = 200, h = 24, text = 'clockwise', selected = sign == 1} then
-		sign = 0 - sign
-	end
+	clockwise = self:togglebutton{id = 'sign',
+		x = 220, y = 10, w = 80, h = 24, text = 'clockwise',
+		selected = clockwise}
 
 	local draw = path_cairo(cr)
 
-	local cx, cy, rx, ry, start_angle, sweep_angle, rotation = 500, 200, 200, 100, 0, (angle % 360)*sign, 30
+	local cx, cy, rx, ry, start_angle, sweep_angle, rotation = 500, 200, 200, 100, 0, (angle % 360)*(clockwise and 1 or -1), 30
 	draw{'elliptic_arc', cx, cy, rx, ry, start_angle, sweep_angle, rotation}
 	cr:set_source_rgb(1,1,1)
 	cr:stroke()

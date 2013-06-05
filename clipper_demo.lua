@@ -53,7 +53,7 @@ function player:on_render(cr)
 	point_count = self:slider{
 		id = 'point_count',
 		x = 10, y = 40, w = 160, h = 24,
-		size = 20, min = 1,
+		i0 = 3, i1 = 20,
 		i = point_count,
 		text = 'points',
 	}
@@ -61,7 +61,7 @@ function player:on_render(cr)
 	offset = self:slider{
 		id = 'offset',
 		x = 10, y = 100, w = 160, h = 24,
-		size = 20, min = 0,
+		i0 = 0, i1 = 20,
 		i = offset,
 		text = 'offset',
 	}
@@ -76,7 +76,7 @@ function player:on_render(cr)
 	miter_limit = self:slider{
 		id = 'miter_limit',
 		x = 10, y = 160, w = 160, h = 24,
-		size = 100, min = 0,
+		i0 = 0, i1 = 100,
 		i = miter_limit,
 		text = 'miter limit',
 	}
@@ -117,15 +117,16 @@ function player:on_render(cr)
 	end
 
 	local function random_polys(n)
-		n = math.floor(n / 2)
+		local n1 = math.floor(n / 2)
+		local n2 = math.ceil(n / 2)
 		--you can preallocate elements...
-		local p = clipper.polygon(n)
-		for i=1,n do
+		local p = clipper.polygon(n1)
+		for i=1,n1 do
 			p:get(i).x = math.random(100, 1000) * scale
 			p:get(i).y = math.random(100, 600) * scale
 		end
 		--or you can add elements one by one...
-		for i=1,n do
+		for i=1,n2 do
 			p:add(math.random(100, 1000) * scale, math.random(100, 600) * scale)
 		end
 

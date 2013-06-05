@@ -8,11 +8,8 @@ function player:on_render(cr)
 
 	i = self:slider{
 		id = 'n',
-		x = 10, y = 10, w = self.w - 20, h = 24, text = 'i',
-		size = 360,
-		min = 0,
-		step = 1,
-		i = i,
+		x = 10, y = 10, w = 200, h = 24, text = 'i',
+		i0 = 0, i1 = 360, step = 1, i = i,
 	}
 
 	local x1,y1

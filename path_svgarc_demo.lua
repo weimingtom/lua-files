@@ -8,31 +8,19 @@ local scale = 1
 
 function player:on_render(cr)
 
-	world_rotation = self:slider{
-		id = 'world_rotation',
+	world_rotation = self:slider{id = 'world_rotation',
 		x = 10, y = 10, w = 300, h = 24, text = 'world rotation',
-		size = 360,
-		min = 0,
-		step = 1,
-		i = world_rotation,
+		i0 = 0, i1 = 360, step = 1, i = world_rotation,
 	}
 
-	rotation = self:slider{
-		id = 'rotation',
+	rotation = self:slider{id = 'rotation',
 		x = 10, y = 40, w = 300, h = 24, text = 'arc rotation',
-		size = 360,
-		min = 0,
-		step = 1,
-		i = rotation,
+		i0 = 0, i1 = 360, step = 1, i = rotation,
 	}
 
-	scale = self:slider{
-		id = 'scale',
+	scale = self:slider{id = 'scale',
 		x = 10, y = 70, w = 300, h = 24, text = 'scale',
-		size = 5,
-		min = 0.1,
-		step = 0.01,
-		i = scale,
+		i0 = 0.1, i1 = 5, step = 0.01, i = scale,
 	}
 
 	cr:identity_matrix()
