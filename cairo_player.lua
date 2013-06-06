@@ -360,7 +360,7 @@ end
 
 --submodule autoloader
 
-local submodules = {
+local autoload = {
 	editbox = 'editbox',
 	vscrollbar = 'scrollbars',
 	hscrollbar = 'scrollbars',
@@ -377,8 +377,8 @@ local submodules = {
 }
 
 setmetatable(player, {__index = function(_, k)
-	if submodules[k] then
-		require('cplayer.' .. submodules[k])
+	if autoload[k] then
+		require('cplayer.' .. autoload[k])
 		return player[k]
 	end
 end})
