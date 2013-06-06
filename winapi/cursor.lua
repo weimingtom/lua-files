@@ -53,6 +53,7 @@ end
 
 if not ... then
 print(LoadCursor(IDC_ARROW))
+assert(LoadCursor(IDC_ARROW) == LoadCursor(IDC_ARROW)) --same handle every time, no worry about freeing these
 print(LoadCursor(IDC_HELP))
 end
 

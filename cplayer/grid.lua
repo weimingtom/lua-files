@@ -1,3 +1,18 @@
+--[[
+bugs:
+- vert. scroll should not scroll header, only content
+todo:
+- auto ellipsis and/or clipping
+- column sorting: so rows get to be in grid state too?
+- column auto-width: distribute grid width proportionally among columns to avoid horiz. scrolling
+- per column min. width
+- quick search: specify column to search to
+- cell select mode
+- multicell select mode
+- editable cells: immediate mode (click) or click-click mode; tab goes to next cell; right/left goes to next/prev cell
+-
+
+]]
 local player = require'cairo_player'
 
 function player:grid(t)
@@ -11,13 +26,31 @@ function player:grid(t)
 		selected_row = 1
 	}
 	local default_col_w = 100
+	local min_col_w = 20
 	local col_spacing = 4
 	local row_h = 24
 	local font_size = t.font_size or row_h/2
 
+	if self.active == id then
+		if self.lbutton then
+			state.col_widths[self.ui.resize_col] = math.max(self.mousex - self.ui.field_x - x, min_col_w)
+		else
+			self.active = nil
+		end
+	end
+
+	if self.focused == id then
+		if self.key == 'down' or self.key == 'right' then
+			state.selected_row = math.min(state.selected_row + 1, #rows)
+			state.cy = math.min(state.cy, state.selected_row * row_h)
+		elseif self.key == 'up' or self.key == 'left' then
+			state.selected_row = math.max(state.selected_row - 1, 1)
+		end
+	end
+
 	local cw = 0
 	for i,name in ipairs(fields) do
-		cw = cw + (field_meta and field_meta[name] and field_meta[name].w or default_col_w)
+		cw = cw + (state.col_widths and state.col_widths[name] or default_col_w)
 		cw = cw + (i < #fields and col_spacing or 0)
 	end
 	local ch = (1 + #rows) * row_h
@@ -47,8 +80,17 @@ function player:grid(t)
 	local field_x = 0
 	for i,name in ipairs(fields) do
 		local field = field_meta and field_meta[name]
-		local col_w = field and field.w or default_col_w
+		local col_w = state.col_widths and state.col_widths[name] or default_col_w
 		local col_align = field and field.align or 'left'
+
+		if self:hotbox(field_x + col_w - 5, 0, 10, row_h) then
+			self.cursor = 'resize_horizontal'
+			if not self.active then
+				self.active = id
+				self.ui.resize_col = name
+				self.ui.field_x = field_x + cx
+			end
+		end
 
 		self:text(name, font_size, 'selected_fg', col_align, 'middle', field_x, 0, col_w, row_h)
 
@@ -60,10 +102,11 @@ function player:grid(t)
 	for j,row in ipairs(rows) do
 
 		local selrow = state.selected_row == j
-		local hotrow = self:hotbox(0, field_y, cw, row_h)
+		local hotrow = not self.active and self:hotbox(0, field_y, cw, row_h)
 		if hotrow and self.clicked then
 			state.selected_row = j
 			selrow = true
+			self.focused = id
 		end
 
 		if selrow or hotrow then
@@ -72,7 +115,7 @@ function player:grid(t)
 
 		for i,name in ipairs(fields) do
 			local field = field_meta and field_meta[name]
-			local col_w = field and field.w or default_col_w
+			local col_w = state.col_widths and state.col_widths[name] or default_col_w
 			local col_align = field and field.align or 'left'
 			local v = tostring(row[i])
 

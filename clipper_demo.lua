@@ -40,15 +40,9 @@ function player:on_render(cr)
 		selected = even_odd,
 	}
 
-	if self:button{id = 'first_poly', x = 700, y = 10, w = 60, h = 24, text = 'first', selected = first_poly, cut = 'right'} then
-		first_poly = not first_poly
-	end
-	if self:button{id = 'second_poly', x = 760, y = 10, w = 60, h = 24, text = 'second', selected = second_poly, cut = 'both'} then
-		second_poly = not second_poly
-	end
-	if self:button{id = 'result_poly', x = 820, y = 10, w = 60, h = 24, text = 'result', selected = result_poly, cut = 'left'} then
-		result_poly = not result_poly
-	end
+	first_poly  = self:togglebutton{id = 'first_poly',  x = 700, y = 10, w = 60, h = 24, text = 'first',  selected = first_poly,  cut = 'right'}
+	second_poly = self:togglebutton{id = 'second_poly', x = 760, y = 10, w = 60, h = 24, text = 'second', selected = second_poly, cut = 'both'}
+	result_poly = self:togglebutton{id = 'result_poly', x = 820, y = 10, w = 60, h = 24, text = 'result', selected = result_poly, cut = 'left'}
 
 	point_count = self:slider{
 		id = 'point_count',

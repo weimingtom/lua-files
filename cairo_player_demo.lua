@@ -16,34 +16,6 @@ function player:on_render(cr)
 
 	local cpx, cpy = 10, 10
 
-	--[[
-	local screenbox = self:getbox()
-	local leftbox, rightbox = screenbox:vsplit(nil, 200)
-	local topbox, bottombox = leftbox:hsplit(200, nil)
-
-	self:setbox(topbox)
-
-	self:setbox(leftbox)
-
-	self:setbox(rightbox)
-
-	self:setbox(bottombox)
-
-
-	for box in topbox:nsplit(5) do
-		self:setbox(box)
-		--
-	end
-
-	self:autoadvance(0, 1)
-
-	self:editbox()
-	self:editbox()
-	self:editbox()
-]]
-
-
-
 	local rx, ry, rw, rh = cpx, cpy, 260, 120
 	t.vx = self:hscrollbar{id = 'hs', x = rx, y = ry + rh, w = rw, h = 16, size = rw * 2, i = t.vx, autohide = false}
 	t.vy = self:vscrollbar{id = 'vs', x = rx + rw, y = ry, w = 16, h = rh, size = rh * 2, i = t.vy, autohide = true}
@@ -122,23 +94,45 @@ function player:on_render(cr)
 	self:grid{id = 'grid', x = 530, y = 10, w = 400, h = 200,
 		fields = {'id', 'name', 'description'},
 		field_meta = {
-			id = {w = 50, align = 'right'},
-			description = {w = 300},
+			id = {align = 'right'},
 		},
 		rows = {
 			{1, 'goon', 'woody quality'},
 			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'tit', 'tinny quality'},
-			{2, 'end', 'endy quality'},
+			{3, 'tit', 'tinny quality'},
+			{4, 'tit', 'tinny quality'},
+			{5, 'tit', 'tinny quality'},
+			{6, 'tit', 'tinny quality'},
+			{7, 'tit', 'tinny quality'},
+			{8, 'tit', 'tinny quality'},
+			{9, 'tit', 'tinny quality'},
+			{10,'end', 'endy quality'},
 		},
 		state = t.grid_state or {
 			selected_row = 5,
+			col_widths = {
+				id = 50,
+				description = 300,
+			},
+		},
+	}
+
+	t.node13 = t.node13 or
+			{name = 'level1.3',
+				'level2.1',
+				'level2.2',
+			}
+
+	t.tree_state =
+	self:treeview{id = 'tree', x = 530, y = 220, w = 400, h = 200,
+		nodes = {
+			'level1.1',
+			'level1.2',
+			t.node13,
+			'level1.4',
+		},
+		state = t.tree_state or {
+			open_nodes = {[t.node13] = true},
 		},
 	}
 

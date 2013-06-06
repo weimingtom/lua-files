@@ -27,6 +27,10 @@ function player:editbox(t)
 
 	local hot = self:hotbox(x, y, w, h)
 
+	if hot and not self.active or self.active == id then
+		self.cursor = 'text'
+	end
+
 	cr:set_font_size(font_size)
 
 	local text_x = 0

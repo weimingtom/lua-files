@@ -52,6 +52,10 @@ function player:button(t)
 	local down = self.lbutton
 	local hot = self:hotbox(x, y, w, h)
 
+	if hot and (not self.active or self.active == id) then
+		self.cursor = 'link'
+	end
+
 	local clicked = false
 	if not self.active and hot and down then
 		self.active = id

@@ -65,6 +65,28 @@ local keynames = {
 	[0xde] = "'",
 }
 
+local cursors = { --names are by function not shape when possible
+	--pointers
+	normal = winapi.IDC_ARROW,
+	text = winapi.IDC_IBEAM,
+	link = winapi.IDC_HAND,
+	crosshair = winapi.IDC_CROSS,
+	invalid = winapi.IDC_NO,
+	--move and resize
+	resize_nwse = winapi.IDC_SIZENWSE,
+	resize_nesw = winapi.IDC_SIZENESW,
+	resize_horizontal = winapi.IDC_SIZEWE,
+	resize_vertical = winapi.IDC_SIZENS,
+	move = winapi.IDC_SIZEALL,
+	--app state
+	busy = winapi.IDC_WAIT,
+	background_busy = winapi.IDC_APPSTARTING,
+}
+
+local function set_cursor(name)
+	winapi.SetCursor(winapi.LoadCursor(assert(cursors[name or 'normal'])))
+end
+
 ffi.cdef'uint32_t GetTickCount();'
 
 local function fps_function()
@@ -106,7 +128,9 @@ function player:window(t)
 		w = t.w or 1200,
 		h = t.h or 600,
 	}
-	self.window = window
+	set_cursor() --reset the cursor (the app starts with the busy cursor)
+
+	self.window = window --needed by filebox
 
 	local panel = CPanel{
 		parent = window, w = window.client_w, h = window.client_h,
@@ -140,8 +164,9 @@ function player:window(t)
 	--layout state
 	self.layout = null_layout
 
-	--active widget state
+	--widget state
 	self.active = nil
+	self.focused = nil
 	self.ui = {}
 
 	--panel receives painting and mouse events
@@ -178,8 +203,14 @@ function player:window(t)
 		--set the wall clock
 		self.clock = ffi.C.GetTickCount()
 
+		--clear the cursor state
+		self.cursor = nil
+
 		--render the frame
 		self:on_render(self.cr)
+
+		--set the cursor if set in the frame, or reset it
+		set_cursor(self.cursor)
 
 		--reset the one-shot state vars
 		self.clicked = false
@@ -191,6 +222,7 @@ function player:window(t)
 		self.ctrl = nil
 		self.alt = nil
 		self.wheel_delta = 0
+		self.cursor = false
 	end
 
 	function panel.on_mouse_move(panel, x, y, buttons)
@@ -234,6 +266,10 @@ function player:window(t)
 		panel:invalidate()
 	end
 
+	function panel.on_set_cursor()
+		return true --we use our own cursor
+	end
+
 	--window receives keyboard and mouse wheel events
 
 	function window.on_mouse_wheel(window, x, y, buttons, wheel_delta)
@@ -241,7 +277,7 @@ function player:window(t)
 		panel:invalidate()
 	end
 
-	window.__wantallkeys = true --superhack
+	window.__wantallkeys = true --suppress TranslateMessage() that eats up our WM_CHARs
 
 	function window:WM_GETDLGCODE()
 		return winapi.DLGC_WANTALLKEYS
@@ -355,7 +391,7 @@ end
 
 function player:hotbox(x, y, w, h)
 	local mx, my = self.cr:device_to_user(self.mousex, self.mousey)
-	return mx >= x and mx <= x + w and my >= y and my <= y + h
+	return self.cr:in_clip(mx, my) and mx >= x and mx <= x + w and my >= y and my <= y + h
 end
 
 --submodule autoloader
@@ -374,6 +410,7 @@ local autoload = {
 	combobox = 'combobox',
 	filebox = 'filebox',
 	grid = 'grid',
+	treeview = 'treeview',
 }
 
 setmetatable(player, {__index = function(_, k)

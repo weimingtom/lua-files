@@ -21,7 +21,13 @@ function player:slider(t)
 	local i0, i1, step = t.i0 or 0, t.i1 or 100, t.step or 1
 	local i = t.i or i0
 
-	if not self.active and self.lbutton and self:hotbox(x, y, w, h) then
+	local hot = self:hotbox(x, y, w, h)
+
+	if hot and (not self.active or self.active == id) then
+		self.cursor = 'resize_horizontal'
+	end
+
+	if not self.active and self.lbutton and hot then
 		self.active = id
 	elseif self.active == id then
 		if self.lbutton then

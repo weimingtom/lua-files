@@ -99,6 +99,7 @@ function player:scrollbox(t)
 	local hscroll = t.hscroll or 'always'
 	local vscroll_w = t.vscroll_w or scroll_width
 	local hscroll_h = t.hscroll_h or scroll_width
+	local page_size = t.page_size or 120
 
 	local need_vscroll = vscroll == 'always' or (vscroll == 'auto' and ch > h -
 									((hscroll == 'always' or hscroll == 'auto' and cw > w - vscroll_w) and hscroll_h or 0))
@@ -106,6 +107,10 @@ function player:scrollbox(t)
 
 	w = need_vscroll and w - vscroll_w or w
 	h = need_hscroll and h - hscroll_h or h
+
+	if self.wheel_delta ~= 0 and not self.active and self:hotbox(x, y, w, h) then
+		cy = cy + self.wheel_delta * page_size
+	end
 
 	--drawing
 	if need_vscroll then
