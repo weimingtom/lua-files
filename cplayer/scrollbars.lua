@@ -26,7 +26,7 @@ local function view_offset(bx, x, w, size)
 end
 
 local function view_offset_clamp(i, size, w)
-	return math.min(math.max(i, 0), size - w)
+	return math.min(math.max(i, 0), math.max(size - w, 0))
 end
 
 local function bar_box(x, y, w, h, size, i, vertical)
@@ -45,13 +45,7 @@ local function scrollbar(self, t, vertical)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
 	local size = assert(t.size, 'size missing')
-	local i = t.i or 0
-
-	if vertical then
-		i = view_offset_clamp(i, size, h)
-	else
-		i = view_offset_clamp(i, size, w)
-	end
+	local i = view_offset_clamp(t.i or 0, size, vertical and h or w)
 
 	if t.autohide and self.active ~= id and not self:hotbox(x, y, w, h) then
 		return i
@@ -79,7 +73,9 @@ local function scrollbar(self, t, vertical)
 
 	--drawing
 	self:rect(x, y, w, h, 'faint_bg')
-	self:rect(bx, by, bw, bh, self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
+	if bw < w or bh < h then
+		self:rect(bx, by, bw, bh, self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
+	end
 
 	return i
 end

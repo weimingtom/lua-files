@@ -15,7 +15,7 @@ function player:combobox(t)
 	if not self.active and hot and down then
 		self.active = id
 	elseif self.active == id then
-		if hot and self.click then
+		if hot and self.clicked then
 			if not self.cmenu then
 				local menu_id = id .. '_menu'
 				self.cmenu = {id = menu_id, x = x, y = y + h, w = w, h = menu_h, items = items}

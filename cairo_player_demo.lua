@@ -9,6 +9,7 @@ local t = {
 	percent = 50,
 	fruit = 'cherries',
 	theme = 'dark',
+	grid_state = nil,
 }
 
 function player:on_render(cr)
@@ -52,50 +53,50 @@ function player:on_render(cr)
 	cr:set_source_rgba(1,1,1,0.1)
 	cr:paint()
 
-	if self:button{id = 'apples_btn', x = rx - t.vx, y = ry - t.vy, w = 100, h = 22, text = 'go apples!'} then
+	if self:button{id = 'apples_btn', x = rx - t.vx, y = ry - t.vy, w = 100, h = 24, text = 'go apples!'} then
 		t.fruit = 'apples'
 	end
 
-	if self:button{id = 'bannanas_btn', x = rx - t.vx, y = ry + 30 - t.vy, w = 100, h = 22, text = 'go bannanas!'} then
+	if self:button{id = 'bannanas_btn', x = rx - t.vx, y = ry + 30 - t.vy, w = 100, h = 24, text = 'go bannanas!'} then
 		t.fruit = 'bannanas'
 	end
 
-	if self:button{id = 'undecided_btn', x = rx - t.vx, y = ry + 2*30 - t.vy, w = 100, h = 22, text = 'meh, dunno...'} then
+	if self:button{id = 'undecided_btn', x = rx - t.vx, y = ry + 2*30 - t.vy, w = 100, h = 24, text = 'meh, dunno...'} then
 		t.fruit = nil
 	end
 
-	t.fruit = self:mbutton{id = 'fruits_btn', x = rx - t.vx, y = ry + 3*30 - t.vy, w = 260, h = 22,
+	t.fruit = self:mbutton{id = 'fruits_btn', x = rx - t.vx, y = ry + 3*30 - t.vy, w = 260, h = 24,
 									values = {'apples', 'bannanas', 'cherries'}, selected = t.fruit}
 
 	cr:reset_clip()
 
 	cpy = cpy + rh + 16 + 10
 
-	t.text1 = self:editbox{id = 'ed1', x = 10, y = cpy, w = 200, h = 22, text = t.text1, next_tab = 'ed2', prev_tab = 'ed3'}
-	cpy = cpy + 22 + 10
-	t.text2 = self:editbox{id = 'ed2', x = 10, y = cpy, w = 200, h = 22, text = t.text2, next_tab = 'ed3', prev_tab = 'ed1'}
-	cpy = cpy + 22 + 10
-	t.text3 = self:editbox{id = 'ed3', x = 10, y = cpy, w = 200, h = 22, text = t.text3, next_tab = 'ed1', prev_tab = 'ed2'}
-	cpy = cpy + 22 + 10
+	t.text1 = self:editbox{id = 'ed1', x = 10, y = cpy, w = 200, h = 24, text = t.text1, next_tab = 'ed2', prev_tab = 'ed3'}
+	cpy = cpy + 24 + 10
+	t.text2 = self:editbox{id = 'ed2', x = 10, y = cpy, w = 200, h = 24, text = t.text2, next_tab = 'ed3', prev_tab = 'ed1'}
+	cpy = cpy + 24 + 10
+	t.text3 = self:editbox{id = 'ed3', x = 10, y = cpy, w = 200, h = 24, text = t.text3, next_tab = 'ed1', prev_tab = 'ed2'}
+	cpy = cpy + 24 + 10
 
-	t.percent = self:slider{id = 'slider', x = 10, y = cpy, w = 200, h = 22, size = 100, i = t.percent, i1 = 100, step = 10}
-	cpy = cpy + 22 + 10
+	t.percent = self:slider{id = 'slider', x = 10, y = cpy, w = 200, h = 24, size = 100, i = t.percent, i1 = 100, step = 10}
+	cpy = cpy + 24 + 10
 
 	local theme_names = glue.keys(self.themes); table.sort(theme_names)
-	t.theme = self:mbutton{id = 'theme_btn', x = 10, y = cpy, w = 120, h = 22, values = theme_names, selected = t.theme}
+	t.theme = self:mbutton{id = 'theme_btn', x = 10, y = cpy, w = 120, h = 24, values = theme_names, selected = t.theme}
 	self.theme = self.themes[t.theme]
-	cpy = cpy + 22 + 10
+	cpy = cpy + 24 + 10
 
-	t.filename = self:filebox{id = 'filebox', x = 10, y = cpy, w = 200, h = 22, filename = t.filename}
-	cpy = cpy + 22 + 10
+	t.filename = self:filebox{id = 'filebox', x = 10, y = cpy, w = 200, h = 24, filename = t.filename}
+	cpy = cpy + 24 + 10
 
-	local menu = self:combobox{id = 'combo', x = 10, y = cpy, w = 100, h = 22, items = {'item1', 'item2', 'item3'},
+	local menu = self:combobox{id = 'combo', x = 10, y = cpy, w = 100, h = 24, items = {'item1', 'item2', 'item3'},
 										selected = t.combo_item}
-	cpy = cpy + 22 + 10
+	cpy = cpy + 24 + 10
 
-	t.tab = self:tabs{id = 'tabs', x = 10, y = cpy, w = 200, h = 22,
+	t.tab = self:tabs{id = 'tabs', x = 10, y = cpy, w = 200, h = 24,
 							values = {'tab1', 'tab2', 'tab3'}, selected = t.tab}
-	cpy = cpy + 22 + 10
+	cpy = cpy + 24 + 10
 
 	t.menu_item = self:menu{id = 'menu', x = 10, y = cpy, w = 100, h = 100,
 										items = {'item1', 'item2', 'item3'}, selected = t.menu_item}
@@ -115,6 +116,31 @@ function player:on_render(cr)
 	self.cr:rectangle(x, y, w, h)
 	self.cr:clip()
 	self:rect(300 + self.cx, 10 + self.cy, 500, 500, 'normal_bg', 'normal_border', 10)
+	self.cr:reset_clip()
+
+	t.grid_state =
+	self:grid{id = 'grid', x = 530, y = 10, w = 400, h = 200,
+		fields = {'id', 'name', 'description'},
+		field_meta = {
+			id = {w = 50, align = 'right'},
+			description = {w = 300},
+		},
+		rows = {
+			{1, 'goon', 'woody quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'tit', 'tinny quality'},
+			{2, 'end', 'endy quality'},
+		},
+		state = t.grid_state or {
+			selected_row = 5,
+		},
+	}
 
 end
 

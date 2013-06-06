@@ -120,17 +120,19 @@ function player:window(t)
 	--mouse state (off screen, no buttons pressed)
 	self.mousex = -1
 	self.mousey = -1
-	self.click = false        --left mouse button clicked (one-shot)
-	self.leftclick = false    --right mouse button clicked (one-shot)
-	self.lbutton = false      --left mouse button pressed state
-	self.rbutton = false      --right mouse button pressed state
-	self.wheel_delta = 0      --mouse wheel movement as number of scroll pages (one-shot)
+	self.clicked = false       --left mouse button clicked (one-shot)
+	self.rightclick = false    --right mouse button clicked (one-shot)
+	self.doubleclicked = false --left mouse button double-clicked (one-shot)
+	self.lbutton = false       --left mouse button pressed state
+	self.rbutton = false       --right mouse button pressed state
+	self.wheel_delta = 0       --mouse wheel movement as number of scroll pages (one-shot)
 
 	--keyboard state (no key pressed)
 	self.key = nil            --key pressed: key code (one-shot)
 	self.char = nil           --key pressed: char code (one-shot)
 	self.shift = false        --shift key pressed state (only if key ~= nil)
-	self.control = false      --control key pressed state (only if key ~= nil)
+	self.ctrl = false         --control key pressed state (only if key ~= nil)
+	self.alt = false          --alt key pressed state (only if key ~= nil)
 
 	--theme state
 	self.theme = referer.theme or self.themes.dark
@@ -159,7 +161,7 @@ function player:window(t)
 
 	function panel.on_render(panel, surface)
 		--set the window title
-		window.title = string.format('Cairo %s - %6.2f fps', cairo.cairo_version_string(), fps())
+		window.title = string.format('Cairo %s - %d fps', cairo.cairo_version_string(), fps())
 
 		--set the window state
 		self.w = panel.client_w
@@ -180,8 +182,9 @@ function player:window(t)
 		self:on_render(self.cr)
 
 		--reset the one-shot state vars
-		self.click = false
-		self.leftclick = false
+		self.clicked = false
+		self.rightclick = false
+		self.doubleclicked = false
 		self.key = nil
 		self.char = nil
 		self.shift = nil
@@ -190,35 +193,53 @@ function player:window(t)
 		self.wheel_delta = 0
 	end
 
-	function panel.on_mouse_move(panel, x, y, buttons, wheel_delta)
+	function panel.on_mouse_move(panel, x, y, buttons)
 		self.mousex = x
 		self.mousey = y
-		self.click = self.lbutton and not buttons.lbutton
-		self.leftclick = self.rbutton and not buttons.rbutton
 		self.lbutton = buttons.lbutton
 		self.rbutton = buttons.rbutton
-		self.wheel_delta = self.wheel_delta + (wheel_delta and wheel_delta / 120 or 0)
+		panel:invalidate()
+	end
+	panel.on_mouse_over = panel.on_mouse_move
+	panel.on_mouse_leave = panel.on_mouse_move
+
+	function panel.on_lbutton_down(panel)
+		winapi.SetCapture(panel.hwnd)
+		self.lbutton = true
+		self.clicked = false
 		panel:invalidate()
 	end
 
-	function panel.on_lbutton_down(panel, ...)
-		winapi.SetCapture(panel.hwnd)
-		panel.on_mouse_move(panel, ...)
-	end
-
-	function panel.on_lbutton_up(panel, ...)
+	function panel.on_lbutton_up()
 		winapi.ReleaseCapture()
-		panel.on_mouse_move(panel, ...)
+		self.lbutton = false
+		self.clicked = true
+		panel:invalidate()
 	end
 
-	panel.on_mouse_over = panel.on_mouse_move
-	panel.on_mouse_leave = panel.on_mouse_move
-	panel.on_lbutton_double_click = panel.on_mouse_move
-	panel.on_rbutton_double_click = panel.on_mouse_move
-	panel.on_rbutton_down = panel.on_mouse_move
-	panel.on_rbutton_up = panel.on_mouse_move
+	function panel.on_rbutton_down()
+		self.rbutton = true
+		self.rightclick = false
+		panel:invalidate()
+	end
+
+	function panel.on_rbutton_up()
+		self.rbutton = false
+		self.rightclick = true
+		panel:invalidate()
+	end
+
+	function panel.on_lbutton_double_click()
+		self.doubleclicked = true
+		panel:invalidate()
+	end
 
 	--window receives keyboard and mouse wheel events
+
+	function window.on_mouse_wheel(window, x, y, buttons, wheel_delta)
+		self.wheel_delta = self.wheel_delta + (wheel_delta and wheel_delta / 120 or 0)
+		panel:invalidate()
+	end
 
 	window.__wantallkeys = true --superhack
 
@@ -249,8 +270,6 @@ function player:window(t)
 
 	window.on_syskey_down_char = window.on_key_down_char
 	window.on_dead_syskey_down_char = window.on_key_down_char
-
-	window.on_mouse_wheel = panel.on_mouse_move
 
 	--set panel to render continuously
 	panel:settimer(1, panel.invalidate)
@@ -354,6 +373,7 @@ local submodules = {
 	menu = 'menu',
 	combobox = 'combobox',
 	filebox = 'filebox',
+	grid = 'grid',
 }
 
 setmetatable(player, {__index = function(_, k)
