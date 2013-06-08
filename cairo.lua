@@ -1,6 +1,6 @@
 --lightweight ffi binding of cairo graphics library with garbage collection, metatype methods, accepting
---and returning strings, accepting rgb(a) hex colors, returning multiple values instead of passing output buffers,
---and API additions for completeness (drawing quad curves, etc).
+--and returning strings, returning multiple values instead of passing output buffers, and API additions
+--for completeness (drawing quad curves, etc).
 --note that methods of specific backends and extensions are not added and cannot be added after loading this
 --module due to constraints of ffi.metatype(). still looking for a nice way to solve this.
 

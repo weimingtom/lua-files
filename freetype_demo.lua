@@ -11,7 +11,9 @@ function player:render_glyph(face, glyph_index, glyph_size, x, y, t)
 	face:load_glyph(glyph_index)
 	local glyph = face.glyph
 
-	glyph:render()
+	if glyph.format ~= ft.FT_GLYPH_FORMAT_BITMAP then
+		glyph:render()
+	end
 	assert(glyph.format == ft.FT_GLYPH_FORMAT_BITMAP)
 
 	local bitmap = glyph.bitmap

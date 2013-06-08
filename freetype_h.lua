@@ -517,6 +517,15 @@ typedef enum FT_Render_Mode_
  FT_RENDER_MODE_LCD_V,
  FT_RENDER_MODE_MAX
 } FT_Render_Mode;
+
+typedef enum {
+	FT_LOAD_TARGET_NORMAL = (FT_RENDER_MODE_NORMAL & 15) << 16,
+	FT_LOAD_TARGET_LIGHT  = (FT_RENDER_MODE_LIGHT & 15) << 16,
+	FT_LOAD_TARGET_MONO   = (FT_RENDER_MODE_MONO & 15) << 16,
+	FT_LOAD_TARGET_LCD    = (FT_RENDER_MODE_LCD & 15) << 16,
+	FT_LOAD_TARGET_LCD_V  = (FT_RENDER_MODE_LCD_V & 15) << 16
+};
+
 FT_Error
 FT_Render_Glyph( FT_GlyphSlot slot,
 					 FT_Render_Mode render_mode );

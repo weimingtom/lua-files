@@ -4,6 +4,7 @@ cairo.dll       csrc/cairo
 cjson.dll       csrc/lua-cjson
 clipper.dll     csrc/clipper
 expat.dll       expat-2.1.0 (static multi-threaded build)
+fribidi.dll     csrc/fribidi
 giflib5.dll     csrc/giflib
 harfbuzz.dll    csrc/harfbuzz
 hpdf.dll        csrc/luahpdf

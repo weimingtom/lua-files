@@ -1,3 +1,4 @@
+--result of `cpp cairo-ft.h` from cairo 1.12.3
 local ffi = require'ffi'
 require'cairo_h'
 require'freetype_h'

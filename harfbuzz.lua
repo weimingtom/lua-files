@@ -1,19 +1,12 @@
+--harfbuzz binding with extensions: ucdn, opentype, freetype.
 local ffi = require'ffi'
 require'harfbuzz_h'
+require'harfbuzz_ot_h'
+require'harfbuzz_ft_h'
 local C = ffi.load'harfbuzz'
-local ft = require'freetype'
-
 local M = setmetatable({C = C}, {__index = C})
 
-function M.version()
-	local v = ffi.new'uint32_t[3]'
-	C.hb_version(v, v+1, v+2)
-	return v[0], v[1], v[2]
-end
-
-function M.version_string()
-	return ffi.string(C.hb_version_string())
-end
+--wrappers
 
 local function get_xy_func(func)
 	return function(self)
@@ -39,16 +32,73 @@ local function get_pos2_func(func)
 	end
 end
 
-function M.hb_blob_create(data, size, mode, user_data, destroy_func)
-	return ffi.gc(C.hb_blob_create(data, size, mode, user_data, destroy_func), C.hb_blob_destroy)
+local function create_func(func, destroy_func)
+	return function(...)
+		local ptr = func(...)
+		assert(ptr ~= nil)
+		return ffi.gc(ptr, destroy_func)
+	end
 end
 
-ffi.metatype('hb_blob_t', {__index = {
-	create_sub_blob = C.hb_blob_create_sub_blob, -- offset, length -> hb_blob_t
+local function destroy_func(destroy_func)
+	return function(ptr)
+		ffi.gc(ptr, nil)
+		destroy_func(ptr)
+	end
+end
 
-	get_empty = C.hb_blob_get_empty, -- () -> hb_blob_t
-	reference = C.hb_blob_reference, -- ()
-	destroy = C.hb_blob_destroy, --()
+local function string_func(func)
+	return function(...)
+		return ffi.string(func(...))
+	end
+end
+
+--globals
+
+function M.version()
+	local v = ffi.new'uint32_t[3]'
+	C.hb_version(v, v+1, v+2)
+	return v[0], v[1], v[2]
+end
+
+M.version_string = string_func(C.hb_version_string)
+
+M.empty_blob = C.hb_blob_get_empty
+M.empty_shape_plan = C.hb_shape_plan_get_empty
+M.empty_face = C.hb_face_get_empty
+M.empty_font = C.hb_font_get_empty
+M.empty_buffer = C.hb_buffer_get_empty
+
+function M.list_shapers()
+	local t = {}
+	local s = C.hb_shape_list_shapers()
+	while s ~= nil do
+		t[#t+1] = ffi.string(s[0])
+		s = s + 1
+	end
+	return t
+end
+
+--constructors
+
+M.create_blob = create_func(C.hb_blob_create, C.hb_blob_destroy)
+
+function M.create_buffer()
+	local self = assert(ffi.gc(C.hb_buffer_create(), C.hb_buffer_destroy))
+	C.hb_buffer_set_unicode_funcs(self, nil)
+	return self
+end
+
+--from hb-ft.h
+M.create_ft_face = create_func(C.hb_ft_face_create, C.hb_face_destroy)
+M.create_ft_face_cached = create_func(C.hb_ft_face_create_cached, C.hb_face_destroy)
+M.create_ft_font = create_func(C.hb_ft_font_create, C.hb_font_destroy)
+
+--methods
+
+ffi.metatype('hb_blob_t', {__index = {
+	reference = create_func(C.hb_blob_reference, C.hb_blob_destroy),
+	destroy = destroy_func(C.hb_blob_destroy),
 	set_user_data = C.hb_blob_set_user_data, --key, data, destroy, replace
 	get_user_data = C.hb_blob_get_user_data, --key -> data
 	make_immutable = C.hb_blob_make_immutable,
@@ -56,32 +106,25 @@ ffi.metatype('hb_blob_t', {__index = {
 
 	get_length = C.hb_blob_get_length,
 	get_data = C.hb_blob_get_data, --length -> data
-	get_data_writable = C.hb_blob_get_data_writable --length -> data,
-}})
+	get_data_writable = C.hb_blob_get_data_writable, --length -> data,
 
-function M.hb_face_create(blob, index)
-	return ffi.gc(C.hb_face_create(blob, index), C.hb_face_destroy)
-end
+	create_sub_blob = create_func(C.hb_blob_create_sub_blob, C.hb_blob_destroy), -- offset, length -> hb_blob_t
+	create_face = create_func(C.hb_face_create, C.hb_face_destroy),
+}})
 
 --hb_bool_t hb_feature_from_string (const char *str, int len, hb_feature_t *feature);
 --void      hb_feature_to_string (hb_feature_t *feature, char *buf, unsigned int size);
 
-local function hb_shape_plan_create(face, props, user_features, num_user_features, shaper_list)
-	return C.hb_shape_plan_create(face, props, user_features, num_user_features, shaper_list)
-end
-
 ffi.metatype('hb_face_t', {__index = {
-
-	get_empty = C.hb_face_get_empty, -- () -> hb_face_t
-	reference = C.hb_face_reference, -- ()
-	destroy = C.hb_face_destroy, --()
+	reference = create_func(C.hb_face_reference, C.hb_face_destroy),
+	destroy = destroy_func(C.hb_face_destroy),
 	set_user_data = C.hb_face_set_user_data, --key, data, destroy, replace
 	get_user_data = C.hb_face_get_user_data, --key -> data
 	make_immutable = C.hb_face_make_immutable,
 	is_immutable = C.hb_face_is_immutable,
 
-	reference_table = C.hb_face_reference_table, --tag -> hb_blob_t
-	refernce_blob = C.hb_face_reference_blob, --() -> hb_blob_t
+	reference_table = create_func(C.hb_face_reference_table, C.hb_blob_destroy), --tag -> hb_blob_t
+	refernce_blob = create_func(C.hb_face_reference_blob, C.hb_blob_destroy),
 	set_index = C.hb_face_set_index,
 	get_index = C.hb_face_get_index,
 	set_upem  = C.hb_face_set_upem,
@@ -89,33 +132,43 @@ ffi.metatype('hb_face_t', {__index = {
 	set_glyph_count = C.hb_face_set_glyph_count,
 	get_glyph_count = C.hb_face_get_glyph_count,
 
-	create_shape_plan = hb_shape_plan_create,
+	create_font = create_func(C.hb_font_create, C.hb_font_destroy),
+	create_shape_plan = create_func(C.hb_shape_plan_create, C.hb_shape_plan_destroy),
+	create_shape_plan_cached = create_func(C.hb_shape_plan_create_cached, C.hb_shape_plan_destroy),
+
+	--from hb-ot.h
+	get_script_tags     = C.hb_ot_layout_table_get_script_tags,
+	find_script         = C.hb_ot_layout_table_find_script,
+	choose_script       = C.hb_ot_layout_table_choose_script,
+	get_feature_tags    = C.hb_ot_layout_table_get_feature_tags,
+	get_language_tags   = C.hb_ot_layout_script_get_language_tags,
+	find_language       = C.hb_ot_layout_script_find_language,
+	get_required_feature_index = C.hb_ot_layout_language_get_required_feature_index,
+	get_feature_indexes = C.hb_ot_layout_language_get_feature_indexes,
+	get_feature_tags    = C.hb_ot_layout_language_get_feature_tags,
+	find_feature        = C.hb_ot_layout_language_find_feature,
+	get_feature_lookups = C.hb_ot_layout_feature_get_lookups,
+	collect_lookups     = C.hb_ot_layout_collect_lookups,
+	collect_glyphs      = C.hb_ot_layout_lookup_collect_glyphs,
+	has_substitution    = C.hb_ot_layout_has_substitution,
+	would_substitute    = C.hb_ot_layout_lookup_would_substitute,
+	substitute_closure  = C.hb_ot_layout_lookup_substitute_closure,
+	has_positioning     = C.hb_ot_layout_has_positioning,
+	get_size_params     = C.hb_ot_layout_get_size_params,
 }})
 
-local function hb_shape(font, buffer, features, num_features)
-	C.hb_shape(font, buffer, features, num_features or 0)
-end
-
-local function hb_shape_full(font, buffer, features, num_features, shaper_list)
-	return C.hb_shape_full(font, buffer, features, num_features or 0, shaper_list)
-end
-
-function M.hb_font_create(face)
-	return ffi.gc(C.hb_font_create(face), C.hb_font_destroy)
-end
-
 ffi.metatype('hb_font_t', {__index = {
-	create_sub_font = C.hb_font_create_sub_font, --parent -> hb_font_t
-	get_parent = C.hb_font_get_parent, -- () -> hb_font_t
-	get_face = C.hb_font_get_face, -- () -> hb_face_t
-
-	get_empty = C.hb_font_get_empty, -- () -> hb_font_t
-	reference = C.hb_font_reference, -- ()
-	destroy = C.hb_font_destroy, --()
+	reference = create_func(C.hb_font_reference, C.hb_font_destroy),
+	destroy = destroy_func(C.hb_font_destroy),
 	set_user_data = C.hb_font_set_user_data, --key, data, destroy, replace
 	get_user_data = C.hb_font_get_user_data, --key -> data
 	make_immutable = C.hb_font_make_immutable,
 	is_immutable = C.hb_font_is_immutable,
+
+	create_sub_font = create_func(C.hb_font_create_sub_font, C.hb_font_destroy),
+
+	get_parent = C.hb_font_get_parent,
+	get_face = C.hb_font_get_face,
 
 	set_scale = C.hb_font_set_scale, --int x_scale, int y_scale
 	get_scale = get_xy_func(C.hb_font_get_scale), --int *x_scale, int *y_scale
@@ -143,31 +196,32 @@ ffi.metatype('hb_font_t', {__index = {
 	glyph_to_string = C.hb_font_glyph_to_string, --hb_codepoint_t glyph, s, size
 	glyph_from_string = C.hb_font_glyph_from_string, --s, len, hb_codepoint_t *glyph -> hb_bool_t
 
-	shape = hb_shape,
-	shape_full = hb_shape_full,
+	shape = function(font, buffer, features, num_features)
+		C.hb_shape(font, buffer, features, num_features or 0)
+	end,
+	shape_full = function(font, buffer, features, num_features, shaper_list)
+		return C.hb_shape_full(font, buffer, features, num_features or 0, shaper_list)
+	end,
+
+	--from hb-ot.h
+	get_ligature_carets  = C.hb_ot_layout_get_ligature_carets,
+	shape_glyphs_closure = C.hb_ot_shape_glyphs_closure,
+
+	--from hb-ft.h
+	set_ft_funcs = C.hb_ft_font_set_funcs,
+	get_ft_face = C.hb_ft_font_get_face,
 }})
 
-function M.hb_buffer_create()
-	local self = assert(ffi.gc(C.hb_buffer_create(), C.hb_buffer_destroy))
-	C.hb_buffer_set_unicode_funcs(self, C.hb_ucdn_get_unicode_funcs())
-	return self
-end
-
-local function hb_buffer_shape_full(buffer, font, features, num_features, shaper_list)
-	return C.hb_shape_full(font, buffer, features, num_features or 0, shaper_list)
-end
-
 ffi.metatype('hb_buffer_t', {__index = {
-	get_empty = C.hb_buffer_get_empty, -- () -> hb_buffer_t
-	reference = C.hb_buffer_reference, -- ()
-	destroy = C.hb_buffer_destroy, --()
+	reference = create_func(C.hb_buffer_reference, C.hb_buffer_destroy),
+	destroy = destroy_func(C.hb_buffer_destroy),
 	set_user_data = C.hb_buffer_set_user_data, --key, data, destroy, replace
 	get_user_data = C.hb_buffer_get_user_data, --key -> data
 
 	set_content_type = C.hb_buffer_set_content_type, --hb_buffer_content_type_t content_type
 	get_content_type = C.hb_buffer_get_content_type, -- () -> hb_buffer_content_type_t
-	--set_unicode_funcs = C.hb_buffer_set_unicode_funcs, --hb_unicode_funcs_t *unicode_funcs
-	--get_unicode_funcs = C.hb_buffer_get_unicode_funcs,
+	set_unicode_funcs = C.hb_buffer_set_unicode_funcs, --hb_unicode_funcs_t *unicode_funcs
+	get_unicode_funcs = C.hb_buffer_get_unicode_funcs,
 	set_direction = function(self, direction)
 		if type(direction) == 'string' then
 			direction = C.hb_direction_from_string(direction, #direction)
@@ -224,46 +278,22 @@ ffi.metatype('hb_buffer_t', {__index = {
 	shape = function(buffer, font, features, num_features)
 		C.hb_shape(font, buffer, features, num_features or 0)
 	end,
-
-	shape_full = hb_buffer_shape_full,
+	shape_full = function(buffer, font, features, num_features, shaper_list)
+		return C.hb_shape_full(font, buffer, features, num_features or 0, shaper_list)
+	end,
 }})
 
-function M.list_shapers()
-	local t = {}
-	local s = C.hb_shape_list_shapers()
-	while s ~= nil do
-		t[#t+1] = ffi.string(s[0])
-		s = s + 1
-	end
-	return t
-end
+ffi.metatype('hb_shape_plan_t', {__index = {
+	reference = create_func(C.hb_shape_plan_reference, C.hb_shape_plan_destroy),
+	destroy = destroy_func(C.hb_shape_plan_destroy),
+	set_user_data = C.hb_shape_plan_set_user_data,
+	get_user_data = C.hb_shape_plan_get_user_data,
+	execute = C.hb_shape_plan_execute,
+	get_shaper = string_func(C.hb_shape_plan_get_shaper),
 
---[[
-
-hb_shape_plan_t *
-hb_shape_plan_create_cached (hb_face_t *face,
-        const hb_segment_properties_t *props,
-        const hb_feature_t *user_features,
-        unsigned int num_user_features,
-        const char * const *shaper_list);
-hb_shape_plan_t * hb_shape_plan_get_empty (void);
-hb_shape_plan_t * hb_shape_plan_reference (hb_shape_plan_t *shape_plan);
-void         hb_shape_plan_destroy (hb_shape_plan_t *shape_plan);
-hb_bool_t    hb_shape_plan_set_user_data (hb_shape_plan_t *shape_plan,
-                        hb_user_data_key_t *key,
-                        void * data,
-                        hb_destroy_func_t destroy,
-                        hb_bool_t replace);
-void *       hb_shape_plan_get_user_data (hb_shape_plan_t *shape_plan, hb_user_data_key_t *key);
-hb_bool_t    hb_shape_plan_execute (hb_shape_plan_t *shape_plan,
-                        hb_font_t *font,
-                        hb_buffer_t *buffer,
-                        const hb_feature_t *features,
-                        unsigned int num_features);
-const char * hb_shape_plan_get_shaper (hb_shape_plan_t *shape_plan);
-
-
-]]
+	--from hb-ot.h
+	collect_lookups = C.hb_ot_shape_plan_collect_lookups,
+}})
 
 if not ... then require'harfbuzz_test' end
 

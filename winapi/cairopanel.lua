@@ -4,7 +4,7 @@ local bit = require'bit'
 local winapi = require'winapi'
 require'winapi.panelclass'
 local cairo = require'cairo'
-require'cairo_h_win32'
+require'cairo_win32'
 
 local CairoPanel = winapi.class(winapi.Panel)
 

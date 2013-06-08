@@ -2,7 +2,8 @@
 --supports all conversions between packed 8 bit-per-channel gray and rgb pixel formats + cmyk to all.
 --supports different input/output orientations, namely top-down and bottom-up, and different strides.
 --TODO: 16bit rgb (565,4444,5551)? bw-1? alpha-1,4,8? linear-rgb? premultiplied-alpha? xyz? cie?
---TODO: can split up the conversion to multiple threads taking advantage of multiple cpu cores.
+--TODO: split up the conversion to multiple threads taking advantage of multiple cpu cores
+--      but use a different pipelining strategy for small bitmaps like glyphs.
 
 --conversion functions: these must run in lanes, so don't drag any upvalues with them
 

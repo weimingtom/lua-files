@@ -1,4 +1,4 @@
---result of `cpp cairo.h` from cairo 1.12.3 (extensions removed)
+--result of `cpp cairo.h` from cairo 1.12.3 (extensions in separate files)
 local ffi = require'ffi'
 ffi.cdef[[
 int cairo_version (void);
