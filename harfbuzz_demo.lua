@@ -12,7 +12,7 @@ local function shape_text(s, ft_face, hb_font, size, direction, script, language
 	script = script or hb.HB_SCRIPT_LATIN
 	language = language or 'en'
 
-	local buf = hb.create_buffer()
+	local buf = hb.hb_buffer_create()
 	buf:set_direction(direction)
 	buf:set_script(script)
 	buf:set_language(language)

@@ -32,6 +32,34 @@ local function get_pos2_func(func)
 	end
 end
 
+local function string_func(func)
+	return function(...)
+		return ffi.string(func(...))
+	end
+end
+
+--globals
+
+function M.hb_version()
+	local v = ffi.new'uint32_t[3]'
+	C.hb_version(v, v+1, v+2)
+	return v[0], v[1], v[2]
+end
+
+M.hb_version_string = string_func(C.hb_version_string)
+
+function M.list_shapers()
+	local t = {}
+	local s = C.hb_shape_list_shapers()
+	while s ~= nil do
+		t[#t+1] = ffi.string(s[0])
+		s = s + 1
+	end
+	return t
+end
+
+--constructors
+
 local function create_func(func, destroy_func)
 	return function(...)
 		local ptr = func(...)
@@ -47,52 +75,18 @@ local function destroy_func(destroy_func)
 	end
 end
 
-local function string_func(func)
-	return function(...)
-		return ffi.string(func(...))
-	end
-end
+M.hb_blob_create = create_func(C.hb_blob_create, C.hb_blob_destroy)
 
---globals
-
-function M.version()
-	local v = ffi.new'uint32_t[3]'
-	C.hb_version(v, v+1, v+2)
-	return v[0], v[1], v[2]
-end
-
-M.version_string = string_func(C.hb_version_string)
-
-M.empty_blob = C.hb_blob_get_empty
-M.empty_shape_plan = C.hb_shape_plan_get_empty
-M.empty_face = C.hb_face_get_empty
-M.empty_font = C.hb_font_get_empty
-M.empty_buffer = C.hb_buffer_get_empty
-
-function M.list_shapers()
-	local t = {}
-	local s = C.hb_shape_list_shapers()
-	while s ~= nil do
-		t[#t+1] = ffi.string(s[0])
-		s = s + 1
-	end
-	return t
-end
-
---constructors
-
-M.create_blob = create_func(C.hb_blob_create, C.hb_blob_destroy)
-
-function M.create_buffer()
+function M.hb_buffer_create()
 	local self = assert(ffi.gc(C.hb_buffer_create(), C.hb_buffer_destroy))
 	C.hb_buffer_set_unicode_funcs(self, nil)
 	return self
 end
 
 --from hb-ft.h
-M.create_ft_face = create_func(C.hb_ft_face_create, C.hb_face_destroy)
-M.create_ft_face_cached = create_func(C.hb_ft_face_create_cached, C.hb_face_destroy)
-M.create_ft_font = create_func(C.hb_ft_font_create, C.hb_font_destroy)
+M.hb_ft_face_create = create_func(C.hb_ft_face_create, C.hb_face_destroy)
+M.hb_ft_face_create_cached = create_func(C.hb_ft_face_create_cached, C.hb_face_destroy)
+M.hb_ft_font_create = create_func(C.hb_ft_font_create, C.hb_font_destroy)
 
 --methods
 
