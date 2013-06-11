@@ -96,7 +96,8 @@ player:play()
 for name,t in pairs(fonts) do
 	t.hb_font:destroy()
 	t.cairo_face:destroy()
-	t.ft_face:free()
+	ffi.gc(t.ft_face, nil) --can't free the face, cairo's cache references it
 end
-ft_lib:free()
+ffi.gc(ft_lib, nil)
+--ft_lib:free()
 

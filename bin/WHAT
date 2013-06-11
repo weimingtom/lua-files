@@ -17,6 +17,7 @@ libharu.dll     csrc/libharu
 libjpeg.dll     csrc/libjpegturbo
 libmysql.dll    mysql Connector/C 6.1
 libpng.dll      csrc/libpng
+libunibreak.dll csrc/libunibreak
 libvlc.dll      vlc 2.0.5 (from vlc.zip)
 libvlccore.dll  vlc 2.0.5 (from vlc.zip)
 lpeg.dll        csrc/lpeg
@@ -32,6 +33,7 @@ pmurhash.dll    csrc/pmurhash
 sha2.dll        csrc/sha2
 socket_core.dll csrc/luasocket
 struct.dll      csrc/struct
+ucdn.dll        csrc/harfbuzz-ucdn
 vararg.dll      csrc/vararg
 zlib.dll        csrc/zlib
 

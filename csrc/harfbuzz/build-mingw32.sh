@@ -1,4 +1,4 @@
-# harfbuzz build with opentype, ucdn, freetype
+# harfbuzz build with opentype, ucdn, freetype. dynamically links to ucdn and freetype.
 
 for f in `ls *.rl`; do
 	if [ ! -f "${f%.*}.hh" ]; then
@@ -23,14 +23,15 @@ gcc \
 	hb-unicode.cc \
 	hb-warning.cc \
 	hb-ucdn.cc \
-	hb-ucdn/ucdn.c \
 	\
 	-I. \
 	-Ihb-ucdn \
 	-DHAVE_OT \
 	-DHAVE_UCDN \
 	-I../freetype \
+	-I../harfbuzz-ucdn \
 	-L../../bin \
+	-lucdn \
 	-lfreetype-6 \
 	-fno-exceptions -fno-rtti \
 	-O3 -s -shared -o ../../bin/harfbuzz.dll

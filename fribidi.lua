@@ -78,13 +78,20 @@ function M.log2vis_ucs4(str, len, debug_func)
 
 	--TODO: line breaking.
 	--The bidi algorithm assumes that that line breaking is done *before* reordering.
-	--You need to carry the over the paragraph bidirectional direction from line to line,
+	--You need to carry over the paragraph bidirectional direction from line to line,
 	--but that is done after the lines have been broken into paragraphs.
 
 	for i=0,len-1 do
 		v_to_l[i] = i
 	end
-	local status = C.fribidi_reorder_line(flags, bidi_types, len, 0, pbase_dir_out, levels, visual_str, v_to_l)
+
+	local x = 0
+	for i,offset in ipairs(line_offsets) do
+		local bidi_types
+		local
+		local status = C.fribidi_reorder_line(flags, bidi_types, len, 0, pbase_dir_out, levels, visual_str, v_to_l)
+	end
+
 	for i=0,len-1 do
 		l_to_v[i] = -1
 	end
