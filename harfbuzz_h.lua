@@ -867,8 +867,11 @@ hb_bool_t    hb_shape_plan_execute (hb_shape_plan_t *shape_plan,
                         unsigned int num_features);
 const char * hb_shape_plan_get_shaper (hb_shape_plan_t *shape_plan);
 
+hb_unicode_funcs_t * hb_ucdn_get_unicode_funcs (void);
+
 void         hb_version (unsigned int *major, unsigned int *minor, unsigned int *micro);
 const char * hb_version_string (void);
 hb_bool_t    hb_version_check (unsigned int major, unsigned int minor, unsigned int micro);
+
 ]]
 

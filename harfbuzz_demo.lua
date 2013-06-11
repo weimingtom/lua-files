@@ -80,15 +80,17 @@ end
 local amiri = font'media/fonts/amiri-regular.ttf'
 local dejavu = font'media/fonts/DejaVuSerif.ttf'
 
+local sub = 0
 function player:on_render(cr)
 	draw_text(cr, 100, 100, 'Te VA - This is Some English Text', dejavu, 20, 'ltr')
 	draw_text(cr, 100, 150, "هذه هي بعض النصوص العربي", amiri, 40, 'rtl', hb.HB_SCRIPT_ARABIC)
 
 	local y = 0
 	for i=6,20 do
-		draw_text(cr, 100, 200 + y, 'Te VA - This is Some English Text', dejavu, i, 'ltr')
+		draw_text(cr, 100 + sub, 200 + y + sub, 'Te VA - This is Some English Text', dejavu, i, 'ltr')
 		y = y + i
 	end
+	sub = sub + 0.01
 end
 
 player:play()
@@ -96,6 +98,7 @@ player:play()
 for name,t in pairs(fonts) do
 	t.hb_font:destroy()
 	t.cairo_face:destroy()
+	print(name, 'face refcoint', t.cairo_face:get_reference_count())
 	ffi.gc(t.ft_face, nil) --can't free the face, cairo's cache references it
 end
 ffi.gc(ft_lib, nil)

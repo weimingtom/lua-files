@@ -1,6 +1,6 @@
 --lightweight ffi binding of cairo graphics library with garbage collection, metatype methods, accepting
 --and returning strings, returning multiple values instead of passing output buffers, and API additions
---for completeness (drawing quad curves, etc).
+--for completeness (drawing quad curves, getting and setting pixel values etc).
 --note that methods of specific backends and extensions are not added and cannot be added after loading this
 --module due to constraints of ffi.metatype(). still looking for a nice way to solve this.
 
@@ -430,6 +430,110 @@ function M.cairo_surface_apply_alpha(surface, alpha)
 	cr:free()
 end
 
+local image_surface_bpp = {
+    [C.CAIRO_FORMAT_ARGB32] = 32,
+    [C.CAIRO_FORMAT_RGB24] = 32,
+    [C.CAIRO_FORMAT_A8] = 8,
+    [C.CAIRO_FORMAT_A1] = 1,
+    [C.CAIRO_FORMAT_RGB16_565] = 16,
+    [C.CAIRO_FORMAT_RGB30] = 30,
+}
+
+function M.cairo_image_surface_get_bpp(surface)
+	return image_surface_bpp[tonumber(surface:get_image_format())]
+end
+
+--return a getpixel function for a surface that returns pixel components based on surface image format:
+--for ARGB32: getpixel(x, y) -> r, g, b, a
+--for RGB24:  getpixel(x, y) -> r, g, b
+--for A8:     getpixel(x, y) -> a
+--for A1:     getpixel(x, y) -> a
+--for RGB16:  getpixel(x, y) -> r, g, b
+--for RGB30:  getpixel(x, y) -> r, g, b
+function M.cairo_image_surface_get_pixel_function(surface)
+	local data   = surface:get_image_data()
+	local format = surface:get_image_format()
+	local w      = surface:get_image_width()
+	local h      = surface:get_image_height()
+	local stride = surface:get_image_stride()
+	local getpixel
+	if format == C.CAIRO_FORMAT_ARGB32 then
+		if ffi.abi'le' then
+			error'NYI'
+		else
+			error'NYI'
+		end
+	elseif format == C.CAIRO_FORMAT_RGB24 then
+		function getpixel(x, y)
+			assert(x < w and y < h and x >= 0 and y >= 0, 'out of range')
+			return
+				data[y * stride + x * 4 + 2],
+				data[y * stride + x * 4 + 1],
+				data[y * stride + x * 4 + 0]
+		end
+	elseif format == C.CAIRO_FORMAT_A8 then
+		function getpixel(x, y)
+			assert(x < w and y < h and x >= 0 and y >= 0, 'out of range')
+			return data[y * stride + x]
+		end
+	elseif format == C.CAIRO_FORMAT_A1 then
+		if ffi.abi'le' then
+			error'NYI'
+		else
+			error'NYI'
+		end
+	elseif format == C.CAIRO_FORMAT_RGB16_565 then
+		error'NYI'
+	elseif format == C.CAIRO_FORMAT_RGB30 then
+		error'NYI'
+	else
+		error'unsupported image format'
+	end
+	return getpixel
+end
+
+--return a setpixel function analog to getpixel above.
+function M.cairo_image_surface_set_pixel_function(surface)
+	local data   = surface:get_image_data()
+	local format = surface:get_image_format()
+	local w      = surface:get_image_width()
+	local h      = surface:get_image_height()
+	local stride = surface:get_image_stride()
+	local setpixel
+	if format == C.CAIRO_FORMAT_ARGB32 then
+		if ffi.abi'le' then
+			error'NYI'
+		else
+			error'NYI'
+		end
+	elseif format == C.CAIRO_FORMAT_RGB24 then
+		function setpixel(x, y, r, g, b)
+			assert(x < w and y < h and x >= 0 and y >= 0, 'out of range')
+			data[y * stride + x * 4 + 2] = r
+			data[y * stride + x * 4 + 1] = g
+			data[y * stride + x * 4 + 0] = b
+		end
+	elseif format == C.CAIRO_FORMAT_A8 then
+		function setpixel(x, y, a)
+			assert(x < w and y < h and x >= 0 and y >= 0, 'out of range')
+			data[y * stride + x] = a
+		end
+	elseif format == C.CAIRO_FORMAT_A1 then
+		if ffi.abi'le' then
+			error'NYI'
+		else
+			error'NYI'
+		end
+	elseif format == C.CAIRO_FORMAT_RGB16_565 then
+		error'NYI'
+	elseif format == C.CAIRO_FORMAT_RGB30 then
+		error'NYI'
+	else
+		error'unsupported image format'
+	end
+	return setpixel
+end
+
 -- rgba additions
 
 --[[
@@ -646,6 +750,16 @@ ffi.metatype('cairo_surface_t', {__index = {
 	has_show_text_glyphs = returns_bool(M.cairo_surface_has_show_text_glyphs),
 	create_pattern = M.cairo_pattern_create_for_surface,
 	apply_alpha = M.cairo_surface_apply_alpha,
+
+	--for image surfaces
+	get_image_data = M.cairo_image_surface_get_data,
+	get_image_format = M.cairo_image_surface_get_format,
+	get_image_width = M.cairo_image_surface_get_width,
+	get_image_height = M.cairo_image_surface_get_height,
+	get_image_stride = M.cairo_image_surface_get_stride,
+	get_image_bpp = M.cairo_image_surface_get_bpp,
+	get_image_pixel_function = M.cairo_image_surface_get_pixel_function,
+	set_image_pixel_function = M.cairo_image_surface_set_pixel_function,
 }})
 
 ffi.metatype('cairo_device_t', {__index = {

@@ -48,7 +48,7 @@ player.themes.red = glue.merge({
 
 --winapi keycodes. key codes for 0-9 and A-Z keys are ascii codes.
 local keynames = {
-	[0x08] = 'backspace',[0x09] = 'tab',      [0x0d] = 'return',   [0x10] = 'shift',    [0x11] = 'control',
+	[0x08] = 'backspace',[0x09] = 'tab',      [0x0d] = 'return',   [0x10] = 'shift',    [0x11] = 'ctrl',
 	[0x12] = 'alt',      [0x13] = 'break',    [0x14] = 'caps',     [0x1b] = 'esc',      [0x20] = 'space',
 	[0x21] = 'pageup',   [0x22] = 'pagedown', [0x23] = 'end',      [0x24] = 'home',     [0x25] = 'left',
 	[0x26] = 'up',       [0x27] = 'right',    [0x28] = 'down',     [0x2c] = 'printscreen',
@@ -64,6 +64,19 @@ local keynames = {
 	[0xbf] = '/',        [0xc0] = '`',        [0xdb] = '[',        [0xdc] = '\\',       [0xdd] = ']',
 	[0xde] = "'",
 }
+
+local function keyname(vk)
+	return
+		(((vk >= string.byte'0' and vk <= string.byte'9') or
+		(vk >= string.byte'A' and vk <= string.byte'Z'))
+			and string.char(vk) or keynames[vk])
+end
+
+local keycodes = glue.index(keynames)
+
+local function keycode(name)
+	return keycodes[name] or string.byte(name)
+end
 
 local cursors = { --names are by function not shape when possible
 	--pointers
@@ -155,7 +168,7 @@ function player:window(t)
 	self.key = nil            --key pressed: key code (one-shot)
 	self.char = nil           --key pressed: char code (one-shot)
 	self.shift = false        --shift key pressed state (only if key ~= nil)
-	self.ctrl = false         --control key pressed state (only if key ~= nil)
+	self.ctrl = false         --ctrl key pressed state (only if key ~= nil)
 	self.alt = false          --alt key pressed state (only if key ~= nil)
 
 	--theme state
@@ -284,10 +297,7 @@ function player:window(t)
 	end
 
 	function window.on_key_down(window, vk, flags)
-		self.key =
-			(((vk >= string.byte'0' and vk <= string.byte'9') or
-			  (vk >= string.byte'A' and vk <= string.byte'Z'))
-				and string.char(vk) or keynames[vk])
+		self.key = keyname(vk)
 		self.shift = bit.band(ffi.C.GetKeyState(winapi.VK_SHIFT), 0x8000) ~= 0
 		self.ctrl = bit.band(ffi.C.GetKeyState(winapi.VK_CONTROL), 0x8000) ~= 0
 		self.alt = bit.band(ffi.C.GetKeyState(winapi.VK_MENU), 0x8000) ~= 0
@@ -394,6 +404,12 @@ function player:hotbox(x, y, w, h)
 	return self.cr:in_clip(mx, my) and mx >= x and mx <= x + w and my >= y and my <= y + h
 end
 
+--keyboard helpers
+
+function player:keypressed(keyname)
+	return bit.band(ffi.C.GetAsyncKeyState(keycode(keyname)), 0x8000) ~= 0
+end
+
 --submodule autoloader
 
 local autoload = {
@@ -411,6 +427,7 @@ local autoload = {
 	filebox = 'filebox',
 	grid = 'grid',
 	treeview = 'treeview',
+	magnifier = 'magnifier',
 }
 
 setmetatable(player, {__index = function(_, k)
