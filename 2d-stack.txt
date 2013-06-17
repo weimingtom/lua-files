@@ -1,0 +1,31 @@
+This is a description of the lua-files 2D graphics stack listing the major modules in the pipeline,
+wanted capabilities and technology choices, options and routes taken for fulfilling those capabilities.
+
+2d vector processing
+	- path simplification (complex path to curves and lines)
+	- path elasticization (curves to lines) + non-linear transformation
+	- affine transformation
+	- curve flattening (adaptive subdivision)
+	- polygon offseting
+		- different line joins and line caps
+		- dash line generator
+		- cap markers
+	- polygon clipping
+
+2d rasterization
+	- polygon rasterization
+		- scanline rasterization
+			- span generation
+				- scanline boolean algebra?
+			- gradient generation
+		- outline rasterization
+
+raster image pipeline
+	- image affine transformation
+		- image subpixel translation
+
+pixel compositing
+	- alpha compositing
+		- porter/duff operators
+	- pixel format adaptation (stride, bpp, pixel layout, etc)
+

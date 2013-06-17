@@ -9,26 +9,29 @@ local M = setmetatable({C = C}, {__index = C})
 --wrappers
 
 local function get_xy_func(func)
-	return function(self)
-		local x = ffi.new'int32_t[2]'
-		func(self, x, x+1)
-		return x[0], x[1]
+	return function(self, x, y)
+		x = x or ffi.new'int32_t[1]'
+		y = y or ffi.new'int32_t[1]'
+		func(self, x, y)
+		return x[0], y[0]
 	end
 end
 
 local function get_pos_func(func)
-	return function(self, glyph)
-		local x = ffi.new'hb_position_t[2]'
-		func(self, glyph, x, x+1)
-		return x[0], x[1]
+	return function(self, glyph, x, y)
+		x = x or ffi.new'hb_position_t[1]'
+		y = y or ffi.new'hb_position_t[1]'
+		func(self, glyph, x, y)
+		return x[0], y[0]
 	end
 end
 
 local function get_pos2_func(func)
-	return function(self, glyph, index)
-		local x = ffi.new'hb_position_t[2]'
-		func(self, glyph, index, x, x+1)
-		return x[0], x[1]
+	return function(self, glyph, index, x, y)
+		x = x or ffi.new'hb_position_t[1]'
+		y = y or ffi.new'hb_position_t[1]'
+		func(self, glyph, index, x, y)
+		return x[0], y[0]
 	end
 end
 
@@ -83,6 +86,18 @@ function M.hb_buffer_create()
 	return self
 end
 
+function M.hb_feature_from_string(str, len, feature)
+	feature = feature or ffi.new'hb_feature_t'
+	assert(C.hb_feature_from_string(str, len or #str, feature) == 1)
+	return feature
+end
+
+function M.hb_feature_to_string(feature, buf, size)
+	buf = buf or ffi.new('uint8_t[?]', size or 64)
+	C.hb_feature_to_string(feature, buf, size)
+	return ffi.string(buf)
+end
+
 --from hb-ft.h
 M.hb_ft_face_create = create_func(C.hb_ft_face_create, C.hb_face_destroy)
 M.hb_ft_face_create_cached = create_func(C.hb_ft_face_create_cached, C.hb_face_destroy)
@@ -105,9 +120,6 @@ ffi.metatype('hb_blob_t', {__index = {
 	create_sub_blob = create_func(C.hb_blob_create_sub_blob, C.hb_blob_destroy), -- offset, length -> hb_blob_t
 	create_face = create_func(C.hb_face_create, C.hb_face_destroy),
 }})
-
---hb_bool_t hb_feature_from_string (const char *str, int len, hb_feature_t *feature);
---void      hb_feature_to_string (hb_feature_t *feature, char *buf, unsigned int size);
 
 ffi.metatype('hb_face_t', {__index = {
 	reference = create_func(C.hb_face_reference, C.hb_face_destroy),

@@ -5,53 +5,11 @@ local player = require'cairo_player'
 local cairo = require'cairo'
 local hb = require'harfbuzz'
 
-function player:shape(s, hb_font, direction, script, language, features)
-	direction = direction or hb.HB_DIRECTION_LTR
-	script = script or hb.HB_SCRIPT_LATIN
-	language = language or 'en'
+function player:render_glyph(face, glyph_index, x, y, load_flags, render_mode)
 
-	local buf = hb.hb_buffer_create()
-	buf:set_direction(direction)
-	buf:set_script(script)
-	buf:set_language(language)
-	buf:add_utf8(s)
-
-	local feats, feats_count = nil, 0
-	if features then
-		for _ in pairs(features) do feats_count = feats_count + 1 end
-		feats = ffi.new('hb_feature_t[?]', feats_count)
-		local i = 0
-		for k,v in pairs(features) do
-			assert(hb.hb_feature_from_string(k, #k, feats[i]) == 1)
-			feats[i].value = v
-			i = i + 1
-		end
-	end
-
-	buf:shape(hb_font, feats, feats_count)
-
-	local glyph_count = buf:get_length()
-	local glyph_info  = buf:get_glyph_infos()
-	local glyph_pos   = buf:get_glyph_positions()
-
-	local x, y = 0, 0
-	local idx, posx, posy = {}, {}, {}
-	for i=0,glyph_count-1 do
-		 idx[i+1] = glyph_info[i].codepoint
-		 posx[i+1] = x + glyph_pos[i].x_offset / 64
-		 posy[i+1] = y - glyph_pos[i].y_offset / 64
-		 x = x + glyph_pos[i].x_advance / 64
-		 y = y - glyph_pos[i].y_advance / 64
-	end
-
-	buf:destroy()
-
-	return idx, posx, posy
-end
-
-function player:render_glyph(face, glyph_index, glyph_size, x, y, load_flags, render_mode)
-
-	face:set_pixel_sizes(glyph_size)
+	local ox = x - math.floor(x)
+	local oy = y - math.floor(y)
+	face:set_transform(nil, ffi.new('FT_Vector', ox * 64, oy * 64))
 
 	face:load_glyph(glyph_index, load_flags)
 	local glyph = face.glyph
@@ -84,11 +42,11 @@ function player:render_glyph(face, glyph_index, glyph_size, x, y, load_flags, re
 		bitmap.rows,
 		cairo_stride)
 
-	x = x - glyph.bitmap_left
-	y = y - glyph.bitmap_top + glyph_size
+	x = x + glyph.bitmap_left
+	y = y - glyph.bitmap_top
 
 	self:setcolor'normal_fg'
-	self.cr:mask_surface(image, x, y)
+	self.cr:mask_surface(image, math.floor(x), math.floor(y))
 
 	image:free()
 	if glyph.bitmap ~= bitmap then
@@ -96,17 +54,18 @@ function player:render_glyph(face, glyph_index, glyph_size, x, y, load_flags, re
 	end
 end
 
-function player:ft_shape(s, face)
-	local idx, posx, posy = {}, {}, {}
+local function glyphs(face, s)
+	local t = {}
 	for i=1,#s do
-		--
+		t[i] = face:char_index(string.byte(s, i))
 	end
-	return idx, posx, posy
+	return t
 end
 
 local lib = ft:new()
 local face = lib:new_face('media/fonts/DejaVuSerif.ttf')
-local hb_font = hb.hb_ft_font_create(face, nil)
+
+player.no_hinting = true
 
 function player:on_render(cr)
 
@@ -121,13 +80,13 @@ function player:on_render(cr)
 	self.fixed_grid = self:togglebutton{id = 'fixed_grid',
 		x = 500, y = 10, w = 90, h = 24, text = 'fixed grid', selected = self.fixed_grid}
 
-	local idx, posx, posy = self:shape('The Quick Brown Fox Jumped Over The Lazy Dog', hb_font)
-	--local idx, posx, posy = self:ft_shape('The Quick Brown Fox Jumped Over The Lazy Dog', face)
-
-	local x, y = 0, 0
+	local x, y = 100, 100
 	for size=1,28 do
-		for i=1,#idx do
-			self:render_glyph(face, idx[i], size, 100 + x, 100 + y,
+		self:rect(x, y, 500, size, nil, 'normal_fg', 0.1)
+		face:set_char_size(size * 64)
+		local t = glyphs(face, 'iiiiiiiiii W.T.Smith')
+		for i,idx in ipairs(t) do
+			self:render_glyph(face, idx, x, y,
 				bit.bor(
 					self.no_hinting and ft.FT_LOAD_NO_HINTING or 0,
 					self.force_autohint and ft.FT_LOAD_FORCE_AUTOHINT or 0,
@@ -138,18 +97,18 @@ function player:on_render(cr)
 					self.render_light and ft.FT_RENDER_MODE_LIGHT or 0
 				)
 			)
-			local advance = posx[i]
-			--print(advance, face.glyph.advance.x / 64)
-			--local advance = face.glyph.advance.x / 64
-			x = x + (self.fixed_grid and math.floor(advance) or advance)
+
+			x = x + face.glyph.advance.x / 64
 		end
 		y = y + size
-		x = 0
+		x = 100
 	end
 
+	if self:keypressed'ctrl' then
+		self:magnifier{id = 'mag', x = self.mousex - 300, y = self.mousey - 200, w = 600, h = 400, zoom_level = 6}
+	end
 end
 
 player:play()
-hb_font:destroy()
 face:free()
 lib:free()

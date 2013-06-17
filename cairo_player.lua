@@ -22,6 +22,8 @@ player.themes.dark = {
 	hot_fg = {0,0,0,1},
 	selected_bg = {1,1,1,1},
 	selected_fg = {0,0,0,1},
+	error_bg = {1,0,0,0.7},
+	error_fg = {1,1,1,1},
 }
 
 player.themes.light = {
@@ -34,6 +36,8 @@ player.themes.light = {
 	hot_fg = {1,1,1,1},
 	selected_bg = {0,0,0,0.9},
 	selected_fg = {1,1,1,1},
+	error_bg = {1,0,0,0.7},
+	error_fg = {1,1,1,1},
 }
 
 player.themes.red = glue.merge({

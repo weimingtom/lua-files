@@ -1,0 +1,36 @@
+This is a description of the lua-files text shaping and rendering stack listing the major modules in the pipeline,
+wanted capabilities and technology choices, options and routes taken for fulfilling those capabilities.
+
+unicode text analysis for shaping
+	- line wrapping and justification
+		- unicode line breaking algorithm (UAX#14; libunibreak, icu with dictionaries)
+	- unicode bidi algorithm (fribidi, icu)
+	- use of unicode's plane 14 language tags to split text into languages
+	- use of unicode script property of code points to split text into scripts (UAX#24)
+
+unicode text shaping and positioning
+	- complex shaping (glyph selection and positioning; open-type feature selection; glyph variant selection)
+		- open type shaper (harfbuzz + freetype)
+		- graphite shaper (libgraphite2)
+
+text positioning alteration
+	- text path alteration
+		- text following path
+
+text effects
+	- underline, strike-through
+
+unicode text analysis
+	- unicode text segmentation (UAX#29)
+		- grapheme cluster boundary (?)
+		- word boundary (libunibreak, icu with dictionaries)
+		- sentince boundary (?)
+
+text path measuring
+	- baseline path (eg. for underline and strike-through with custom stroke)
+	- bbox (cached)
+
+glyph rasterization
+	- glyph rasterization (freetype)
+	- glyph bitmap caching (fractional positioning, no rotation, color-filled only)
+	- glyph compositing (alpha masking or rgb-masking with gamma correction)

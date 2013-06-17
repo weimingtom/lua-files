@@ -1244,4 +1244,27 @@ cairo_region_xor_rectangle (cairo_region_t *dst,
        const cairo_rectangle_int_t *rectangle);
  void
 cairo_debug_reset_static_data (void);
+
+// private APIs
+
+typedef enum _cairo_lcd_filter {
+    CAIRO_LCD_FILTER_DEFAULT,
+    CAIRO_LCD_FILTER_NONE,
+    CAIRO_LCD_FILTER_INTRA_PIXEL,
+    CAIRO_LCD_FILTER_FIR3,
+    CAIRO_LCD_FILTER_FIR5
+} cairo_lcd_filter_t;
+
+typedef enum _cairo_round_glyph_positions {
+    CAIRO_ROUND_GLYPH_POS_DEFAULT,
+    CAIRO_ROUND_GLYPH_POS_ON,
+    CAIRO_ROUND_GLYPH_POS_OFF
+} cairo_round_glyph_positions_t;
+
+void _cairo_font_options_set_lcd_filter (cairo_font_options_t   *options, cairo_lcd_filter_t  lcd_filter);
+cairo_lcd_filter_t _cairo_font_options_get_lcd_filter (const cairo_font_options_t *options);
+void _cairo_font_options_set_round_glyph_positions (cairo_font_options_t *options, cairo_round_glyph_positions_t  round);
+cairo_round_glyph_positions_t _cairo_font_options_get_round_glyph_positions (const cairo_font_options_t *options);
+
 ]]
+

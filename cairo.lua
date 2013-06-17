@@ -865,6 +865,11 @@ ffi.metatype('cairo_font_options_t', {__index = {
 	get_hint_style = M.cairo_font_options_get_hint_style,
 	set_hint_metrics = M.cairo_font_options_set_hint_metrics,
 	get_hint_metrics = M.cairo_font_options_get_hint_metrics,
+	--private
+	set_lcd_filter = M._cairo_font_options_set_lcd_filter,
+	get_lcd_filter = M._cairo_font_options_get_lcd_filter,
+	set_round_glyph_positions = M._cairo_font_options_set_round_glyph_positions,
+	get_round_glyph_positions = M._cairo_font_options_get_round_glyph_positions,
 }})
 
 ffi.metatype('cairo_region_t', {__index = {

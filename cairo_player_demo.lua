@@ -137,7 +137,7 @@ function player:on_render(cr)
 	}
 
 	if self:keypressed'ctrl' then
-		self:magnifier{id = 'mag', x = self.mousex - 150, y = self.mousey - 100, w = 300, h = 200, zoom_level = 2}
+		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
 	end
 
 end

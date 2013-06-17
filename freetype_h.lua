@@ -1,4 +1,4 @@
---based on cpp'ed freetype.h from gtk's freetype-dev v2.4.2
+--freetype/*.h from freetype 2.4.11
 local ffi = require'ffi'
 
 ffi.cdef[[
@@ -17,14 +17,10 @@ typedef enum {
 	FT_FACE_FLAG_HINTER             = ( 1L << 11 ),
 	FT_FACE_FLAG_CID_KEYED          = ( 1L << 12 ),
 	FT_FACE_FLAG_TRICKY             = ( 1L << 13 ),
-};
 
-typedef enum {
 	FT_STYLE_FLAG_ITALIC  = ( 1 << 0 ),
 	FT_STYLE_FLAG_BOLD    = ( 1 << 1 ),
-};
 
-typedef enum {
 	FT_LOAD_DEFAULT                       = 0x0,
 	FT_LOAD_NO_SCALE                      = 0x1,
 	FT_LOAD_NO_HINTING                    = 0x2,
@@ -40,6 +36,11 @@ typedef enum {
 	FT_LOAD_MONOCHROME                    = 0x1000,
 	FT_LOAD_LINEAR_DESIGN                 = 0x2000,
 	FT_LOAD_NO_AUTOHINT                   = 0x8000U,
+
+	FT_RASTER_FLAG_DEFAULT  = 0x0,
+	FT_RASTER_FLAG_AA       = 0x1,
+	FT_RASTER_FLAG_DIRECT   = 0x2,
+	FT_RASTER_FLAG_CLIP     = 0x4,
 };
 
 typedef signed short FT_Int16;
@@ -417,8 +418,8 @@ typedef struct FT_GlyphSlotRec_
  FT_Slot_Internal internal;
 } FT_GlyphSlotRec;
 
-FT_Error FT_Init_FreeType( FT_Library *alibrary );
-FT_Error FT_Done_FreeType( FT_Library library );
+FT_Error FT_Init_FreeType(FT_Library *alibrary );
+FT_Error FT_Done_FreeType(FT_Library library );
 
 typedef struct FT_Parameter_
 {
@@ -621,11 +622,6 @@ FT_Library_Version( FT_Library library,
 						 FT_Int *amajor,
 						 FT_Int *aminor,
 						 FT_Int *apatch );
-FT_Bool
-FT_Face_CheckTrueTypePatents( FT_Face face );
-FT_Bool
-FT_Face_SetUnpatentedHinting( FT_Face face,
-									  FT_Bool value );
 
 // ftbitmap.h
 
@@ -635,5 +631,135 @@ FT_Error FT_Bitmap_Embolden (FT_Library library, FT_Bitmap* bitmap, FT_Pos xStre
 FT_Error FT_Bitmap_Convert  (FT_Library library, const FT_Bitmap *source, FT_Bitmap *target, FT_Int alignment);
 FT_Error FT_GlyphSlot_Own_Bitmap (FT_GlyphSlot slot);
 FT_Error FT_Bitmap_Done     (FT_Library library, FT_Bitmap *bitmap);
+
+// ftglyph.h
+
+typedef struct FT_Glyph_Class_ FT_Glyph_Class;
+typedef struct FT_GlyphRec_* FT_Glyph;
+typedef struct FT_GlyphRec_
+{
+ FT_Library library;
+ const FT_Glyph_Class* clazz;
+ FT_Glyph_Format format;
+ FT_Vector advance;
+} FT_GlyphRec;
+typedef struct FT_BitmapGlyphRec_* FT_BitmapGlyph;
+typedef struct FT_BitmapGlyphRec_
+{
+ FT_GlyphRec root;
+ FT_Int left;
+ FT_Int top;
+ FT_Bitmap bitmap;
+} FT_BitmapGlyphRec;
+typedef struct FT_OutlineGlyphRec_* FT_OutlineGlyph;
+typedef struct FT_OutlineGlyphRec_
+{
+ FT_GlyphRec root;
+ FT_Outline outline;
+} FT_OutlineGlyphRec;
+FT_Error
+FT_Get_Glyph( FT_GlyphSlot slot,
+				 FT_Glyph *aglyph );
+FT_Error
+FT_Glyph_Copy( FT_Glyph source,
+				  FT_Glyph *target );
+FT_Error
+FT_Glyph_Transform( FT_Glyph glyph,
+						 FT_Matrix* matrix,
+						 FT_Vector* delta );
+typedef enum FT_Glyph_BBox_Mode_
+{
+ FT_GLYPH_BBOX_UNSCALED = 0,
+ FT_GLYPH_BBOX_SUBPIXELS = 0,
+ FT_GLYPH_BBOX_GRIDFIT = 1,
+ FT_GLYPH_BBOX_TRUNCATE = 2,
+ FT_GLYPH_BBOX_PIXELS = 3
+} FT_Glyph_BBox_Mode;
+void
+FT_Glyph_Get_CBox( FT_Glyph glyph,
+						FT_UInt bbox_mode,
+						FT_BBox *acbox );
+FT_Error
+FT_Glyph_To_Bitmap( FT_Glyph* the_glyph,
+						 FT_Render_Mode render_mode,
+						 FT_Vector* origin,
+						 FT_Bool destroy );
+void
+FT_Done_Glyph( FT_Glyph glyph );
+void
+FT_Matrix_Multiply( const FT_Matrix* a,
+						 FT_Matrix* b );
+FT_Error
+FT_Matrix_Invert( FT_Matrix* matrix );
+
+//ftoutln.h
+
+FT_Error
+FT_Outline_Decompose( FT_Outline* outline,
+							const FT_Outline_Funcs* func_interface,
+							void* user );
+FT_Error
+FT_Outline_New( FT_Library library,
+					FT_UInt numPoints,
+					FT_Int numContours,
+					FT_Outline *anoutline );
+
+
+FT_Error
+FT_Outline_New_Internal( FT_Memory memory,
+								FT_UInt numPoints,
+								FT_Int numContours,
+								FT_Outline *anoutline );
+FT_Error
+FT_Outline_Done( FT_Library library,
+					 FT_Outline* outline );
+
+
+FT_Error
+FT_Outline_Done_Internal( FT_Memory memory,
+								 FT_Outline* outline );
+FT_Error
+FT_Outline_Check( FT_Outline* outline );
+void
+FT_Outline_Get_CBox( const FT_Outline* outline,
+						  FT_BBox *acbox );
+void
+FT_Outline_Translate( const FT_Outline* outline,
+							FT_Pos xOffset,
+							FT_Pos yOffset );
+FT_Error
+FT_Outline_Copy( const FT_Outline* source,
+					 FT_Outline *target );
+void
+FT_Outline_Transform( const FT_Outline* outline,
+							const FT_Matrix* matrix );
+FT_Error
+FT_Outline_Embolden( FT_Outline* outline,
+						  FT_Pos strength );
+FT_Error
+FT_Outline_EmboldenXY( FT_Outline* outline,
+							 FT_Pos xstrength,
+							 FT_Pos ystrength );
+void
+FT_Outline_Reverse( FT_Outline* outline );
+FT_Error
+FT_Outline_Get_Bitmap( FT_Library library,
+							 FT_Outline* outline,
+							 const FT_Bitmap *abitmap );
+FT_Error
+FT_Outline_Render( FT_Library library,
+						FT_Outline* outline,
+						FT_Raster_Params* params );
+typedef enum FT_Orientation_
+{
+ FT_ORIENTATION_TRUETYPE = 0,
+ FT_ORIENTATION_POSTSCRIPT = 1,
+ FT_ORIENTATION_FILL_RIGHT = FT_ORIENTATION_TRUETYPE,
+ FT_ORIENTATION_FILL_LEFT = FT_ORIENTATION_POSTSCRIPT,
+ FT_ORIENTATION_NONE
+
+} FT_Orientation;
+FT_Orientation
+FT_Outline_Get_Orientation( FT_Outline* outline );
 
 ]]

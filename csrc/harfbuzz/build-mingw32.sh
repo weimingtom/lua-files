@@ -25,7 +25,6 @@ gcc \
 	hb-ucdn.cc \
 	\
 	-I. \
-	-Ihb-ucdn \
 	-DHAVE_OT \
 	-DHAVE_UCDN \
 	-I../freetype \

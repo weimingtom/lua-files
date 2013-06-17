@@ -1,4 +1,3 @@
-
 - important: blur, shadow, 2d projection, perspective projection, contrast, gamma, brightness, saturation, grayscale
 
 - bitmaps: vflip, hflip, crop, tile
@@ -53,4 +52,5 @@ The vertex pipeline:
 	- bezier to bezier
 	- bezier to arc (or arc to bezier)
 	-
+
 

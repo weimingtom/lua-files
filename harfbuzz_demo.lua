@@ -29,7 +29,7 @@ local function shape_text(s, ft_face, hb_font, size, direction, script, language
 		end
 	end
 
-	ft_face:set_pixel_sizes(size, size)
+	ft_face:set_char_size(size * 64)
 	buf:shape(hb_font, feats, feats_count)
 	local glyph_count = buf:get_length()
 	local glyph_info  = buf:get_glyph_infos()
@@ -48,59 +48,133 @@ local function shape_text(s, ft_face, hb_font, size, direction, script, language
 	return cairo_glyphs, glyph_count
 end
 
-local function draw_glyphs(cr, x, y, cairo_glyphs, glyph_count, cairo_face, size)
+function player:draw_glyphs(x, y, cairo_glyphs, glyph_count, cairo_face, size)
+	local cr = self.cr
+	cr:translate(x, y)
 	cr:set_font_face(cairo_face)
 	cr:set_font_size(size)
-	cr:translate(x, y)
-	cr:glyph_path(cairo_glyphs, glyph_count)
-	cr:translate(-x, -y)
-	cr:set_source_rgba(0.7, 0.7, 0.7, 1.0)
-	cr:fill()
+	self:setcolor'normal_fg'
+	cr:show_glyphs(cairo_glyphs, glyph_count); --NOTE: does not support subpixel positioning
+	--cr:glyph_path(cairo_glyphs, glyph_count); cr:fill() --NOTE: extremely slow but supports subpixel positioning
 	cr:set_font_face(nil)
+	cr:translate(-x, -y)
 end
 
-local function draw_text(cr, x, y, s, font, size, direction, script, language, features)
+function player:draw_text(x, y, s, font, size, direction, script, language, features)
 	local glyphs, glyph_count = shape_text(s, font.ft_face, font.hb_font, size, direction, script, language, features)
-	draw_glyphs(cr, x, y, glyphs, glyph_count, font.cairo_face, size)
+	self:draw_glyphs(x, y, glyphs, glyph_count, font.cairo_face, size)
 end
 
 local ft_lib = ft.FT_Init_FreeType()
+ffi.gc(ft_lib, nil)
 
-local fonts = {}
-local function font(filename)
-	if not fonts[filename] then
-		local ft_face = ft_lib:new_face(filename)
-		local cairo_face = cairo.cairo_ft_font_face_create_for_ft_face(ft_face, 0)
-		local hb_font = hb.hb_ft_font_create(ft_face, nil)
-		fonts[filename] = {ft_face = ft_face, cairo_face = cairo_face, hb_font = hb_font}
-	end
-	return fonts[filename]
+local function font(filename, load_flags)
+	local ft_face = ft_lib:new_face(filename)
+	local cairo_face = cairo.cairo_ft_font_face_create_for_ft_face(ft_face, load_flags or 0)
+	local hb_font = hb.hb_ft_font_create(ft_face, nil)
+	ffi.gc(ft_face, nil)
+	ffi.gc(cairo_face, nil)
+	ffi.gc(hb_font, nil)
+	return {ft_face = ft_face, cairo_face = cairo_face, hb_font = hb_font}
 end
 
 local amiri = font'media/fonts/amiri-regular.ttf'
-local dejavu = font'media/fonts/DejaVuSerif.ttf'
+local dejavu_hinted = font'media/fonts/DejaVuSerif.ttf'
+local dejavu_nohint = font('media/fonts/DejaVuSerif.ttf', ft.FT_LOAD_NO_HINTING)
+local dejavu_autohint = font('media/fonts/DejaVuSerif.ttf', ft.FT_LOAD_FORCE_AUTOHINT)
 
+local dark = true
+local selected_font = dejavu_hinted
+local antialias = cairo.CAIRO_ANTIALIAS_DEFAULT
 local sub = 0
+local font_options = cairo.cairo_font_options_create()
+local lcd_filter = cairo.CAIRO_LCD_FILTER_DEFAULT
+local round_glyph_pos = cairo.CAIRO_ROUND_GLYPH_POS_OFF
+
 function player:on_render(cr)
-	draw_text(cr, 100, 100, 'Te VA - This is Some English Text', dejavu, 20, 'ltr')
-	draw_text(cr, 100, 150, "هذه هي بعض النصوص العربي", amiri, 40, 'rtl', hb.HB_SCRIPT_ARABIC)
+
+	dark = self:togglebutton{id = 'dark', x = 10, y = 10, w = 60, h = 24,
+										text = dark and 'lights on' or 'lights off', selected = dark}
+	self.theme = self.themes[dark and 'dark' or 'light']
+
+	antialias = self:mbutton{id = 'antialias',
+		x = 100, y = 40, w = 700, h = 24,
+		values = {
+			cairo.CAIRO_ANTIALIAS_DEFAULT,
+			cairo.CAIRO_ANTIALIAS_NONE,
+			cairo.CAIRO_ANTIALIAS_GRAY,
+			cairo.CAIRO_ANTIALIAS_SUBPIXEL,
+			cairo.CAIRO_ANTIALIAS_FAST,
+			cairo.CAIRO_ANTIALIAS_GOOD,
+			cairo.CAIRO_ANTIALIAS_BEST
+		},
+		texts = {
+			[cairo.CAIRO_ANTIALIAS_DEFAULT] = 'default',
+			[cairo.CAIRO_ANTIALIAS_NONE] = 'none',
+			[cairo.CAIRO_ANTIALIAS_GRAY] = 'gray',
+			[cairo.CAIRO_ANTIALIAS_SUBPIXEL] = 'subpixel',
+			[cairo.CAIRO_ANTIALIAS_FAST] = 'fast',
+			[cairo.CAIRO_ANTIALIAS_GOOD] = 'good',
+			[cairo.CAIRO_ANTIALIAS_BEST] = 'best',
+		},
+		selected = antialias}
+
+	round_glyph_pos = self:mbutton{id = 'round_glyph_pos',
+		x = 410, y = 10, w = 200, h = 24,
+		values = {
+			cairo.CAIRO_ROUND_GLYPH_POS_ON,
+			cairo.CAIRO_ROUND_GLYPH_POS_OFF
+		},
+		texts = {
+			[cairo.CAIRO_ROUND_GLYPH_POS_ON] = 'round glyph pos',
+			[cairo.CAIRO_ROUND_GLYPH_POS_OFF] = 'exact glyph pos',
+		},
+		selected = round_glyph_pos}
+
+	lcd_filter = self:mbutton{id = 'lcd_filter',
+		x = 620, y = 10, w = 400, h = 24,
+		values = {
+			cairo.CAIRO_LCD_FILTER_DEFAULT,
+			cairo.CAIRO_LCD_FILTER_NONE,
+			cairo.CAIRO_LCD_FILTER_INTRA_PIXEL,
+			cairo.CAIRO_LCD_FILTER_FIR3,
+			cairo.CAIRO_LCD_FILTER_FIR5,
+		},
+		texts = {
+			[cairo.CAIRO_LCD_FILTER_DEFAULT] = 'default',
+			[cairo.CAIRO_LCD_FILTER_NONE] = 'none',
+			[cairo.CAIRO_LCD_FILTER_INTRA_PIXEL] = 'intra-pixel',
+			[cairo.CAIRO_LCD_FILTER_FIR3] = 'fir3',
+			[cairo.CAIRO_LCD_FILTER_FIR5] = 'fir5',
+		},
+		selected = lcd_filter}
+
+	cr:set_antialias(antialias)
+	font_options:set_lcd_filter(lcd_filter)
+	font_options:set_antialias(antialias)
+	font_options:set_round_glyph_positions(round_glyph_pos)
+	cr:set_font_options(font_options)
+
+	selected_font = self:mbutton{id = 'font',
+		x = 100, y = 10, w = 300, h = 24,
+		values = {dejavu_hinted, dejavu_nohint, dejavu_autohint},
+		texts = {[dejavu_hinted] = 'hinted', [dejavu_nohint] = 'unhinted', [dejavu_autohint] = 'autohinted'},
+		selected = selected_font}
+
+	self:draw_text(100, 150, "هذه هي بعض النصوص العربي", amiri, 40, 'rtl', hb.HB_SCRIPT_ARABIC)
 
 	local y = 0
-	for i=6,20 do
-		draw_text(cr, 100 + sub, 200 + y + sub, 'Te VA - This is Some English Text', dejavu, i, 'ltr')
+	for i=6,26 do
+		self:draw_text(100 + sub, 200 + y, 'iiiiiiiiii - Te VA - This is Some English Text - Jumped', selected_font, i, 'ltr')
 		y = y + i
 	end
-	sub = sub + 0.01
+	sub = sub + 1/256
+
+	if self:keypressed'ctrl' then
+		self:magnifier{id = 'mag', x = self.mousex - 300, y = self.mousey - 200, w = 600, h = 400, zoom_level = 6}
+	end
+
 end
 
 player:play()
-
-for name,t in pairs(fonts) do
-	t.hb_font:destroy()
-	t.cairo_face:destroy()
-	print(name, 'face refcoint', t.cairo_face:get_reference_count())
-	ffi.gc(t.ft_face, nil) --can't free the face, cairo's cache references it
-end
-ffi.gc(ft_lib, nil)
---ft_lib:free()
 
