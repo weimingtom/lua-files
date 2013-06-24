@@ -120,11 +120,11 @@ ffi.metatype('genxWriter_rec', {__index = {
 
 	end_element = nzcaller(C.genxEndElement),
 
-	add_text = function(w, s, sz)
+	text = function(w, s, sz)
 		checknz(w, C.genxAddCountedText(w, s, sz or #s))
 	end,
 
-	add_char = nzcaller(C.genxAddCharacter),
+	char = nzcaller(C.genxAddCharacter),
 
 	check_text = C.genxCheckText,
 
@@ -139,7 +139,7 @@ ffi.metatype('genxWriter_rec', {__index = {
 
 }, __gc = free})
 
-if not ... then require'genx_test' end
+if not ... then require'genx_demo' end
 
 return M
 

@@ -13,7 +13,7 @@ local a2 = w:attr('a2')
 
 w:start_doc(io.stdout)
 w:start_element'root'
-w:add_text'hello'
+w:text'hello'
 w:end_element()
 w:end_doc()
 print()
@@ -27,20 +27,20 @@ w:start_element('html')
 w:add_ns(ns1)
 w:add_ns(ns2, 'g')
 
-	w:add_text('\n\t')
+	w:text'\n\t'
 	w:start_element('head')
 	w:add_attr('b', 'vb')
 	w:add_attr('a', 'va')
-	w:add_text'hello'
+	w:text'hello'
 	w:end_element()
-	w:add_text('\n\t')
+	w:text'\n\t'
 
 	w:start_element(body)
 	w:add_attr(a1, 'v1')
 	w:add_attr(a2, 'v2')
-	w:add_text('hey')
+	w:text'hey'
 	w:end_element()
-	w:add_text('\n')
+	w:text'\n'
 
 w:end_element()
 
