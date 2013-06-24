@@ -282,7 +282,7 @@ local function unzip_files(file)
 end
 
 local function unzip_extract(file, filename, password)
-	assert(unzip_locate_file(file, assert(filename)), 'file not found')
+	assert(unzip_locate_file(file, assert(filename, 'filename missing')), 'file not found')
 	unzip_open_file(file, password)
 	return glue.fcall(function(finally)
 		finally(function() unzip_close_file(file) end)
@@ -295,20 +295,23 @@ end
 
 --zip+unzip interface
 
-local function copy_from_zip(file, src_file)
-	unzip_open_file(src_file, nil, true)
+local function copy_from_zip(file, src_file, bufsize)
 	glue.fcall(function(finally)
-		finally(function() unzip_close_file(src_file) end)
-		local info = unzip_get_file_info(src_file)
-		local sz = info.compressed_size
-		local buf = ffi.new('char[?]', sz)
-		assert(unzip_read_cdata(src_file, buf, sz) == sz)
 
+		unzip_open_file(src_file, nil, true)
+		finally(function() unzip_close_file(src_file) end)
+
+		local info = unzip_get_file_info(src_file)
+
+		--get local extra header and remove the ZIP64 block as needed for RAW mode copying
 		local local_extra, local_extra_size = unzip_get_local_extra(src_file)
 		if local_extra then
-			C.zipRemoveExtraInfoBlock(local_extra, local_extra_size, 1)
+			local sz = ffi.new'int[1]'
+			C.zipRemoveExtraInfoBlock(local_extra, sz, 1)
+			local_extra_size = sz[0]
 		end
 
+		--add the file to the dest. zip with exactly the same header fields as the source file
 		zip_add_file(file, {
 			filename = info.filename,
 			versionMadeBy = info.version,
@@ -316,7 +319,7 @@ local function copy_from_zip(file, src_file)
 			internal_fa = info.internal_fa,
 			external_fa = info.external_fa,
 			comment = info.comment,
-			method = info.compression_method,
+			method = info.method,
 			level = info.level,
 			raw = true,
 			crc = info.crc,
@@ -326,8 +329,22 @@ local function copy_from_zip(file, src_file)
 			file_extra = info.file_extra,
 			file_extra_size = info.file_extra_size,
 		})
-		zip_write(file, buf, sz)
-		zip_close_file_raw(file, sz, info.crc)
+
+		--copy the file contents in fixed sized chunks
+		local left = info.compressed_size
+		if left > 0 then
+			local bufsize = math.min(left, bufsize or 4096)
+			local buf = ffi.new('char[?]', bufsize)
+			while left > 0 do
+				local sz = math.min(left, bufsize)
+				assert(unzip_read_cdata(src_file, buf, sz) == sz)
+				zip_write(file, buf, sz)
+				left = left - sz
+			end
+		end
+
+		--close the dest. file. the source file is closed on the finally clause.
+		zip_close_file_raw(file, info.uncompressed_size, info.crc)
 	end)
 end
 
