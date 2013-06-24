@@ -53,7 +53,7 @@ ffi.metatype('genxWriter_rec', {__index = {
 
 	free = free,
 
-	open = function(w, f, ...)
+	start_doc = function(w, f, ...)
 		free_sender(w)
 		if type(f) == 'function' then
 			--f is called as either: f(s), f(s, sz), or f() to signal EOF.
@@ -68,7 +68,7 @@ ffi.metatype('genxWriter_rec', {__index = {
 		end
 	end,
 
-	close = nzcaller(C.genxEndDocument),
+	end_doc = nzcaller(C.genxEndDocument),
 
 	ns = function(w, uri, prefix, statusP)
 		statusP = statusP or ffi.new'genxStatus[1]'
@@ -89,9 +89,9 @@ ffi.metatype('genxWriter_rec', {__index = {
 
 	pi = nzcaller(C.genxPI),
 
-	start_element = function(w, e, ns)
+	start_element = function(w, e, ns, prefix)
 		if type(ns) == 'string' then
-			ns = w:ns(ns)
+			ns = w:ns(ns, prefix)
 		end
 		if type(e) == 'string' then
 			e = w:element(e, ns)
@@ -99,9 +99,9 @@ ffi.metatype('genxWriter_rec', {__index = {
 		checknz(w, C.genxStartElement(e))
 	end,
 
-	add_attr = function(w, a, val, ns)
+	add_attr = function(w, a, val, ns, prefix)
 		if type(ns) == 'string' then
-			ns = w:ns(ns)
+			ns = w:ns(ns, prefix)
 		end
 		if type(a) == 'string' then
 			a = w:attr(a, ns)

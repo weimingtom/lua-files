@@ -11,13 +11,14 @@ local body = w:element('body', ns1)
 local a1 = w:attr('a1')
 local a2 = w:attr('a2')
 
-w:open(io.stdout)
-w:start_element'e'
+w:start_doc(io.stdout)
+w:start_element'root'
+w:add_text'hello'
 w:end_element()
-w:close()
+w:end_doc()
 print()
 
-w:open(function(s, sz)
+w:start_doc(function(s, sz)
 	s = s and (sz and ffi.string(s, sz) or ffi.string(s)) or '\n!EOF\n'
 	io.write(s)
 end)
@@ -43,6 +44,6 @@ w:add_ns(ns2, 'g')
 
 w:end_element()
 
-w:close()
+w:end_doc()
 
 w:free()
