@@ -1,18 +1,5 @@
---[[
-bugs:
-- vert. scroll should not scroll header, only content
-todo:
-- auto ellipsis and/or clipping
-- column sorting: so rows get to be in grid state too?
-- column auto-width: distribute grid width proportionally among columns to avoid horiz. scrolling
-- per column min. width
-- quick search: specify column to search to
-- cell select mode
-- multicell select mode
-- editable cells: immediate mode (click) or click-click mode; tab goes to next cell; right/left goes to next/prev cell
--
+--immediate mode grid widget
 
-]]
 local player = require'cairo_player'
 
 function player:grid(t)

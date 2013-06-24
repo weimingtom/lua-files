@@ -432,6 +432,8 @@ local autoload = {
 	grid = 'grid',
 	treeview = 'treeview',
 	magnifier = 'magnifier',
+	vsplitter = 'splitter',
+	hsplitter = 'splitter',
 }
 
 setmetatable(player, {__index = function(_, k)
