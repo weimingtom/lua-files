@@ -116,9 +116,9 @@ end
 
 --zip hi-level API
 
-local function zip_archive(file, t, contents)
+local function zip_archive(file, t, s, sz)
 	zip_add_file(file, t)
-	zip_write(file, contents)
+	zip_write(file, s, sz)
 	zip_close_file(file)
 end
 
@@ -283,14 +283,12 @@ end
 
 local function unzip_extract(file, filename, password)
 	assert(unzip_locate_file(file, assert(filename, 'filename missing')), 'file not found')
+	local sz = unzip_get_file_info(file).uncompressed_size
 	unzip_open_file(file, password)
-	return glue.fcall(function(finally)
-		finally(function() unzip_close_file(file) end)
-		local sz = unzip_get_file_info(file).uncompressed_size
-		local buf = ffi.new('char[?]', sz)
-		assert(unzip_read_cdata(file, buf, sz) == sz)
-		return ffi.string(buf, sz)
-	end)
+	local s = unzip_read(file, sz)
+	unzip_close_file(file)
+	assert(#s == sz, 'short read')
+	return s
 end
 
 --zip+unzip interface

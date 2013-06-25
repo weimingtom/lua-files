@@ -32,3 +32,4 @@ assert(z:extract'dir1/file2.txt' == hello_again)
 
 z:close()
 
+os.remove(filename)
