@@ -98,7 +98,7 @@ function player:on_render(cr)
 	self.theme = self.themes[dark and 'dark' or 'light']
 
 	antialias = self:mbutton{id = 'antialias',
-		x = 100, y = 40, w = 700, h = 24,
+		x = 100, y = 40, w = 600, h = 24,
 		values = {
 			cairo.CAIRO_ANTIALIAS_DEFAULT,
 			cairo.CAIRO_ANTIALIAS_NONE,
@@ -149,7 +149,7 @@ function player:on_render(cr)
 		},
 		selected = lcd_filter}
 
-	use_show_glyphs = self:mbutton{id = 'use_show_glyphs', x = 810, y = 40, w = 300, h = 24,
+	use_show_glyphs = self:mbutton{id = 'use_show_glyphs', x = 710, y = 40, w = 300, h = 24,
 											values = {true, false},
 											texts = {[true] = 'cairo_show_glyphs', [false] = 'cairo_glyph_path'},
 											selected = use_show_glyphs}

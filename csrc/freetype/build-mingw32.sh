@@ -1,5 +1,6 @@
 # freetype 2.5 custom build script
-# features: truetype format, cff format, truetype bytecode hinter, autohinter, smooth rasterizer, stroker.
+# features: truetype format, cff format, truetype bytecode hinter, autohinter,
+# 				non-aa rasterizer, smooth rasterizer, stroker, lcd filtering.
 
 args=(gcc -O3 -s -shared -o ../../bin/libfreetype-6.dll -Icustom -Iinclude -DFT2_BUILD_LIBRARY
 
@@ -18,7 +19,7 @@ args=(gcc -O3 -s -shared -o ../../bin/libfreetype-6.dll -Icustom -Iinclude -DFT2
       #src/base/ftfstype.c     #optional
       #src/base/ftgasp.c       #optional, see <freetype/ftgasp.h>
       #src/base/ftgxval.c      #optional, see <freetype/ftgxval.h>
-      src/base/ftlcdfil.c     #optional, see <freetype/ftlcdfil.h>
+      src/base/ftlcdfil.c     #optional, see <freetype/ftfil.h>
       #src/base/ftmm.c         #optional, see <freetype/ftmm.h>
       #src/base/ftotval.c      #optional, see <freetype/ftotval.h>
       #src/base/ftpatent.c     #optional
@@ -47,7 +48,7 @@ args=(gcc -O3 -s -shared -o ../../bin/libfreetype-6.dll -Icustom -Iinclude -DFT2
 
     #rasterizers (optional; at least one is needed for vector formats)
 
-      #src/raster/raster.c     #monochrome rasterizer
+      src/raster/raster.c     #monochrome rasterizer
       src/smooth/smooth.c     #anti-aliasing rasterizer
 
     #auxiliary modules (optional)
