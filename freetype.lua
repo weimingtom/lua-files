@@ -444,7 +444,7 @@ ffi.metatype('FT_FaceRec', {__index = {
 	chars = face_chars,
 	char_count = face_char_count,
 	name_index = M.FT_Get_Name_Index,
-	fstype_flags = M.FT_Get_FSType_Flags,
+	--fstype_flags = M.FT_Get_FSType_Flags, --fstype stripped (needs type1)
 	--glyph variants
 	char_variant_index = M.FT_Face_GetCharVariantIndex,
 	char_variant_is_default = M.FT_Face_GetCharVariantIsDefault,

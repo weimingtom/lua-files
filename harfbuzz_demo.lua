@@ -8,14 +8,10 @@ require'cairo_ft'
 local player = require'cairo_player'
 
 local function shape_text(s, ft_face, hb_font, size, direction, script, language, features)
-	direction = direction or hb.HB_DIRECTION_LTR
-	script = script or hb.HB_SCRIPT_LATIN
-	language = language or 'en'
-
 	local buf = hb.hb_buffer_create()
-	buf:set_direction(direction)
-	buf:set_script(script)
-	buf:set_language(language)
+	buf:set_direction(direction or hb.HB_DIRECTION_LTR)
+	buf:set_script(script or hb.HB_SCRIPT_UNKNOWN)
+	if language then buf:set_language(language) end
 	buf:add_utf8(s)
 	local feats, feats_count = nil, 0
 	if features then
@@ -48,21 +44,24 @@ local function shape_text(s, ft_face, hb_font, size, direction, script, language
 	return cairo_glyphs, glyph_count
 end
 
-function player:draw_glyphs(x, y, cairo_glyphs, glyph_count, cairo_face, size)
+function player:draw_glyphs(x, y, cairo_glyphs, glyph_count, cairo_face, size, use_show_glyphs)
 	local cr = self.cr
 	cr:translate(x, y)
 	cr:set_font_face(cairo_face)
 	cr:set_font_size(size)
 	self:setcolor'normal_fg'
-	cr:show_glyphs(cairo_glyphs, glyph_count); --NOTE: does not support subpixel positioning
-	--cr:glyph_path(cairo_glyphs, glyph_count); cr:fill() --NOTE: extremely slow but supports subpixel positioning
+	if use_show_glyphs then
+		cr:show_glyphs(cairo_glyphs, glyph_count); --NOTE: does not support subpixel positioning
+	else
+		cr:glyph_path(cairo_glyphs, glyph_count); cr:fill() --NOTE: extremely slow but supports subpixel positioning
+	end
 	cr:set_font_face(nil)
 	cr:translate(-x, -y)
 end
 
-function player:draw_text(x, y, s, font, size, direction, script, language, features)
+function player:draw_text(x, y, s, font, size, direction, script, language, features, use_show_glyphs)
 	local glyphs, glyph_count = shape_text(s, font.ft_face, font.hb_font, size, direction, script, language, features)
-	self:draw_glyphs(x, y, glyphs, glyph_count, font.cairo_face, size)
+	self:draw_glyphs(x, y, glyphs, glyph_count, font.cairo_face, size, use_show_glyphs)
 end
 
 local ft_lib = ft.FT_Init_FreeType()
@@ -90,6 +89,7 @@ local sub = 0
 local font_options = cairo.cairo_font_options_create()
 local lcd_filter = cairo.CAIRO_LCD_FILTER_DEFAULT
 local round_glyph_pos = cairo.CAIRO_ROUND_GLYPH_POS_OFF
+local use_show_glyphs = true
 
 function player:on_render(cr)
 
@@ -149,6 +149,11 @@ function player:on_render(cr)
 		},
 		selected = lcd_filter}
 
+	use_show_glyphs = self:mbutton{id = 'use_show_glyphs', x = 810, y = 40, w = 300, h = 24,
+											values = {true, false},
+											texts = {[true] = 'cairo_show_glyphs', [false] = 'cairo_glyph_path'},
+											selected = use_show_glyphs}
+
 	cr:set_antialias(antialias)
 	font_options:set_lcd_filter(lcd_filter)
 	font_options:set_antialias(antialias)
@@ -161,11 +166,13 @@ function player:on_render(cr)
 		texts = {[dejavu_hinted] = 'hinted', [dejavu_nohint] = 'unhinted', [dejavu_autohint] = 'autohinted'},
 		selected = selected_font}
 
-	self:draw_text(100, 150, "هذه هي بعض النصوص العربي", amiri, 40, 'rtl', hb.HB_SCRIPT_ARABIC)
+	self:draw_text(100, 150, "هذه هي بعض النصوص العربي", amiri, 40,
+							hb.HB_DIRECTION_RTL, hb.HB_SCRIPT_ARABIC, 'ar', nil, use_show_glyphs)
 
 	local y = 0
 	for i=6,26 do
-		self:draw_text(100 + sub, 200 + y, 'iiiiiiiiii - Te VA - This is Some English Text - Jumped', selected_font, i, 'ltr')
+		self:draw_text(100 + sub, 200 + y, 'iiiiiiiiii - Te VA - This is Some English Text - Jumped', selected_font, i,
+							hb.HB_DIRECTION_LTR, hb.HB_SCRIPT_LATIN, 'en', nil, use_show_glyphs)
 		y = y + i
 	end
 	sub = sub + 1/256
