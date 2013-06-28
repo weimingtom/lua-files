@@ -122,7 +122,7 @@ function player:on_render(cr)
 		local ok, err = pcall(function()
 
 			libjpeg.load(source, {
-					accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up},
+					accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up, top_down = not bottom_up},
 					dct = dct, upsampling = upsampling, smoothing = smoothing,
 					render_scan = render_scan,
 				})

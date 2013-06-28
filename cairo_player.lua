@@ -227,7 +227,7 @@ function player:window(t)
 		self:on_render(self.cr)
 
 		--set the cursor if set in the frame, or reset it
-		set_cursor(self.cursor)
+		--set_cursor(self.cursor)
 
 		--reset the one-shot state vars
 		self.clicked = false
@@ -283,8 +283,8 @@ function player:window(t)
 		panel:invalidate()
 	end
 
-	function panel.on_set_cursor()
-		return true --we use our own cursor
+	function panel.on_set_cursor(ht)
+		return ht == winapi.HTCLIENT --we set our own cursor on the client area
 	end
 
 	--window receives keyboard and mouse wheel events

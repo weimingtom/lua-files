@@ -550,7 +550,11 @@ function WM.WM_MOUSEACTIVATE(wParam, lParam)
 	return ffi.cast('HWND', wParam), HT, buttons_bitmask:get(MK) --must return MA_*
 end
 
-WM.WM_SETCURSOR = WM.WM_MOUSEACTIVATE
+
+function WM.WM_SETCURSOR(wParam, lParam)
+	local HT, id = splitlong(lParam)
+	return ffi.cast('HWND', wParam), HT, id
+end
 
 --keyboard input
 
