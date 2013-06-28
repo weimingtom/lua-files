@@ -145,7 +145,6 @@ function player:window(t)
 		w = t.w or 1200,
 		h = t.h or 600,
 	}
-	set_cursor() --reset the cursor (the app starts with the busy cursor)
 
 	self.window = window --needed by filebox
 
@@ -226,9 +225,6 @@ function player:window(t)
 		--render the frame
 		self:on_render(self.cr)
 
-		--set the cursor if set in the frame, or reset it
-		--set_cursor(self.cursor)
-
 		--reset the one-shot state vars
 		self.clicked = false
 		self.rightclick = false
@@ -239,7 +235,6 @@ function player:window(t)
 		self.ctrl = nil
 		self.alt = nil
 		self.wheel_delta = 0
-		self.cursor = false
 	end
 
 	function panel.on_mouse_move(panel, x, y, buttons)
@@ -283,8 +278,13 @@ function player:window(t)
 		panel:invalidate()
 	end
 
-	function panel.on_set_cursor(ht)
-		return ht == winapi.HTCLIENT --we set our own cursor on the client area
+	function panel.on_set_cursor(_, _, ht)
+		if ht == winapi.HTCLIENT then --we set our own cursor on the client area
+			set_cursor(self.cursor)
+			return true
+		else
+			return false
+		end
 	end
 
 	--window receives keyboard and mouse wheel events
