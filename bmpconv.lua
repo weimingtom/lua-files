@@ -1,13 +1,11 @@
 --pixel format upsampling, resampling and downsampling for luajit.
---supports all conversions between packed 8 bit-per-channel gray and rgb pixel formats + cmyk to all.
---supports different input/output orientations, namely top-down and bottom-up, and different strides.
+--supports all conversions between packed 8 bit-per-channel gray and rgb pixel formats, and cmyk to all.
+--supports different input/output scanline orientations, namely top-down and bottom-up, and different strides.
 --TODO: 16bit rgb (565,4444,5551)? bw-1? alpha-1,4,8? linear-rgb? premultiplied-alpha? xyz? cie?
---TODO: split up the conversion to multiple threads taking advantage of multiple cpu cores
---      but use a different pipelining strategy for small bitmaps like glyphs.
+--TODO: split up the conversion of large bitmaps to multiple threads taking advantage of multiple cpu cores.
+--TODO: use a different multi-threading strategy for small bitmaps like glyphs.
 
---conversion functions: these must run in lanes, so don't drag any upvalues with them
-
-local ffi = require'ffi' --for lanes
+--conversion functions: these will run in lanes, so don't drag any upvalues with them!
 
 local function dstride(src, dst)
 	local dj, dstride = 0, dst.stride
@@ -20,13 +18,13 @@ end
 
 local function eachrow(convert)
 	return function(src, dst, h1, h2)
-		--local ffi = require'ffi' --for lanes
+		local ffi = require'ffi' --for lanes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local rowsize = src.w * pixelsize
 		local src_data = ffi.cast('uint8_t*', src.data) --ensure byte type (also src.data is a number when in lanes)
 		local dst_data = ffi.cast('uint8_t*', dst.data)
-		for sj = h1 * src.stride, h2 * src.stride - 1, src.stride do
+		for sj = h1 * src.stride, h2 * src.stride, src.stride do
 			convert(dst_data, dj, src_data, sj, rowsize)
 			dj = dj + dstride
 		end
@@ -34,29 +32,28 @@ local function eachrow(convert)
 end
 
 local copy_rows = eachrow(function(d, i, s, j, rowsize)
-	--local ffi = require'ffi' --for lanes
+	local ffi = require'ffi' --for lanes
 	ffi.copy(d+i, s+j, rowsize)
 end)
 
 local function eachpixel(convert)
 	return function(src, dst, h1, h2)
-		--local ffi = require'ffi' --for lanes
+		local ffi = require'ffi' --for lanes
 		local dj, dstride = dstride(src, dst)
 		local pixelsize = #src.pixel
 		local dpixelsize = #dst.pixel
-		local rowsize = src.w * pixelsize
 		local src_data = ffi.cast('uint8_t*', src.data)
 		local dst_data = ffi.cast('uint8_t*', dst.data)
-		for sj = h1 * src.stride, h2 * src.stride - 1, src.stride do
-			for si = 0, rowsize - 1, pixelsize do
-				convert(dst_data, dj + si * dpixelsize, src_data, sj + si)
+		for sj = h1 * src.stride, h2 * src.stride, src.stride do
+			for i = 0, src.w - 1 do
+				convert(dst_data, dj + i * dpixelsize, src_data, sj + i * pixelsize)
 			end
 			dj = dj + dstride
 		end
 	end
 end
 
---pixel conversion functions: these must also run in lanes
+--pixel conversion functions: these will also run in lanes.
 
 local matrix = {
 	g = {},
@@ -261,7 +258,10 @@ local function convert(src, fmt, opt)
 		split_work(src, dst, operation, math.min(opt.threads - 1))
 	else
 	]]
-	operation(src, dst, 0, src.h)
+
+	--print(src.pixel, fmt.pixel, src.h, src.w * src.h * #src.pixel, ffi.sizeof(dst.data))
+	operation(src, dst, 0, src.h - 1)
+
 	--end
 	return dst
 end
@@ -285,10 +285,11 @@ local function best_format(src, accept)
 	fmt.stride = accept and accept.padded and pad_stride(src.stride) or src.stride
 	assert(src.orientation == 'top_down' or src.orientation == 'bottom_up')
 	fmt.orientation =
-		(not accept or accept.top_down == nil and accept.bottom_up == nil) and src.orientation --no preference, keep it
+		(not accept or (accept.top_down == nil and accept.bottom_up == nil)) and src.orientation --no preference, keep it
 		or accept[src.orientation] and src.orientation --same as source, keep it
 		or accept.top_down and 'top_down'
 		or accept.bottom_up and 'bottom_up'
+		or error('invalid orientation')
 	assert(src.pixel)
 	if not accept or accept[src.pixel] then --source pixel format accepted, keep it, even if unknown
 		fmt.pixel = src.pixel

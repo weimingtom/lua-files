@@ -2,7 +2,6 @@
 local ffi = require'ffi'
 local glue = require'glue'
 local stdio = require'stdio'
-local bmpconv = require'bmpconv'
 local C = ffi.load'nanojpeg2'
 
 ffi.cdef[[
@@ -30,8 +29,10 @@ local function decompress(data, sz, opt)
 	return glue.fcall(function(finally)
 		local nj = C.njInit()
 		finally(function() C.njDone(nj) end)
+
 		local res = C.njDecode(nj, data, sz)
 		assert(res == 0, error_messages[res])
+
 		local img = {}
 		img.w = C.njGetWidth(nj)
 		img.h = C.njGetHeight(nj)
@@ -41,7 +42,13 @@ local function decompress(data, sz, opt)
 		img.size = C.njGetImageSize(nj)
 		img.data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
 		ffi.gc(img.data, C.njFreeImage)
-		return bmpconv.convert_best(img, opt and opt.accept)
+
+		if opt and opt.accept then
+			local bmpconv = require'bmpconv'
+			img = bmpconv.convert_best(img, opt and opt.accept)
+		end
+
+		return img
 	end)
 end
 

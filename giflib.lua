@@ -1,6 +1,5 @@
 local ffi = require'ffi'
 local glue = require'glue'
-local bmpconv = require'bmpconv'
 require'giflib_h'
 local C = ffi.load'giflib5'
 
@@ -139,7 +138,12 @@ local function decompress(datatype, data, size, opt)
 				y = si.ImageDesc.Top,
 				delay_ms = delay,
 			}
-			img = bmpconv.convert_best(img, opt and opt.accept)
+
+			if opt and opt.accept then
+				local bmpconv = require'bmpconv'
+				img = bmpconv.convert_best(img, opt.accept)
+			end
+
 			t.frames[#t.frames + 1] = img
 		end
 		return t

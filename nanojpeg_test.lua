@@ -15,8 +15,8 @@ for _,filename in ipairs(dir('media/jpeg/*.jpg')) do
 	elseif filename:match'testimgp.jpg' or filename:match'progressive' then
 		print'progressive jpeg not supported'
 	else
-		pp(nanojpeg.load({path = filename}))
-		pp(nanojpeg.load({cdata = cdata, size = #s}))
+		assert(nanojpeg.load({path = filename}))
+		assert(nanojpeg.load({cdata = cdata, size = #s}))
 
 		for _,row_format in ipairs{'top_down', 'bottom_up'} do
 			for _,padded in ipairs{true, false} do

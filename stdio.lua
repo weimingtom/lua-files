@@ -1,24 +1,74 @@
+--stdio binding (incomplete)
 local ffi = require'ffi'
 require'stdio_h'
-local M = {C = ffi.C}
+local M = setmetatable({C = ffi.C}, {__index = ffi.C})
 
---TODO: error reporting on these
+local function checkh(h)
+	if h ~= nil then return h end
+	error(string.format('errno: %d', ffi.errno))
+end
+
+local function str(s)
+	return ffi.string(checkh(s))
+end
+
+local function checkz(ret)
+	if ret == 0 then return end
+	error(string.format('errno: %d', ffi.errno()))
+end
+
+local function zcaller(f)
+	return function(...)
+		checkz(f(...))
+	end
+end
+
+function M.fopen(path, mode)
+	return ffi.gc(checkh(ffi.C.fopen(path, mode or 'rb')), M.fclose)
+end
+
+function M.freopen(file, path, mode)
+	return checkh(ffi.C.freopen(path, mode or 'rb', file))
+end
+
+function M.tmpfile()
+	return ffi.gc(checkh(ffi.C.tmpfile()), M.fclose)
+end
+
+function M.tmpnam(prefix)
+	return str(ffi.C.tmpnam(prefix))
+end
+
+function M.fclose(file)
+	checkz(ffi.C.fclose(file))
+	ffi.gc(file, nil)
+end
+
+--methods
+
+ffi.metatype('FILE', {__index = {
+	close = M.fclose,
+	reopen = M.freopen,
+	flush = zcaller(ffi.C.fflush),
+}})
+
+--hi-level API
 
 function M.readfile(file, format)
-	local f = ffi.C.fopen(file, format=='t' and 'r' or 'rb')
+	local f = M.fopen(file, format=='t' and 'r' or 'rb')
 	ffi.C.fseek(f, 0, ffi.C.SEEK_END)
 	local sz = ffi.C.ftell(f)
 	ffi.C.fseek(f, 0, ffi.C.SEEK_SET)
 	local buf = ffi.new('uint8_t[?]', sz)
 	ffi.C.fread(buf, 1, sz, f)
-	ffi.C.fclose(f)
+	f:close()
 	return buf, sz
 end
 
 function M.writefile(file, data, sz, format)
-	local f = ffi.C.fopen(file, format=='t' and 'w' or 'wb')
+	local f = M.fopen(file, format=='t' and 'w' or 'wb')
 	ffi.C.fwrite(data, 1, sz, f)
-	ffi.C.fclose(f)
+	f:close()
 end
 
 return M

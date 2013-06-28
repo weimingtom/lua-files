@@ -41,7 +41,7 @@ enum {
 
    GIF_FONT_WIDTH  = 8,
    GIF_FONT_HEIGHT = 8,
-}
+};
 
 typedef unsigned char GifPixelType;
 typedef unsigned char *GifRowType;

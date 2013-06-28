@@ -377,11 +377,11 @@ local function aligntext(cr, text, font_size, halign, valign, x, y, w, h)
 	local extents = cr:text_extents(text)
 	cr:move_to(
 		halign == 'center' and (2 * x + w - extents.width) / 2 or
-		halign == 'left' and x or
-		halign == 'right' and x + w - extents.width,
+		halign == 'left'   and x or
+		halign == 'right'  and x + w - extents.width,
 		valign == 'middle' and (2 * y + h - extents.y_bearing) / 2 or
-		valign == 'top' and y or
-		valign == 'bottom' and y + h - extents.height)
+		valign == 'top'    and y + extents.height or
+		valign == 'bottom' and y + h)
 end
 
 function player:text_path(text, font_size, halign, valign, x, y, w, h)
@@ -434,6 +434,7 @@ local autoload = {
 	magnifier = 'magnifier',
 	vsplitter = 'splitter',
 	hsplitter = 'splitter',
+	image = 'image',
 }
 
 setmetatable(player, {__index = function(_, k)

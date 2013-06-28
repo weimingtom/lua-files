@@ -2,7 +2,6 @@
 local ffi = require'ffi'
 local bit = require'bit'
 local glue = require'glue'
-local bmpconv = require'bmpconv'
 require'libjpeg_h'
 require'stdio_h' --for C.fopen()
 local C = ffi.load'libjpeg'
@@ -29,19 +28,19 @@ local pixel_formats = {
 
 local color_spaces = glue.index(pixel_formats)
 
-local conversions = { --all conversions that libjpeg implements (source = {dest1, ...}}
+local conversions = { --all conversions that libjpeg implements. {source = {dest1, ...}}.
 	ycc = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr', 'g'},
-	g = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr'},
+	g = {'g', 'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr'},
 	ycck = {'cmyk'},
 }
 
 local function best_pixel_format(pixel, accept)
-	if not accept or accept[pixel] then return pixel end --no preference or source accepted
+	if not accept or accept[pixel] then return pixel end --no preference or source format accepted
 	if conversions[pixel] then
 		for _,pixel in ipairs(conversions[pixel]) do
 			if accept[pixel] then return pixel end --convertible to the best accepted format
 		end
-		return conversions[pixel][1] --convertible to a format that bmpconv can use as input
+		return conversions[pixel][1] --easiest conversion to a format that bmpconv can use as input
 	end
 	return pixel --not convertible
 end
@@ -52,7 +51,7 @@ local dct_methods = {
 	float = C.JDCT_FLOAT,
 }
 local upsample_methods = {fast = 0, smooth = 1}
-local smoothing_methods = {fuzzy = 1, blocky = 0}
+local block_smoothing_methods = {fuzzy = 1, blocky = 0}
 
 local function callback_manager(mgr_ctype, callbacks) --create a callback manager and its destructor
 	local mgr = ffi.new(mgr_ctype)
@@ -134,7 +133,7 @@ end
 local function set_string_reader_source(cinfo, finally, read)
 	local s --pin it so it doesn't get collected till next read
 	local function read_wrapper()
-		s = read()
+		s = assert(read(), 'eof')
 		return ffi.cast('const uint8_t*', s), #s --const prevents string copy
 	end
 	return set_cdata_reader_source(cinfo, finally, read_wrapper)
@@ -186,11 +185,11 @@ local function load(src, opt)
 		elseif src.string_source then
 			set_string_reader_source(cinfo, finally, src.string_source)
 		else
-			error'invalid source: stream, path, string, cdata/size, cdata_source, string_source accepted'
+			error'invalid source: stream, path, string, cdata/size, cdata_source, string_source expected'
 		end
 
 		--read header and get info
-		C.jpeg_read_header(cinfo, 1)
+		assert(C.jpeg_read_header(cinfo, 1) ~= 0, 'eof')
 		local img = {}
 		img.image_w = cinfo.image_width
 		img.image_h = cinfo.image_height
@@ -207,82 +206,91 @@ local function load(src, opt)
 			transform = cinfo.Adobe_transform,
 		} or nil
 
-		--set decompression options
-		img.pixel = best_pixel_format(img.image_pixel, opt.accept)
-		cinfo.out_color_space = assert(color_spaces[img.pixel])
-		cinfo.output_components = #img.pixel
-		cinfo.scale_num = opt.scale_num or 1
-		cinfo.scale_denom = opt.scale_denom or 1
-		local function setopt(k, dk, enum)
-			if opt[k] then cinfo[dk] = glue.assert(enum[opt[k]], 'invalid %s %s', k, opt[k]) end
-		end
-		setopt('dct', 'dct_method', dct_methods)
-		setopt('upsampling', 'do_fancy_upsampling', upsample_methods)
-		setopt('smoothing', 'do_block_smoothing', smoothing_methods)
-		cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and opt.render_scan and 1 or 0
-		C.jpeg_start_decompress(cinfo)
+		if not opt.header_only then
 
-		--get info about the output image
-		img.w = cinfo.output_width
-		img.h = cinfo.output_height
-		img.stride = cinfo.output_width * cinfo.output_components
-		if opt.accept and opt.accept.padded then
-			img.stride = bmpconv.pad_stride(img.stride)
-		end
+			--find the best accepted output pixel format
+			img.pixel = best_pixel_format(img.image_pixel, opt.accept)
 
-		--allocate image and rows buffers
-		img.size = img.h * img.stride
-		img.data = ffi.new('uint8_t[?]', img.size)
-		local rows = ffi.new('uint8_t*[?]', img.h)
-
-		--arrange row pointers according to accepted orientation
-		local bottom_up = opt.accept and opt.accept.bottom_up and not opt.accept.top_down
-		if bottom_up then
-			for i=0,img.h-1 do
-				rows[img.h-1-i] = img.data + (i * img.stride)
+			--set decompression options
+			cinfo.out_color_space = assert(color_spaces[img.pixel])
+			cinfo.output_components = #img.pixel
+			cinfo.scale_num = opt.scale_num or 1
+			cinfo.scale_denom = opt.scale_denom or 1
+			local function setopt(k, dk, enum)
+				if opt[k] then cinfo[dk] = glue.assert(enum[opt[k]], 'invalid %s %s', k, opt[k]) end
 			end
-			img.orientation = 'bottom_up'
-		else
-			for i=0,img.h-1 do
-				rows[i] = img.data + (i * img.stride)
-			end
-			img.orientation = 'top_down'
-		end
+			setopt('dct', 'dct_method', dct_methods)
+			setopt('upsampling', 'do_fancy_upsampling', upsample_methods)
+			setopt('block_smoothing', 'do_block_smoothing', block_smoothing_methods)
+			cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and opt.render_scan and 1 or 0
 
-		local function read_scanlines()
-			img.scan = cinfo.output_scan_number
-			while cinfo.output_scanline < img.h do
-				local i = cinfo.output_scanline
-				local n = math.min(img.h - i, cinfo.rec_outbuf_height)
-				local actual = C.jpeg_read_scanlines(cinfo, rows + i, n)
-				assert(actual == n)
-				assert(cinfo.output_scanline == i + actual)
-				if opt.update_lines then opt.update_lines(img) end
-			end
-		end
+			--decompress image
+			C.jpeg_start_decompress(cinfo)
 
-		if cinfo.buffered_image == 1 then --multiscan reading
-			while C.jpeg_input_complete(cinfo) == 0 do
-				if opt.have_data then
-					while opt.have_data() do
+			--get info about the output image
+			img.w = cinfo.output_width
+			img.h = cinfo.output_height
+			img.stride = cinfo.output_width * cinfo.output_components
+			if opt.accept and opt.accept.padded then
+				img.stride = bit.band(img.stride + 3, bit.bnot(3)) --bmpconv.pad_stride()
+			end
+
+			--allocate image and rows buffers
+			img.size = img.h * img.stride
+			img.data = ffi.new('uint8_t[?]', img.size)
+			local rows = ffi.new('uint8_t*[?]', img.h)
+
+			--arrange row pointers according to accepted orientation
+			local bottom_up = opt.accept and opt.accept.bottom_up and not opt.accept.top_down
+			if bottom_up then
+				for i=0,img.h-1 do
+					rows[img.h-1-i] = img.data + (i * img.stride)
+				end
+				img.orientation = 'bottom_up'
+			else
+				for i=0,img.h-1 do
+					rows[i] = img.data + (i * img.stride)
+				end
+				img.orientation = 'top_down'
+			end
+
+			local function read_scan()
+				img.scan = cinfo.output_scan_number
+				while cinfo.output_scanline < img.h do
+					local i = cinfo.output_scanline
+					local n = math.min(img.h - i, cinfo.rec_outbuf_height)
+					local actual = C.jpeg_read_scanlines(cinfo, rows + i, n)
+					assert(actual == n)
+					assert(cinfo.output_scanline == i + actual)
+					if opt.update_lines then opt.update_lines(img) end
+				end
+				if opt.accept and not opt.accept[img.pixel] then
+					local bmpconv = require'bmpconv'
+					img = bmpconv.convert_best(img, opt.accept)
+				end
+				if opt.render_scan then
+					opt.render_scan(img)
+				end
+			end
+
+			if cinfo.buffered_image == 1 then --multiscan reading
+				while C.jpeg_input_complete(cinfo) == 0 do
+					repeat
 						local ret = C.jpeg_consume_input(cinfo)
 						assert(ret ~= C.JPEG_SUSPENDED)
-						if ret == C.JPEG_REACHED_EOI then break end
-					end
+					until ret == C.JPEG_REACHED_EOI or ret == C.JPEG_SCAN_COMPLETED
+					C.jpeg_start_output(cinfo, cinfo.input_scan_number)
+					read_scan()
+					C.jpeg_finish_output(cinfo)
 				end
-				C.jpeg_start_output(cinfo, cinfo.input_scan_number)
-				read_scanlines()
-				img = bmpconv.convert_best(img, opt.accept)
-				opt.render_scan(img)
-				C.jpeg_finish_output(cinfo)
+			else
+				read_scan()
 			end
-		else
-			read_scanlines()
-			img = bmpconv.convert_best(img, opt.accept)
+
+			C.jpeg_finish_decompress(cinfo)
 		end
 
-		C.jpeg_finish_decompress(cinfo)
-		return img --last scan
+		return img
 	end)
 end
 
