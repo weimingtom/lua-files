@@ -40,9 +40,9 @@ function player:on_render(cr)
 
 		pcall(function()
 
-			local image = jpeg.load(source, {
-				accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up, top_down = not bottom_up},
-			})
+			local image = jpeg.load(glue.update({
+				accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up and true or nil},
+			}, source))
 			local w, h = image.w * scale, image.h * scale
 
 			if cx + w > self.w then

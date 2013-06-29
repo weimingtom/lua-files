@@ -265,11 +265,14 @@ typedef struct jpeg_decompress_struct {
   struct jpeg_color_quantizer * cquantize;
 } jpeg_decompress_struct;
 typedef void (*jpeg_error_exit_callback) (j_common_ptr cinfo);
+typedef void (*jpeg_emit_message_callback) (j_common_ptr cinfo, int msg_level);
+typedef void (*jpeg_output_message_callback) (j_common_ptr cinfo);
+typedef void (*jpeg_format_message_callback) (j_common_ptr cinfo, char * buffer);
 typedef struct jpeg_error_mgr {
   jpeg_error_exit_callback error_exit;
-  void (*emit_message) (j_common_ptr cinfo, int msg_level);
-  void (*output_message) (j_common_ptr cinfo);
-  void (*format_message) (j_common_ptr cinfo, char * buffer);
+  jpeg_emit_message_callback emit_message;
+  jpeg_output_message_callback output_message;
+  jpeg_format_message_callback format_message;
   void (*reset_error_mgr) (j_common_ptr cinfo);
   int msg_code;
   union {

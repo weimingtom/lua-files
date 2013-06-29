@@ -3,7 +3,7 @@ local ffi = require'ffi'
 require'ctypes'
 
 ffi.cdef[[
-typedef struct _iobuf FILE;
+typedef struct FILE_ FILE;
 typedef long long fpos_t;
 
 enum {

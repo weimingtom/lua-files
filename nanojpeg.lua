@@ -25,7 +25,18 @@ local error_messages = {
 	'Syntax error',
 }
 
-local function decompress(data, sz, opt)
+local function load(t)
+	local data, sz
+	if t.string then
+		data, sz = t.string, #t.string
+	elseif t.cdata then
+		data, sz = t.cdata, t.size
+	elseif t.path then
+		data, sz = stdio.readfile(t.path)
+	else
+		error'source missing'
+	end
+
 	return glue.fcall(function(finally)
 		local nj = C.njInit()
 		finally(function() C.njDone(nj) end)
@@ -43,29 +54,16 @@ local function decompress(data, sz, opt)
 		img.data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
 		ffi.gc(img.data, C.njFreeImage)
 
-		if opt and opt.accept then
+		if t.accept then
 			local bmpconv = require'bmpconv'
-			img = bmpconv.convert_best(img, opt and opt.accept)
+			img = bmpconv.convert_best(img, t.accept)
 		end
 
 		return img
 	end)
 end
 
-local function load(t, opt)
-	if t.string then
-		return decompress(t.string, #t.string, opt)
-	elseif t.cdata then
-		return decompress(t.cdata, t.size, opt)
-	elseif t.path then
-		local data, sz = stdio.readfile(t.path)
-		return decompress(data, sz, opt)
-	else
-		error'unspecified data source: path, string or cdata expected'
-	end
-end
-
-if not ... then require'nanojpeg_test' end
+if not ... then require'nanojpeg_demo' end
 
 return {
 	load = load,

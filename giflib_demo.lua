@@ -22,7 +22,7 @@ function player:on_render(cr)
 	self.theme = self.themes[white_bg and 'light' or 'dark']
 
 	source_type = self:mbutton{id = 'source_type', x = 150, y = 10, w = 290, h = 24,
-						values = {'path', 'cdata', 'string', 'fileno'},
+						values = {'path', 'cdata', 'string'},
 						selected = source_type}
 
 	mode = self:mbutton{id = 'mode', x = 450, y = 10, w = 190, h = 24,
@@ -36,25 +36,22 @@ function player:on_render(cr)
 
 	for i,filename in ipairs(files) do
 
-		local source, file
+		local t
 		if source_type == 'path' then
-			source = {path = filename}
-		elseif source_type == 'fileno' then
-			file = assert(io.open(filename, 'rb'))
-			source = {fileno = ffi.C._fileno(file)}
+			t = {path = filename}
 		elseif source_type == 'cdata' then
 			local s = glue.readfile(filename)
 			local cdata = ffi.new('unsigned char[?]', #s+1, s)
-			source = {cdata = cdata, size = #s}
+			t = {cdata = cdata, size = #s}
 		elseif source_type == 'string' then
 			local s = glue.readfile(filename)
-			source = {string = s}
+			t = {string = s}
 		end
 
-		local gif = giflib.load(source, {
-			accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up, top_down = not bottom_up},
+		local gif = giflib.load(glue.update(t, {
+			accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up and true or nil},
 			mode = mode,
-		})
+		}))
 
 		local state = frame_state[filename]
 		if not state then
@@ -74,20 +71,16 @@ function player:on_render(cr)
 			image = gif.frames[state.frame]
 		end
 
-		if cx + image.w > self.w then
+		if cx + gif.w > self.w then
 			cx = 0
 			cy = cy + maxh + 10
 			maxh = 0
 		end
 
-		self:image{x = cx, y = cy, image = image}
+		self:image{x = cx + image.x, y = cy + image.y, image = image}
 
 		cx = cx + gif.w + 10
-		maxh = math.max(maxh, image.h)
-
-		if file then
-			file:close()
-		end
+		maxh = math.max(maxh, gif.h)
 	end
 end
 

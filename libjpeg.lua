@@ -1,9 +1,10 @@
 --libjpeg binding
 local ffi = require'ffi'
 local bit = require'bit'
-local glue = require'glue'
+local glue = require'glue' --fcall, index, pass
+local stdio = require'stdio' --fopen
+local jit = require'jit' --off
 require'libjpeg_h'
-require'stdio_h' --for C.fopen()
 local C = ffi.load'libjpeg'
 
 local LIBJPEG_VERSION = 62
@@ -28,10 +29,18 @@ local pixel_formats = {
 
 local color_spaces = glue.index(pixel_formats)
 
-local conversions = { --all conversions that libjpeg implements. {source = {dest1, ...}}.
+--all conversions that libjpeg implements, in order of preference. {source = {dest1, ...}}.
+local conversions = {
 	ycc = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr', 'g'},
-	g = {'g', 'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr'},
+	g = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr'},
 	ycck = {'cmyk'},
+}
+
+--easiest conversions that libjpeg implements to a format that bmpconv can use as input.
+local fallback_conversions = {
+	ycc = 'rgb',
+	g = 'g',
+	ycck = 'cmyk',
 }
 
 local function best_pixel_format(pixel, accept)
@@ -40,20 +49,13 @@ local function best_pixel_format(pixel, accept)
 		for _,pixel in ipairs(conversions[pixel]) do
 			if accept[pixel] then return pixel end --convertible to the best accepted format
 		end
-		return conversions[pixel][1] --easiest conversion to a format that bmpconv can use as input
+		return fallback_conversions[pixel] --easiest supported conversion to a format that bmpconv can use as input
 	end
 	return pixel --not convertible
 end
 
-local dct_methods = {
-	accurate = C.JDCT_ISLOW,
-	fast = C.JDCT_IFAST,
-	float = C.JDCT_FLOAT,
-}
-local upsample_methods = {fast = 0, smooth = 1}
-local block_smoothing_methods = {fuzzy = 1, blocky = 0}
-
-local function callback_manager(mgr_ctype, callbacks) --create a callback manager and its destructor
+--create a callback manager object and its destructor.
+local function callback_manager(mgr_ctype, callbacks)
 	local mgr = ffi.new(mgr_ctype)
 	local cbt = {}
 	for k,f in pairs(callbacks) do
@@ -75,47 +77,37 @@ local function callback_manager(mgr_ctype, callbacks) --create a callback manage
 	return mgr, free_mgr
 end
 
-local function set_source(cinfo, finally, callbacks) --create a source manager and set it up
-	local mgr, free_mgr = callback_manager('jpeg_source_mgr', callbacks)
-	cinfo.src = mgr
-	finally(function() --the finalizer needs to pin mgr or it gets collected
-		cinfo.src = nil
-		free_mgr()
-	end)
-end
+--end-of-image marker, inserted on EOF for partial display of broken images.
+local JPEG_EOI = string.char(0xff, 0xD9):rep(32)
 
-local function set_cdata_source(cinfo, finally, data, size)
+local function set_source(cinfo, finally, partial_loading, img, read)
+	partial_loading = partial_loading == nil or partial_loading
+
 	local cb = {}
 	cb.init_source = glue.pass
 	cb.term_source = glue.pass
 	cb.resync_to_restart = C.jpeg_resync_to_restart
-	function cb.fill_input_buffer(cinfo) error'eof' end
-	function cb.skip_input_data(cinfo, sz)
-		cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
-		cinfo.src.bytes_in_buffer = cinfo.src.bytes_in_buffer - sz
-	end
-	set_source(cinfo, finally, cb)
-	cinfo.src.bytes_in_buffer = size
-	cinfo.src.next_input_byte = data
-end
 
-local function set_string_source(cinfo, finally, s)
-	set_cdata_source(cinfo, finally, ffi.cast('const uint8_t*', s), #s) --const prevents copying
-end
-
-local function set_cdata_reader_source(cinfo, finally, read)
-	local cb = {}
-	cb.init_source = glue.pass
-	cb.term_source = glue.pass
-	cb.resync_to_restart = C.jpeg_resync_to_restart
-	local buf, sz --pin it so it doesn't get collected till next read
+	local s, buf, sz --these must be upvalues so they don't get collected between calls
 	function cb.fill_input_buffer(cinfo)
-		buf, sz = read()
-		assert(buf, 'eof')
+		buf, sz = read(); s = buf
+		if not buf then
+			if partial_loading then
+				buf = JPEG_EOI
+				s = JPEG_EOI
+				img.partial = true
+			else
+				assert(buf, 'eof')
+			end
+		end
+		if type(buf) == 'string' then
+			buf, sz = ffi.cast('const uint8_t*', s), #s --const prevents string copy
+		end
 		cinfo.src.bytes_in_buffer = sz
 		cinfo.src.next_input_byte = buf
 		return true
 	end
+
 	function cb.skip_input_data(cinfo, sz)
 		if sz <= 0 then return end
 		while sz > cinfo.src.bytes_in_buffer do
@@ -125,72 +117,91 @@ local function set_cdata_reader_source(cinfo, finally, read)
 		cinfo.src.next_input_byte = cinfo.src.next_input_byte + sz
 		cinfo.src.bytes_in_buffer = cinfo.src.bytes_in_buffer - sz
 	end
-	set_source(cinfo, finally, cb)
+
+	--create a source manager and set it up
+	local mgr, free_mgr = callback_manager('jpeg_source_mgr', cb)
+	cinfo.src = mgr
+	finally(function() --the finalizer needs to pin mgr or it gets collected
+		cinfo.src = nil
+		free_mgr()
+	end)
+
 	cinfo.src.bytes_in_buffer = 0
 	cinfo.src.next_input_byte = nil
 end
 
-local function set_string_reader_source(cinfo, finally, read)
-	local s --pin it so it doesn't get collected till next read
-	local function read_wrapper()
-		s = assert(read(), 'eof')
-		return ffi.cast('const uint8_t*', s), #s --const prevents string copy
+local function one_shot_reader(data, size)
+	local done
+	return function()
+		if done then return end
+		done = true
+		return data, size
 	end
-	return set_cdata_reader_source(cinfo, finally, read_wrapper)
 end
 
-local function load(src, opt)
+local dct_methods = {
+	accurate = C.JDCT_ISLOW,
+	fast = C.JDCT_IFAST,
+	float = C.JDCT_FLOAT,
+}
+
+local function load(t)
+	assert(t, 'args missing')
 	return glue.fcall(function(finally)
-		opt = opt or {}
 		local cinfo = ffi.new'jpeg_decompress_struct'
+		local img = {}
 
 		--setup error handling
 		local jerr = ffi.new'jpeg_error_mgr'
+		C.jpeg_std_error(jerr)
 		local err_cb = ffi.cast('jpeg_error_exit_callback', function(cinfo)
 			local buf = ffi.new'uint8_t[512]'
 			cinfo.err.format_message(cinfo, buf)
 			error(string.format('libjpeg error: %s', ffi.string(buf)))
 		end)
+		local warnbuf --cache this buffer because there are a ton of messages
+		local emit_cb = ffi.cast('jpeg_emit_message_callback', function(cinfo, level)
+			if t.warning then
+				warnbuf = warnbuf or ffi.new'uint8_t[512]'
+				cinfo.err.format_message(cinfo, warnbuf)
+				t.warning(ffi.string(warnbuf), level)
+			end
+		end)
 		finally(function()
-			jerr.error_exit = nil
 			C.jpeg_std_error(jerr)
 			err_cb:free()
+			emit_cb:free()
 		end)
 		jerr.error_exit = err_cb
-		cinfo.err = C.jpeg_std_error(jerr)
+		jerr.emit_message = emit_cb
+		cinfo.err = jerr
 
 		--init state
 		C.jpeg_CreateDecompress(cinfo, LIBJPEG_VERSION, ffi.sizeof(cinfo))
 		finally(function() C.jpeg_destroy_decompress(cinfo) end)
 
 		--setup source
-		if src.stream then
-			C.jpeg_stdio_src(cinfo, src.stream)
-		elseif src.path then
-			local f = ffi.C.fopen(src.path, 'rb')
-			glue.assert(f ~= nil, 'could not open file %s', src.path)
-			ffi.gc(f, ffi.C.fclose)
+		if t.stream then
+			C.jpeg_stdio_src(cinfo, t.stream)
+		elseif t.path then
+			local f = stdio.fopen(t.path, 'rb')
 			finally(function()
 				C.jpeg_stdio_src(cinfo, nil)
-				ffi.C.fclose(f)
-				ffi.gc(f, nil)
+				f:close()
 			end)
 			C.jpeg_stdio_src(cinfo, f)
-		elseif src.string then
-			set_string_source(cinfo, finally, src.string)
-		elseif src.cdata then
-			set_cdata_source(cinfo, finally, src.cdata, src.size)
-		elseif src.cdata_source then
-			set_cdata_reader_source(cinfo, finally, src.cdata_source)
-		elseif src.string_source then
-			set_string_reader_source(cinfo, finally, src.string_source)
+		elseif t.string then
+			set_source(cinfo, finally, t.partial_loading, img, one_shot_reader(t.string))
+		elseif t.cdata then
+			set_source(cinfo, finally, t.partial_loading, img, one_shot_reader(t.cdata, t.size))
+		elseif t.read then
+			set_source(cinfo, finally, t.partial_loading, img, t.read)
 		else
 			error'invalid source: stream, path, string, cdata/size, cdata_source, string_source expected'
 		end
 
 		--read header and get info
 		assert(C.jpeg_read_header(cinfo, 1) ~= 0, 'eof')
-		local img = {}
 		img.image_w = cinfo.image_width
 		img.image_h = cinfo.image_height
 		img.image_pixel = assert(pixel_formats[tonumber(cinfo.jpeg_color_space)])
@@ -206,23 +217,20 @@ local function load(src, opt)
 			transform = cinfo.Adobe_transform,
 		} or nil
 
-		if not opt.header_only then
+		if not t.header_only then
 
 			--find the best accepted output pixel format
-			img.pixel = best_pixel_format(img.image_pixel, opt.accept)
+			img.pixel = best_pixel_format(img.image_pixel, t.accept)
 
 			--set decompression options
 			cinfo.out_color_space = assert(color_spaces[img.pixel])
 			cinfo.output_components = #img.pixel
-			cinfo.scale_num = opt.scale_num or 1
-			cinfo.scale_denom = opt.scale_denom or 1
-			local function setopt(k, dk, enum)
-				if opt[k] then cinfo[dk] = glue.assert(enum[opt[k]], 'invalid %s %s', k, opt[k]) end
-			end
-			setopt('dct', 'dct_method', dct_methods)
-			setopt('upsampling', 'do_fancy_upsampling', upsample_methods)
-			setopt('block_smoothing', 'do_block_smoothing', block_smoothing_methods)
-			cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and opt.render_scan and 1 or 0
+			cinfo.scale_num = t.scale_num or 1
+			cinfo.scale_denom = t.scale_denom or 1
+			cinfo.dct_method = assert(dct_methods[t.dct_method or 'accurate'], 'invalid dct_method')
+			cinfo.do_fancy_upsampling = t.fancy_upsampling or false
+			cinfo.do_block_smoothing = t.block_smoothing or false
+			cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and t.render_scan and 1 or 0
 
 			--decompress image
 			C.jpeg_start_decompress(cinfo)
@@ -231,7 +239,7 @@ local function load(src, opt)
 			img.w = cinfo.output_width
 			img.h = cinfo.output_height
 			img.stride = cinfo.output_width * cinfo.output_components
-			if opt.accept and opt.accept.padded then
+			if t.accept and t.accept.padded then
 				img.stride = bit.band(img.stride + 3, bit.bnot(3)) --bmpconv.pad_stride()
 			end
 
@@ -241,7 +249,7 @@ local function load(src, opt)
 			local rows = ffi.new('uint8_t*[?]', img.h)
 
 			--arrange row pointers according to accepted orientation
-			local bottom_up = opt.accept and opt.accept.bottom_up and not opt.accept.top_down
+			local bottom_up = t.accept and t.accept.bottom_up and not t.accept.top_down
 			if bottom_up then
 				for i=0,img.h-1 do
 					rows[img.h-1-i] = img.data + (i * img.stride)
@@ -262,14 +270,14 @@ local function load(src, opt)
 					local actual = C.jpeg_read_scanlines(cinfo, rows + i, n)
 					assert(actual == n)
 					assert(cinfo.output_scanline == i + actual)
-					if opt.update_lines then opt.update_lines(img) end
+					if t.update_lines then t.update_lines(img) end
 				end
-				if opt.accept and not opt.accept[img.pixel] then
+				if t.accept and not t.accept[img.pixel] then
 					local bmpconv = require'bmpconv'
-					img = bmpconv.convert_best(img, opt.accept)
+					img = bmpconv.convert_best(img, t.accept)
 				end
-				if opt.render_scan then
-					opt.render_scan(img)
+				if t.render_scan then
+					t.render_scan(img)
 				end
 			end
 
@@ -294,7 +302,9 @@ local function load(src, opt)
 	end)
 end
 
-if not ... then require'libjpeg_test' end
+jit.off(load, true) --can't call error() from callbacks called from C
+
+if not ... then require'libjpeg_demo' end
 
 return {
 	load = load,

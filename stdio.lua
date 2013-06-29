@@ -44,12 +44,22 @@ function M.fclose(file)
 	ffi.gc(file, nil)
 end
 
+local fileno = ffi.abi'win' and ffi.C._fileno or ffi.C.fileno
+function M.fileno(file)
+	local n = fileno(file)
+	assert(n >= 0, 'fileno error')
+	return n
+end
+
+M.fflush = zcaller(ffi.C.fflush)
+
 --methods
 
 ffi.metatype('FILE', {__index = {
 	close = M.fclose,
 	reopen = M.freopen,
-	flush = zcaller(ffi.C.fflush),
+	flush = M.fflush,
+	no = M.fileno,
 }})
 
 --hi-level API

@@ -10,7 +10,7 @@ end
 local function string_reader(data)
 	local i = 1
 	return function(_, buf, sz)
-		if sz < 1 or #data < i then error'reading pass eof' end
+		if sz < 1 or #data < i then error'eof' end
 		local s = data:sub(i, i+sz-1)
 		ffi.copy(buf, s, #s)
 		i = i + #s
@@ -21,17 +21,13 @@ end
 local function cdata_reader(data, size)
 	data = ffi.cast('unsigned char*', data)
 	return function(_, buf, sz)
-		if sz < 1 or size < 1 then error'reading pass eof' end
+		if sz < 1 or size < 1 then error'eof' end
 		sz = math.min(size, sz)
 		ffi.copy(buf, data, sz)
 		data = data + sz
 		size = size - sz
 		return sz
 	end
-end
-
-local function reader_callback(reader)
-	return ffi.cast('GifInputFunc', reader)
 end
 
 local function open_callback(cb, err)
@@ -42,7 +38,7 @@ local function open_fileno(fileno, err)
 	return C.DGifOpenFileHandle(fileno, err)
 end
 
-local function open_file(filename, err)
+local function open_filename(filename, err)
 	return C.DGifOpenFileName(filename, err)
 end
 
@@ -53,45 +49,46 @@ local function open(opener, arg)
 	return ft
 end
 
-local function check(res, ft)
-	if res == 0 then error(ffi.string(C.GifErrorString(ft.Error))) end
+local function checknz(ft, res)
+	if res ~= 0 then return end
+	error(ffi.string(C.GifErrorString(ft.Error)))
 end
 
-local function close(ft) --fugget about why it couldn't close, geez
-	if C.DGifCloseFile(ft) == 0 then ffi.C.free(ft) end
+local function close(ft)
+	if C.DGifCloseFile(ft) == 0 then
+		ffi.C.free(ft)
+	end
 end
 
-local function parse(datatype, data, size, handle) --callback-based parser
+local function load(t)
 	return glue.fcall(function(finally)
+		--open source
 		local ft
-		if datatype == 'string' then
-			local cb = reader_callback(string_reader(data))
+		if t.string then
+			local cb = ffi.cast('GifInputFunc', string_reader(t.string))
 			finally(function() cb:free() end)
 			ft = open(open_callback, cb)
-		elseif datatype == 'cdata' then
-			local cb = reader_callback(cdata_reader(data, size))
+		elseif t.cdata then
+			local cb = ffi.cast('GifInputFunc', cdata_reader(t.cdata, t.size))
 			finally(function() cb:free() end)
 			ft = open(open_callback, cb)
-		elseif datatype == 'path' then
-			ft = open(open_file, data)
-		elseif datatype == 'fileno' then
-			ft = open(open_fileno, data)
+		elseif t.path then
+			ft = open(open_filename, t.path)
+		elseif t.fileno then
+			ft = open(open_fileno, t.fileno)
 		else
-			error(string.format('Unknown data source type %s', tostring(datatype)))
+			error'source missing'
 		end
 		finally(function() close(ft) end)
-		check(C.DGifSlurp(ft), ft)
-		return handle(ft)
-	end)
-end
 
-local function decompress(datatype, data, size, opt)
-	local mode = opt and opt.mode
-	return parse(datatype, data, size, function(ft)
-		local t = {frames = {}}
-		t.w, t.h = ft.SWidth, ft.SHeight
+		--decode gif
+		checknz(ft, C.DGifSlurp(ft))
+
+		--collect data
+		local gif = {frames = {}}
+		gif.w, gif.h = ft.SWidth, ft.SHeight
 		local c = ft.SColorMap.Colors[ft.SBackGroundColor]
-		t.bg_color = {c.Red/255, c.Green/255, c.Blue/255}
+		gif.bg_color = {c.Red/255, c.Green/255, c.Blue/255}
 		local gcb = ffi.new'GraphicsControlBlock'
 		for i=0,ft.ImageCount-1 do
 			local si = ft.SavedImages[i]
@@ -109,10 +106,12 @@ local function decompress(datatype, data, size, opt)
 			local sz = w * h * 4
 			local data = ffi.new('uint8_t[?]', sz)
 			local di = 0
+			local assert = assert
+			local transparent = t.mode ~= 'opaque'
 			for i=0, w * h-1 do
 				local idx = si.RasterBits[i]
 				assert(idx < colormap.ColorCount)
-				if idx == tcolor_idx and mode ~= 'opaque' then
+				if idx == tcolor_idx and transparent then
 					data[di+0] = 0
 					data[di+1] = 0
 					data[di+2] = 0
@@ -139,32 +138,18 @@ local function decompress(datatype, data, size, opt)
 				delay_ms = delay,
 			}
 
-			if opt and opt.accept then
+			if t.accept then
 				local bmpconv = require'bmpconv'
-				img = bmpconv.convert_best(img, opt.accept)
+				img = bmpconv.convert_best(img, t.accept)
 			end
 
-			t.frames[#t.frames + 1] = img
+			gif.frames[#gif.frames + 1] = img
 		end
-		return t
+		return gif
 	end)
 end
 
-local function load(t, opt)
-	if t.string then
-		return decompress('string', t.string, nil, opt)
-	elseif t.cdata then
-		return decompress('cdata', t.cdata, t.size, opt)
-	elseif t.path then
-		return decompress('path', t.path, nil, opt)
-	elseif t.fileno then
-		return decompress('fileno', t.fileno, nil, opt)
-	else
-		error'unspecified data source: path, string, cdata or fileno expected'
-	end
-end
-
-if not ... then require'giflib_test' end
+if not ... then require'giflib_demo' end
 
 return {
 	load = load,

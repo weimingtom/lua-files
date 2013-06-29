@@ -20,9 +20,10 @@ local total_h = 0
 
 --jpeg options
 local source_type = 'path'
-local dct = 'accurate'
-local upsampling = 'smooth'
-local smoothing = 'fuzzy'
+local dct_method = 'accurate'
+local fancy_upsampling = false
+local block_smoothing = false
+local partial = true
 local bottom_up = false
 
 function player:on_render(cr)
@@ -44,18 +45,20 @@ function player:on_render(cr)
 		selected = filter}
 
 	source_type = self:mbutton{id = 'source_type', x = 10, y = 40, w = 600, h = 24,
-						values = {'path', 'cdata', 'string', 'cdata_source', 'string_source', 'stream', 'progressive'},
+						values = {'path', 'cdata', 'string', 'read_cdata', 'read_string', 'stream', 'progressive'},
 						selected = source_type}
 	if source_type == 'progressive' then
-		cut_size = self:slider{id = 'cut_size', x = 800, y = 10, w = 180, h = 24,
+		cut_size = self:slider{id = 'cut_size', x = 900, y = 10, w = 180, h = 24,
 										i0 = 1, i1 = 1024 * 64, step = 1, i = cut_size, text = 'file cut'}
+		partial = self:togglebutton{id = 'partial', x = 900, y = 40, w = 140, h = 24, text = 'partial loading',
+												selected = partial}
 	end
 
-	bottom_up = self:togglebutton{id = 'bottom_up', x = 700, y = 10, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
+	bottom_up = self:togglebutton{id = 'bottom_up', x = 800, y = 10, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
 
-	dct = self:mbutton{id = 'dct', x = 300, y = 10, w = 190, h = 24, values = {'accurate', 'fast', 'float'}, selected = dct}
-	upsampling = self:mbutton{id = 'upsampling', x = 500, y = 10, w = 90, h = 24, values = {'fast', 'smooth'}, selected = upsampling}
-	smoothing = self:mbutton{id = 'smoothing', x = 600, y = 10, w = 90, h = 24, values = {'fuzzy', 'blocky'}, selected = smoothing}
+	dct_method = self:mbutton{id = 'dct', x = 300, y = 10, w = 190, h = 24, values = {'accurate', 'fast', 'float'}, selected = dct_method}
+	fancy_upsampling = self:togglebutton{id = 'fancy_upsampling', x = 500, y = 10, w = 140, h = 24, text = 'fancy upsampling', selected = fancy_upsampling}
+	block_smoothing = self:togglebutton{id = 'block_smoothing', x = 650, y = 10, w = 140, h = 24, text = 'block smoothing', selected = block_smoothing}
 
 	local cy = 80
 	local cx = 0
@@ -83,14 +86,13 @@ function player:on_render(cr)
 				source = {cdata = cdata, size = #s}
 			elseif source_type == 'string' then
 				source = {string = s}
-			elseif source_type == 'cdata_source' then
+			elseif source_type == 'read_cdata' then
 				local function read_cdata() return cdata, #s end
-				source = {cdata_source = read_cdata}
-			elseif source_type == 'string_source' then
+				source = {read = read_cdata}
+			elseif source_type == 'read_string' then
 				local function read_string() return s end
-				source = {string_source = read_string}
+				source = {read = read_string}
 			elseif source_type == 'progressive' then
-				require'jit'.off(libjpeg.load, true)
 				local pos = 1
 				local function read_string()
 					local newpos = math.min(cut_size, pos + 4096 - 1)
@@ -99,7 +101,7 @@ function player:on_render(cr)
 					if #rs == 0 then return end
 					return rs
 				end
-				source = {string_source = read_string}
+				source = {read = read_string}
 			end
 		end
 
@@ -117,20 +119,27 @@ function player:on_render(cr)
 
 			self:text(string.format('scan %d', image.scan), 14, 'normal_fg', 'left', 'top',
 												cx, cy - scroll, image.w * zoom, image.h * zoom)
+
+			if image.partial then
+				self:text('partial', 14, 'normal_fg', 'right', 'top', cx, cy - scroll, image.w * zoom, image.h * zoom)
+			end
 		end
 
 		local ok, err = pcall(function()
 
-			libjpeg.load(source, {
-					accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up, top_down = not bottom_up},
-					dct = dct, upsampling = upsampling, smoothing = smoothing,
+			libjpeg.load(glue.update({
+					accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up and true or nil},
+					dct_method = dct_method,
+					fancy_upsampling = fancy_upsampling,
+					block_smoothing = block_smoothing,
+					partial_loading = partial,
 					render_scan = render_scan,
-				})
+				}, source))
 
 		end)
 
 		if not ok and not last_image then
-			local image = {w = 50, h = 50}
+			local image = {w = 200, h = 100}
 
 			if cx + image.w * zoom + 10 + 16 > self.w then
 				cx = 0
