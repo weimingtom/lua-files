@@ -139,49 +139,68 @@ local function load(t)
 			error'source missing'
 		end
 
+		local function image_info(t)
+			t = t or {}
+			t.w = C.png_get_image_width(png_ptr, info_ptr)
+			t.h = C.png_get_image_height(png_ptr, info_ptr)
+			local color_type = C.png_get_color_type(png_ptr, info_ptr)
+			t.paletted = bit.band(color_type, C.PNG_COLOR_MASK_PALETTE) == C.PNG_COLOR_MASK_PALETTE
+			t.pixel = assert(pixel_formats[bit.band(color_type, bit.bnot(C.PNG_COLOR_MASK_PALETTE))])
+			t.bit_depth = C.png_get_bit_depth(png_ptr, info_ptr)
+			t.interlaced = C.png_get_interlace_type(png_ptr, info_ptr) ~= C.PNG_INTERLACE_NONE
+			return t
+		end
+
 		--read header
 		C.png_read_info(png_ptr, info_ptr)
 		local img = {}
-		img.file = {}
-		img.file.w = C.png_get_image_width(png_ptr, info_ptr)
-		img.file.h = C.png_get_image_height(png_ptr, info_ptr)
-		local color_type = C.png_get_color_type(png_ptr, info_ptr)
-		img.file.paletted = bit.band(color_type, C.PNG_COLOR_MASK_PALETTE) == C.PNG_COLOR_MASK_PALETTE
-		img.file.pixel = assert(pixel_formats[bit.band(color_type, bit.bnot(C.PNG_COLOR_MASK_PALETTE))])
-		img.file.bit_depth = C.png_get_bit_depth(png_ptr, info_ptr)
-		img.file.interlaced = C.png_get_interlace_type(png_ptr, info_ptr) ~= C.PNG_INTERLACE_NONE
+		img.file = image_info()
 
 		if t.header_only then
 			return img
 		end
 
+		local number_of_scans
+
 		--mandatory conversions: expand palette and normalize pixel format to 8bpc.
-		C.png_set_expand(png_ptr) --1,2,4bpp -> 8bpp, palette -> 8bpp, tRNS -> alpha
-		C.png_set_scale_16(png_ptr) --16bpp -> 8bpp; since 1.5.4+
+		C.png_set_expand(png_ptr) --1,2,4bpc -> 8bpp, palette -> 8bpc, tRNS -> alpha
+		C.png_set_scale_16(png_ptr) --16bpc -> 8bpc; since 1.5.4+
+		number_of_scans = C.png_set_interlace_handling(png_ptr)
 		C.png_read_update_info(png_ptr, info_ptr)
-		local passes = C.png_set_interlace_handling(png_ptr)
 
-		img.w = img.file.w
-		img.h = img.file.h
-		img.pixel = img.file.pixel
+		--check that the conversions had the desired effect
+		local info = image_info()
+		assert(info.w == img.file.w)
+		assert(info.h == img.file.h)
+		assert(info.paletted == false)
+		assert(info.bit_depth == 8)
 
-		if t.accept then
+		--set output image fields
+		img.w = info.w
+		img.h = info.h
+		img.pixel = info.pixel
 
-			local function set_alpha()
-				C.png_set_alpha_mode(png_ptr, C.PNG_ALPHA_OPTIMIZED, t.gamma or 2.2) --> premultiply alpha
+		local function update_info()
+			C.png_read_update_info(png_ptr, info_ptr)
+		end
+
+		local function set_alpha()
+			C.png_set_alpha_mode(png_ptr, C.PNG_ALPHA_OPTIMIZED, t.gamma or 2.2) --> premultiply alpha
+		end
+
+		local function strip_alpha()
+			local my_background = ffi.new('png_color_16', 0, 0xff, 0xff, 0xff, 0xff)
+			local image_background = ffi.new'png_color_16'
+			local image_background_p = ffi.new('png_color_16p[1]', image_background)
+			if C.png_get_bKGD(png_ptr, info_ptr, image_background_p) then
+				C.png_set_background(png_ptr, image_background, C.PNG_BACKGROUND_GAMMA_FILE, 1, 1.0)
+			else
+				C.png_set_background(png_ptr, my_background, PNG_BACKGROUND_GAMMA_SCREEN, 0, 1.0)
 			end
+		end
 
-			local function strip_alpha()
-				local my_background = ffi.new('png_color_16', 0, 0xff, 0xff, 0xff, 0xff)
-				local image_background = ffi.new'png_color_16'
-				local image_background_p = ffi.new('png_color_16p[1]', image_background)
-				if C.png_get_bKGD(png_ptr, info_ptr, image_background_p) then
-					C.png_set_background(png_ptr, image_background, C.PNG_BACKGROUND_GAMMA_FILE, 1, 1.0)
-				else
-					C.png_set_background(png_ptr, my_background, PNG_BACKGROUND_GAMMA_SCREEN, 0, 1.0)
-				end
-			end
-
+		--request more conversions based on accept options.
+		if t.accept and false then
 			if img.pixel == 'g' then
 				if t.accept.g then
 					--we're good
@@ -357,9 +376,6 @@ local function load(t)
 			local channels = C.png_get_channels(png_ptr, info_ptr)
 			assert(#img.pixel == channels) --each letter a channel
 			]]
-
-			img.pixel = img.pixel
-
 		end --if t.accept
 
 		--compute the stride
@@ -387,43 +403,44 @@ local function load(t)
 
 		--finally, decompress the image
 		local outimg
-		local function render_scan(scan_number, multiple_scans)
+		local function render_scan(last_scan, scan_number, multiple_scans)
 
 			--convert the image with bmpconv if its pixel format is not among accepted ones.
 			--the resulting image may be a new image object with a new buffer, a new image object
 			--with the same buffer as img, or can be img itself.
 			outimg = img
-			--[[
 			if t.accept and not t.accept[img.pixel] then
 				local bmpconv = require'bmpconv'
 				outimg = bmpconv.convert_best(img, t.accept, {force_copy = multiple_scans})
 			end
-			]]
 
 			--call the rendering callback on the converted image
 			if t.render_scan then
-				t.render_scan(outimg, scan_number)
+				t.render_scan(outimg, last_scan, scan_number)
 			end
 		end
 
-		if passes > 1 and t.render_scan then --multipass reading
-			for pass = 1, passes do
+		if number_of_scans > 1 and t.render_scan then --multipass reading
+			for scan_number = 1, number_of_scans do
 				if t.sparkle then
 					C.png_read_rows(png_ptr, rows, nil, img.h)
 				else
 					C.png_read_rows(png_ptr, nil, rows, img.h)
 				end
-				render_scan(pass, true)
+				local last_scan = scan_number == number_of_scans
+				render_scan(last_scan, scan_number, true)
 			end
 		else
 			C.png_read_image(png_ptr, rows)
-			render_scan(1)
+			render_scan(true, 1)
 		end
 
 		C.png_read_end(png_ptr, info_ptr)
 		return outimg
 	end)
 end
+
+jit.off(load, true) --can't call error() from callbacks called from C
 
 if not ... then require'libpng_demo' end
 

@@ -97,7 +97,7 @@ function player:on_render(cr)
 		end
 
 		last_image = nil
-		local function render_scan(image, scan_number)
+		local function render_scan(image, last_scan, scan_number)
 
 			if not last_image and cx + image.w + 10 + 16 > self.w then
 				cx = 0

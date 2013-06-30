@@ -285,7 +285,7 @@ local function load(t)
 
 		--finally, decompress the image
 		local outimg
-		local function render_scan(scan_number, multiple_scans)
+		local function render_scan(last_scan, scan_number, multiple_scans)
 
 			--read all the scanlines into the row buffers
 			while cinfo.output_scanline < img.h do
@@ -314,7 +314,7 @@ local function load(t)
 
 			--call the rendering callback on the converted image
 			if t.render_scan then
-				t.render_scan(outimg, scan_number)
+				t.render_scan(outimg, last_scan, scan_number)
 			end
 		end
 
@@ -322,18 +322,20 @@ local function load(t)
 			while C.jpeg_input_complete(cinfo) == 0 do
 
 				--read all the scanlines of the current scan
+				local ret
 				repeat
-					local ret = C.jpeg_consume_input(cinfo)
+					ret = C.jpeg_consume_input(cinfo)
 					assert(ret ~= C.JPEG_SUSPENDED)
 				until ret == C.JPEG_REACHED_EOI or ret == C.JPEG_SCAN_COMPLETED
+				local last_scan = ret == C.JPEG_SCAN_COMPLETED
 
 				--render the scan
 				C.jpeg_start_output(cinfo, cinfo.input_scan_number)
-				render_scan(cinfo.output_scan_number, true)
+				render_scan(last_scan, cinfo.output_scan_number, true)
 				C.jpeg_finish_output(cinfo)
 			end
 		else
-			render_scan(1)
+			render_scan(true, 1)
 		end
 
 		C.jpeg_finish_decompress(cinfo)
