@@ -102,7 +102,7 @@ local function load(t)
 			local w, h = si.ImageDesc.Width, si.ImageDesc.Height
 			local colormap = si.ImageDesc.ColorMap ~= nil and si.ImageDesc.ColorMap or ft.SColorMap
 
-			--convert image to RGBA8888
+			--convert image to top-down 8bpc rgba.
 			local sz = w * h * 4
 			local data = ffi.new('uint8_t[?]', sz)
 			local di = 0

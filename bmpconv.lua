@@ -209,19 +209,20 @@ end
 local MIN_SIZE_PER_THREAD = 1024 * 1024 --1MB/thread to make it worth to create one
 
 local function convert(src, fmt, opt)
-	local dst = {}
-	for k,v in pairs(src) do dst[k] = v end --all image info gets copied
-	dst.pixel = fmt.pixel
-	dst.stride = fmt.stride
-	dst.orientation = fmt.orientation
 
-	--see if there's anything to convert
+	--see if there's anything to convert. if not, return the source image.
 	if src.pixel == fmt.pixel
 		and src.stride == fmt.stride
 		and src.orientation == fmt.orientation
 	then
-		return dst
+		return src
 	end
+
+	local dst = {}
+	for k,v in pairs(src) do dst[k] = v end --all image info gets copied; TODO: deepcopy
+	dst.pixel = fmt.pixel
+	dst.stride = fmt.stride
+	dst.orientation = fmt.orientation
 
 	--check consistency of the input
 	--NOTE: we support unknown pixel formats as long as #pixel == pixel size in bytes
@@ -310,7 +311,7 @@ local function convert_best(src, accept, opt)
 	local fmt = best_format(src, accept)
 
 	if not fmt then
-		local t = {}; for k in pairs(accept) do t[#t+1] = k end
+		local t = {}; for k,v in pairs(accept) do t[#t+1] = v ~= false and k or nil end
 		error(string.format('cannot convert from (%s, %s) to (%s)',
 									src.pixel, src.orientation, table.concat(t, ', ')))
 	end

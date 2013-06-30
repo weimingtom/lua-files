@@ -84,31 +84,37 @@ function player:button(t)
 	return clicked
 end
 
-function player:mbutton(t)
-	local id = assert(t.id, 'id missing')
-	local x, y, w, h = self:getbox(t)
-	local values, texts, selected = t.values, t.texts, t.selected
-
-	local bwidth = w/#values
-
-	for i,v in ipairs(values) do
-		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
-		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
-							cut = cut, selected = selected == v}
-		then
-			selected = v
-		end
-		x = x + bwidth
-	end
-	return selected
-end
-
 function player:togglebutton(t)
 	if self:button(t) then
 		return not t.selected
 	else
 		return t.selected
 	end
+end
+
+function player:mbutton(t)
+	local id = assert(t.id, 'id missing')
+	local x, y, w, h = self:getbox(t)
+	local values, texts, selected = t.values, t.texts, t.selected
+	local multisel = type(selected) == 'table' and (t.multiselect == true or t.multiselect == nil)
+
+	local bwidth = w/#values
+
+	for i,v in ipairs(values) do
+		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
+		local t = {id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v, cut = cut}
+		if multisel then
+			t.selected = selected[v]
+			selected[v] = self:togglebutton(t)
+		else
+			t.selected = selected == v
+			if self:button(t) then
+				selected = v
+			end
+		end
+		x = x + bwidth
+	end
+	return selected
 end
 
 function player:tabs(t)

@@ -184,7 +184,7 @@ typedef char * * png_charpp;
 typedef png_fixed_point * * png_fixed_point_pp;
 typedef double * * png_doublepp;
 typedef char * * * png_charppp;
-       typedef png_size_t png_alloc_size_t;
+typedef png_size_t png_alloc_size_t;
 typedef char* png_libpng_version_1_5_12;
 typedef struct png_color_struct
 {
