@@ -27,6 +27,8 @@ local padded = false
 
 function player:on_render(cr)
 
+	--self.theme = self.themes.light
+
 	source_type = self:mbutton{id = 'source_type', x = 10, y = 10, w = 480, h = 24,
 						values = {'path', 'stream', 'cdata', 'string', 'read cdata', 'read string'},
 						selected = source_type}
@@ -42,7 +44,8 @@ function player:on_render(cr)
 	block_smoothing = self:togglebutton{id = 'block_smoothing', x = 350, y = 40, w = 140, h = 24, text = 'block smoothing', selected = block_smoothing}
 
 	pixel_format = self:mbutton{id = 'pixel', x = 500, y = 40, w = 390, h = 24,
-						values = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'g', 'ga', 'ag', 'ycc', 'ycck', 'cmyk'},
+						values = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr',
+										'g', 'ga', 'ag', 'ycc', 'ycck', 'cmyk'},
 						selected = pixel_format}
 	bottom_up = self:togglebutton{id = 'bottom_up', x = 900, y = 40, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
 	padded = self:togglebutton{id = 'padded', x = 1000, y = 40, w = 90, h = 24, text = 'padded', selected = padded}
@@ -96,25 +99,43 @@ function player:on_render(cr)
 			end
 		end
 
-		last_image = nil
-		local function render_scan(image, last_scan, scan_number)
+		local rendered_once
+		local function render_scan(image, last_scan, scan_number, err)
+			--if not last_scan then return end
+			rendered_once = true
+			local w, h = 300, 100
+			if image then w, h = image.w, image.h end
 
-			if not last_image and cx + image.w + 10 + 16 > self.w then
+			if scan_number == 1 and cx + w + 10 + 16 > self.w then
 				cx = 0
-				local h = (maxh or image.h) + 10
+				local h = (maxh or h) + 10
 				cy = cy + h
 				total_h = total_h + h
 				maxh = nil
 			end
-			last_image = image
 
-			self:image{x = cx, y = cy, image = image}
+			if image then
+				self:image{x = cx, y = cy, image = image}
 
-			self:text(string.format('scan %d', scan_number), 14, 'normal_fg', 'left', 'top',
-												cx, cy, image.w, image.h)
+				self:text(string.format('scan %d', scan_number), 14, 'normal_fg', 'left', 'top',
+													cx, cy, w, h)
 
-			if image.partial then
-				self:text('partial', 14, 'normal_fg', 'right', 'top', cx, cy, image.w, image.h)
+				self:text(image.file.pixel .. ' -> ' .. image.pixel,
+								14, 'normal_fg', 'center', 'middle', cx, cy, w, h)
+
+				if image.partial then
+					self:text('partial', 14, 'normal_fg', 'right', 'top', cx, cy, w, h)
+				end
+			else
+				self:rect(cx, cy, w, h, 'error_bg')
+				self:text(string.format('%s', err:match('^(.-)\n'):match(': ([^:]-)$')), 14,
+													'normal_fg', 'center', 'middle',
+													cx, cy, w, h)
+			end
+
+			if last_scan then
+				cx = cx + w + 10
+				maxh = math.max(maxh or 0, h)
 			end
 		end
 
@@ -136,32 +157,9 @@ function player:on_render(cr)
 
 		end)
 
-		if ok then
-			self:text(last_image.file.pixel .. ' -> ' .. last_image.pixel,
-							14, 'normal_fg', 'center', 'middle', cx, cy, last_image.w, last_image.h)
+		if not ok and not rendered_once then
+			render_scan(nil, true, 1, err)
 		end
-
-		if not ok and not last_image then
-
-			local image = {w = 300, h = 100}
-
-			if cx + image.w + 10 + 16 > self.w then
-				cx = 0
-				local h = (maxh or image.h) + 10
-				cy = cy + h
-				total_h = total_h + h
-				maxh = nil
-			end
-			last_image = image
-
-			self:rect(cx, cy, image.w, image.h, 'error_bg')
-			self:text(string.format('%s', err:match('^(.-)\n'):match(': ([^:]-)$')), 14,
-												'normal_fg', 'center', 'middle',
-												cx, cy, image.w, image.h)
-		end
-
-		cx = cx + last_image.w + 10
-		maxh = math.max(maxh or 0, last_image.h)
 
 		if t.stream then
 			t.stream:close()

@@ -11,7 +11,6 @@ local files = dir'media/gif/*'
 
 local white_bg = false
 local source_type = 'path'
-local bottom_up = false
 local mode = 'transparent'
 local frame_state = {} --{[filename] = {frame = <current_frame_no>, time = <next_frame_time>}
 
@@ -29,29 +28,26 @@ function player:on_render(cr)
 						values = {'transparent', 'opaque'},
 						selected = mode}
 
-	bottom_up = self:togglebutton{id = 'bottom_up', x = 650, y = 10, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
-
 	local cx, cy = 0, 40
 	local maxh = 0
 
 	for i,filename in ipairs(files) do
 
-		local t
+		local t = {}
 		if source_type == 'path' then
-			t = {path = filename}
+			t.path = filename
 		elseif source_type == 'cdata' then
 			local s = glue.readfile(filename)
 			local cdata = ffi.new('unsigned char[?]', #s+1, s)
-			t = {cdata = cdata, size = #s}
+			t.cdata = cdata
+			t.size = #s
 		elseif source_type == 'string' then
 			local s = glue.readfile(filename)
-			t = {string = s}
+			t.string = s
 		end
+		t.mode = mode
 
-		local gif = giflib.load(glue.update(t, {
-			accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up and true or nil},
-			mode = mode,
-		}))
+		local gif = giflib.load(t)
 
 		local state = frame_state[filename]
 		if not state then

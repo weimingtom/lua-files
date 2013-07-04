@@ -3,7 +3,7 @@ local glue = require'glue'
 local ffi = require'ffi'
 local bmpconv = require'bmpconv'
 
-local formats = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'g', 'ga', 'ag', 'cmyk'}
+local formats = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr', 'g', 'ga', 'ag', 'cmyk'}
 local src_pixel = 'rgba'
 local dst_pixels = {bgra = true}
 local src_bottom_up = false
@@ -46,6 +46,7 @@ function player:on_render(cr)
 	else
 		img.stride = #img.pixel * img.w
 	end
+	img.bpc = 8
 	img.size = img.stride * img.h
 	img.data = ffi.new('uint8_t[?]', img.size)
 	img.orientation = 'top_down'
@@ -69,6 +70,7 @@ function player:on_render(cr)
 		setcolor('g', colors.gray)
 	end
 	setcolor('a', colors.alpha)
+	setcolor('x', 0xff)
 
 	for i=0,img.h-1 do
 		for j=0,img.w-1 do

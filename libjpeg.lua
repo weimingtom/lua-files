@@ -9,6 +9,7 @@ local C = ffi.load'libjpeg'
 
 local LIBJPEG_VERSION = 62
 
+--NOTE: images with C.JCS_UNKNOWN format are not supported.
 local pixel_formats = {
 	[C.JCS_GRAYSCALE]= 'g',
 	[C.JCS_YCbCr]    = 'ycc',
@@ -36,25 +37,18 @@ local conversions = {
 	ycck = {'cmyk'},
 }
 
---easiest conversions that libjpeg implements to a format that bmpconv can use as input.
-local fallback_conversions = {
-	ycc = 'rgb',
-	g = 'g',
-	ycck = 'cmyk',
-}
-
+--given current pixel format of an image and an accept table, choose the best accepted pixel format.
 local function best_pixel_format(pixel, accept)
 	if not accept or accept[pixel] then return pixel end --no preference or source format accepted
 	if conversions[pixel] then
-		for _,pixel in ipairs(conversions[pixel]) do
-			if accept[pixel] then return pixel end --convertible to the best accepted format
+		for _,dest_pixel in ipairs(conversions[pixel]) do
+			if accept[dest_pixel] then return dest_pixel end --convertible to the best accepted format
 		end
-		--not directly convertible but convertible to a format that bmpconv can use as input
-		return fallback_conversions[pixel]
 	end
 	return pixel --not convertible
 end
 
+--given current orientation of an image and an accept table, choose the best accepted orientation.
 local function best_orientation(orientation, accept)
 	return
 		(not accept or (accept.top_down == nil and accept.bottom_up == nil)) and orientation --no preference, keep it
@@ -64,10 +58,13 @@ local function best_orientation(orientation, accept)
 		or error('invalid orientation')
 end
 
+--given a row stride, return the next larger multiple of 4 stride.
 local function pad_stride(stride)
 	return bit.band(stride + 3, bit.bnot(3))
 end
 
+--given a string or cdata/size pair, return a stream reader function that returns the entire data
+--the first time it is called, and then returns nothing on subsequent calls, signaling eof.
 local function one_shot_reader(buf, sz)
 	local done
 	return function()
@@ -110,7 +107,7 @@ local dct_methods = {
 }
 
 local function load(t)
-	return glue.fcall(function(finally)
+	return glue.fcall(function(finally, onerror)
 
 		--create the state object and output image
 		local cinfo = ffi.new'jpeg_decompress_struct'
@@ -149,12 +146,12 @@ local function load(t)
 		if t.stream then
 			C.jpeg_stdio_src(cinfo, t.stream)
 		elseif t.path then
-			local f = stdio.fopen(t.path, 'rb')
+			local file = stdio.fopen(t.path, 'rb')
 			finally(function()
 				C.jpeg_stdio_src(cinfo, nil)
-				f:close()
+				file:close()
 			end)
-			C.jpeg_stdio_src(cinfo, f)
+			C.jpeg_stdio_src(cinfo, file)
 		elseif t.string or t.cdata or t.read then
 			local read = t.read
 				or t.string and one_shot_reader(t.string)
@@ -221,8 +218,8 @@ local function load(t)
 		img.file = {}
 		img.file.w = cinfo.image_width
 		img.file.h = cinfo.image_height
-		img.file.pixel = assert(pixel_formats[tonumber(cinfo.jpeg_color_space)])
-		assert(cinfo.num_components == #img.file.pixel)
+		img.file.pixel = pixel_formats[tonumber(cinfo.jpeg_color_space)]
+		img.file.progressive = C.jpeg_has_multiple_scans(cinfo) ~= 0
 
 		img.file.jfif = cinfo.saw_JFIF_marker == 1 and {
 			maj_ver = cinfo.JFIF_major_version,
@@ -241,6 +238,8 @@ local function load(t)
 		end
 
 		--find the best accepted output pixel format
+		assert(img.file.pixel, 'unknown pixel format')
+		assert(cinfo.num_components == #img.file.pixel)
 		img.pixel = best_pixel_format(img.file.pixel, t.accept)
 
 		--set decompression options
@@ -251,7 +250,7 @@ local function load(t)
 		cinfo.dct_method = assert(dct_methods[t.dct_method or 'accurate'], 'invalid dct_method')
 		cinfo.do_fancy_upsampling = t.fancy_upsampling or false
 		cinfo.do_block_smoothing = t.block_smoothing or false
-		cinfo.buffered_image = C.jpeg_has_multiple_scans(cinfo) and t.render_scan and 1 or 0
+		cinfo.buffered_image = img.file.progressive and t.render_scan and 1 or 0
 
 		--start decompression, which fills the info about the output image
 		C.jpeg_start_decompress(cinfo)
@@ -284,7 +283,6 @@ local function load(t)
 		end
 
 		--finally, decompress the image
-		local outimg
 		local function render_scan(last_scan, scan_number, multiple_scans)
 
 			--read all the scanlines into the row buffers
@@ -303,43 +301,35 @@ local function load(t)
 				end
 			end
 
-			--convert the image with bmpconv if its pixel format is not among accepted ones.
-			--the resulting image may be a new image object with a new buffer, a new image object
-			--with the same buffer as img, or can be img itself.
-			outimg = img
-			if t.accept and not t.accept[img.pixel] then
-				local bmpconv = require'bmpconv'
-				outimg = bmpconv.convert_best(img, t.accept, {force_copy = multiple_scans})
-			end
-
 			--call the rendering callback on the converted image
 			if t.render_scan then
-				t.render_scan(outimg, last_scan, scan_number)
+				t.render_scan(img, last_scan, scan_number)
 			end
 		end
 
 		if cinfo.buffered_image == 1 then --multiscan reading
-			while C.jpeg_input_complete(cinfo) == 0 do
-
+			while true do
 				--read all the scanlines of the current scan
 				local ret
 				repeat
 					ret = C.jpeg_consume_input(cinfo)
-					assert(ret ~= C.JPEG_SUSPENDED)
+					assert(ret ~= C.JPEG_SUSPENDED, 'eof')
 				until ret == C.JPEG_REACHED_EOI or ret == C.JPEG_SCAN_COMPLETED
-				local last_scan = ret == C.JPEG_SCAN_COMPLETED
+				local last_scan = ret == C.JPEG_REACHED_EOI
 
 				--render the scan
 				C.jpeg_start_output(cinfo, cinfo.input_scan_number)
 				render_scan(last_scan, cinfo.output_scan_number, true)
 				C.jpeg_finish_output(cinfo)
+
+				if C.jpeg_input_complete(cinfo) ~= 0 then return end
 			end
 		else
 			render_scan(true, 1)
 		end
 
 		C.jpeg_finish_decompress(cinfo)
-		return outimg
+		return img
 	end)
 end
 

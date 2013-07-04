@@ -94,17 +94,18 @@ local function load(t)
 			local si = ft.SavedImages[i]
 
 			--find delay and transparent color index, if any
-			local delay, tcolor_idx
+			local delay_ms, tcolor_idx
 			if C.DGifSavedExtensionToGCB(ft, i, gcb) == 1 then
-				delay = gcb.DelayTime * 10 --make it milliseconds
+				delay_ms = gcb.DelayTime * 10 --make it milliseconds
 				tcolor_idx = gcb.TransparentColor
 			end
 			local w, h = si.ImageDesc.Width, si.ImageDesc.Height
 			local colormap = si.ImageDesc.ColorMap ~= nil and si.ImageDesc.ColorMap or ft.SColorMap
 
 			--convert image to top-down 8bpc rgba.
-			local sz = w * h * 4
-			local data = ffi.new('uint8_t[?]', sz)
+			local stride = w * 4
+			local size = stride * h
+			local data = ffi.new('uint8_t[?]', size)
 			local di = 0
 			local assert = assert
 			local transparent = t.mode ~= 'opaque'
@@ -127,21 +128,16 @@ local function load(t)
 
 			local img = {
 				data = data,
-				size = sz,
+				size = size,
+				stride = stride,
 				pixel = 'rgba',
-				stride = w * 4,
 				orientation = 'top_down',
 				w = w,
 				h = h,
 				x = si.ImageDesc.Left,
 				y = si.ImageDesc.Top,
-				delay_ms = delay,
+				delay_ms = delay_ms,
 			}
-
-			if t.accept then
-				local bmpconv = require'bmpconv'
-				img = bmpconv.convert_best(img, t.accept)
-			end
 
 			gif.frames[#gif.frames + 1] = img
 		end

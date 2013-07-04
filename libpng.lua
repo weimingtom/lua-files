@@ -16,6 +16,8 @@ local pixel_formats = {
 	[C.PNG_COLOR_TYPE_GRAY_ALPHA] = 'ga',
 }
 
+--given a stream reader function that returns an unknwn amount of bytes each time it is called,
+--return a reader which expects an exact amount of bytes to be filled in each time it is called.
 local function buffered_reader(read, bufsize)
 	local buf, s --these must be upvalues so they don't get collected between calls
 	local left = 0 --how much bytes left to consume from the current buffer
@@ -50,6 +52,7 @@ local function buffered_reader(read, bufsize)
 	end
 end
 
+--given current orientation of an image and an accept table, choose the best accepted orientation.
 local function best_orientation(orientation, accept)
 	return
 		(not accept or (accept.top_down == nil and accept.bottom_up == nil)) and orientation --no preference, keep it
@@ -59,10 +62,13 @@ local function best_orientation(orientation, accept)
 		or error('invalid orientation')
 end
 
+--given a row stride, return the next larger stride that is a multiple of 4.
 local function pad_stride(stride)
 	return bit.band(stride + 3, bit.bnot(3))
 end
 
+--given a string or cdata/size pair, return a stream reader function that returns the entire data
+--the first time it is called, and then returns nothing on subsequent calls, signaling eof.
 local function one_shot_reader(buf, sz)
 	local done
 	return function()
@@ -402,24 +408,6 @@ local function load(t)
 		end
 
 		--finally, decompress the image
-		local outimg
-		local function render_scan(last_scan, scan_number, multiple_scans)
-
-			--convert the image with bmpconv if its pixel format is not among accepted ones.
-			--the resulting image may be a new image object with a new buffer, a new image object
-			--with the same buffer as img, or can be img itself.
-			outimg = img
-			if t.accept and not t.accept[img.pixel] then
-				local bmpconv = require'bmpconv'
-				outimg = bmpconv.convert_best(img, t.accept, {force_copy = multiple_scans})
-			end
-
-			--call the rendering callback on the converted image
-			if t.render_scan then
-				t.render_scan(outimg, last_scan, scan_number)
-			end
-		end
-
 		if number_of_scans > 1 and t.render_scan then --multipass reading
 			for scan_number = 1, number_of_scans do
 				if t.sparkle then
@@ -427,16 +415,20 @@ local function load(t)
 				else
 					C.png_read_rows(png_ptr, nil, rows, img.h)
 				end
-				local last_scan = scan_number == number_of_scans
-				render_scan(last_scan, scan_number, true)
+				if t.render_scan then
+					local last_scan = scan_number == number_of_scans
+					t.render_scan(img, last_scan, scan_number)
+				end
 			end
 		else
 			C.png_read_image(png_ptr, rows)
-			render_scan(true, 1)
+			if t.render_scan then
+				t.render_scan(img, true, 1)
+			end
 		end
 
 		C.png_read_end(png_ptr, info_ptr)
-		return outimg
+		return img
 	end)
 end
 
