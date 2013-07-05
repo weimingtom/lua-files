@@ -1,9 +1,9 @@
 --bitmap conversions between different pixel formats, bitmap orientations, strides and bit depths.
 --changing stride, row orientation and channel order of arbitrary 8bpc and 16bpc pixel formats.
---built-in conversions between 8bpc and 16bpc rgb, rgba, rgbx, g, ga, and cmyk pixel formats in any channel order.
---creating expression-based and pixel-level and row-level function-based custom converters.
+--built-in conversions between 8bpc rgb, rgba, rgbx, g, ga, a, and cmyk pixel formats in any channel order.
+--creating custom converters based on pixel kernels expressed as functions or compiled expressions.
 --TODO: generic scaling between 8bpc and 16bpc for any pixel format.
---TODO: 16bpp? (565,4444,5551)? bw-1? alpha-1,4,8? linear-rgb? premultiplied-alpha? xyz? cie?
+--TODO: 16bpp? (565,4444,5551)? bw-1? alpha-1,4? linear-rgb? premultiplied-alpha? xyz? cie?
 --TODO: create a thread pool and pipe up conversions to multiple threads, splitting the work on bitmap segments.
 
 local ffi = require'ffi'
@@ -11,35 +11,56 @@ local bit = require'bit'
 
 --bitmap converters based on custom row-level and pixel-level conversion kernels.
 
---check if the dest. image has enough space and compatible attributes to do a conversion.
-local function validate(src, dst, h1, h2)
-	--TODO
-end
-
-local function dstride(src, dst)
-	local dj, dstride = 0, dst.stride
-	if src.orientation ~= dst.orientation then
-		dj = (src.h - 1) * dstride --first pixel of the last row
-		dstride = -dstride --...and stepping backwards
-	end
-	return dj, dstride
-end
-
 local ctypes = {
 	[8]  = ffi.typeof('uint8_t*'),
 	[16] = ffi.typeof('uint16_t*'),
 }
 
+local function wordstride(src) --return the stride in words, not bytes, and validate it
+	local stride = src.stride / (src.bpc / 8)
+	assert(math.floor(stride) == stride, 'invalid stride')
+	return stride
+end
+
+local function prepare(src, dst)
+	assert(src.w == dst.w)
+	assert(src.h == dst.h)
+	assert(#src.pixel > 0)
+	assert(#dst.pixel > 0)
+	local sstride = wordstride(src)
+	local dstride = wordstride(dst)
+	local src_data = ffi.cast(assert(ctypes[src.bpc], 'invalid bpc'), src.data)
+	local dst_data = ffi.cast(assert(ctypes[dst.bpc], 'invalid bpc'), dst.data)
+	local dj = 0
+	if src.orientation ~= dst.orientation then
+		dj = (src.h - 1) * dstride --first pixel of the last row
+		dstride = -dstride --...and stepping backwards
+	end
+	return src_data, dst_data, sstride, dj, dstride
+end
+
 --bitmap converter based on a custom row converter function to be called as
---  convert_row(dst_pointer, dst_row_offest, src_pointer, src_row_offset).
-local function eachrow(convert_row, src, dst, h1, h2)
-	validate(src, dst, h1, h2)
-	local dj, dstride = dstride(src, dst)
+--  convert_row(dst_pointer, dst_row_offest, src_pointer, src_row_offset, row_width, row_size).
+local function eachrow(convert_row, src, dst)
+	local src_data, dst_data, sstride, dj, dstride = prepare(src, dst)
 	local rowsize = src.w * #src.pixel * (src.bpc / 8)
-	local src_data = ffi.cast(ctypes[src.bpc], src.data)
-	local dst_data = ffi.cast(ctypes[dst.bpc], dst.data)
-	for sj = h1 * src.stride, h2 * src.stride, src.stride do
+	for sj = 0, (src.h - 1) * sstride, sstride do
 		convert_row(dst_data, dj, src_data, sj, rowsize)
+		dj = dj + dstride
+	end
+end
+
+--bitmap converter based on a custom pixel converter function to be called as
+--  convert_pixel(dst_pointer, dst_pixel_offset, src_pointer, src_pixel_offset).
+local function eachpixel(convert_pixel, src, dst)
+	local src_data, dst_data, sstride, dj, dstride = prepare(src, dst)
+	local spixelsize = #src.pixel
+	local dpixelsize = #dst.pixel
+	local mw = src.w-1
+	for sj = 0, (src.h - 1) * sstride, sstride do
+		for i = 0, mw do
+			convert_pixel(dst_data, dj + i * dpixelsize, src_data, sj + i * spixelsize)
+		end
 		dj = dj + dstride
 	end
 end
@@ -48,36 +69,22 @@ end
 local function copy_row(d, i, s, j, rowsize)
 	ffi.copy(d+i, s+j, rowsize)
 end
-local function copy_rows(...)
-	eachrow(copy_row, ...)
+local function copy_rows(src, dst, ...)
+	assert(src.bpc == dst.bpc)
+	assert(src.pixel == dst.pixel)
+	eachrow(copy_row, src, dst, ...)
 end
 
---bitmap converter based on a custom pixel converter function to be called as
---  convert_pixel(dst_pointer, dst_pixel_offset, src_pointer, src_pixel_offset).
-local function eachpixel(convert_pixel, src, dst, h1, h2)
-	validate(src, dst, h1, h2)
-	local dj, dstride = dstride(src, dst)
-	local spixelsize = #src.pixel
-	local dpixelsize = #dst.pixel
-	local src_data = ffi.cast(ctypes[src.bpc], src.data)
-	local dst_data = ffi.cast(ctypes[dst.bpc], dst.data)
-	for sj = h1 * src.stride, h2 * src.stride, src.stride do
-		for i = 0, src.w - 1 do
-			convert_pixel(dst_data, dj + i * dpixelsize, src_data, sj + i * spixelsize)
-		end
-		dj = dj + dstride
-	end
-end
-
---pixel converter kernels based on expression templates. to be used with eachpixel().
+--pixel converter kernels based on expression templates, to be used with eachpixel().
 
 --given a pixel format, return an iterator of its channels.
+local function next_channel(fmt,i)
+	i = i + 1
+	if i > #fmt then return end
+	return i, fmt:sub(i,i)
+end
 local function channels(fmt)
-	return function(fmt,i)
-		i = i + 1
-		if i > #fmt then return end
-		return i, fmt:sub(i,i)
-	end, fmt, 0
+	return next_channel, fmt, 0
 end
 
 --given a pixel format and a channel letter, return its position in the pixel, eg. channel_pos('b', 'rgb') -> 3
@@ -85,10 +92,24 @@ local function channel_pos(c, fmt)
 	return (fmt:find(c))
 end
 
+--check if two pixel formats have the same channels, possibly in different order.
+local function same_channels(sfmt, dfmt)
+	if #sfmt ~= #dfmt then return end
+	if sfmt == dfmt then return true end
+	for i,c in channels(sfmt) do --sfmt must not have repeated channels
+		if channel_pos(c, sfmt) ~= i then return end
+	end
+	for i,c in channels(sfmt) do --all channels of sfmt must be found in dfmt
+		if not channel_pos(c, dfmt) then return end
+	end
+	return true
+end
+
 --create a pixel conversion kernel given source and dest. pixel formats, an expression template
 --and its return type, eg. expr_kernel('bgra', 'argb', 'r / 2, g / 2, b / 2, 0xff', 'rgba').
---NOTE: sfmt and dfmt must have all the channels that tfmt has in whatever order.
 local function expr_kernel(sfmt, dfmt, template, tfmt)
+	assert(tfmt:gsub('[a-zA-Z]', '') == '') --template channels must be letters for the parser to work.
+	assert(same_channels(dfmt, tfmt)) --dest. format must have all the channels that the expression returns.
 	local left = ''
 	for i,c in channels(tfmt) do
 		local pos = assert(channel_pos(c, dfmt), 'channel missing in destination format')
@@ -96,64 +117,88 @@ local function expr_kernel(sfmt, dfmt, template, tfmt)
 	end
 	local right = template
 	for i,c in channels(sfmt) do
-		right = (' '..right..' '):gsub('([^a-z])('..c..')([^a-z])', '%1s[j' .. (i == 1 and '' or '+' .. i-1) .. ']%3')
+		right = right:gsub(c..'([^a-zA-Z])', 's[j' .. (i == 1 and '' or '+' .. i-1) .. ']%1')
 	end
-	right = right:gsub('^%s+', ''):gsub('%s+$', '') --trim
-	print(sfmt, dfmt, left .. ' = ' .. right) --go ahead, have a look
+	--print(sfmt, dfmt, left .. ' = ' .. right) --go ahead, have a look
 	return assert(loadstring(
 		'return function(d, i, s, j) ' ..
 			left .. ' = ' .. right ..
 		' end'))
 end
 
---built-in expression templates for converting between different color types.
+--built-in expression templates for converting between different 8bpc pixel formats.
 
-local template = {rgb = {}, rgbx = {}, rgba = {}, g = {}, ga = {}, cmyk = {}}
+local t8 = {rgb = {}, rgbx = {}, rgba = {}, g = {}, ga = {}, cmyk = {}}
 
-template.rgb.g     = '0.2126 * r + 0.7152 * g + 0.0722 * b'
-template.rgbx.g    = template.rgb.g
-template.rgba.g    = template.rgb.g
-template.rgb.ga    = template.rgb.g .. ', 0xff'
-template.rgbx.ga   = template.rgb.g .. ', 0xff'
-template.rgba.ga   = template.rgb.g .. ', a'
-template.rgbx.rgb  = 'r, g, b'
-template.rgba.rgb  = 'r, g, b'
-template.rgb.rgbx  = 'r, g, b, 0xff'
-template.rgba.rgbx = 'r, g, b, 0xff'
-template.rgb.rgba  = 'r, g, b, 0xff'
-template.rgbx.rgba = 'r, g, b, 0xff'
-template.cmyk.rgb  = 'c * k / 0xff, m * k / 0xff, y * k / 0xff' --inverse cmyk actually
-template.cmyk.rgbx = template.cmyk.rgb .. ', 0xff'
-template.cmyk.rgba = template.cmyk.rgb .. ', 0xff'
-template.cmyk.g    = '0.2126 * c * k / 0xff, 0.7152 * m * k / 0xff, 0.0722 * y * k / 0xff' --inverse cmyk actually
-template.cmyk.ga   = template.cmyk.g .. ', 0xff'
-template.g.ga      = 'g, 0xff'
-template.g.rgb     = 'g, g, g'
-template.g.rgbx    = 'g, g, g, 0xff'
-template.g.rgba    = 'g, g, g, 0xff'
-template.ga.g      = 'g'
-template.ga.rgb    = 'g, g, g'
-template.ga.rgbx   = 'g, g, g, 0xff'
-template.ga.rgba   = 'g, g, g, a'
-template.g.cmyk    = '0, 0, 0, 0xff - g' --inverse cmyk actually
-template.ga.cmyk   = 'g, g, g, 0xff - g' --inverse cmyk actually
+t8.rgb.g     = '0.2126 * r + 0.7152 * g + 0.0722 * b'
+t8.rgbx.g    = t8.rgb.g
+t8.rgba.g    = t8.rgb.g
+t8.rgb.ga    = t8.rgb.g .. ', 0xff'
+t8.rgbx.ga   = t8.rgb.g .. ', 0xff'
+t8.rgba.ga   = t8.rgb.g .. ', a'
+t8.rgbx.rgb  = 'r, g, b'
+t8.rgba.rgb  = 'r, g, b'
+t8.rgb.rgbx  = 'r, g, b, 0xff'
+t8.rgba.rgbx = 'r, g, b, 0xff'
+t8.rgb.rgba  = 'r, g, b, 0xff'
+t8.rgbx.rgba = 'r, g, b, 0xff'
+t8.cmyk.rgb  = 'c * k / 0xff, m * k / 0xff, y * k / 0xff' --inverse cmyk actually
+t8.cmyk.rgbx = t8.cmyk.rgb .. ', 0xff'
+t8.cmyk.rgba = t8.cmyk.rgb .. ', 0xff'
+t8.cmyk.g    = '0.2126 * c * k / 0xff, 0.7152 * m * k / 0xff, 0.0722 * y * k / 0xff' --inverse cmyk actually
+t8.cmyk.ga   = t8.cmyk.g .. ', 0xff'
+t8.g.ga      = 'g, 0xff'
+t8.g.rgb     = 'g, g, g'
+t8.g.rgbx    = 'g, g, g, 0xff'
+t8.g.rgba    = 'g, g, g, 0xff'
+t8.ga.g      = 'g'
+t8.ga.rgb    = 'g, g, g'
+t8.ga.rgbx   = 'g, g, g, 0xff'
+t8.ga.rgba   = 'g, g, g, a'
+t8.g.cmyk    = '0, 0, 0, 0xff - g' --inverse cmyk actually
+t8.ga.cmyk   = 'g, g, g, 0xff - g' --inverse cmyk actually
+t8.a.g       = '0xff'
+t8.a.ga      = '0xff, a'
+t8.a.rgb     = '0xff, 0xff, 0xff'
+t8.a.rgbx    = '0xff, 0xff, 0xff, 0xff'
+t8.a.rgba    = '0xff, 0xff, 0xff, a'
+t8.a.cmyk    = '0, 0, 0, 0xff'
+t8.g.a       = '0xff'
+t8.ga.a      = 'a'
+t8.rgb.a     = '0xff'
+t8.rgbx.a    = '0xff'
+t8.rgba.a    = 'a'
+t8.cmyk.a    = '0xff'
 
---pixel formats and their color type (pixel formats are variants of a color type with different channel order)
+--16bpc templates are the same, the only difference is that 0xff is now 0xffff
 
-local colortype = {} --{[pixel_format] = color_type}
-local function addcolors(ctype, ...)
-	for i=1,select('#',...) do
-		colortype[select(i,...)] = ctype
+local t16 = {}
+
+for sfmt,t in pairs(t8) do
+	t16[sfmt] = {}
+	for dfmt, template in pairs(t) do
+		t16[sfmt][dfmt] = template:gsub('0xff', '0xffff')
 	end
 end
-addcolors('rgb',  'rgb', 'bgr')
-addcolors('rgba', 'rgba', 'bgra', 'argb', 'abgr')
-addcolors('rgbx', 'rgbx', 'bgrx', 'xrgb', 'xbgr')
-addcolors('g',    'g')
-addcolors('ga',   'ga', 'ag')
-addcolors('cmyk', 'cmyk')
 
---given a pixel format, return an expression template that lists the channels in order. eg. 'rgb' -> 'r, g, b'.
+local builtin = {[8] = t8, [16] = t16}
+
+--find a built-in pixel expression template to be used with expr_kernel().
+local function builtin_template(sfmt, dfmt, bpc)
+	local t = assert(builtin[bpc], 'invalid bpc')
+	for stype, dtypes in pairs(t) do
+		if same_channels(sfmt, stype) then
+			for dtype, template in pairs(dtypes) do
+				if same_channels(dfmt, dtype) then
+					return template, dtype
+				end
+			end
+			break
+		end
+	end
+end
+
+--expression template that lists the channels in order. eg. 'rgb' -> 'r, g, b'.
 local function identity_template(fmt)
 	local s = ''
 	for i,c in channels(fmt) do
@@ -162,82 +207,57 @@ local function identity_template(fmt)
 	return s
 end
 
---return a built-in pixel expression template and its return pixel format to be used with expr_kernel().
-local function builtin_template(sfmt, dfmt)
-	local stype = colortype[sfmt]
-	local dtype = colortype[dfmt]
-	if not stype or not dtype then return end
-	if stype == dtype then --same color type, so it's just channel reordering
-		return identity_template(dtype), dtype
-	elseif template[stype] then
-		return template[stype][dtype], dtype
+--expression template that scales the channels eg. ('rgb', 256) -> 'r * 256, g * 256, b * 256'.
+local function scale_template(fmt, factor)
+	local s = ''
+	for i,c in channels(fmt) do
+		s = s .. c .. ' * ' .. tostring(factor) .. (i < #fmt and ', ' or '')
 	end
+	return s
 end
 
---create a bitmap converter given source and dest. pixel formats and either:
---  a pixel kernel function, eg. pixel_converter('bgra', 'abgr', function(d, i, s, j) ... end).
---  an expression template/return type, eg. pixel_converter('bgra', 'argb', 'r / 2, g / 2, b / 2, 0xff', 'rgba').
---  nothing, in which case the converter will do:
---    row copying, if source and dest. pixel formats are the same, eg. pixel_converter('rgb', 'rgb').
---    built-in default conversion, if any is found, eg. pixel_converter('ga', 'rgb').
---    channel reordering conversion, eg. pixel_converter('abc', 'bac')
-local function pixel_converter(sfmt, dfmt, kernel, ...)
+--finally, the frontend. decide how to convert the input and call a conversion function.
+
+--[[
 	if not kernel then
-		if sfmt == dfmt then
-			return copy_rows
+		local template, tfmt
+		if same_channels(sfmt, dfmt) then --channel reordering of arbitrary, unknown pixel formats
+			template, tfmt = identity_template(dfmt), dfmt
 		else
 			local template, tfmt = builtin_template(sfmt, dfmt)
-			if not template then --couldn't find a built-in template, *assume* channel reordering
-				template, tfmt = identity_template(dfmt), dfmt
-			end
-			kernel = expr_kernel(sfmt, dfmt, template, tfmt)
+			if not template then return end --we tried everything, give up
 		end
+		kernel = expr_kernel(sfmt, dfmt, template, tfmt)
 	elseif type(kernel) == 'string' then --kernel is an expression template
 		kernel = expr_kernel(sfmt, dfmt, kernel, ...)
 	end
 	return function(...)
 		return eachpixel(kernel, ...)
 	end
-end
+]]
 
---the matrix of default pixel conversion functions.
-
-local matrix = {} --{[src_format][dst_format] = function(d, i, s, j) d[i+N] = s[j+M] end}
-
-for sfmt, stype in pairs(colortype) do
-	matrix[sfmt] = {}
-	for dfmt, dtype in pairs(colortype) do
-		matrix[sfmt][dfmt] = pixel_converter(sfmt, dfmt)
-	end
-end
-
---finally, the frontend. decide how to convert the input and call a conversion function.
-
-local function conversion_supported(src, dst)
-	return src == dst or (matrix[src] and matrix[src][dst] and true or false)
-end
-
-local function convert(src, fmt, opt)
+local function convert(src, fmt, force_copy)
 
 	--see if there's anything to convert. if not, return the source image.
 	if src.pixel == fmt.pixel
 		and src.stride == fmt.stride
 		and src.orientation == fmt.orientation
 		and src.bpc == fmt.bpc
-		and not (opt and opt.force_copy)
+		and not force_copy
 	then
 		return src
 	end
 
 	local dst = {}
-	for k,v in pairs(src) do dst[k] = v end --all image info gets copied; TODO: deepcopy
+	for k,v in pairs(src) do --all image info gets copied; TODO: deepcopy
+		dst[k] = v
+	end
 	dst.pixel = fmt.pixel
 	dst.stride = fmt.stride
 	dst.orientation = fmt.orientation
 	dst.bpc = fmt.bpc
 
 	--check consistency of the input
-	--NOTE: we support unknown pixel formats as long as #pixel == pixel size in bytes
 	assert(src.size == src.h * src.stride)
 	assert(src.stride >= src.w * #src.pixel)
 	assert(fmt.stride >= src.w * #fmt.pixel)
@@ -250,7 +270,7 @@ local function convert(src, fmt, opt)
 		assert(opt.size >= src.h * fmt.stride)
 		dst.size = opt.size
 		dst.data = opt.data
-	elseif (opt and opt.force_copy)
+	elseif force_copy
 		or src.stride ~= fmt.stride --diff. buffer size
 		or src.orientation ~= fmt.orientation --needs flippin'
 		or #fmt.pixel > #src.pixel --bigger pixel, even if same row size
@@ -265,7 +285,6 @@ local function convert(src, fmt, opt)
 	--print(src.pixel, fmt.pixel, src.h, src.w * src.h * #src.pixel, ffi.sizeof(dst.data))
 	operation(src, dst, 0, src.h - 1)
 
-	--end
 	return dst
 end
 
@@ -298,26 +317,31 @@ addpref('abgr', rgba, rgbx, rgb, ga, g)
 local function preferred_pixel(pixel, accept)
 	if not preferred[pixel] then return end
 	for _,dpixel in ipairs(preferred[pixel]) do
-		if accept[dpixel] and matrix[pixel][dpixel] then --accepted and we have an implementation for it
+		if accept[dpixel] then
 			return dpixel
 		end
 	end
 end
 
+--given source pixel format and an accept table, find out if the format is accepted, possibly
+--with its channels in a different order.
 local function permutation_pixel(pixel, accept)
-	--TODO
-	return
+	for k in pairs(accept) do
+		if same_channels(pixel, k) then
+			return k
+		end
+	end
 end
 
 --given source pixel format and an accept table, return the best accepted dest. format.
 local function best_pixel(pixel, accept)
 	return
-		(not accept or accept[pixel] and pixel) --source pixel format accepted, keep it, even if unknown!
-		or preferred_pixel(pixel, accept) --an accepted pixel format is in conversion preference table.
-		or permutation_pixel(pixel, accept) --an accepted pixel format is a channel permutation of the source format.
+		(not accept or accept[pixel] and pixel) --source pixel format accepted, keep it, even if unknown.
+		or preferred_pixel(pixel, accept)       --an accepted pixel format is in preference table.
+		or permutation_pixel(pixel, accept)     --an accepted pixel format is a channel permutation of the source format.
 end
 
---increase stride to the next number divisible by 4. stride is in bytes here!
+--increase stride to the next number divisible by 4.
 local function pad_stride(stride)
 	return bit.band(stride + 3, bit.bnot(3))
 end
@@ -329,7 +353,7 @@ local function best_stride(stride, bpc, accept)
 	bpc = bpc / 8
 	assert(bpc == math.floor(bpc), 'invalid bpc')
 	if not accept or not accept.padded then return stride end
-	return pad_stride(stride * bpc) / bpc
+	return pad_stride(stride)
 end
 
 --given source orientation and an accept table, choose the best accepted dest. orientation.
@@ -354,7 +378,7 @@ local function best_format(src, accept)
 	return fmt
 end
 
-local function convert_best(src, accept, opt)
+local function convert_best(src, accept, force_copy)
 	local fmt = best_format(src, accept)
 
 	if not fmt then
@@ -363,7 +387,7 @@ local function convert_best(src, accept, opt)
 									src.pixel, src.orientation, table.concat(t, ', ')))
 	end
 
-	return convert(src, fmt, opt)
+	return convert(src, fmt, force_copy)
 end
 
 if not ... then require'bmpconv_demo' end
@@ -372,7 +396,6 @@ return {
 	eachrow = eachrow,
 	eachpixel = eachpixel,
 	channels = channels,
-	pixel_converter = pixel_converter,
 	convert = convert,
 	best_format = best_format,
 	convert_best = convert_best,

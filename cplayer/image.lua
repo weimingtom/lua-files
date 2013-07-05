@@ -9,7 +9,7 @@ function player:image(t)
 	local img = assert(t.image, 'image missing')
 
 	--link image bits to a surface
-	img = bmpconv.convert_best(img, {bgra = true, padded = true, top_down = true})
+	img = bmpconv.convert_best(img, {bgra = true, top_down = true})
 	local surface = cairo.cairo_image_surface_create_for_data(img.data, cairo.CAIRO_FORMAT_ARGB32,
 																					img.w, img.h, img.stride)
 
