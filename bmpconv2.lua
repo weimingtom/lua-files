@@ -15,14 +15,14 @@ end
 
 local formats = {}
 
-formats.rgb565   = {size = 2, ctype = ffi.typeof'uint16_t'}
-formats.rgba4444 = {size = 2, ctype = ffi.typeof'uint16_t'}
-formats.rgba5551 = {size = 2, ctype = ffi.typeof'uint16_t'}
+formats.rgb565   = {bpp = 16, ctype = ffi.typeof'uint16_t'}
+formats.rgba4444 = {bpp = 16, ctype = ffi.typeof'uint16_t'}
+formats.rgba5551 = {bpp = 16, ctype = ffi.typeof'uint16_t'}
 
-formats.rgb24    = {size = 3, ctype = ffi.typeof'uint8_t'}
+formats.rgb24    = {bpp = 24, ctype = ffi.typeof'uint8_t'}
 formats.bgr24    = formats.rgb24
 
-formats.rgba32   = {size = 4, ctype = ffi.typeof'uint8_t'}
+formats.rgba32   = {bpp = 32, ctype = ffi.typeof'uint8_t'}
 formats.bgra32   = formats.rgba32
 formats.argb32   = formats.rgba32
 formats.abgr32   = formats.rgba32
@@ -32,20 +32,22 @@ formats.bgrx32   = formats.rgba32
 formats.xrgb32   = formats.rgba32
 formats.xbgr32   = formats.rgba32
 
-formats.rgba64   = {size = 8, ctype = ffi.typeof'uint16_t'}
+formats.rgba64   = {bpp = 64, ctype = ffi.typeof'uint16_t'}
 formats.bgra64   = formats.rgba64
 formats.argb64   = formats.rgba64
 formats.abgr64   = formats.rgba64
 
-formats.g8       = {size = 1, ctype = ffi.typeof'uint8_t'}
-formats.ga8      = {size = 2, ctype = ffi.typeof'uint8_t'}
+formats.g8       = {bpp =  8, ctype = ffi.typeof'uint8_t'}
+formats.ga8      = {bpp = 16, ctype = ffi.typeof'uint8_t'}
 formats.ag8      = formats.ga8
 
-formats.g16      = {size = 2, ctype = ffi.typeof'uint16_t'}
-formats.ga16     = {size = 4, ctype = ffi.typeof'uint16_t'}
+formats.g16      = {bpp = 16, ctype = ffi.typeof'uint16_t'}
+formats.ga16     = {bpp = 32, ctype = ffi.typeof'uint16_t'}
 formats.ag16     = formats.ga16
 
-formats.icmyk32  = {size = 4, ctype = ffi.typeof'uint8_t'} --inverse cmyk
+formats.g1       = {bpp =  1, ctype = ffi.typeof'uint8_t'}
+
+formats.icmyk32  = {bpp = 32, ctype = ffi.typeof'uint8_t'} --inverse cmyk
 
 local readers = autotable{}
 
@@ -200,20 +202,21 @@ writers.icmyk8.icmyk32 = writers.rgba8.rgba32
 local function prepare(img)
 	local format = assert(formats[img.format])
 	local ctype = ffi.typeof('$ *', format.ctype)
-	local pixelsize = format.size
+	local bpp = format.bpp / 8 --no precision loss
 	local data = ffi.cast(ctype, img.data)
-	assert(not img.stride or img.stride >= img.w * pixelsize)
-	local stride = (img.stride or pixelsize * img.w) / ffi.sizeof(format.ctype)
+	local min_stride = math.ceil(img.w * bpp)
+	assert(not img.stride or img.stride >= min_stride)
+	local stride = (img.stride or min_stride) / ffi.sizeof(format.ctype)
 	assert(stride == math.floor(stride)) --stride must be a multiple of format's ctype size
 	assert(img.orientation == 'top_down' or img.orientation == 'bottom_up')
-	return data, pixelsize, stride
+	return data, bpp, stride
 end
 
 local function eachpixel(convert_pixel, src, dst)
 	assert(src.h == dst.h)
 	assert(src.w == dst.w)
-	local src_data, src_pixelsize, src_stride = prepare(src)
-	local dst_data, dst_pixelsize, dst_stride = prepare(dst)
+	local src_data, src_bpp, src_stride = prepare(src)
+	local dst_data, dst_bpp, dst_stride = prepare(dst)
 	local dj = 0
 	if src.orientation ~= dst.orientation then
 		dj = (src.h - 1) * dst_stride --first pixel of the last row
@@ -223,26 +226,43 @@ local function eachpixel(convert_pixel, src, dst)
 	for sj = 0, (src.h - 1) * src_stride, src_stride do
 		--from the entire module, this is really the only loop that needs a good jit trace.
 		--luajit inlines nested function calls and keeps math in integer if it can.
-		--the cpu cache takes care of the rest, so we can have as long a pixel processing call stack as we wish.
 		for i = 0, mw do
 			convert_pixel(
-				dst_data, dj + i * dst_pixelsize,
-				src_data, sj + i * src_pixelsize)
+				dst_data, dj + i * dst_bpp,
+				src_data, sj + i * src_bpp)
 		end
 		dj = dj + dst_stride
 	end
 end
 
+local function convolve(filter, img)
+	local data, bpp, stride = prepare(img)
+	local ii, jj
+	local function getpixel(x, y, c)
+		return src_data[y * stride + x * bpp + c]
+	end
+	local function setrgba8(x, y, r, g, b, a)
+		--write(data, y * stride + x * bpp,
+	end
+	for j = 0, (src.h-1) * stride, stride do
+		for i = 0, (src.w-1) * bpp, bpp do
+			for c = 0, bpp-1 do
+				filter(src_data, getpixel, setpixel)
+			end
+		end
+	end
+end
+
 --from http://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
-local function floyd_stenberg(x, y, c, getpixel, setpixel)
+local function dither16to8(x, y, c, getpixel, setpixel)
 	local oldpixel = getpixel(x, y, c)
-	local newpixel = bit.rshift(oldpixel, 8)
+	local newpixel = bit.band(oldpixel, 0xff00) --round by 256
 	local quant_error = oldpixel - newpixel
 	setpixel(x,   y,   c, newpixel)
-	setpixel(x+1, y,   c, getpixel(x+1, y,   c) + 7/16 * quant_error
-	setpixel(x-1, y+1, c, getpixel(x-1, y+1, c) + 3/16 * quant_error
-	setpixel(x,   y+1, c, getpixel(x,   y+1, c) + 5/16 * quant_error
-	setpixel(x+1, y+1, c, getpixel(x+1, y+1, c) + 1/16 * quant_error
+	setpixel(x+1, y,   c, getpixel(x+1, y,   c) + 7/16 * quant_error)
+	setpixel(x-1, y+1, c, getpixel(x-1, y+1, c) + 3/16 * quant_error)
+	setpixel(x,   y+1, c, getpixel(x,   y+1, c) + 5/16 * quant_error)
+	setpixel(x+1, y+1, c, getpixel(x+1, y+1, c) + 1/16 * quant_error)
 end
 
 
@@ -275,7 +295,7 @@ local function pad_stride(stride)
 end
 
 local function alloc(img)
-	img.stride = pad_stride(formats[img.format].size * img.w)
+	img.stride = pad_stride(formats[img.format].bpp * 8 * img.w)
 	img.size = img.stride * img.h
 	img.data = ffi.new('uint8_t[?]', img.size)
 	return img
@@ -284,10 +304,6 @@ end
 local src = alloc{w = 1921, h = 1081, format = 'icmyk32', orientation = 'top_down'}
 local dst = alloc{w = 1921, h = 1081, format = 'ag8', orientation = 'bottom_up'}
 
-local read = readers.rgb24.rgba8
---local convert = converters.rgba8.
-local convert = converters.rgba8.rgba16
-local write = writers.rgba16.rgba64
 local function convert_pixel(d, i, s, j)
 	writers.ga8.ag8(d, i,
 		converters.ga16.ga8(
