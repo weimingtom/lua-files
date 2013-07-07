@@ -32,9 +32,9 @@ local color_spaces = glue.index(pixel_formats)
 
 --all conversions that libjpeg implements, in order of preference. {source = {dest1, ...}}.
 local conversions = {
-	ycc = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr', 'g'},
-	g = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr'},
-	ycck = {'cmyk'},
+	ycc = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8', 'g8'},
+	g = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8'},
+	ycck = {'cmyk8'},
 }
 
 --given current pixel format of an image and an accept table, choose the best accepted pixel format.

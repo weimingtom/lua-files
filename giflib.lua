@@ -128,9 +128,7 @@ local function load(t)
 
 			local img = {
 				data = data,
-				size = size,
-				stride = stride,
-				pixel = 'rgba',
+				format = 'rgba8',
 				orientation = 'top_down',
 				w = w,
 				h = h,
