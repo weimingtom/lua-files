@@ -145,7 +145,7 @@ function player:on_render(cr)
 				self:text(string.format('scan %d', scan_number), 14, 'normal_fg', 'left', 'top',
 													cx, cy, w, h)
 
-				self:text(image.file.format .. ' -> ' .. image.format,
+				self:text(image.file.format .. (image.format ~= image.file.format and ' -> ' .. image.format or ''),
 								14, 'normal_fg', 'center', 'middle', cx, cy, w, h)
 
 				if image.partial then

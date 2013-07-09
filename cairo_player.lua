@@ -22,6 +22,8 @@ player.themes.dark = {
 	hot_fg = {0,0,0,1},
 	selected_bg = {1,1,1,1},
 	selected_fg = {0,0,0,1},
+	disabled_bg = {1,1,1,0.3},
+	disabled_fg = {.6,.6,.6,1},
 	error_bg = {1,0,0,0.7},
 	error_fg = {1,1,1,1},
 }
@@ -36,6 +38,8 @@ player.themes.light = {
 	hot_fg = {1,1,1,1},
 	selected_bg = {0,0,0,0.9},
 	selected_fg = {1,1,1,1},
+	disabled_bg = {0,0,0,0.3},
+	disabled_fg = {0.4,0.4,0.4,1},
 	error_bg = {1,0,0,0.7},
 	error_fg = {1,1,1,1},
 }
@@ -48,6 +52,8 @@ player.themes.red = glue.merge({
 	hot_fg = {1,1,1,1},
 	selected_bg = {1,1,1,1},
 	selected_fg = {0,0,0,1},
+	disabled_bg = {1,0,0,0.7},
+	disabled_fg = {.6,.6,.6,1},
 }, player.themes.dark)
 
 --winapi keycodes. key codes for 0-9 and A-Z keys are ascii codes.

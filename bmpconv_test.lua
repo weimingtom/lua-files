@@ -30,6 +30,9 @@ local g4       = alloc{w = 1921, h = 1081, format = 'g4', orientation = 'top_dow
 local ga8      = alloc{w = 1921, h = 1081, format = 'ga8', orientation = 'top_down'}
 local ga8_2    = alloc{w = 1921, h = 1081, format = 'ga8', orientation = 'top_down'}
 
+local rgba16   = alloc{w = 1921, h = 1081, format = 'rgba16', orientation = 'top_down'}
+local ga16     = alloc{w = 1921, h = 1081, format = 'ga16', orientation = 'top_down'}
+
 require'unit'
 local function convert(src, dst, conv)
 	timediff()
@@ -43,6 +46,10 @@ local function convert(src, dst, conv)
 end
 
 bmpconv.dumpinfo()
+
+convert(rgb8, ga8)
+convert(rgba16, ga16)
+convert(cmyk8, ag8)
 
 convert(rgba4444, rgba8)
 convert(rgba8, rgba4444)
@@ -61,4 +68,3 @@ convert(g4, g2)
 convert(g4, g1)
 convert(g2, g4)
 convert(ga8, ga8_2)
-convert(cmyk8, ag8)

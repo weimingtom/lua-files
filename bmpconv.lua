@@ -275,16 +275,27 @@ function conv.ga16.ga8(g, a)
 		bit.rshift(a, 8)
 end
 
+--note: we want to round the result but math.floor(x+0.5) is expensive, so we just add 0.5 and clamp
+--the result instead, and let the ffi truncate the value when it writes to an integer pointer.
+local function round8(x, max)
+	return math.min(math.max(x + 0.5, 0), 0xff)
+end
+
+local function round16(x, max)
+	return math.min(math.max(x + 0.5, 0), 0xffff)
+end
+
+--note: needs no clamping as long as the r, g, b values are within range.
 local function rgb2g(r, g, b)
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b
 end
 
 function conv.rgba8.ga8(r, g, b, a)
-	return bit.band(rgb2g(r, g, b), 0xff), a
+	return round8(rgb2g(r, g, b)), a
 end
 
 function conv.rgba16.ga16(r, g, b, a)
-	return bit.band(rgb2g(r, g, b), 0xffff), a
+	return round16(rgb2g(r, g, b)), a
 end
 
 function conv.ga8.rgba8(g, a)
@@ -297,15 +308,11 @@ function conv.cmyk8.rgba16(c, m, y, k)
 	return c * k, m * k, y * k, 0xffff
 end
 
-local function clamp8(x)
-	return math.min(math.max(x, 0), 255)
-end
-
 function conv.ycc8.rgba8(y, cb, cr) --see http://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
 	return
-		clamp8(y                        + 1.402   * (cr - 128)),
-		clamp8(y - 0.34414 * (cb - 128) - 0.71414 * (cr - 128)),
-      clamp8(y + 1.772   * (cb - 128)),
+		round8(y                        + 1.402   * (cr - 128)),
+		round8(y - 0.34414 * (cb - 128) - 0.71414 * (cr - 128)),
+      round8(y + 1.772   * (cb - 128)),
 		0xff
 end
 
@@ -414,6 +421,24 @@ end
 
 --reflection/reporting
 
+local function conversions(src_format)
+	src_format = valid_format(src_format)
+	return coroutine.wrap(function()
+		for dname, dst_format in pairs(formats) do
+			if dst_format.colortype == src_format.colortype then
+				coroutine.yield(dname, dst_format)
+			end
+		end
+		for dst_colortype in pairs(conv[src_format.colortype]) do
+			for dname, dst_format in pairs(formats) do
+				if dst_format.colortype == dst_colortype then
+					coroutine.yield(dname, dst_format)
+				end
+			end
+		end
+	end)
+end
+
 local function dumpinfo()
 	local glue = require'glue'
 	local function enumkeys(t)
@@ -421,9 +446,10 @@ local function dumpinfo()
 		table.sort(t)
 		return table.concat(t, ', ')
 	end
-	print'formats:	bpp	ctype			colortype'
+	print'formats:	bpp	ctype			colortype	conversions'
 	for s,t in glue.sortedpairs(formats) do
-		print('  '..s..'     ', t.bpp, t.ctype, t.colortype)
+		local ct = {}; for d in conversions(s) do ct[#ct+1] = d; end; table.sort(ct)
+		print('  '..s..'     ', t.bpp, t.ctype, t.colortype, '', table.concat(ct, ', '))
 	end
 	print'converters:'
 	for s,t in glue.sortedpairs(conv) do
@@ -438,6 +464,7 @@ return {
 	converters = conv,
 	new = new,
 	convert = convert,
+	conversions = conversions,
 	dumpinfo = dumpinfo,
 }
 

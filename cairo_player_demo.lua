@@ -37,6 +37,9 @@ function player:on_render(cr)
 		t.fruit = nil
 	end
 
+	assert(not self:button{id = 'undecided_btn', x = rx - t.vx + 110, y = ry + 30 - t.vy, w = 100, h = 24,
+			text = 'disabled', enabled = false})
+
 	t.fruit = self:mbutton{id = 'fruits_btn', x = rx - t.vx, y = ry + 3*30 - t.vy, w = 260, h = 24,
 									values = {'apples', 'bannanas', 'cherries'}, selected = t.fruit}
 

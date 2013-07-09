@@ -47,12 +47,13 @@ function player:button(t)
 	local text = t.text or 'OK'
 	local cut = t.cut
 	local selected = t.selected
+	local enabled = t.enabled == nil and true or t.enabled
 	local font_size = t.font_size or h / 2
 
 	local down = self.lbutton
-	local hot = self:hotbox(x, y, w, h)
+	local hot = enabled and self:hotbox(x, y, w, h)
 
-	if hot and (not self.active or self.active == id) then
+	if hot and (not self.active or self.active == id)  then
 		self.cursor = 'link'
 	end
 
@@ -70,7 +71,9 @@ function player:button(t)
 	end
 
 	local color_state = (selected or self.active == id and hot and down) and 'selected'
-								or ((not self.active or self.active == id) and hot and 'hot') or 'normal'
+								or ((not self.active or self.active == id) and hot and 'hot')
+								or enabled and 'normal'
+								or 'disabled'
 	local bg_color = color_state..'_bg'
 	local fg_color = color_state..'_fg'
 
@@ -95,14 +98,15 @@ end
 function player:mbutton(t)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
-	local values, texts, selected = t.values, t.texts, t.selected
+	local values, texts, selected, enabled = t.values, t.texts, t.selected, t.enabled
 	local multisel = type(selected) == 'table' and (t.multiselect == true or t.multiselect == nil)
 
 	local bwidth = w/#values
 
 	for i,v in ipairs(values) do
 		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
-		local t = {id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v, cut = cut}
+		local t = {id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
+						cut = cut, enabled = enabled and enabled[v]}
 		if multisel then
 			t.selected = selected[v]
 			selected[v] = self:togglebutton(t)
