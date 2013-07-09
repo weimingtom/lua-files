@@ -9,11 +9,11 @@ local C = ffi.load'libpng'
 
 local PNG_LIBPNG_VER_STRING = '1.5.10'
 
-local pixel_formats = {
-	[C.PNG_COLOR_TYPE_GRAY] = 'g',
-	[C.PNG_COLOR_TYPE_RGB] = 'rgb',
-	[C.PNG_COLOR_TYPE_RGB_ALPHA] = 'rgba',
-	[C.PNG_COLOR_TYPE_GRAY_ALPHA] = 'ga',
+local formats = {
+	[C.PNG_COLOR_TYPE_GRAY] = 'g8',
+	[C.PNG_COLOR_TYPE_RGB] = 'rgb8',
+	[C.PNG_COLOR_TYPE_RGB_ALPHA] = 'rgba8',
+	[C.PNG_COLOR_TYPE_GRAY_ALPHA] = 'ga8',
 }
 
 --given a stream reader function that returns an unknwn amount of bytes each time it is called,
@@ -151,8 +151,8 @@ local function load(t)
 			t.h = C.png_get_image_height(png_ptr, info_ptr)
 			local color_type = C.png_get_color_type(png_ptr, info_ptr)
 			t.paletted = bit.band(color_type, C.PNG_COLOR_MASK_PALETTE) == C.PNG_COLOR_MASK_PALETTE
-			t.pixel = assert(pixel_formats[bit.band(color_type, bit.bnot(C.PNG_COLOR_MASK_PALETTE))])
-			t.bit_depth = C.png_get_bit_depth(png_ptr, info_ptr)
+			t.format = assert(formats[bit.band(color_type, bit.bnot(C.PNG_COLOR_MASK_PALETTE))])
+			t.bpp = C.png_get_bit_depth(png_ptr, info_ptr)
 			t.interlaced = C.png_get_interlace_type(png_ptr, info_ptr) ~= C.PNG_INTERLACE_NONE
 			return t
 		end
@@ -184,7 +184,7 @@ local function load(t)
 		--set output image fields
 		img.w = info.w
 		img.h = info.h
-		img.pixel = info.pixel
+		img.format = info.format
 
 		local function update_info()
 			C.png_read_update_info(png_ptr, info_ptr)

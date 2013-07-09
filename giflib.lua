@@ -128,8 +128,10 @@ local function load(t)
 
 			local img = {
 				data = data,
+				size = size,
 				format = 'rgba8',
 				orientation = 'top_down',
+				stride = stride,
 				w = w,
 				h = h,
 				x = si.ImageDesc.Left,

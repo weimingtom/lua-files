@@ -10,42 +10,46 @@ local C = ffi.load'libjpeg'
 local LIBJPEG_VERSION = 62
 
 --NOTE: images with C.JCS_UNKNOWN format are not supported.
-local pixel_formats = {
-	[C.JCS_GRAYSCALE]= 'g',
-	[C.JCS_YCbCr]    = 'ycc',
-	[C.JCS_CMYK]     = 'cmyk',
-	[C.JCS_YCCK]     = 'ycck',
-	[C.JCS_RGB]      = 'rgb',
-	[C.JCS_EXT_RGB]  = 'rgb',
-	[C.JCS_EXT_BGR]  = 'bgr',
-	[C.JCS_EXT_RGBX] = 'rgbx',
-	[C.JCS_EXT_BGRX] = 'bgrx',
-	[C.JCS_EXT_XRGB] = 'xrgb',
-	[C.JCS_EXT_XBGR] = 'xbgr',
-	[C.JCS_EXT_RGBA] = 'rgba',
-	[C.JCS_EXT_BGRA] = 'bgra',
-	[C.JCS_EXT_ARGB] = 'argb',
-	[C.JCS_EXT_ABGR] = 'abgr',
+local formats = {
+	[C.JCS_GRAYSCALE]= 'g8',
+	[C.JCS_YCbCr]    = 'ycc8',
+	[C.JCS_CMYK]     = 'cmyk8',
+	[C.JCS_YCCK]     = 'ycck8',
+	[C.JCS_RGB]      = 'rgb8',
+	[C.JCS_EXT_RGB]  = 'rgb8',
+	[C.JCS_EXT_BGR]  = 'bgr8',
+	[C.JCS_EXT_RGBX] = 'rgbx8',
+	[C.JCS_EXT_BGRX] = 'bgrx8',
+	[C.JCS_EXT_XRGB] = 'xrgb8',
+	[C.JCS_EXT_XBGR] = 'xbgr8',
+	[C.JCS_EXT_RGBA] = 'rgba8',
+	[C.JCS_EXT_BGRA] = 'bgra8',
+	[C.JCS_EXT_ARGB] = 'argb8',
+	[C.JCS_EXT_ABGR] = 'abgr8',
 }
 
-local color_spaces = glue.index(pixel_formats)
+local color_spaces = glue.index(formats)
 
 --all conversions that libjpeg implements, in order of preference. {source = {dest1, ...}}.
 local conversions = {
-	ycc = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8', 'g8'},
-	g = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8'},
-	ycck = {'cmyk8'},
+	ycc8 = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8', 'g8'},
+	g8 = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8'},
+	ycck8 = {'cmyk8'},
 }
 
 --given current pixel format of an image and an accept table, choose the best accepted pixel format.
-local function best_pixel_format(pixel, accept)
-	if not accept or accept[pixel] then return pixel end --no preference or source format accepted
-	if conversions[pixel] then
-		for _,dest_pixel in ipairs(conversions[pixel]) do
-			if accept[dest_pixel] then return dest_pixel end --convertible to the best accepted format
+local function best_format(format, accept)
+	if not accept or accept[format] then --no preference or source format accepted
+		return format
+	end
+	if conversions[format] then
+		for _,dformat in ipairs(conversions[format]) do
+			if accept[dformat] then --convertible to the best accepted format
+				return dformat
+			end
 		end
 	end
-	return pixel --not convertible
+	return format --not convertible
 end
 
 --given current orientation of an image and an accept table, choose the best accepted orientation.
@@ -218,7 +222,7 @@ local function load(t)
 		img.file = {}
 		img.file.w = cinfo.image_width
 		img.file.h = cinfo.image_height
-		img.file.pixel = pixel_formats[tonumber(cinfo.jpeg_color_space)]
+		img.file.format = formats[tonumber(cinfo.jpeg_color_space)]
 		img.file.progressive = C.jpeg_has_multiple_scans(cinfo) ~= 0
 
 		img.file.jfif = cinfo.saw_JFIF_marker == 1 and {
@@ -238,13 +242,12 @@ local function load(t)
 		end
 
 		--find the best accepted output pixel format
-		assert(img.file.pixel, 'unknown pixel format')
-		assert(cinfo.num_components == #img.file.pixel)
-		img.pixel = best_pixel_format(img.file.pixel, t.accept)
+		assert(img.file.format, 'unknown pixel format')
+		img.format = best_format(img.file.format, t.accept)
 
 		--set decompression options
-		cinfo.out_color_space = assert(color_spaces[img.pixel])
-		cinfo.output_components = #img.pixel
+		cinfo.out_color_space = assert(color_spaces[img.format])
+		cinfo.output_components = #img.format-1 --too hackish?
 		cinfo.scale_num = t.scale_num or 1
 		cinfo.scale_denom = t.scale_denom or 1
 		cinfo.dct_method = assert(dct_methods[t.dct_method or 'accurate'], 'invalid dct_method')
@@ -261,7 +264,7 @@ local function load(t)
 
 		--compute the stride
 		img.stride = cinfo.output_width * cinfo.output_components
-		if t.accept and t.accept.padded then
+		if t.accept and t.accept.stride_aligned then
 			img.stride = pad_stride(img.stride)
 		end
 

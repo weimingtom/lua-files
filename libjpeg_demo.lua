@@ -11,7 +11,7 @@ table.insert(files, 'media/jpeg/progressive.jpg')
 --table.insert(files, 'media/jpeg/autumn-wallpaper.jpg')
 
 --gui options
-local pixel_format = 'rgb'
+local format = 'bgra8'
 local cut_size = 1024 * 64 --truncate input file to size to test progressive mode
 local scroll = 0
 local total_h = 0
@@ -23,7 +23,9 @@ local fancy_upsampling = false
 local block_smoothing = false
 local partial = true
 local bottom_up = false
-local padded = false
+local stride_aligned = false
+
+local convert = 'g4'
 
 function player:on_render(cr)
 
@@ -43,12 +45,29 @@ function player:on_render(cr)
 	fancy_upsampling = self:togglebutton{id = 'fancy_upsampling', x = 200, y = 40, w = 140, h = 24, text = 'fancy upsampling', selected = fancy_upsampling}
 	block_smoothing = self:togglebutton{id = 'block_smoothing', x = 350, y = 40, w = 140, h = 24, text = 'block smoothing', selected = block_smoothing}
 
-	pixel_format = self:mbutton{id = 'pixel', x = 500, y = 40, w = 390, h = 24,
-						values = {'rgb', 'bgr', 'rgba', 'bgra', 'argb', 'abgr', 'rgbx', 'bgrx', 'xrgb', 'xbgr',
-										'g', 'ga', 'ag', 'ycc', 'ycck', 'cmyk'},
-						selected = pixel_format}
-	bottom_up = self:togglebutton{id = 'bottom_up', x = 900, y = 40, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
-	padded = self:togglebutton{id = 'padded', x = 1000, y = 40, w = 90, h = 24, text = 'padded', selected = padded}
+	format = self:mbutton{id = 'format', x = 500, y = 40, w = 590, h = 24,
+						values = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8',
+										'g8', 'ga8', 'ag8', 'ycc8', 'ycck8', 'cmyk8'},
+						selected = format}
+
+	convert = self:mbutton{id = 'convert', x = 500, y = 10, w = 1290, h = 24,
+						values = {
+							'rgb8', 'bgr8', --RGB 8bpc, 24bpp
+							'rgb16', 'bgr16', --RGB 16bpc, 48bpp
+							'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8', --RGBX 8bpc, 32bpp
+							'rgbx16', 'bgrx16', 'xrgb16', 'xbgr16', --RGBX 16bpc, 64bpp
+							'rgba8', 'bgra8', 'argb8', 'abgr8', --RGBA 8bpc, 32bpp
+							'rgba16', 'bgra16', 'argb16', 'abgr16', --RGBA 16bpc, 64bpp
+							'rgb565', 'rgb555', 'rgb444', 'rgba4444', 'rgba5551', --RGB 16bpp
+							'icmyk8', -- CMYK 8bpc, 32bpp
+							'g1', 'g2', 'g4', 'g8', 'g16', --GRAY, 1, 2, 4, 8, 16bpp
+							'ga8', 'ag8', 'ga16', 'ag16', --GRAY+ALPHA, 8 & 16bpp.
+						},
+						selected = convert}
+
+	bottom_up = self:togglebutton{id = 'bottom_up', x = 1100, y = 40, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
+	stride_aligned = self:togglebutton{id = 'stride_aligned', x = 1200, y = 40, w = 90, h = 24,
+									text = 'stride_aligned', selected = stride_aligned}
 
 
 	local cy = 80
@@ -115,12 +134,18 @@ function player:on_render(cr)
 			end
 
 			if image then
-				self:image{x = cx, y = cy, image = image}
+
+				local bmpconv = require'bmpconv'
+				local img = {w = image.w, h = image.h, format = convert, orientation = 'top_down'}
+				bmpconv.alloc(img, true)
+				bmpconv.convert(image, img)
+
+				self:image{x = cx, y = cy, image = img}
 
 				self:text(string.format('scan %d', scan_number), 14, 'normal_fg', 'left', 'top',
 													cx, cy, w, h)
 
-				self:text(image.file.pixel .. ' -> ' .. image.pixel,
+				self:text(image.file.format .. ' -> ' .. image.format,
 								14, 'normal_fg', 'center', 'middle', cx, cy, w, h)
 
 				if image.partial then
@@ -139,12 +164,12 @@ function player:on_render(cr)
 			end
 		end
 
-		local ok, err = pcall(function()
+		--local ok, err = pcall(function()
 
 			libjpeg.load(glue.update(t, {
 					accept = {
-						[pixel_format] = true,
-						padded = padded,
+						[format] = true,
+						stride_aligned = stride_aligned,
 						bottom_up = bottom_up,
 						top_down = not bottom_up
 					},
@@ -155,11 +180,13 @@ function player:on_render(cr)
 					render_scan = render_scan,
 				}))
 
-		end)
+		--end)
 
+		--[[
 		if not ok and not rendered_once then
 			render_scan(nil, true, 1, err)
 		end
+		]]
 
 		if t.stream then
 			t.stream:close()

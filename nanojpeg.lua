@@ -47,18 +47,12 @@ local function load(t)
 		local img = {}
 		img.w = C.njGetWidth(nj)
 		img.h = C.njGetHeight(nj)
-		img.pixel = C.njIsColor(nj) == 1 and 'rgb' or 'g'
-		img.stride = img.w * #img.pixel
+		img.format = C.njIsColor(nj) == 1 and 'rgb8' or 'g8'
+		img.stride = img.w * (C.njIsColor(nj) == 1 and 3 or 1)
 		img.orientation = 'top_down'
 		img.size = C.njGetImageSize(nj)
 		img.data = C.njGetImage(nj) --pointer to RGB888[] or G8[]
 		ffi.gc(img.data, C.njFreeImage)
-
-		if t.accept then
-			local bmpconv = require'bmpconv'
-			img = bmpconv.convert_best(img, t.accept)
-		end
-
 		return img
 	end)
 end

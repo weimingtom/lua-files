@@ -96,7 +96,7 @@ formats.abgr16 = format(64, 'uint16_t', 'rgba16', formats.abgr8.read, formats.ab
 --8bpc GRAY and GRAY+APLHA
 formats.g8  = format( 8, 'uint8_t', 'ga8',
 	function(s,i)  return s[i], 0xff end,
-	function(d,i,r,g,a) d[i] = g end)
+	function(d,i,g,a) d[i] = g end)
 
 formats.ga8 = format(16, 'uint8_t', 'ga8',
 	function(s,i) return s[i], s[i+1] end,
@@ -130,7 +130,7 @@ end
 function formats.rgb565.write(d,i,r,g,b)
 	d[i] = bit.bor(bit.lshift(bit.rshift(r, 3), 11),
 						bit.lshift(bit.rshift(g, 2),  5),
-						           bit.rshift(b, 2))
+						           bit.rshift(b, 3))
 end
 
 formats.rgba4444 = format(16, 'uint16_t', 'rgba8')
@@ -155,8 +155,8 @@ formats.rgba5551 = format(16, 'uint16_t', 'rgba8')
 function formats.rgba5551.read(s,i)
 	return
 					bit.rshift(s[i], 11)      * (255 / 31),
-		bit.band(bit.rshift(s[i],  6), 15) * (255 / 31),
-		bit.band(bit.rshift(s[i],  1), 15) * (255 / 31),
+		bit.band(bit.rshift(s[i],  6), 31) * (255 / 31),
+		bit.band(bit.rshift(s[i],  1), 31) * (255 / 31),
 		bit.band(           s[i],       1) *  255
 end
 
@@ -219,23 +219,23 @@ end
 
 function formats.g1.write(d,i,g,a)
 	local dbit = bit.band(i * 8, 7) --0-7
-	bit.bor(
-		bit.band(d[i], bit.rshift(0xffff-0x80, dbit), --clear the bit
-		bit.rshift(bit.band(g, 0x80), dbit))) --set the bit
+	d[i] = bit.bor(
+				bit.band(d[i], bit.rshift(0xffff-0x80, dbit)), --clear the bit
+				bit.rshift(bit.band(g, 0x80), dbit)) --set the bit
 end
 
 function formats.g2.write(d,i,g,a)
 	local dbit = bit.band(i * 8, 7) --0,2,4,6
 	d[i] = bit.bor(
-		bit.band(d[i], bit.rshift(0xffff-0xC0, dbit), --clear the bits
-		bit.rshift(bit.band(g, 0xC0), dbit))) --set the bits
+				bit.band(d[i], bit.rshift(0xffff-0xC0, dbit)), --clear the bits
+				bit.rshift(bit.band(g, 0xC0), dbit)) --set the bits
 end
 
 function formats.g4.write(d,i,g,a)
 	local dbit = bit.band(i * 8, 7) --0,4
 	d[i] = bit.bor(
-		bit.band(d[i], bit.rshift(0xffff-0xf0, dbit), --clear the bits
-		bit.rshift(bit.band(g, 0xf0), dbit))) --set the bits
+				bit.band(d[i], bit.rshift(0xffff-0xf0, dbit)), --clear the bits
+				bit.rshift(bit.band(g, 0xf0), dbit)) --set the bits
 end
 
 --converters between the different color types returned by readers and accepted by writers
@@ -331,8 +331,10 @@ local function image_stride(img) --get/validate image stride
 end
 
 local function alloc(img, stride_aligned) --allocate or reallocate an image's buffer
-	local stride = valid_stride(img.format, img.w, img.stride, stride_aligned)
-	img.data = ffi.new('uint8_t[?]', math.ceil(stride * h))
+	img.stride = valid_stride(img.format, img.w, img.stride, stride_aligned)
+	img.size = math.ceil(img.stride * img.h)
+	img.data = ffi.new('uint8_t[?]', img.size)
+	return img
 end
 
 --bitmap converter between two bitmaps of same size but different formats.
@@ -371,6 +373,7 @@ local function convert(src, dst, convert_pixel)
 		end
 		dj = dj + dst_stride
 	end
+	return dst
 end
 
 --reflection/reporting

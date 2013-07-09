@@ -6,10 +6,15 @@ local bmpconv = require'bmpconv'
 function player:image(t)
 	local x = t.x or 0
 	local y = t.y or 0
-	local img = assert(t.image, 'image missing')
+	local src = assert(t.image, 'image missing')
 
 	--link image bits to a surface
-	img = bmpconv.convert_best(img, {bgra = true, top_down = true})
+	local img = src
+	if true then
+		img = {w = src.w, h = src.h, format = 'bgra8', orientation = 'top_down'}
+		bmpconv.alloc(img, true)
+		bmpconv.convert(src, img)
+	end
 	local surface = cairo.cairo_image_surface_create_for_data(img.data, cairo.CAIRO_FORMAT_ARGB32,
 																					img.w, img.h, img.stride)
 
@@ -26,5 +31,5 @@ function player:image(t)
 	surface:free()
 end
 
-if not ... then require'libjpeg_demo' end
+if not ... then require'cairo_player_demo' end
 

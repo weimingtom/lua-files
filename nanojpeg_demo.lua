@@ -10,7 +10,6 @@ require'unit'
 local files = dir'media/jpeg/*'
 
 local source_type = 'path'
-local bottom_up = false
 local scale = 0.5
 
 function player:on_render(cr)
@@ -18,9 +17,6 @@ function player:on_render(cr)
 	source_type = self:mbutton{id = 'source_type', x = 10, y = 10, w = 280, h = 24,
 						values = {'path', 'cdata', 'string'},
 						selected = source_type}
-
-	bottom_up = self:togglebutton{id = 'bottom_up', x = 300, y = 10, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
-
 	local cx, cy = 0, 40
 	local maxh = 0
 
@@ -40,9 +36,7 @@ function player:on_render(cr)
 
 		pcall(function()
 
-			local image = jpeg.load(glue.update({
-				accept = {bgra = true, g = true, padded = true, bottom_up = bottom_up and true or nil},
-			}, source))
+			local image = jpeg.load(source)
 			local w, h = image.w * scale, image.h * scale
 
 			if cx + w > self.w then
