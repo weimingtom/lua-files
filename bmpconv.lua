@@ -1,6 +1,6 @@
 --go @ bin/luajit.exe -e io.stdout:setvbuf'no' -jdump *
 --bitmap conversions between different pixel formats, bitmap orientations, strides and bit depths.
---formats: rgb8 rgb16 rgbx8 rgbx16 rgba8 rgba16 rgb565 rgba4444 rgba5551 rgb555 rgb444 icmyk8 g8 g16 ga8 ga16 g4 g2 g1.
+--formats: rgb8 rgb16 rgbx8 rgbx16 rgba8 rgba16 rgb565 rgba4444 rgba5551 rgb555 rgb444 cmyk8 g8 g16 ga8 ga16 g4 g2 g1.
 local ffi = require'ffi'
 local bit = require'bit'
 
@@ -115,7 +115,7 @@ formats.ga16 = format(32, 'uint16_t', 'ga16', formats.ga8.read, formats.ga8.writ
 formats.ag16 = format(32, 'uint16_t', 'ga16', formats.ag8.read, formats.ag8.write)
 
 --8bpc INVERSE CMYK
-formats.icmyk8 = format(32, 'uint8_t', 'icmyk8', formats.rgba8.read, formats.rgba8.write)
+formats.cmyk8 = format(32, 'uint8_t', 'cmyk8', formats.rgba8.read, formats.rgba8.write)
 
 --16bpp RGB and RGBA
 formats.rgb565 = format(16, 'uint16_t', 'rgba8')
@@ -238,6 +238,11 @@ function formats.g4.write(d,i,g,a)
 				bit.rshift(bit.band(g, 0xf0), dbit)) --set the bits
 end
 
+--8bpc YCC and YCCK
+
+formats.ycc8 = format(24, 'uint8_t', 'ycc8', formats.rgb8.read, formats.rgb8.write)
+formats.ycck8 = format(32, 'uint8_t', 'ycck8', formats.rgba8.read, formats.rgba8.write)
+
 --converters between the different color types returned by readers and accepted by writers
 
 local conv = autotable{}
@@ -288,19 +293,50 @@ end
 
 conv.ga16.rgba16 = conv.ga8.rgba8
 
-function conv.icmyk8.rgba16(c, m, y, k)
+function conv.cmyk8.rgba16(c, m, y, k)
 	return c * k, m * k, y * k, 0xffff
+end
+
+local function clamp8(x)
+	return math.min(math.max(x, 0), 255)
+end
+
+function conv.ycc8.rgba8(y, cb, cr) --see http://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
+	return
+		clamp8(y                        + 1.402   * (cr - 128)),
+		clamp8(y - 0.34414 * (cb - 128) - 0.71414 * (cr - 128)),
+      clamp8(y + 1.772   * (cb - 128)),
+		0xff
+end
+
+function conv.ycck8.cmyk8(y, cb, cr, k)
+	local r, g, b = conv.ycc8.rgba8(y, cb, cr)
+	return 255 - r, 255 - g, 255 - b, k
 end
 
 --composite converters
 
 function conv.ga16.rgba8(g, a) return conv.rgba16.rgba8(conv.ga16.rgba16(g, a)) end
 function conv.ga8.rgba16(g, a) return conv.ga16.rgba16(conv.ga8.ga16(g, a)) end
-function conv.icmyk8.rgba8(c, m, y, k) return conv.rgba16.rgba8(conv.icmyk8.rgba16(c, m, y, k)) end
-function conv.icmyk8.ga16(c, m, y, k) return conv.rgba16.ga16(conv.icmyk8.rgba16(c, m, y, k)) end
-function conv.icmyk8.ga8(c, m, y, k) return conv.ga16.ga8(conv.rgba16.ga16(conv.icmyk8.rgba16(c, m, y, k))) end
 function conv.rgba16.ga8(r, g, b, a) return conv.ga16.ga8(conv.rgba16.ga16(r, g, b, a)) end
-function conv.rgba8.ga16(r, g, b, a) return conv.ga8.ga16(conv.rgba8.ga8(r, g, b, a)) end
+function conv.rgba8.ga16(r, g, b, a) return conv.rgba16.ga16(conv.rgba8.rgba16(r, g, b, a)) end
+
+function conv.cmyk8.rgba8(c, m, y, k) return conv.rgba16.rgba8(conv.cmyk8.rgba16(c, m, y, k)) end
+function conv.cmyk8.ga16(c, m, y, k) return conv.rgba16.ga16(conv.cmyk8.rgba16(c, m, y, k)) end
+function conv.cmyk8.ga8(c, m, y, k) return conv.ga16.ga8(conv.rgba16.ga16(conv.cmyk8.rgba16(c, m, y, k))) end
+
+function conv.ycc8.rgba16(y, cb, cr) return conv.rgba8.rgba16(conv.ycc8.rgba8(y, cb, cr)) end
+function conv.ycc8.ga16(y, cb, cr) return conv.rgba16.ga16(conv.rgba8.rgba16(conv.ycc8.rgba8(y, cb, cr))) end
+function conv.ycc8.ga8(y, cb, cr) return conv.rgba8.ga8(conv.ycc8.rgba8(y, cb, cr)) end
+
+function conv.ycck8.rgba16(y, cb, cr, k) return conv.cmyk8.rgba16(conv.ycck8.cmyk8(y, cb, cr, k)) end
+function conv.ycck8.rgba8(y, cb, cr, k) return conv.cmyk8.rgba8(conv.ycck8.cmyk8(y, cb, cr, k)) end
+function conv.ycck8.ga16(y, cb, cr, k)
+	return conv.rgba16.ga16(conv.cmyk8.rgba16(conv.ycck8.cmyk8(y, cb, cr, k)))
+end
+function conv.ycck8.ga8(y, cb, cr, k) return
+	conv.ga16.ga8(conv.rgba16.ga16(conv.cmyk8.rgba16(conv.ycck8.cmyk8(y, cb, cr, k))))
+end
 
 --format helpers
 
@@ -330,7 +366,7 @@ local function image_stride(img) --get/validate image stride
 	return valid_stride(img.format, img.w, img.stride)
 end
 
-local function alloc(img, stride_aligned) --allocate or reallocate an image's buffer
+local function new(img, stride_aligned) --allocate or reallocate an image's buffer
 	img.stride = valid_stride(img.format, img.w, img.stride, stride_aligned)
 	img.size = math.ceil(img.stride * img.h)
 	img.data = ffi.new('uint8_t[?]', img.size)
@@ -400,7 +436,7 @@ if not ... then require'bmpconv_test' end
 return {
 	formats = formats,
 	converters = conv,
-	alloc = alloc,
+	new = new,
 	convert = convert,
 	dumpinfo = dumpinfo,
 }

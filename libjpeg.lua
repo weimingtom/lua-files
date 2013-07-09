@@ -28,6 +28,11 @@ local formats = {
 	[C.JCS_EXT_ABGR] = 'abgr8',
 }
 
+local channel_count = {}
+for _,format_name in pairs(formats) do
+	channel_count[format_name] = #format_name-1 --hack: it goes that the formats are named like that.
+end
+
 local color_spaces = glue.index(formats)
 
 --all conversions that libjpeg implements, in order of preference. {source = {dest1, ...}}.
@@ -243,11 +248,12 @@ local function load(t)
 
 		--find the best accepted output pixel format
 		assert(img.file.format, 'unknown pixel format')
+		assert(cinfo.num_components == channel_count[img.file.format], 'num comp')
 		img.format = best_format(img.file.format, t.accept)
 
 		--set decompression options
 		cinfo.out_color_space = assert(color_spaces[img.format])
-		cinfo.output_components = #img.format-1 --too hackish?
+		cinfo.output_components = channel_count[img.format]
 		cinfo.scale_num = t.scale_num or 1
 		cinfo.scale_denom = t.scale_denom or 1
 		cinfo.dct_method = assert(dct_methods[t.dct_method or 'accurate'], 'invalid dct_method')

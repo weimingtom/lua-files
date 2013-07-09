@@ -11,8 +11,7 @@ function player:image(t)
 	--link image bits to a surface
 	local img = src
 	if true then
-		img = {w = src.w, h = src.h, format = 'bgra8', orientation = 'top_down'}
-		bmpconv.alloc(img, true)
+		img = bmpconv.new({w = src.w, h = src.h, format = 'bgra8', orientation = 'top_down'}, true)
 		bmpconv.convert(src, img)
 	end
 	local surface = cairo.cairo_image_surface_create_for_data(img.data, cairo.CAIRO_FORMAT_ARGB32,

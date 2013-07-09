@@ -15,7 +15,7 @@ local function alloc(img)
 	return img
 end
 
-local icmyk8   = alloc{w = 1921, h = 1081, format = 'icmyk8', orientation = 'top_down'}
+local cmyk8    = alloc{w = 1921, h = 1081, format = 'cmyk8', orientation = 'top_down'}
 local rgba4444 = alloc{w = 1921, h = 1081, format = 'rgba4444', orientation = 'top_down'}
 local rgb565   = alloc{w = 1921, h = 1081, format = 'rgb565', orientation = 'top_down'}
 local ag8      = alloc{w = 1921, h = 1081, format = 'ag8', orientation = 'top_down'}
@@ -61,4 +61,4 @@ convert(g4, g2)
 convert(g4, g1)
 convert(g2, g4)
 convert(ga8, ga8_2)
-convert(icmyk8, ag8)
+convert(cmyk8, ag8)
