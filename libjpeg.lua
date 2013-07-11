@@ -28,10 +28,11 @@ local formats = {
 	[C.JCS_EXT_ABGR] = 'abgr8',
 }
 
-local channel_count = {}
-for _,format_name in pairs(formats) do
-	channel_count[format_name] = #format_name-1 --hack: it goes that the formats are named like that.
-end
+local channel_count = {
+	g8 = 1, ycc8 = 3, cmyk8 = 4, ycck8 = 4, rgb8 = 3, bgr8 = 3,
+	rgbx8 = 4, bgrx8 = 4, xrgb8 = 4, xbgr8 = 4,
+	rgba8 = 4, bgra8 = 4, argb8 = 4, abgr8 = 4,
+}
 
 local color_spaces = glue.index(formats)
 

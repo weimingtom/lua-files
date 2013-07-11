@@ -25,3 +25,4 @@ for src_format in glue.sortedpairs(bitmap.formats) do
 				timediff(), flag, src.format, dst.format, src.size / 1024 / 1024, src.stride))
 	end
 end
+

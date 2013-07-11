@@ -108,7 +108,7 @@ local function load(t)
 			local data = ffi.new('uint8_t[?]', size)
 			local di = 0
 			local assert = assert
-			local transparent = t.mode ~= 'opaque'
+			local transparent = not t.opaque
 			for i=0, w * h-1 do
 				local idx = si.RasterBits[i]
 				assert(idx < colormap.ColorCount)

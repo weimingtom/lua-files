@@ -11,7 +11,7 @@ local files = dir'media/gif/*'
 
 local white_bg = false
 local source_type = 'path'
-local mode = 'transparent'
+local opaque = false
 local max_cutsize = 65536
 local cut_size = max_cutsize
 local frame_state = {} --{[filename] = {frame = <current_frame_no>, time = <next_frame_time>}
@@ -31,9 +31,9 @@ function player:on_render(cr)
 										i0 = 0, i1 = max_cutsize, i = cut_size, text = 'cut size'}
 	end
 
-	mode = self:mbutton{id = 'mode', x = 450, y = 10, w = 190, h = 24,
-						values = {'transparent', 'opaque'},
-						selected = mode}
+	opaque = self:mbutton{id = 'mode', x = 450, y = 10, w = 190, h = 24,
+						texts = {[true] = 'opaque', [false] = 'transparent'}, values = {true, false},
+						selected = opaque}
 
 	local cx, cy = 0, 40
 	local maxh = 0
@@ -54,7 +54,7 @@ function player:on_render(cr)
 			s = s:sub(1, cut_size)
 			t.string = s
 		end
-		t.mode = mode
+		t.opaque = opaque
 
 		local ok,err = pcall(function()
 
