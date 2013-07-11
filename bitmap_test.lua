@@ -16,7 +16,9 @@ for src_format in glue.sortedpairs(bitmap.formats) do
 		local dst = bitmap.new(1921, 1081, dst_format, true)
 
 		timediff()
-		bitmap.convert(src, dst)
+		for i=1,1 do
+			bitmap.convert(src, dst)
+		end
 
 		local flag = src_format == dst_format and '*' or ''
 		print(string.format('%-6.4f %-4s %-10s %-10s %6.2f MB   %-10s',

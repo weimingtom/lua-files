@@ -26,8 +26,6 @@ local partial = true
 local bottom_up = false
 local stride_aligned = false
 
-local convert = 'bgra8'
-
 function player:on_render(cr)
 
 	--self.theme = self.themes.light
@@ -50,21 +48,6 @@ function player:on_render(cr)
 						values = {'rgb8', 'bgr8', 'rgba8', 'bgra8', 'argb8', 'abgr8', 'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8',
 										'g8', 'ga8', 'ag8', 'ycc8', 'ycck8', 'cmyk8'},
 						selected = formats}
-
-	convert = self:mbutton{id = 'convert', x = 500, y = 10, w = 1290, h = 24,
-						values = {
-							'rgb8', 'bgr8', --RGB 8bpc, 24bpp
-							'rgb16', 'bgr16', --RGB 16bpc, 48bpp
-							'rgbx8', 'bgrx8', 'xrgb8', 'xbgr8', --RGBX 8bpc, 32bpp
-							'rgbx16', 'bgrx16', 'xrgb16', 'xbgr16', --RGBX 16bpc, 64bpp
-							'rgba8', 'bgra8', 'argb8', 'abgr8', --RGBA 8bpc, 32bpp
-							'rgba16', 'bgra16', 'argb16', 'abgr16', --RGBA 16bpc, 64bpp
-							'rgb565', 'rgb555', 'rgb444', 'rgba4444', 'rgba5551', --RGB 16bpp
-							'cmyk8', -- CMYK 8bpc, 32bpp
-							'g1', 'g2', 'g4', 'g8', 'g16', --GRAY, 1, 2, 4, 8, 16bpp
-							'ga8', 'ag8', 'ga16', 'ag16', --GRAY+ALPHA, 8 & 16bpp.
-						},
-						selected = convert}
 
 	bottom_up = self:togglebutton{id = 'bottom_up', x = 1100, y = 40, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
 	stride_aligned = self:togglebutton{id = 'stride_aligned', x = 1200, y = 40, w = 90, h = 24,
@@ -136,11 +119,7 @@ function player:on_render(cr)
 
 			if image then
 
-				local bmpconv = require'bmpconv'
-				local img = bmpconv.new({w = image.w, h = image.h, format = convert, orientation = 'top_down'}, true)
-				bmpconv.convert(image, img)
-
-				self:image{x = cx, y = cy, image = img}
+				self:image{x = cx, y = cy, image = image}
 
 				self:text(string.format('scan %d', scan_number), 14, 'normal_fg', 'left', 'top',
 													cx, cy, w, h)
@@ -182,6 +161,8 @@ function player:on_render(cr)
 		end)
 
 		if not ok then
+			print(err)
+			os.exit(1)
 			render_scan(nil, true, 1, err)
 		end
 
