@@ -33,52 +33,38 @@ end
 
 function player:on_render(cr)
 
-	local img = load_bmp'media/bmp/bg.bmp'
-	--local img = load_bmp'media/bmp/parrot.bmp'
-
 	--apply dithering
 
-	self.method = self:mbutton{id = 'method', x = 10 + img.w + 10, y = 70, w = 190, h = 24,
+	self.method = self:mbutton{id = 'method', x = 10, y = 70, w = 190, h = 24,
 										values = {'fs', 'ordered', 'none'}, selected = self.method or 'ordered'}
 
 	if self.method == 'fs' then
 		local oldrbits = self.rbits
-		self.rbits = self:slider{id = 'rbits', x = 10 + img.w + 10, y = 100, w = 190, h = 24,
+		self.rbits = self:slider{id = 'rbits', x = 10 , y = 100, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.rbits or 4, text = 'r bits'}
 		if oldrbits ~= self.rbits then
 			self.gbits = self.rbits
 			self.bbits = self.rbits
 			self.abits = self.rbits
 		end
-		self.gbits = self:slider{id = 'gbits', x = 10 + img.w + 10, y = 130, w = 190, h = 24,
+		self.gbits = self:slider{id = 'gbits', x = 10 , y = 130, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.gbits or 4, text = 'g bits'}
-		self.bbits = self:slider{id = 'bbits', x = 10 + img.w + 10, y = 160, w = 190, h = 24,
+		self.bbits = self:slider{id = 'bbits', x = 10 , y = 160, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.bbits or 4, text = 'b bits'}
-		self.abits = self:slider{id = 'abits', x = 10 + img.w + 10, y = 190, w = 190, h = 24,
+		self.abits = self:slider{id = 'abits', x = 10 , y = 190, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.abits or 4, text = 'a bits'}
 
-		bitmap.dither.fs(img, self.rbits, self.gbits, self.bbits, self.abits)
-
 	elseif self.method == 'ordered' then
-		self.map = self:mbutton{id = 'map', x = 10 + img.w + 10, y = 100, w = 190, h = 24,
+		self.map = self:mbutton{id = 'map', x = 10 , y = 100, w = 190, h = 24,
 											values = {2, 3, 4, 8}, selected = self.map or 4}
 
-		bitmap.dither.ordered(img, self.map)
 	end
 
 	--clip the low bits
 
-	self.bits = self:slider{id = 'bits', x = 10 + img.w + 10,
+	self.bits = self:slider{id = 'bits', x = 10,
 										y = self.method == 'fs' and 220 or self.method == 'ordered' and 130 or 100,
 										w = 190, h = 24, i0 = 0, i1 = 8, step = 1, i = self.bits or 8, text = 'out bits'}
-
-	if self.bits < 8 then
-		local c = 0xff-(2^(8-self.bits)-1)
-
-		bitmap.convert(img, img, function(r,g,b,a)
-			return bit.band(r,c), bit.band(g,c), bit.band(b,c), bit.band(a,c)
-		end)
-	end
 
 	--convert to dest. format
 
@@ -91,7 +77,7 @@ function player:on_render(cr)
 		'rgba8', 'bgra8', 'argb8', 'abgr8',
 		'rgba16', 'bgra16', 'argb16', 'abgr16',
 	}
-	local e1 = available(img.format, v1)
+	local e1 = available('bgr8', v1)
 	local format1 = self:mbutton{id = 'format1', x = 10, y = 10, w = 990, h = 24,
 						values = v1, enabled = e1, selected = self.format}
 	local v2 = {
@@ -102,16 +88,46 @@ function player:on_render(cr)
 		'ycc8',
 		'ycck8',
 	}
-	local e2 = available(img.format, v2)
+	local e2 = available('bgr8', v2)
 	local format2 = self:mbutton{id = 'format2', x = 10, y = 40, w = 990, h = 24,
 						values = v2, enabled = e2, selected = self.format}
 	self.format = format2 ~= self.format and format2 or format1
 
-	if img.format ~= self.format then
-		img = bitmap.copy(img, self.format, false, true)
+	--finally, perform the conversions and display up the images
+
+	local cx, cy = 210, 70
+	local function show(file)
+
+		local img = load_bmp(file)
+
+		if self.method == 'fs' then
+			bitmap.dither.fs(img, self.rbits, self.gbits, self.bbits, self.abits)
+		elseif self.method == 'ordered' then
+			bitmap.dither.ordered(img, self.map)
+		end
+		if self.bits < 8 then
+			local c = 0xff-(2^(8-self.bits)-1)
+			local m = (0xff / c)
+			bitmap.convert(img, img, function(r,g,b,a)
+				return
+					bit.band(r,c) * m,
+					bit.band(g,c) * m,
+					bit.band(b,c) * m,
+					bit.band(a,c) * m
+			end)
+		end
+		if img.format ~= self.format then
+			img = bitmap.copy(img, self.format, false, true)
+		end
+
+		self:image{x = cx, y = cy, image = img}
+		cx = cx + img.w + 10
 	end
 
-	self:image{x = 10, y = 80, image = img}
+	show'media/bmp/bg.bmp'
+	show'media/bmp/parrot.bmp'
+	show'media/bmp/rgb_3bit.bmp'
+	show'media/bmp/rgb_24bit.bmp'
 
 	if self:keypressed'ctrl' then
 		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}

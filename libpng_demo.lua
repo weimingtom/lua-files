@@ -3,7 +3,6 @@ local libpng = require'libpng'
 local glue = require'glue'
 local ffi = require'ffi'
 local stdio = require'stdio'
-local bmpconv = require'bmpconv'
 require'unit' --dir
 
 local good_files = dir'media/png/good/*.png'
@@ -37,7 +36,7 @@ function player:on_render(cr)
 						values = {'path',  'stream', 'cdata', 'string', 'read cdata', 'read string'},
 						selected = source_type}
 
-	sparkle  = self:togglebutton{id = 'sparkle', x = 700, y = 10, w = 90, h = 24, text = 'sparkle', selected = sparkle}
+	sparkle = self:togglebutton{id = 'sparkle', x = 700, y = 10, w = 90, h = 24, text = 'sparkle', selected = sparkle}
 
 	bottom_up = self:togglebutton{id = 'bottom_up', x = 800, y = 10, w = 90, h = 24, text = 'bottom_up', selected = bottom_up}
 	padded = self:togglebutton{id = 'padded', x = 900, y = 10, w = 90, h = 24, text = 'padded', selected = padded}
