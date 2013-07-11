@@ -1,4 +1,4 @@
---go@ bin/luajit.exe -jv *
+--go @ bin/luajit.exe -jv *
 local bitmap = require'bitmap'
 local glue = require'glue'
 require'unit'
@@ -16,7 +16,7 @@ for src_format in glue.sortedpairs(bitmap.formats) do
 		local dst = bitmap.new(1921, 1081, dst_format, true)
 
 		timediff()
-		for i=1,1 do
+		for i=1,100 do
 			bitmap.convert(src, dst)
 		end
 

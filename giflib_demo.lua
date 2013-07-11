@@ -12,6 +12,8 @@ local files = dir'media/gif/*'
 local white_bg = false
 local source_type = 'path'
 local mode = 'transparent'
+local max_cutsize = 65536
+local cut_size = max_cutsize
 local frame_state = {} --{[filename] = {frame = <current_frame_no>, time = <next_frame_time>}
 
 function player:on_render(cr)
@@ -23,6 +25,11 @@ function player:on_render(cr)
 	source_type = self:mbutton{id = 'source_type', x = 150, y = 10, w = 290, h = 24,
 						values = {'path', 'cdata', 'string'},
 						selected = source_type}
+
+	if source_type ~= 'path' then
+		cut_size = self:slider{id = 'cut_size', x = 700, y = 10, w = 190, h = 24,
+										i0 = 0, i1 = max_cutsize, i = cut_size, text = 'cut size'}
+	end
 
 	mode = self:mbutton{id = 'mode', x = 450, y = 10, w = 190, h = 24,
 						values = {'transparent', 'opaque'},
@@ -38,45 +45,54 @@ function player:on_render(cr)
 			t.path = filename
 		elseif source_type == 'cdata' then
 			local s = glue.readfile(filename)
+			s = s:sub(1, cut_size)
 			local cdata = ffi.new('unsigned char[?]', #s+1, s)
 			t.cdata = cdata
 			t.size = #s
 		elseif source_type == 'string' then
 			local s = glue.readfile(filename)
+			s = s:sub(1, cut_size)
 			t.string = s
 		end
 		t.mode = mode
 
-		local gif = giflib.load(t)
+		local ok,err = pcall(function()
 
-		local state = frame_state[filename]
-		if not state then
-			state = {frame = 0, time = 0}
-			frame_state[filename] = state
-		end
+			local gif = giflib.load(t)
 
-		local image
-		if self.clock >= state.time then
-			state.frame = state.frame + 1
-			if state.frame > #gif.frames then
-				state.frame = 1
+			local state = frame_state[filename]
+			if not state then
+				state = {frame = 0, time = 0}
+				frame_state[filename] = state
 			end
-			image = gif.frames[state.frame]
-			state.time = self.clock + (image.delay_ms or 0)
-		else
-			image = gif.frames[state.frame]
+
+			local image
+			if self.clock >= state.time then
+				state.frame = state.frame + 1
+				if state.frame > #gif.frames then
+					state.frame = 1
+				end
+				image = gif.frames[state.frame]
+				state.time = self.clock + (image.delay_ms or 0)
+			else
+				image = gif.frames[state.frame]
+			end
+
+			if cx + gif.w > self.w then
+				cx = 0
+				cy = cy + maxh + 10
+				maxh = 0
+			end
+
+			self:image{x = cx + image.x, y = cy + image.y, image = image}
+
+			cx = cx + gif.w + 10
+			maxh = math.max(maxh, gif.h)
+		end)
+
+		if not ok then
+			print(err)
 		end
-
-		if cx + gif.w > self.w then
-			cx = 0
-			cy = cy + maxh + 10
-			maxh = 0
-		end
-
-		self:image{x = cx + image.x, y = cy + image.y, image = image}
-
-		cx = cx + gif.w + 10
-		maxh = math.max(maxh, gif.h)
 	end
 end
 

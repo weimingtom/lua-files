@@ -441,6 +441,7 @@ local autoload = {
 	vsplitter = 'splitter',
 	hsplitter = 'splitter',
 	image = 'image',
+	label = 'label',
 }
 
 setmetatable(player, {__index = function(_, k)

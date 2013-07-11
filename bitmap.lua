@@ -510,14 +510,15 @@ local function dumpinfo()
 		table.sort(t)
 		return table.concat(t, ', ')
 	end
-	print'formats:	bpp	ctype			colortype	conversions'
+	local format = '%-10s %-6s %-25s %-10s %s'
+	print(string.format(format, '!format', 'bpp', 'ctype', 'colortype', 'conversions'))
 	for s,t in glue.sortedpairs(formats) do
 		local ct = {}; for d in conversions(s) do ct[#ct+1] = d; end; table.sort(ct)
-		print('  '..s..'     ', t.bpp, t.ctype, t.colortype, '', table.concat(ct, ', '))
+		print(string.format(format, s, tostring(t.bpp), tostring(t.ctype), t.colortype, table.concat(ct, ', ')))
 	end
-	print'converters:'
+	print'!colortype conversions:'
 	for s,t in glue.sortedpairs(conv) do
-		print('  '..s..'     ', '->', enumkeys(t))
+		print(string.format('  %-8s ->  %s',  s, enumkeys(t)))
 	end
 end
 
