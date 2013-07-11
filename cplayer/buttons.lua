@@ -105,7 +105,7 @@ function player:mbutton(t)
 
 	for i,v in ipairs(values) do
 		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
-		local t = {id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
+		local t = {id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or tostring(v),
 						cut = cut, enabled = enabled and enabled[v]}
 		if multisel then
 			t.selected = selected[v]

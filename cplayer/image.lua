@@ -1,7 +1,7 @@
 --draw scaled RGBA8888 and G8 images
 local player = require'cairo_player'
 local cairo = require'cairo'
-local bmpconv = require'bmpconv'
+local bitmap = require'bitmap'
 
 function player:image(t)
 	local x = t.x or 0
@@ -10,9 +10,12 @@ function player:image(t)
 
 	--link image bits to a surface
 	local img = src
-	if true then
-		img = bmpconv.new({w = src.w, h = src.h, format = 'bgra8', orientation = 'top_down'}, true)
-		bmpconv.convert(src, img)
+	if src.format ~= 'bgra8'
+		or src.bottom_up
+		or bitmap.stride(src) ~= bitmap.aligned_stride(bitmap.min_stride(src.format, src.w))
+	then
+		img = bitmap.new(src.w, src.h, 'bgra8', false, true)
+		bitmap.convert(src, img)
 	end
 	local surface = cairo.cairo_image_surface_create_for_data(img.data, cairo.CAIRO_FORMAT_ARGB32,
 																					img.w, img.h, img.stride)

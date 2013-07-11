@@ -130,7 +130,6 @@ local function load(t)
 				data = data,
 				size = size,
 				format = 'rgba8',
-				orientation = 'top_down',
 				stride = stride,
 				w = w,
 				h = h,

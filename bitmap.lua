@@ -1,17 +1,9 @@
---go @ bin/luajit.exe -e io.stdout:setvbuf'no' -jdump *
+--go @ bin/luajit.exe -e io.stdout:setvbuf'no' -jv *
 --bitmap conversions between different pixel formats, bitmap orientations, strides and bit depths.
---formats: rgb8 rgb16 rgbx8 rgbx16 rgba8 rgba16 rgb565 rgba4444 rgba5551 rgb555 rgb444 cmyk8 g8 g16 ga8 ga16 g4 g2 g1.
 local ffi = require'ffi'
 local bit = require'bit'
 
-local function create_table(t, k)
-	if k == nil then return end
-	t[k] = {}
-	return t[k]
-end
-local function autotable(t)
-	return setmetatable(t, {__index = create_table})
-end
+--bitmap formats
 
 local function format(bpp, ctype, colortype, read, write)
 	return {bpp = bpp, ctype = ffi.typeof(ctype), colortype = colortype, read = read, write = write}
@@ -239,13 +231,12 @@ function formats.g4.write(d,i,g,a)
 end
 
 --8bpc YCC and YCCK
-
 formats.ycc8 = format(24, 'uint8_t', 'ycc8', formats.rgb8.read, formats.rgb8.write)
 formats.ycck8 = format(32, 'uint8_t', 'ycck8', formats.rgba8.read, formats.rgba8.write)
 
---converters between the different color types returned by readers and accepted by writers
+--converters between different colortypes
 
-local conv = autotable{}
+local conv = {rgba8 = {}, rgba16 = {}, ga8 = {}, ga16 = {}, cmyk8 = {}, ycc8 = {}, ycck8 = {}}
 
 function conv.rgba8.rgba16(r, g, b, a)
 	return
@@ -345,7 +336,7 @@ function conv.ycck8.ga8(y, cb, cr, k) return
 	conv.ga16.ga8(conv.rgba16.ga16(conv.cmyk8.rgba16(conv.ycck8.cmyk8(y, cb, cr, k))))
 end
 
---format helpers
+--bitmap objects
 
 local function valid_format(format)
 	return type(format) == 'string'
@@ -357,50 +348,112 @@ local function aligned_stride(stride) --smallest stride that is a multiple of 4 
 	return bit.band(math.ceil(stride) + 3, bit.bnot(3))
 end
 
-local function min_stride(format, w, aligned) --minimum stride (dword aligned or not) for a specific format
-	local stride = w * valid_format(format).bpp / 8 --stride is fractional for < 8bpp formats, that's ok.
-	return aligned and aligned_stride(stride) or stride
+local function min_stride(format, w) --minimum stride for a specific format
+	return w * valid_format(format).bpp / 8 --stride is fractional for < 8bpp formats, that's ok.
 end
 
 local function valid_stride(format, w, stride, aligned) --validate stride against min. stride or min. stride
-	local min_stride = min_stride(format, w, aligned)
-	local stride = stride or min_stride
+	local min_stride = min_stride(format, w)
+	stride = stride or min_stride
+	stride = aligned and aligned_stride(stride) or stride
 	assert(stride >= min_stride, 'invalid stride')
 	return stride
 end
 
-local function image_stride(img) --get/validate image stride
-	return valid_stride(img.format, img.w, img.stride)
+local function bitmap_stride(bmp)
+	return valid_stride(bmp.format, bmp.w, bmp.stride)
 end
 
-local function new(img, stride_aligned) --allocate or reallocate an image's buffer
-	img.stride = valid_stride(img.format, img.w, img.stride, stride_aligned)
-	img.size = math.ceil(img.stride * img.h)
-	img.data = ffi.new('uint8_t[?]', img.size)
-	return img
+local function bitmap_row_size(bmp) --can be fractional
+	return min_stride(bmp.format, bmp.w)
 end
 
---bitmap converter between two bitmaps of same size but different formats.
+local function bitmap_format(bmp)
+	return valid_format(bmp.format)
+end
 
-local function prepare(img)
-	local format = valid_format(img.format)
-	local data = ffi.cast(ffi.typeof('$ *', format.ctype), img.data)
-	local stride = image_stride(img) / ffi.sizeof(format.ctype) --stride is now in units of ctype, not bytes!
+local function new(w, h, format, bottom_up, stride_aligned, stride)
+	stride = valid_stride(format, w, stride, stride_aligned)
+	local size = math.ceil(stride * h)
+	local data = ffi.new('uint8_t[?]', size)
+	return {w = w, h = h, format = format, bottom_up = bottom_up or nil, stride = stride, data = data, size = size}
+end
+
+--low-level bitmap interface for random access to pixels
+
+local function data_interface(bmp)
+	local format = bitmap_format(bmp)
+	local data = ffi.cast(ffi.typeof('$ *', format.ctype), bmp.data)
+	local stride = valid_stride(bmp.format, bmp.w, bmp.stride)
+	local stride = stride / ffi.sizeof(format.ctype) --stride is now in units of ctype, not bytes!
 	local pixelsize = format.bpp / 8 / ffi.sizeof(format.ctype) --pixelsize is fractional for < 8bpp formats, that's ok.
-	assert(img.orientation == 'top_down' or img.orientation == 'bottom_up')
-	return data, stride, pixelsize, format
+	return format, data, stride, pixelsize
 end
+
+--hi-level bitmap interface for random access to pixels
+
+local function pixel_interface(bmp)
+	local format, data, stride, pixelsize = data_interface(bmp)
+	local function getpixel(x, y)
+		return format.read(data, y * stride + x * pixelsize)
+	end
+	local function setpixel(x, y, ...)
+		format.write(data, y * stride + x * pixelsize, ...)
+	end
+	return getpixel, setpixel
+end
+
+--bitmap converter
 
 local function convert(src, dst, convert_pixel)
 	assert(src.h == dst.h)
 	assert(src.w == dst.w)
-	local src_data, src_stride, src_pixelsize, src_format = prepare(src)
-	local dst_data, dst_stride, dst_pixelsize, dst_format = prepare(dst)
+	local src_format, src_data, src_stride, src_pixelsize = data_interface(src)
+	local dst_format, dst_data, dst_stride, dst_pixelsize = data_interface(dst)
+
+	--try to copy the bitmap whole
+	if src_format == dst_format
+		and not convert_pixel
+		and src_stride == dst_stride
+		and not src.bottom_up == not dst.bottom_up
+	then
+		if src.data ~= dst.data then
+			assert(src.size == dst.size)
+			ffi.copy(dst.data, src.data, dst.size)
+		end
+		return dst
+	end
+
+	--check that dest. pixels would not be written ahead of source pixels
+	assert(src.data ~= dst.data or (
+		dst_format.bpp <= src_format.bpp
+		and dst_stride <= src_stride
+		and not src.bottom_up == not dst.bottom_up))
+
+	--dest. starting index and step, depending on whether the orientation is different.
 	local dj = 0
-	if src.orientation ~= dst.orientation then
+	if not src.bottom_up ~= not dst.bottom_up then
 		dj = (src.h - 1) * dst_stride --first pixel of the last row
 		dst_stride = -dst_stride --...and stepping backwards
 	end
+
+	--try to copy the bitmap row-by-row
+	local src_rowsize = bitmap_row_size(src)
+	if
+		src_format == dst_format
+		and not convert_pixel
+		and src_stride == math.floor(src_stride) --we can't copy from fractional offsets
+		and dst_stride == math.floor(dst_stride) --we can't copy from fractional offsets
+		and src_rowsize == math.floor(src_rowsize) --we can't copy fractional row sizes
+	then
+		for sj = 0, (src.h - 1) * src_stride, src_stride do
+			ffi.copy(dst.data + dj, src.data + sj, src_rowsize)
+			dj = dj + dst_stride
+		end
+		return dst
+	end
+
+	--convert the bitmap pixel-by-pixel
 	if not convert_pixel and src_format.colortype ~= dst_format.colortype then
 		convert_pixel = assert(conv[src_format.colortype][dst_format.colortype], 'invalid conversion')
 	end
@@ -419,7 +472,18 @@ local function convert(src, dst, convert_pixel)
 	return dst
 end
 
---reflection/reporting
+--bitmap copy
+
+local function copy(src, format, bottom_up, stride_aligned, stride)
+	if not format then
+		format = src.format
+		if bottom_up == nil then bottom_up = src.bottom_up end
+		stride = stride or src.stride
+	end
+	return convert(src, new(src.w, src.h, format, bottom_up, stride_aligned, stride))
+end
+
+--bitmap converter reflection/reporting
 
 local function conversions(src_format)
 	src_format = valid_format(src_format)
@@ -457,13 +521,142 @@ local function dumpinfo()
 	end
 end
 
-if not ... then require'bmpconv_test' end
+--dithering algorithms (only 4 channel colortypes for now)
+
+local dither = {}
+
+--floyd-steinberg dithering
+
+local function fs_dither_4c(x, maxval, r1, g1, b1, a1, r0, g0, b0, a0)
+	return
+		math.min(r0 + bit.rshift(x * r1, 4), maxval),
+		math.min(g0 + bit.rshift(x * g1, 4), maxval),
+		math.min(b0 + bit.rshift(x * b1, 4), maxval),
+		math.min(a0 + bit.rshift(x * a1, 4), maxval)
+end
+
+local fs_maxbits = {rgba8 = 8, rgba16 = 16, cmyk8 = 8}
+
+function dither.fs(src, rbits, gbits, bbits, abits)
+	local maxbits = assert(fs_maxbits[valid_format(src.format).colortype], 'invalid colortype')
+	local getpixel, setpixel = pixel_interface(src)
+	local maxval = 2^maxbits-1
+	local rmask = 2^(maxbits-rbits)-1
+	local gmask = 2^(maxbits-gbits)-1
+	local bmask = 2^(maxbits-bbits)-1
+	local amask = 2^(maxbits-abits)-1
+	for y = 0, src.h-1 do
+		for x = 0, src.w-1 do
+			local r0, g0, b0, a0 = getpixel(x, y)
+			local r1 = bit.band(r0, rmask)
+			local g1 = bit.band(g0, gmask)
+			local b1 = bit.band(b0, bmask)
+			local a1 = bit.band(a0, amask)
+			setpixel(x, y,
+				bit.band(r0, maxval-rmask),
+				bit.band(g0, maxval-gmask),
+				bit.band(b0, maxval-bmask),
+				bit.band(a0, maxval-amask))
+			if x < src.w-1 then
+				setpixel(x+1, y, fs_dither_4c(7, maxval, r1, g1, b1, a1, getpixel(x+1, y)))
+			end
+			if y < src.h-1 and x > 0 then
+				setpixel(x-1, y+1, fs_dither_4c(3, maxval, r1, g1, b1, a1, getpixel(x-1, y+1)))
+			end
+			if y < src.h-1 then
+				setpixel(x, y+1, fs_dither_4c(5, maxval, r1, g1, b1, a1, getpixel(x, y+1)))
+			end
+			if y < src.h-1 and x < src.w-1 then
+				setpixel(x+1, y+1, fs_dither_4c(1, maxval, r1, g1, b1, a1, getpixel(x+1, y+1)))
+			end
+		end
+	end
+end
+
+--ordered dithering
+
+local tmap = {[2] = {}, [3] = {}, [4] = {}, [8] = {}} --threshold maps from wikipedia
+
+tmap[2] = {[0] =
+	{[0] = 1, 3},
+	{[0] = 4, 2}}
+
+tmap[3] = {[0] =
+	{[0] = 3, 7, 4},
+	{[0] = 6, 1, 9},
+	{[0] = 2, 8, 5}}
+
+tmap[4] = {[0] =
+	{[0] =  1,  9,  3, 11},
+	{[0] = 13,  5, 15,  7},
+	{[0] =  4, 12,  2, 10},
+	{[0] = 16,  8, 14, 6}}
+
+tmap[8] = {[0] =
+	{[0] =  1, 49, 13, 61,  4, 52, 16, 64},
+	{[0] = 33, 17, 45, 29, 36, 20, 48, 32},
+	{[0] =  9, 57,  5, 53, 12, 60,  8, 56},
+	{[0] = 41, 25, 37, 21, 44, 28, 40, 24},
+	{[0] =  3, 51, 15, 63,  2, 50, 14, 62},
+	{[0] = 35, 19, 47, 31, 34, 18, 46, 30},
+	{[0] = 11, 59,  7, 55, 10, 58,  6, 54},
+	{[0] = 43, 27, 39, 23, 42, 26, 38, 22}}
+
+--note: actual clipping of the low bits is not done here, it will be done naturally
+--when converting the bitmap to lower bpc.
+local function od_4c(t, maxval, r, g, b, a)
+	return
+		math.min(r + t, maxval),
+		math.min(g + t, maxval),
+		math.min(b + t, maxval),
+		math.min(a + t, maxval)
+end
+
+local function od_2c(t, maxval, g, a)
+	return
+		math.min(g + t, maxval),
+		math.min(a + t, maxval)
+end
+
+local ordered_maxval = {rgba8 = 0xff, rgba16 = 0xffff, cmyk8 = 0xff, ga8 = 0xff, ga16 = 0xffff}
+local ordered_kernel = {rgba8 = od_4c, rgba16 = od_4c, cmyk8 = od_4c, ga8 = od_2c, ga16 = od_2c}
+
+function dither.ordered(src, map)
+	local colortype = valid_format(src.format).colortype
+	local maxval = assert(ordered_maxval[colortype], 'invalid colortype')
+	local kernel = ordered_kernel[colortype]
+	local getpixel, setpixel = pixel_interface(src)
+	local tmap = assert(tmap[map], 'invalid map size')
+	for y = 0, src.h-1 do
+		local tmap = tmap[bit.band(y, map-1)]
+		for x = 0, src.w-1 do
+			local t = tmap[bit.band(x, map-1)]
+			setpixel(x, y, kernel(t, maxval, getpixel(x, y)))
+		end
+	end
+end
+
+if not ... then require'bitmap_demo' end
 
 return {
+	--format/stride API
+	valid_format = valid_format,
+	aligned_stride = aligned_stride,
+	min_stride = min_stride,
+	valid_stride = valid_stride,
+	--bitmap API
+	format = bitmap_format,
+	stride = bitmap_stride,
+	row_size = bitmap_row_size,
+	new = new,
+	data_interface = data_interface,
+	pixel_interface = pixel_interface,
+	convert = convert,
+	copy = copy,
+	dither = dither,
+	--inspection API
 	formats = formats,
 	converters = conv,
-	new = new,
-	convert = convert,
 	conversions = conversions,
 	dumpinfo = dumpinfo,
 }
