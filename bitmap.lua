@@ -3,7 +3,19 @@
 local ffi = require'ffi'
 local bit = require'bit'
 
---bitmap formats
+--colortypes
+
+local colortypes = {
+	rgba8  = {channels = 'rgba', bpc =  8},
+	rgba16 = {channels = 'rgba', bpc = 16},
+	ga8    = {channels = 'ga',   bpc =  8},
+	ga16   = {channels = 'ga',   bpc = 16},
+	cmyk8  = {channels = 'cmyk', bpc =  8},
+	ycc8   = {channels = 'ycc',  bpc =  8},
+	ycck8  = {channels = 'ycck', bpc =  8},
+}
+
+--pixel formats
 
 local function format(bpp, ctype, colortype, read, write)
 	return {bpp = bpp, ctype = ffi.typeof(ctype), colortype = colortype, read = read, write = write}
@@ -234,7 +246,7 @@ end
 formats.ycc8 = format(24, 'uint8_t', 'ycc8', formats.rgb8.read, formats.rgb8.write)
 formats.ycck8 = format(32, 'uint8_t', 'ycck8', formats.rgba8.read, formats.rgba8.write)
 
---converters between different colortypes
+--converters between different standard colortypes
 
 local conv = {rgba8 = {}, rgba16 = {}, ga8 = {}, ga16 = {}, cmyk8 = {}, ycc8 = {}, ycck8 = {}}
 
@@ -338,6 +350,12 @@ end
 
 --bitmap objects
 
+local function valid_colortype(colortype)
+	return type(colortype) == 'string'
+				and assert(colortypes[colortype], 'invalid colortype') --standard colortype
+				or assert(colortype, 'colortype missing') --custom colortype
+end
+
 local function valid_format(format)
 	return type(format) == 'string'
 				and assert(formats[format], 'invalid format') --standard format
@@ -372,6 +390,10 @@ local function bitmap_format(bmp)
 	return valid_format(bmp.format)
 end
 
+local function bitmap_colortype(bmp)
+	return valid_colortype(valid_format(bmp.format).colortype)
+end
+
 local function new(w, h, format, bottom_up, stride_aligned, stride)
 	stride = valid_stride(format, w, stride, stride_aligned)
 	local size = math.ceil(stride * h)
@@ -404,18 +426,38 @@ local function pixel_interface(bmp)
 	return getpixel, setpixel
 end
 
+--bitmap pixel sweeper
+
+local function eachpixel(bmp, convert)
+	local getpixel, setpixel = pixel_interface(bmp)
+	for y = 0, bmp.h-1 do
+		for x = 0, bmp.w-1 do
+			setpixel(x, y, convert(getpixel(x, y)))
+		end
+	end
+end
+
 --bitmap region selector
 
 --given a bitmap and a box, adjust the box to fit the bitmap. if the result is an empty box, return bitmap's box.
-local function fit(bmp, x, y, w, h)
-	x = math.min(math.max(x, 0), bmp.w)
-	y = math.min(math.max(y, 0), bmp.h)
-	w = math.min(x + w, bmp.w) - x
-	h = math.min(y + h, bmp.h) - y
-	if w == 0 or h == 0 then
+local function fit(bmp, x1, y1, w, h)
+	local x2 = x1 + w
+	local y2 = y1 + h
+	--clip points
+	x1 = math.min(math.max(x1, 0), bmp.w)
+	y1 = math.min(math.max(y1, 0), bmp.h)
+	x2 = math.min(math.max(x2, 0), bmp.w)
+	y2 = math.min(math.max(y2, 0), bmp.h)
+	--normalize corners
+	if x2 < x1 then x1, x2 = x2, x1 end
+	if y2 < y1 then y1, y2 = y2, y1 end
+	--get dimensions again
+	w = x2 - x1
+	h = y2 - y1
+	if w <= 0 or h <= 0 then
 		return 0, 0, bmp.w, bmp.h
 	else
-		return x, y, w, h
+		return x1, y1, w, h
 	end
 end
 
@@ -544,13 +586,15 @@ local function dumpinfo()
 		local ct = {}; for d in conversions(s) do ct[#ct+1] = d; end; table.sort(ct)
 		print(string.format(format, s, tostring(t.bpp), tostring(t.ctype), t.colortype, table.concat(ct, ', ')))
 	end
-	print'!colortype conversions:'
+	local format = '%-12s %-10s %-6s  ->  %s'
+	print(string.format(format, '!colortype', 'channels', 'bpc', 'conversions'))
 	for s,t in glue.sortedpairs(conv) do
-		print(string.format('  %-8s ->  %s',  s, enumkeys(t)))
+		local ct = colortypes[s]
+		print(string.format(format, s, ct.channels, tostring(ct.bpc), enumkeys(t)))
 	end
 end
 
---dithering algorithms (only 4 channel colortypes for now)
+--dithering algorithms
 
 local dither = {}
 
@@ -564,12 +608,12 @@ local function fs_dither_4c(x, maxval, r1, g1, b1, a1, r0, g0, b0, a0)
 		math.min(a0 + bit.rshift(x * a1, 4), maxval)
 end
 
-local fs_maxbits = {rgba8 = 8, rgba16 = 16, cmyk8 = 8}
-
 function dither.fs(src, rbits, gbits, bbits, abits)
-	local maxbits = assert(fs_maxbits[valid_format(src.format).colortype], 'invalid colortype')
+	local colortype = bitmap_colortype(src)
+	assert(#colortype.channels == 4, 'invalid colortype')
+	local maxbits = colortype.bpc
+	local maxval  = 2^maxbits-1
 	local getpixel, setpixel = pixel_interface(src)
-	local maxval = 2^maxbits-1
 	local rmask = 2^(maxbits-rbits)-1
 	local gmask = 2^(maxbits-gbits)-1
 	local bmask = 2^(maxbits-bbits)-1
@@ -633,7 +677,9 @@ tmap[8] = {[0] =
 
 --note: actual clipping of the low bits is not done here, it will be done naturally
 --when converting the bitmap to lower bpc.
-local function od_4c(t, maxval, r, g, b, a)
+local ordered_dither = {}
+
+ordered_dither[4] = function(t, maxval, r, g, b, a)
 	return
 		math.min(r + t, maxval),
 		math.min(g + t, maxval),
@@ -641,50 +687,85 @@ local function od_4c(t, maxval, r, g, b, a)
 		math.min(a + t, maxval)
 end
 
-local function od_2c(t, maxval, g, a)
+ordered_dither[2] = function(t, maxval, g, a)
 	return
 		math.min(g + t, maxval),
 		math.min(a + t, maxval)
 end
 
-local ordered_maxval = {rgba8 = 0xff, rgba16 = 0xffff, cmyk8 = 0xff, ga8 = 0xff, ga16 = 0xffff}
-local ordered_kernel = {rgba8 = od_4c, rgba16 = od_4c, cmyk8 = od_4c, ga8 = od_2c, ga16 = od_2c}
-
-function dither.ordered(src, map)
-	local colortype = valid_format(src.format).colortype
-	local maxval = assert(ordered_maxval[colortype], 'invalid colortype')
-	local kernel = ordered_kernel[colortype]
+function dither.ordered(src, mapsize)
+	local colortype = bitmap_colortype(src)
+	local maxval = 2^colortype.bpc-1
+	local kernel = assert(ordered_dither[#colortype.channels], 'invalid colortype')
 	local getpixel, setpixel = pixel_interface(src)
-	local tmap = assert(tmap[map], 'invalid map size')
+	local tmap = assert(tmap[mapsize], 'invalid map size')
 	for y = 0, src.h-1 do
-		local tmap = tmap[bit.band(y, map-1)]
+		local tmap = tmap[bit.band(y, mapsize-1)]
 		for x = 0, src.w-1 do
-			local t = tmap[bit.band(x, map-1)]
+			local t = tmap[bit.band(x, mapsize-1)]
 			setpixel(x, y, kernel(t, maxval, getpixel(x, y)))
 		end
 	end
 end
 
+--pixel effects
+
+local function invert(bmp)
+	local ct = bitmap_colortype(bmp)
+	assert(#ct.channels == 4)
+	local maxval = 2^ct.bpc-1
+	eachpixel(bmp, function(r, g, b, a)
+		r = maxval-r
+		g = maxval-g
+		b = maxval-b
+		a = maxval-a
+		return r, g, b, a
+	end)
+end
+
+local function grayscale(bmp)
+	local ct = bitmap_colortype(bmp)
+	if ct.channels == 'rgba' then
+		eachpixel(bmp, function(r, g, b, a)
+			g = rgb2g(r, g, b)
+			return g, g, g, a
+		end)
+	elseif ct.channels == 'ga' then
+		--already gray
+	else
+		error('invalid colortype')
+	end
+end
+
+
 if not ... then require'bitmap_demo' end
 
 return {
-	--format/stride API
+	--format/stride math
 	valid_format = valid_format,
 	aligned_stride = aligned_stride,
 	min_stride = min_stride,
 	valid_stride = valid_stride,
-	--bitmap API
+	--bitmap info
 	format = bitmap_format,
 	stride = bitmap_stride,
 	row_size = bitmap_row_size,
+	--bitmap operations
 	new = new,
-	data_interface = data_interface,
-	pixel_interface = pixel_interface,
-	sub = sub,
 	convert = convert,
 	copy = copy,
+	sub = sub,
+	--pixel interface
+	data_interface = data_interface,
+	pixel_interface = pixel_interface,
+	eachpixel = eachpixel,
+	--dithering
 	dither = dither,
-	--inspection API
+	--pixel effects
+	invert = invert,
+	grayscale = grayscale,
+	--reporting
+	colortypes = colortypes,
 	formats = formats,
 	converters = conv,
 	conversions = conversions,

@@ -93,6 +93,12 @@ function player:on_render(cr)
 						values = v2, enabled = e2, selected = self.format}
 	self.format = format2 ~= self.format and format2 or format1
 
+	--effects
+
+	self.invert = self:togglebutton{id = 'invert', x = 10, y = 260, w = 90, h = 24, text = 'invert', selected = self.invert}
+	self.grayscale = self:togglebutton{id = 'grayscale', x = 10, y = 290, w = 90, h = 24, text = 'grayscale', selected = self.grayscale}
+
+
 	--finally, perform the conversions and display up the images
 
 	local cx, cy = 210, 70
@@ -116,6 +122,14 @@ function player:on_render(cr)
 					bit.band(b,c) * m,
 					bit.band(a,c) * m
 			end)
+		end
+
+		if self.invert then
+			bitmap.invert(img)
+		end
+
+		if self.grayscale then
+			bitmap.grayscale(img)
 		end
 
 		--[[
