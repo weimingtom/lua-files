@@ -375,6 +375,7 @@ end
 local function new(w, h, format, bottom_up, stride_aligned, stride)
 	stride = valid_stride(format, w, stride, stride_aligned)
 	local size = math.ceil(stride * h)
+	assert(size > 0, 'invalid size')
 	local data = ffi.new('uint8_t[?]', size)
 	return {w = w, h = h, format = format, bottom_up = bottom_up or nil, stride = stride, data = data, size = size}
 end
@@ -401,6 +402,33 @@ local function pixel_interface(bmp)
 		format.write(data, y * stride + x * pixelsize, ...)
 	end
 	return getpixel, setpixel
+end
+
+--bitmap region selector
+
+--given a bitmap and a box, adjust the box to fit the bitmap. if the result is an empty box, return bitmap's box.
+local function fit(bmp, x, y, w, h)
+	x = math.min(math.max(x, 0), bmp.w)
+	y = math.min(math.max(y, 0), bmp.h)
+	w = math.min(x + w, bmp.w) - x
+	h = math.min(y + h, bmp.h) - y
+	if w == 0 or h == 0 then
+		return 0, 0, bmp.w, bmp.h
+	else
+		return x, y, w, h
+	end
+end
+
+local function sub(bmp, x, y, w, h)
+	x, y, w, h = fit(bmp, x, y, w, h)
+	local format, data, stride, pixelsize = data_interface(bmp)
+	if bmp.bottom_up then
+		y = bmp.h - y - h
+	end
+	local i = y * stride + x * pixelsize
+	assert(i == math.floor(i), 'invalid coordinates')
+	return {w = w, h = h, format = bmp.format, bottom_up = bmp.bottom_up,
+				stride = stride, data = data + i, size = stride * h, parent = bmp}
 end
 
 --bitmap converter
@@ -652,6 +680,7 @@ return {
 	new = new,
 	data_interface = data_interface,
 	pixel_interface = pixel_interface,
+	sub = sub,
 	convert = convert,
 	copy = copy,
 	dither = dither,

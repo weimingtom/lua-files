@@ -53,6 +53,8 @@ function player:on_render(cr)
 	stride_aligned = self:togglebutton{id = 'stride_aligned', x = 1200, y = 40, w = 90, h = 24,
 									text = 'stride_aligned', selected = stride_aligned}
 
+	stride_aligned = self:togglebutton{id = 'stride_aligned', x = 1200, y = 40, w = 90, h = 24,
+									text = 'stride_aligned', selected = stride_aligned}
 
 	local cy = 80
 	local cx = 0
@@ -104,6 +106,7 @@ function player:on_render(cr)
 
 		local rendered_once
 		local function render_scan(image, last_scan, scan_number, err)
+
 			--if not last_scan then return end
 			rendered_once = true
 			local w, h = 300, 100

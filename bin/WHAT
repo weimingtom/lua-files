@@ -13,6 +13,7 @@ lanes/core.dll  csrc/lanes
 lfs.dll         csrc/lfs
 libAmanithVG.dll amanithvg 4.0.0.679-eval
 amanithvg.ini    amanithvg 4.0.0.679-eval
+libexif.dll     csrc/libexif
 libfreetype-6.dll csrc/freetype
 libharu.dll     csrc/libharu
 libjpeg.dll     csrc/libjpegturbo

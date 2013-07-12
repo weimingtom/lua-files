@@ -105,6 +105,7 @@ function player:on_render(cr)
 		elseif self.method == 'ordered' then
 			bitmap.dither.ordered(img, self.map)
 		end
+
 		if self.bits < 8 then
 			local c = 0xff-(2^(8-self.bits)-1)
 			local m = (0xff / c)
@@ -116,6 +117,38 @@ function player:on_render(cr)
 					bit.band(a,c) * m
 			end)
 		end
+
+		--[[
+		local filter = {[0] =
+			{[0] = -1, -1, -1},
+			{[0] = 2, 2, 2},
+			{[0] = -1, -1, -1}}
+
+		local function clamp(x) return math.min(math.max(x,0),0xff) end
+		local getpixel, setpixel = bitmap.pixel_interface(img)
+		for y=0,img.h-1 do
+			for x=0,img.w-1 do
+				local r,g,b = 0,0,0
+				for fy=0,#filter do
+					for fx=0,#filter do
+						local r0, g0, b0 = getpixel(
+							(x-(#filter)/2 + fx + img.w) % img.w,
+							(y-(#filter)/2 + fy + img.h) % img.h)
+						local f = filter[fx][fy]
+						r = r + r0 * f
+						g = g + g0 * f
+						b = b + b0 * f
+					end
+				end
+				r,g,b=r/9,g/9,b/9
+				setpixel(x,y,clamp(r),clamp(g),clamp(b))
+			end
+		end
+		]]
+
+		--self.move = (self.move or 0) + 1
+		--img = bitmap.sub(img, self.move, self.move, 400, 400)
+
 		if img.format ~= self.format then
 			img = bitmap.copy(img, self.format, false, true)
 		end

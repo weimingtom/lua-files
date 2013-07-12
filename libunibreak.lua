@@ -1,5 +1,7 @@
+--libunibreak binding
 local ffi = require'ffi'
 
+--linebreak.h and wordbreak.h from libunibreak 1.0
 ffi.cdef[[
 const int linebreak_version;
 
@@ -42,6 +44,7 @@ local M = {C = C}
 C.init_linebreak()
 C.init_wordbreak()
 
+M.version = C.linebreak_version
 M.is_line_breakable = C.is_line_breakable
 
 local function set_breaks_func(set_func, code_size)
@@ -96,33 +99,6 @@ M.len_utf16 = len_func(C.lb_get_next_char_utf16, 2)
 M.len_utf32 = len_func(C.lb_get_next_char_utf32, 4)
 
 
---showcase
-
-if not ... then
-
-local ub = M
-local line_break_names = {[0] = '!', 'Y', 'N', '.'}
-local word_break_names = {[0] = 'Y', 'N', '.'}
-
-print('version', C.linebreak_version)
-print()
-
-local s = 'The quick (“brown”) fox can’t jump 32.3 feet,\xC2\x85right?'
-
-print('len', ub.len_utf8(s))
-print()
-
-for i, c in ub.chars_utf8(s) do
-	print(i, c < 256 and string.char(c) or '', string.format('0x%X', c))
-end
-print()
-
-local line_brks = ub.linebreaks_utf8(s)
-local word_brks = ub.wordbreaks_utf8(s)
-for i=1,#s do
-	print(s:sub(i,i), line_break_names[line_brks[i-1]], word_break_names[word_brks[i-1]])
-end
-
-end
+if not ... then require'libunibreak_demo' end
 
 return M

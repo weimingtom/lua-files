@@ -13,7 +13,7 @@ local function benchmark(s, hash)
 	for i=1,iter do
 		h = hash(key, sz, h)
 	end
-	print(string.format('%s  %f MB/s', s, fps(sz*iter)/sz))
+	print(string.format('%s  %8.2f MB/s', s, fps(sz*iter)/sz))
 end
 
 benchmark('murmurhash3 Lua', require'murmurhash3')
