@@ -1,4 +1,4 @@
---go @ bin/luajit.exe -jv *
+--go @ bin/luajit.exe -e io.stdout:setvbuf'no' -jv *
 local bitmap = require'bitmap'
 local glue = require'glue'
 require'unit'
@@ -11,12 +11,13 @@ for src_format in glue.sortedpairs(bitmap.formats) do
 	print(string.format('%-6s %-4s %-10s %-10s %6s      %-10s',
 			'time', '', 'src', 'dst', 'size', 'stride'))
 
+	jit.flush()
 	for dst_format in bitmap.conversions(src_format) do
 		local src = bitmap.new(1921, 1081, src_format)
 		local dst = bitmap.new(1921, 1081, dst_format, true)
 
 		timediff()
-		for i=1,100 do
+		for i=1,1 do
 			bitmap.convert(src, dst)
 		end
 
@@ -24,5 +25,6 @@ for src_format in glue.sortedpairs(bitmap.formats) do
 		print(string.format('%-6.4f %-4s %-10s %-10s %6.2f MB   %-10s',
 				timediff(), flag, src.format, dst.format, src.size / 1024 / 1024, src.stride))
 	end
+
 end
 

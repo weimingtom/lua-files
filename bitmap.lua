@@ -1,4 +1,4 @@
---go @ bin/luajit.exe -e io.stdout:setvbuf'no' -jv *
+--go@ bin/luajit.exe -e io.stdout:setvbuf'no' *
 --bitmap conversions between different pixel formats, bitmap orientations, strides and bit depths.
 local ffi = require'ffi'
 local bit = require'bit'
@@ -6,13 +6,13 @@ local bit = require'bit'
 --colortypes
 
 local colortypes = {
-	rgba8  = {channels = 'rgba', bpc =  8},
-	rgba16 = {channels = 'rgba', bpc = 16},
-	ga8    = {channels = 'ga',   bpc =  8},
-	ga16   = {channels = 'ga',   bpc = 16},
-	cmyk8  = {channels = 'cmyk', bpc =  8},
-	ycc8   = {channels = 'ycc',  bpc =  8},
-	ycck8  = {channels = 'ycck', bpc =  8},
+	rgba8  = {channels = 'rgba', bpc =  8, max = 0xff},
+	rgba16 = {channels = 'rgba', bpc = 16, max = 0xffff},
+	ga8    = {channels = 'ga',   bpc =  8, max = 0xff},
+	ga16   = {channels = 'ga',   bpc = 16, max = 0xffff},
+	cmyk8  = {channels = 'cmyk', bpc =  8, max = 0xff},
+	ycc8   = {channels = 'ycc',  bpc =  8, max = 0xff},
+	ycck8  = {channels = 'ycck', bpc =  8, max = 0xff},
 }
 
 --pixel formats
@@ -406,7 +406,7 @@ end
 
 local function data_interface(bmp)
 	local format = bitmap_format(bmp)
-	local data = ffi.cast(ffi.typeof('$ *', format.ctype), bmp.data)
+	local data = ffi.cast(ffi.typeof('$ *', ffi.typeof(format.ctype)), bmp.data)
 	local stride = valid_stride(bmp.format, bmp.w, bmp.stride)
 	local stride = stride / ffi.sizeof(format.ctype) --stride is now in units of ctype, not bytes!
 	local pixelsize = format.bpp / 8 / ffi.sizeof(format.ctype) --pixelsize is fractional for < 8bpp formats, that's ok.
@@ -415,32 +415,52 @@ end
 
 --hi-level bitmap interface for random access to pixels
 
-local function pixel_interface(bmp)
+local function direct_pixel_interface(bmp)
 	local format, data, stride, pixelsize = data_interface(bmp)
-	local function getpixel(x, y)
-		return format.read(data, y * stride + x * pixelsize)
-	end
-	local function setpixel(x, y, ...)
-		format.write(data, y * stride + x * pixelsize, ...)
+	local getpixel, setpixel
+	if bmp.bottom_up then
+		function getpixel(x, y)
+			return format.read(data, (bmp.h - y - 1) * stride + x * pixelsize)
+		end
+		function setpixel(x, y, ...)
+			format.write(data, (bmp.h - y - 1) * stride + x * pixelsize, ...)
+		end
+	else
+		function getpixel(x, y)
+			return format.read(data, y * stride + x * pixelsize)
+		end
+		function setpixel(x, y, ...)
+			format.write(data, y * stride + x * pixelsize, ...)
+		end
 	end
 	return getpixel, setpixel
 end
 
---bitmap pixel sweeper
-
-local function eachpixel(bmp, convert)
-	local getpixel, setpixel = pixel_interface(bmp)
-	for y = 0, bmp.h-1 do
-		for x = 0, bmp.w-1 do
-			setpixel(x, y, convert(getpixel(x, y)))
-		end
+local function pixel_interface(bmp, colortype)
+	local format, data, stride, pixelsize = data_interface(bmp)
+	if not colortype or colortype == format.colortype then
+		return direct_pixel_interface(bmp)
 	end
+	local read_pixel  = assert(conv[format.colortype][colortype], 'invalid conversion')
+	local write_pixel = assert(conv[colortype][format.colortype], 'invalid conversion')
+	local direct_getpixel, direct_setpixel = direct_pixel_interface(bmp)
+	local function getpixel(x, y)
+		return read_pixel(direct_getpixel(x, y))
+	end
+	local function setpixel(x, y, ...)
+		direct_setpixel(x, y, write_pixel(...))
+	end
+	return getpixel, setpixel
 end
 
 --bitmap region selector
 
 --given a bitmap and a box, adjust the box to fit the bitmap. if the result is an empty box, return bitmap's box.
 local function fit(bmp, x1, y1, w, h)
+	x1 = x1 or 0
+	y1 = y1 or 0
+	w = w or bmp.w
+	h = h or bmp.h
 	local x2 = x1 + w
 	local y2 = y1 + h
 	--clip points
@@ -594,153 +614,18 @@ local function dumpinfo()
 	end
 end
 
---dithering algorithms
-
-local dither = {}
-
---floyd-steinberg dithering
-
-local function fs_dither_4c(x, maxval, r1, g1, b1, a1, r0, g0, b0, a0)
-	return
-		math.min(r0 + bit.rshift(x * r1, 4), maxval),
-		math.min(g0 + bit.rshift(x * g1, 4), maxval),
-		math.min(b0 + bit.rshift(x * b1, 4), maxval),
-		math.min(a0 + bit.rshift(x * a1, 4), maxval)
-end
-
-function dither.fs(src, rbits, gbits, bbits, abits)
-	local colortype = bitmap_colortype(src)
-	assert(#colortype.channels == 4, 'invalid colortype')
-	local maxbits = colortype.bpc
-	local maxval  = 2^maxbits-1
-	local getpixel, setpixel = pixel_interface(src)
-	local rmask = 2^(maxbits-rbits)-1
-	local gmask = 2^(maxbits-gbits)-1
-	local bmask = 2^(maxbits-bbits)-1
-	local amask = 2^(maxbits-abits)-1
-	for y = 0, src.h-1 do
-		for x = 0, src.w-1 do
-			local r0, g0, b0, a0 = getpixel(x, y)
-			local r1 = bit.band(r0, rmask)
-			local g1 = bit.band(g0, gmask)
-			local b1 = bit.band(b0, bmask)
-			local a1 = bit.band(a0, amask)
-			setpixel(x, y,
-				bit.band(r0, maxval-rmask),
-				bit.band(g0, maxval-gmask),
-				bit.band(b0, maxval-bmask),
-				bit.band(a0, maxval-amask))
-			if x < src.w-1 then
-				setpixel(x+1, y, fs_dither_4c(7, maxval, r1, g1, b1, a1, getpixel(x+1, y)))
-			end
-			if y < src.h-1 and x > 0 then
-				setpixel(x-1, y+1, fs_dither_4c(3, maxval, r1, g1, b1, a1, getpixel(x-1, y+1)))
-			end
-			if y < src.h-1 then
-				setpixel(x, y+1, fs_dither_4c(5, maxval, r1, g1, b1, a1, getpixel(x, y+1)))
-			end
-			if y < src.h-1 and x < src.w-1 then
-				setpixel(x+1, y+1, fs_dither_4c(1, maxval, r1, g1, b1, a1, getpixel(x+1, y+1)))
-			end
-		end
-	end
-end
-
---ordered dithering
-
-local tmap = {[2] = {}, [3] = {}, [4] = {}, [8] = {}} --threshold maps from wikipedia
-
-tmap[2] = {[0] =
-	{[0] = 1, 3},
-	{[0] = 4, 2}}
-
-tmap[3] = {[0] =
-	{[0] = 3, 7, 4},
-	{[0] = 6, 1, 9},
-	{[0] = 2, 8, 5}}
-
-tmap[4] = {[0] =
-	{[0] =  1,  9,  3, 11},
-	{[0] = 13,  5, 15,  7},
-	{[0] =  4, 12,  2, 10},
-	{[0] = 16,  8, 14, 6}}
-
-tmap[8] = {[0] =
-	{[0] =  1, 49, 13, 61,  4, 52, 16, 64},
-	{[0] = 33, 17, 45, 29, 36, 20, 48, 32},
-	{[0] =  9, 57,  5, 53, 12, 60,  8, 56},
-	{[0] = 41, 25, 37, 21, 44, 28, 40, 24},
-	{[0] =  3, 51, 15, 63,  2, 50, 14, 62},
-	{[0] = 35, 19, 47, 31, 34, 18, 46, 30},
-	{[0] = 11, 59,  7, 55, 10, 58,  6, 54},
-	{[0] = 43, 27, 39, 23, 42, 26, 38, 22}}
-
---note: actual clipping of the low bits is not done here, it will be done naturally
---when converting the bitmap to lower bpc.
-local ordered_dither = {}
-
-ordered_dither[4] = function(t, maxval, r, g, b, a)
-	return
-		math.min(r + t, maxval),
-		math.min(g + t, maxval),
-		math.min(b + t, maxval),
-		math.min(a + t, maxval)
-end
-
-ordered_dither[2] = function(t, maxval, g, a)
-	return
-		math.min(g + t, maxval),
-		math.min(a + t, maxval)
-end
-
-function dither.ordered(src, mapsize)
-	local colortype = bitmap_colortype(src)
-	local maxval = 2^colortype.bpc-1
-	local kernel = assert(ordered_dither[#colortype.channels], 'invalid colortype')
-	local getpixel, setpixel = pixel_interface(src)
-	local tmap = assert(tmap[mapsize], 'invalid map size')
-	for y = 0, src.h-1 do
-		local tmap = tmap[bit.band(y, mapsize-1)]
-		for x = 0, src.w-1 do
-			local t = tmap[bit.band(x, mapsize-1)]
-			setpixel(x, y, kernel(t, maxval, getpixel(x, y)))
-		end
-	end
-end
-
---pixel effects
-
-local function invert(bmp)
-	local ct = bitmap_colortype(bmp)
-	assert(#ct.channels == 4)
-	local maxval = 2^ct.bpc-1
-	eachpixel(bmp, function(r, g, b, a)
-		r = maxval-r
-		g = maxval-g
-		b = maxval-b
-		a = maxval-a
-		return r, g, b, a
-	end)
-end
-
-local function grayscale(bmp)
-	local ct = bitmap_colortype(bmp)
-	if ct.channels == 'rgba' then
-		eachpixel(bmp, function(r, g, b, a)
-			g = rgb2g(r, g, b)
-			return g, g, g, a
-		end)
-	elseif ct.channels == 'ga' then
-		--already gray
-	else
-		error('invalid colortype')
-	end
-end
-
 
 if not ... then require'bitmap_demo' end
 
-return {
+local submodules = {
+	dither    = 'bitmap_dither',
+	invert    = 'bitmap_effects',
+	grayscale = 'bitmap_effects',
+	convolve  = 'bitmap_effects',
+	blend     = 'bitmap_blend',
+}
+
+return setmetatable({
 	--format/stride math
 	valid_format = valid_format,
 	aligned_stride = aligned_stride,
@@ -750,6 +635,7 @@ return {
 	format = bitmap_format,
 	stride = bitmap_stride,
 	row_size = bitmap_row_size,
+	colortype = bitmap_colortype,
 	--bitmap operations
 	new = new,
 	convert = convert,
@@ -758,17 +644,18 @@ return {
 	--pixel interface
 	data_interface = data_interface,
 	pixel_interface = pixel_interface,
-	eachpixel = eachpixel,
-	--dithering
-	dither = dither,
-	--pixel effects
-	invert = invert,
-	grayscale = grayscale,
 	--reporting
 	colortypes = colortypes,
 	formats = formats,
 	converters = conv,
 	conversions = conversions,
 	dumpinfo = dumpinfo,
-}
+	--utils
+	rgb2g = rgb2g,
+}, {__index = function(t, k)
+	if submodules[k] then
+		require(submodules[k])
+	end
+	return rawget(t, k)
+end})
 

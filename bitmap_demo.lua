@@ -31,12 +31,16 @@ local function available(src_format, values)
 	return t
 end
 
+local i = 0
 function player:on_render(cr)
+
+	i = (i + 1) % 10
+	if i == 0 then jit.flush() end
 
 	--apply dithering
 
 	self.method = self:mbutton{id = 'method', x = 10, y = 70, w = 190, h = 24,
-										values = {'fs', 'ordered', 'none'}, selected = self.method or 'ordered'}
+										values = {'fs', 'ordered', 'none'}, selected = self.method or 'none'}
 
 	if self.method == 'fs' then
 		local oldrbits = self.rbits
@@ -68,7 +72,7 @@ function player:on_render(cr)
 
 	--convert to dest. format
 
-	self.format = self.format or 'rgba8'
+	self.format = self.format or 'bgra8'
 
 	local v1 = {
 		'rgb8', 'bgr8', 'rgb16', 'bgr16',
@@ -93,29 +97,35 @@ function player:on_render(cr)
 						values = v2, enabled = e2, selected = self.format}
 	self.format = format2 ~= self.format and format2 or format1
 
-	--effects
+	--bitmap
 
-	self.invert = self:togglebutton{id = 'invert', x = 10, y = 260, w = 90, h = 24, text = 'invert', selected = self.invert}
-	self.grayscale = self:togglebutton{id = 'grayscale', x = 10, y = 290, w = 90, h = 24, text = 'grayscale', selected = self.grayscale}
+	self.invert = self:togglebutton{id = 'invert', x = 10, y = 270, w = 90, h = 24, text = 'invert', selected = self.invert}
+	self.grayscale = self:togglebutton{id = 'grayscale', x = 10, y = 300, w = 90, h = 24, text = 'grayscale', selected = self.grayscale}
+	self.sharpen = self:togglebutton{id = 'sharpen', x = 10, y = 330, w = 90, h = 24, text = 'sharpen', selected = self.sharpen}
+	if self.sharpen then
+		self.sharpen_amount = self:slider{id = 'sharpen_amount', x = 10 , y = 360, w = 90, h = 24,
+											i0 = -20, i1 = 20, step = 1, i = self.sharpen_amount or 4, text = 'amount'}
 
+	end
 
 	--finally, perform the conversions and display up the images
 
 	local cx, cy = 210, 70
 	local function show(file)
 
-		local img = load_bmp(file)
+		local bmp = load_bmp(file)
 
 		if self.method == 'fs' then
-			bitmap.dither.fs(img, self.rbits, self.gbits, self.bbits, self.abits)
+			bitmap.dither.fs(bmp, self.rbits, self.gbits, self.bbits, self.abits)
 		elseif self.method == 'ordered' then
-			bitmap.dither.ordered(img, self.map)
+			bitmap.dither.ordered(bmp, self.map)
 		end
 
+		--low-pass filter
 		if self.bits < 8 then
 			local c = 0xff-(2^(8-self.bits)-1)
 			local m = (0xff / c)
-			bitmap.convert(img, img, function(r,g,b,a)
+			bitmap.convert(bmp, bmp, function(r,g,b,a)
 				return
 					bit.band(r,c) * m,
 					bit.band(g,c) * m,
@@ -125,56 +135,43 @@ function player:on_render(cr)
 		end
 
 		if self.invert then
-			bitmap.invert(img)
+			bitmap.invert(bmp)
 		end
 
 		if self.grayscale then
-			bitmap.grayscale(img)
+			bitmap.grayscale(bmp)
 		end
 
-		--[[
-		local filter = {[0] =
-			{[0] = -1, -1, -1},
-			{[0] = 2, 2, 2},
-			{[0] = -1, -1, -1}}
-
-		local function clamp(x) return math.min(math.max(x,0),0xff) end
-		local getpixel, setpixel = bitmap.pixel_interface(img)
-		for y=0,img.h-1 do
-			for x=0,img.w-1 do
-				local r,g,b = 0,0,0
-				for fy=0,#filter do
-					for fx=0,#filter do
-						local r0, g0, b0 = getpixel(
-							(x-(#filter)/2 + fx + img.w) % img.w,
-							(y-(#filter)/2 + fy + img.h) % img.h)
-						local f = filter[fx][fy]
-						r = r + r0 * f
-						g = g + g0 * f
-						b = b + b0 * f
-					end
-				end
-				r,g,b=r/9,g/9,b/9
-				setpixel(x,y,clamp(r),clamp(g),clamp(b))
-			end
-		end
-		]]
-
-		--self.move = (self.move or 0) + 1
-		--img = bitmap.sub(img, self.move, self.move, 400, 400)
-
-		if img.format ~= self.format then
-			img = bitmap.copy(img, self.format, false, true)
+		if self.sharpen then
+			local sharpen = {
+				{0,-1,0},
+				{-1,5,-1},
+				{0,-1,0}}
+			bmp = bitmap.convolve(bmp, sharpen)
 		end
 
-		self:image{x = cx, y = cy, image = img}
-		cx = cx + img.w + 10
+		if true or self.blend then
+			local mask = load_bmp'media/bmp/rgb_24bit.bmp'
+
+			bmp = bitmap.copy(bmp, 'bgra8')
+			mask = bitmap.copy(mask, 'bgra8')
+
+			bitmap.convert(mask, mask, function(r, g, b, a) return r, g, b, 254 end)
+			bitmap.blend(mask, bitmap.sub(bmp, 100, 100), 'src_over')
+		end
+
+		if bmp.format ~= self.format then
+			bmp = bitmap.copy(bmp, self.format, false, true)
+		end
+
+		self:image{x = cx, y = cy, image = bmp}
+		cx = cx + bmp.w + 10
 	end
 
 	show'media/bmp/bg.bmp'
-	show'media/bmp/parrot.bmp'
-	show'media/bmp/rgb_3bit.bmp'
-	show'media/bmp/rgb_24bit.bmp'
+	--show'media/bmp/parrot.bmp'
+	--show'media/bmp/rgb_3bit.bmp'
+	--show'media/bmp/rgb_24bit.bmp'
 
 	if self:keypressed'ctrl' then
 		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
