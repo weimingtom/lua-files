@@ -3,31 +3,27 @@ local bitmap = require'bitmap'
 
 local op = {}
 
-function op.clear    (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max) return 0, 0, 0, 0 end
-function op.src      (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max) return Sr, Sg, Sb, Sa end
-function op.dst      (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max) return Dr, Dg, Db, Da end
+function op.clear (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max) return 0, 0, 0, 0 end
+function op.src   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max) return Sr, Sg, Sb, Sa end
+function op.dst   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max) return Dr, Dg, Db, Da end
 
-local function clip(x, max)
-	return math.min(math.max(x, 0), max)
-end
-
-function op.src_over (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.src_over (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		clip(Sr + (max - Sa) * Dr, max),
-		clip(Sg + (max - Sa) * Dg, max),
-		clip(Sb + (max - Sa) * Db, max),
-		clip(Sa + Da - Sa * Da, max)
-end
-
-function op.dst_over (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
-	return
-		Dr + (max - Da) * Sr,
-		Dg + (max - Da) * Sg,
-		Db + (max - Da) * Sb,
+		Sr + (1 - Sa) * Dr,
+		Sg + (1 - Sa) * Dg,
+		Sb + (1 - Sa) * Db,
 		Sa + Da - Sa * Da
 end
 
-function op.src_in   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.dst_over (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
+	return
+		Dr + (1 - Da) * Sr,
+		Dg + (1 - Da) * Sg,
+		Db + (1 - Da) * Sb,
+		Sa + Da - Sa * Da
+end
+
+function op.src_in (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
 		Sr * Da,
 		Sg * Da,
@@ -35,7 +31,7 @@ function op.src_in   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
 		Sa * Da
 end
 
-function op.dst_in   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.dst_in (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
 		Sa * Dr,
 		Sa * Dg,
@@ -43,63 +39,63 @@ function op.dst_in   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
 		Sa * Da
 end
 
-function op.src_out  (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.src_out (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (max - Dr),
-		Sg * (max - Dg),
-		Sb * (max - Db),
-		Sa * (max - Da)
+		Sr * (1 - Dr),
+		Sg * (1 - Dg),
+		Sb * (1 - Db),
+		Sa * (1 - Da)
 end
 
-function op.dst_out  (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.dst_out (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Dr * (max - Sa),
-		Dg * (max - Sa),
-		Db * (max - Sa),
-		Da * (max - Sa)
+		Dr * (1 - Sa),
+		Dg * (1 - Sa),
+		Db * (1 - Sa),
+		Da * (1 - Sa)
 end
 
-function op.src_atop (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.src_atop (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * Da + (max - Sa) * Dr,
-		Sg * Da + (max - Sa) * Dg,
-		Sb * Da + (max - Sa) * Db,
+		Sr * Da + (1 - Sa) * Dr,
+		Sg * Da + (1 - Sa) * Dg,
+		Sb * Da + (1 - Sa) * Db,
 		Da
 end
 
-function op.dst_atop (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.dst_atop (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sa * Dr + Sr * (max - Da),
-		Sa * Dg + Sg * (max - Da),
-		Sa * Db + Sb * (max - Da),
+		Sa * Dr + Sr * (1 - Da),
+		Sa * Dg + Sg * (1 - Da),
+		Sa * Db + Sb * (1 - Da),
 		Sa
 end
 
-function op.xor      (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.xor (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (max - Da) + (max - Sa) * Dr,
-		Sg * (max - Da) + (max - Sa) * Dg,
-		Sb * (max - Da) + (max - Sa) * Db,
+		Sr * (1 - Da) + (1 - Sa) * Dr,
+		Sg * (1 - Da) + (1 - Sa) * Dg,
+		Sb * (1 - Da) + (1 - Sa) * Db,
 		Sa + Da - 2 * Sa * Da
 end
 
-function op.darken   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.darken (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (max - Da) + Dc * (max - Sa) + math.min(Sr, Dr),
-		Sg * (max - Da) + Dc * (max - Sa) + math.min(Sg, Dg),
-		Sb * (max - Da) + Dc * (max - Sa) + math.min(Sb, Db),
+		Sr * (1 - Da) + Dc * (1 - Sa) + math.min(Sr, Dr),
+		Sg * (1 - Da) + Dc * (1 - Sa) + math.min(Sg, Dg),
+		Sb * (1 - Da) + Dc * (1 - Sa) + math.min(Sb, Db),
 		Sa + Da - Sa * Da
 end
 
-function op.lighten  (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.lighten (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (max - Da) + Dc * (max - Sa) + math.max(Sr, Dr),
-		Sg * (max - Da) + Dc * (max - Sa) + math.max(Sg, Dg),
-		Sb * (max - Da) + Dc * (max - Sa) + math.max(Sb, Db),
+		Sr * (1 - Da) + Dc * (1 - Sa) + math.max(Sr, Dr),
+		Sg * (1 - Da) + Dc * (1 - Sa) + math.max(Sg, Dg),
+		Sb * (1 - Da) + Dc * (1 - Sa) + math.max(Sb, Db),
 		Sa + Da - Sa * Da
 end
 
-function op.modulate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.modulate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
 		Sr * Dr,
 		Sg * Dg,
@@ -107,7 +103,7 @@ function op.modulate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
 		Sa * Da
 end
 
-function op.screen   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
+function op.screen (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
 		Sr + Dr - Sr * Dr,
 		Sg + Dg - Sg * Dg,
@@ -115,8 +111,8 @@ function op.screen   (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
 		Sa + Da - Sa * Da
 end
 
-function op.add      (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
-	Da = math.min(max, Sa + Da)
+function op.add (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
+	Da = math.min(1, Sa + Da)
 	return
 		(Sr + Dr) / Da,
 		(Sg + Dg) / Da,
@@ -124,9 +120,9 @@ function op.add      (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
 		Da
 end
 
-function op.saturate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
-	local Za = math.min(Sa, max - Da)
-	Da = math.min(max, Sa + Da)
+function op.saturate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
+	local Za = math.min(Sa, 1 - Da)
+	Da = math.min(1, Sa + Da)
 	return
 		(Za * Sr + Dr) / Da,
 		(Za * Sg + Dg) / Da,
@@ -134,20 +130,17 @@ function op.saturate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, max)
 		Da
 end
 
+require'bitmap_rgbaf'
+
 function bitmap.blend(src, dst, operator)
-	local src_colortype = bitmap.colortype(src)
-	local dst_colortype = bitmap.colortype(dst)
-	assert(#src_colortype.channels == 4, 'invalid colortype')
-	assert(src_colortype == dst_colortype, 'different colortypes')
 	local operator = assert(op[operator], 'invalid operator')
-	local maxval = src_colortype.max
-	local src_getpixel = bitmap.pixel_interface(src)
-	local dst_getpixel, dst_setpixel = bitmap.pixel_interface(dst)
+	local src_getpixel = bitmap.pixel_interface(src, 'rgbaf')
+	local dst_getpixel, dst_setpixel = bitmap.pixel_interface(dst, 'rgbaf')
 	for y = 0, src.h-1 do
 		for x = 0, src.w-1 do
 			local Sr, Sg, Sb, Sa = src_getpixel(x, y)
 			local Dr, Dg, Db, Da = dst_getpixel(x, y)
-			dst_setpixel(x, y, operator(Sr, Sg, Sb, Sa, Dr, Dg, Db, Da, maxval))
+			dst_setpixel(x, y, operator(Sr, Sg, Sb, Sa, Dr, Dg, Db, Da))
 		end
 	end
 end

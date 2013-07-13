@@ -2,20 +2,31 @@
 local bitmap = require'bitmap'
 local ffi = require'ffi'
 
-bitmap.colortypes.rgbaf = {channels = 'rgba', bpc = 32, max = 1}
+bitmap.colortypes.rgbaf = {channels = 'rgba', max = 1}
 
-bitmap.formats.rgbaf = {bpp = 32, ctype = ffi.typeof'float', colortype = 'rgbaf',
+bitmap.formats.rgbaf = {bpp = 32 * 4, ctype = ffi.typeof'float', colortype = 'rgbaf',
 								read = bitmap.formats.rgba8.read, write = bitmap.formats.rgba8.write}
-bitmap.formats.rgbad = {bpp = 64, ctype = ffi.typeof'double', colortype = 'rgbaf',
+
+bitmap.formats.rgbad = {bpp = 64 * 4, ctype = ffi.typeof'double', colortype = 'rgbaf',
 								read = bitmap.formats.rgba8.read, write = bitmap.formats.rgba8.write}
 
 bitmap.converters.rgbaf = {}
 
-function bitmap.converters.rgbaf.rgba8(r, g, b, a) return r * 255, g * 255, b * 255, a * 255 end
-function bitmap.converters.rgba8.rgbaf(r, g, b, a) return r / 255, g / 255, b / 255, a / 255 end
+function bitmap.converters.rgbaf.rgba8(r, g, b, a)
+	return r * 255, g * 255, b * 255, a * 255
+end
 
-function bitmap.converters.rgbaf.rgba16(r, g, b, a) return r * 65535, g * 65535, b * 65535, a * 65535 end
-function bitmap.converters.rgba16.rgbaf(r, g, b, a) return r / 65535, g / 65535, b / 65535, a / 65535 end
+function bitmap.converters.rgba8.rgbaf(r, g, b, a)
+	return r * (1 / 255), g * (1 / 255), b * (1 / 255), a * (1 / 255)
+end
+
+function bitmap.converters.rgbaf.rgba16(r, g, b, a)
+	return r * 65535, g * 65535, b * 65535, a * 65535
+end
+
+function bitmap.converters.rgba16.rgbaf(r, g, b, a)
+	return r * (1 / 65535), g * (1 / 65535), b * (1 / 65535), a * (1 / 65535)
+end
 
 function bitmap.converters.rgbaf.ga8(r, g, b, a)
 	return bitmap.rgb2g(r, g, b) * 255, a

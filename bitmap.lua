@@ -489,8 +489,9 @@ local function sub(bmp, x, y, w, h)
 	end
 	local i = y * stride + x * pixelsize
 	assert(i == math.floor(i), 'invalid coordinates')
+	local byte_stride = stride * ffi.sizeof(format.ctype)
 	return {w = w, h = h, format = bmp.format, bottom_up = bmp.bottom_up,
-				stride = stride, data = data + i, size = stride * h, parent = bmp}
+				stride = bmp.stride, data = data + i, size = byte_stride * h, parent = bmp}
 end
 
 --bitmap converter
@@ -617,7 +618,7 @@ end
 
 if not ... then require'bitmap_demo' end
 
-local submodules = {
+local autoload = {
 	dither    = 'bitmap_dither',
 	invert    = 'bitmap_effects',
 	grayscale = 'bitmap_effects',
@@ -653,8 +654,8 @@ return setmetatable({
 	--utils
 	rgb2g = rgb2g,
 }, {__index = function(t, k)
-	if submodules[k] then
-		require(submodules[k])
+	if autoload[k] then
+		require(autoload[k])
 	end
 	return rawget(t, k)
 end})

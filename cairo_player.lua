@@ -444,10 +444,10 @@ local autoload = {
 	label = 'label',
 }
 
-setmetatable(player, {__index = function(_, k)
+setmetatable(player, {__index = function(t, k)
 	if autoload[k] then
 		require('cplayer.' .. autoload[k])
-		return player[k]
+		return rawget(t, k)
 	end
 end})
 

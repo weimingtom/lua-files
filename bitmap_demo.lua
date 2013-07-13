@@ -153,10 +153,16 @@ function player:on_render(cr)
 		if true or self.blend then
 			local mask = load_bmp'media/bmp/rgb_24bit.bmp'
 
-			bmp = bitmap.copy(bmp, 'bgra8')
-			mask = bitmap.copy(mask, 'bgra8')
+			--require'bitmap_rgbaf'
+			bmp = bitmap.copy(bmp, 'rgba8')
+			mask = bitmap.copy(mask, 'rgba8')
 
-			bitmap.convert(mask, mask, function(r, g, b, a) return r, g, b, 254 end)
+			self.i = ((self.i or 0) + 0.01) % 1
+			local A = self.i
+			bitmap.convert(mask, mask, function(r, g, b, a)
+				return r * A, g * A, b * A, a * A
+			end)
+
 			bitmap.blend(mask, bitmap.sub(bmp, 100, 100), 'src_over')
 		end
 
