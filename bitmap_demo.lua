@@ -39,27 +39,27 @@ function player:on_render(cr)
 
 	--apply dithering
 
-	self.method = self:mbutton{id = 'method', x = 10, y = 70, w = 190, h = 24,
+	self.method = self:mbutton{id = 'method', x = 10, y = 100, w = 190, h = 24,
 										values = {'fs', 'ordered', 'none'}, selected = self.method or 'none'}
 
 	if self.method == 'fs' then
 		local oldrbits = self.rbits
-		self.rbits = self:slider{id = 'rbits', x = 10 , y = 100, w = 190, h = 24,
+		self.rbits = self:slider{id = 'rbits', x = 10 , y = 130, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.rbits or 4, text = 'r bits'}
 		if oldrbits ~= self.rbits then
 			self.gbits = self.rbits
 			self.bbits = self.rbits
 			self.abits = self.rbits
 		end
-		self.gbits = self:slider{id = 'gbits', x = 10 , y = 130, w = 190, h = 24,
+		self.gbits = self:slider{id = 'gbits', x = 10 , y = 160, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.gbits or 4, text = 'g bits'}
-		self.bbits = self:slider{id = 'bbits', x = 10 , y = 160, w = 190, h = 24,
+		self.bbits = self:slider{id = 'bbits', x = 10 , y = 190, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.bbits or 4, text = 'b bits'}
-		self.abits = self:slider{id = 'abits', x = 10 , y = 190, w = 190, h = 24,
+		self.abits = self:slider{id = 'abits', x = 10 , y = 220, w = 190, h = 24,
 											i0 = 0, i1 = 8, step = 1, i = self.abits or 4, text = 'a bits'}
 
 	elseif self.method == 'ordered' then
-		self.map = self:mbutton{id = 'map', x = 10 , y = 100, w = 190, h = 24,
+		self.map = self:mbutton{id = 'map', x = 10 , y = 130, w = 190, h = 24,
 											values = {2, 3, 4, 8}, selected = self.map or 4}
 
 	end
@@ -67,7 +67,7 @@ function player:on_render(cr)
 	--clip the low bits
 
 	self.bits = self:slider{id = 'bits', x = 10,
-										y = self.method == 'fs' and 220 or self.method == 'ordered' and 130 or 100,
+										y = self.method == 'fs' and 250 or self.method == 'ordered' and 160 or 130,
 										w = 190, h = 24, i0 = 0, i1 = 8, step = 1, i = self.bits or 8, text = 'out bits'}
 
 	--convert to dest. format
@@ -97,7 +97,7 @@ function player:on_render(cr)
 						values = v2, enabled = e2, selected = self.format}
 	self.format = format2 ~= self.format and format2 or format1
 
-	--bitmap
+	--effects
 
 	self.invert = self:togglebutton{id = 'invert', x = 10, y = 270, w = 90, h = 24, text = 'invert', selected = self.invert}
 	self.grayscale = self:togglebutton{id = 'grayscale', x = 10, y = 300, w = 90, h = 24, text = 'grayscale', selected = self.grayscale}
@@ -108,9 +108,15 @@ function player:on_render(cr)
 
 	end
 
+	--blending
+
+	self.blend = self:mbutton{id = 'blend', x = 10, y = 70, w = 990, h = 24,
+										values = glue.extend({'none'}, glue.keys(bitmap.blend_op, true)),
+										selected = self.blend or 'none'}
+
 	--finally, perform the conversions and display up the images
 
-	local cx, cy = 210, 70
+	local cx, cy = 210, 100
 	local function show(file)
 
 		local bmp = load_bmp(file)
@@ -150,7 +156,7 @@ function player:on_render(cr)
 			bmp = bitmap.convolve(bmp, sharpen)
 		end
 
-		if true or self.blend then
+		if self.blend ~= 'none' then
 			local mask = load_bmp'media/bmp/rgb_24bit.bmp'
 
 			--require'bitmap_rgbaf'
@@ -163,7 +169,7 @@ function player:on_render(cr)
 				return r * A, g * A, b * A, a * A
 			end)
 
-			bitmap.blend(mask, bitmap.sub(bmp, 100, 100), 'src_over')
+			bitmap.blend(mask, bitmap.sub(bmp, 100, 100), self.blend)
 		end
 
 		if bmp.format ~= self.format then

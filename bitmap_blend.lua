@@ -82,17 +82,17 @@ end
 
 function op.darken (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (1 - Da) + Dc * (1 - Sa) + math.min(Sr, Dr),
-		Sg * (1 - Da) + Dc * (1 - Sa) + math.min(Sg, Dg),
-		Sb * (1 - Da) + Dc * (1 - Sa) + math.min(Sb, Db),
+		Sr * (1 - Da) + Dr * (1 - Sa) + math.min(Sr, Dr),
+		Sg * (1 - Da) + Dg * (1 - Sa) + math.min(Sg, Dg),
+		Sb * (1 - Da) + Db * (1 - Sa) + math.min(Sb, Db),
 		Sa + Da - Sa * Da
 end
 
 function op.lighten (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (1 - Da) + Dc * (1 - Sa) + math.max(Sr, Dr),
-		Sg * (1 - Da) + Dc * (1 - Sa) + math.max(Sg, Dg),
-		Sb * (1 - Da) + Dc * (1 - Sa) + math.max(Sb, Db),
+		Sr * (1 - Da) + Dr * (1 - Sa) + math.max(Sr, Dr),
+		Sg * (1 - Da) + Dg * (1 - Sa) + math.max(Sg, Dg),
+		Sb * (1 - Da) + Db * (1 - Sa) + math.max(Sb, Db),
 		Sa + Da - Sa * Da
 end
 
@@ -143,6 +143,8 @@ function bitmap.blend(src, dst, operator)
 		end
 	end
 end
+
+bitmap.blend_op = op
 
 
 if not ... then require'bitmap_demo' end

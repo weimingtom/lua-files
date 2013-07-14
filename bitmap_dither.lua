@@ -14,11 +14,11 @@ local function fs_dither_4c(x, maxval, r1, g1, b1, a1, r0, g0, b0, a0)
 end
 
 function bitmap.dither.fs(src, rbits, gbits, bbits, abits)
-	local colortype = bitmap_colortype(src)
+	local colortype = bitmap.colortype(src)
 	assert(#colortype.channels == 4, 'invalid colortype')
 	local maxbits = colortype.bpc
 	local maxval  = colortype.max
-	local getpixel, setpixel = pixel_interface(src)
+	local getpixel, setpixel = bitmap.pixel_interface(src)
 	local rmask = 2^(maxbits-rbits)-1
 	local gmask = 2^(maxbits-gbits)-1
 	local bmask = 2^(maxbits-bbits)-1
@@ -99,10 +99,10 @@ ordered_dither[2] = function(t, maxval, g, a)
 end
 
 function bitmap.dither.ordered(src, mapsize)
-	local colortype = bitmap_colortype(src)
+	local colortype = bitmap.colortype(src)
 	local maxval = colortype.max
 	local kernel = assert(ordered_dither[#colortype.channels], 'invalid colortype')
-	local getpixel, setpixel = pixel_interface(src)
+	local getpixel, setpixel = bitmap.pixel_interface(src)
 	local tmap = assert(tmap[mapsize], 'invalid map size')
 	for y = 0, src.h-1 do
 		local tmap = tmap[bit.band(y, mapsize-1)]

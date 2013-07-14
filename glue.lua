@@ -12,8 +12,16 @@ function glue.index(t)
 	return dt
 end
 
-function glue.keys(t)
-	local dt={} for k in pairs(t) do dt[#dt+1]=k end
+function glue.keys(t, cmp)
+	local dt={}
+	for k in pairs(t) do
+		dt[#dt+1]=k
+	end
+	if cmp == true then
+		sort(dt)
+	elseif cmp then
+		sort(dt, cmp)
+	end
 	return dt
 end
 
@@ -42,8 +50,7 @@ end
 --TODO: document and test this if it's a keeper
 local keys = glue.keys
 function glue.sortedpairs(t, cmp)
-	local kt = keys(t)
-	sort(kt, cmp)
+	local kt = keys(t, cmp)
 	local i = 0
 	return function()
 		i = i + 1

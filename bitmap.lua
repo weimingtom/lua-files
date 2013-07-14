@@ -267,9 +267,7 @@ autoload(formats, {
 
 --converters between different standard colortypes
 
-local module_of_rgbaf = {rgbaf = 'bitmap_rgbaf'}
-local function L(t) return autoload(t, module_of_rgbaf) end
-local conv = L{rgba8 = L{}, rgba16 = L{}, ga8 = L{}, ga16 = L{}, cmyk8 = L{}, ycc8 = L{}, ycck8 = L{}}
+local conv = {rgba8 = {}, rgba16 = {}, ga8 = {}, ga16 = {}, cmyk8 = {}, ycc8 = {}, ycck8 = {}}
 
 function conv.rgba8.rgba16(r, g, b, a)
 	return
@@ -462,6 +460,8 @@ local function pixel_interface(bmp, colortype)
 	if not colortype or colortype == format.colortype then
 		return direct_pixel_interface(bmp)
 	end
+	valid_colortype(format.colortype) --autoload colortypes
+	valid_colortype(colortype)        --autoload colortypes
 	local read_pixel  = assert(conv[format.colortype][colortype], 'invalid conversion')
 	local write_pixel = assert(conv[colortype][format.colortype], 'invalid conversion')
 	local direct_getpixel, direct_setpixel = direct_pixel_interface(bmp)
@@ -595,7 +595,7 @@ local function copy(src, format, bottom_up, stride_aligned, stride)
 	return convert(src, new(src.w, src.h, format, bottom_up, stride_aligned, stride))
 end
 
---bitmap converter reflection/reporting
+--reflection
 
 local function conversions(src_format)
 	src_format = valid_format(src_format)
@@ -658,13 +658,13 @@ return autoload({
 	--pixel interface
 	data_interface = data_interface,
 	pixel_interface = pixel_interface,
-	--reporting
+	--reflection
+	conversions = conversions,
+	dumpinfo = dumpinfo,
+	--extension
 	colortypes = colortypes,
 	formats = formats,
 	converters = conv,
-	conversions = conversions,
-	dumpinfo = dumpinfo,
-	--utils
 	rgb2g = rgb2g,
 }, {
 	dither    = 'bitmap_dither',
@@ -672,5 +672,6 @@ return autoload({
 	grayscale = 'bitmap_effects',
 	convolve  = 'bitmap_effects',
 	blend     = 'bitmap_blend',
+	blend_op  = 'bitmap_blend',
 })
 
