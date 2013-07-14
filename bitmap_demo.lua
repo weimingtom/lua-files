@@ -169,7 +169,7 @@ function player:on_render(cr)
 				return r * A, g * A, b * A, a * A
 			end)
 
-			bitmap.blend(mask, bitmap.sub(bmp, 100, 100), self.blend)
+			bitmap.blend(mask, bmp, self.blend, 100, 100)
 		end
 
 		if bmp.format ~= self.format then

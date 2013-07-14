@@ -131,15 +131,19 @@ function op.saturate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 		Da
 end
 
-function bitmap.blend(src, dst, operator)
+function bitmap.blend(src, dst, operator, x0, y0)
+	x0 = x0 or 0
+	y0 = y0 or 0
+	operator = operator or 'src_over'
 	local operator = assert(op[operator], 'invalid operator')
 	local src_getpixel = bitmap.pixel_interface(src, 'rgbaf')
 	local dst_getpixel, dst_setpixel = bitmap.pixel_interface(dst, 'rgbaf')
-	for y = 0, src.h-1 do
-		for x = 0, src.w-1 do
+	local w, h = select(3, bitmap.fit(dst, x0, y0, src.w, src.h))
+	for y = 0, h-1 do
+		for x = 0, w-1 do
 			local Sr, Sg, Sb, Sa = src_getpixel(x, y)
-			local Dr, Dg, Db, Da = dst_getpixel(x, y)
-			dst_setpixel(x, y, operator(Sr, Sg, Sb, Sa, Dr, Dg, Db, Da))
+			local Dr, Dg, Db, Da = dst_getpixel(x0 + x, y0 + y)
+			dst_setpixel(x0 + x, y0 + y, operator(Sr, Sg, Sb, Sa, Dr, Dg, Db, Da))
 		end
 	end
 end

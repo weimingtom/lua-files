@@ -493,17 +493,14 @@ local function fit(bmp, x1, y1, w, h)
 	if x2 < x1 then x1, x2 = x2, x1 end
 	if y2 < y1 then y1, y2 = y2, y1 end
 	--get dimensions again
-	w = x2 - x1
-	h = y2 - y1
-	if w <= 0 or h <= 0 then
-		return 0, 0, bmp.w, bmp.h
-	else
-		return x1, y1, w, h
-	end
+	w = math.max(x2 - x1, 0)
+	h = math.max(y2 - y1, 0)
+	return x1, y1, w, h
 end
 
 local function sub(bmp, x, y, w, h)
 	x, y, w, h = fit(bmp, x, y, w, h)
+	if w == 0 or h == 0 then return end --can't have dimensionless bitmaps
 	local format, data, stride, pixelsize = data_interface(bmp)
 	if bmp.bottom_up then
 		y = bmp.h - y - h
@@ -666,6 +663,7 @@ return autoload({
 	formats = formats,
 	converters = conv,
 	rgb2g = rgb2g,
+	fit = fit,
 }, {
 	dither    = 'bitmap_dither',
 	invert    = 'bitmap_effects',
