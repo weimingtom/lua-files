@@ -108,12 +108,6 @@ function player:on_render(cr)
 
 	end
 
-	--blending
-
-	self.blend = self:mbutton{id = 'blend', x = 10, y = 70, w = 990, h = 24,
-										values = glue.extend({'none'}, glue.keys(bitmap.blend_op, true)),
-										selected = self.blend or 'none'}
-
 	--finally, perform the conversions and display up the images
 
 	local cx, cy = 210, 100
@@ -149,27 +143,7 @@ function player:on_render(cr)
 		end
 
 		if self.sharpen then
-			local sharpen = {
-				{0,-1,0},
-				{-1,5,-1},
-				{0,-1,0}}
-			bmp = bitmap.convolve(bmp, sharpen)
-		end
-
-		if self.blend ~= 'none' then
-			local mask = load_bmp'media/bmp/rgb_24bit.bmp'
-
-			--require'bitmap_rgbaf'
-			bmp = bitmap.copy(bmp, 'rgba8')
-			mask = bitmap.copy(mask, 'rgba8')
-
-			self.i = ((self.i or 0) + 0.01) % 1
-			local A = self.i
-			bitmap.convert(mask, mask, function(r, g, b, a)
-				return r * A, g * A, b * A, a * A
-			end)
-
-			bitmap.blend(mask, bmp, self.blend, 100, 100)
+			bmp = bitmap.sharpen(bmp, self.sharpen_amount)
 		end
 
 		if bmp.format ~= self.format then

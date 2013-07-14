@@ -53,7 +53,7 @@ local function normalize(kernel)
 end
 
 function bitmap.convolve(bmp, kernel, edge)
-	edge = edge or 'crop'
+	edge = edge or 'extend'
 	local dst = bitmap.new(bmp.w, bmp.h, {
 		ctype = 'int16_t', bpp = 16 * 4,
 		colortype = 'rgba16',
@@ -106,6 +106,15 @@ function bitmap.convolve(bmp, kernel, edge)
 			math.min(math.max(b / sum, 0), 0xff),
 			math.min(math.max(a / sum, 0), 0xff)
 	end)
+end
+
+
+function bitmap.sharpen(bmp, amount)
+	local sharpen = {
+		{0,-1,0},
+		{-1,5,-1},
+		{0,-1,0}}
+	return bitmap.convolve(bmp, sharpen)
 end
 
 

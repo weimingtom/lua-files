@@ -113,7 +113,7 @@ function op.screen (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 end
 
 function op.add (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
-	Da = math.min(1, Sa + Da)
+	Da = math.max(1, Sa + Da)
 	return
 		(Sr + Dr) / Da,
 		(Sg + Dg) / Da,

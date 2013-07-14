@@ -669,6 +669,7 @@ return autoload({
 	invert    = 'bitmap_effects',
 	grayscale = 'bitmap_effects',
 	convolve  = 'bitmap_effects',
+	sharpen   = 'bitmap_effects',
 	blend     = 'bitmap_blend',
 	blend_op  = 'bitmap_blend',
 })
