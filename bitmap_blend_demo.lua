@@ -17,6 +17,16 @@ function player:on_render(cr)
 	i = (i + 1) % 10
 	if i == 0 then jit.flush() end
 
+	--background: grid
+	local sz = 30
+	for y=0,self.h/sz do
+		for x=0,self.w/sz do
+			cr:rectangle(x * sz, y * sz, sz, sz)
+			cr:set_source_rgba(1, 1, 1, 0.03 * ((x + y % 2) % 2))
+			cr:fill()
+		end
+	end
+
 	local function blend(x, y, op)
 		local src = bitmap_cairo(100, 100)
 		local dst = bitmap_cairo(100, 100)
@@ -26,7 +36,7 @@ function player:on_render(cr)
 		scr:move_to(25, 25)
 		scr:line_to(75, 50)
 		scr:line_to(50, 75)
-		scr:set_source_rgba(1, 0, 0, 1)
+		scr:set_source_rgba(1, 0.4, 0, 1)
 		scr:fill()
 
 		--dest: the "&" character
@@ -34,7 +44,7 @@ function player:on_render(cr)
 		dcr:move_to(30, 70)
 		dcr:set_font_size(60)
 		dcr:text_path('&')
-		dcr:set_source_rgba(0, 0.6, 1, 1)
+		dcr:set_source_rgba(0, 0.4, 1, 1)
 		dcr:fill()
 
 		bitmap.blend(src.bitmap, dst.bitmap, op)

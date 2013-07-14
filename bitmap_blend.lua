@@ -90,10 +90,10 @@ end
 
 function op.lighten (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	return
-		Sr * (1 - Da) + Dr * (1 - Sa) + math.max(Sr, Dr),
-		Sg * (1 - Da) + Dg * (1 - Sa) + math.max(Sg, Dg),
-		Sb * (1 - Da) + Db * (1 - Sa) + math.max(Sb, Db),
-		Sa + Da - Sa * Da
+		math.min(math.max(Sr * (1 - Da) + Dr * (1 - Sa) + math.max(Sr, Dr), 0), 1),
+		math.min(math.max(Sg * (1 - Da) + Dg * (1 - Sa) + math.max(Sg, Dg), 0), 1),
+		math.min(math.max(Sb * (1 - Da) + Db * (1 - Sa) + math.max(Sb, Db), 0), 1),
+		math.min(math.max(Sa + Da - Sa * Da, 0), 1)
 end
 
 function op.modulate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
@@ -151,5 +151,5 @@ end
 bitmap.blend_op = op
 
 
-if not ... then require'bitmap_demo' end
+if not ... then require'bitmap_blend_demo' end
 
