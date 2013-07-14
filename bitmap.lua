@@ -3,9 +3,20 @@
 local ffi = require'ffi'
 local bit = require'bit'
 
+--module autoloader
+
+local function autoload(t, module_of)
+	return setmetatable(t, {__index = function(t, k)
+		if module_of[k] then
+			require(module_of[k])
+		end
+		return rawget(t, k)
+	end})
+end
+
 --colortypes
 
-local colortypes = {
+local colortypes = autoload({
 	rgba8  = {channels = 'rgba', bpc =  8, max = 0xff},
 	rgba16 = {channels = 'rgba', bpc = 16, max = 0xffff},
 	ga8    = {channels = 'ga',   bpc =  8, max = 0xff},
@@ -13,7 +24,9 @@ local colortypes = {
 	cmyk8  = {channels = 'cmyk', bpc =  8, max = 0xff},
 	ycc8   = {channels = 'ycc',  bpc =  8, max = 0xff},
 	ycck8  = {channels = 'ycck', bpc =  8, max = 0xff},
-}
+}, {
+	rgbaf = 'bitmap_rgbaf',
+})
 
 --pixel formats
 
@@ -246,9 +259,17 @@ end
 formats.ycc8 = format(24, 'uint8_t', 'ycc8', formats.rgb8.read, formats.rgb8.write)
 formats.ycck8 = format(32, 'uint8_t', 'ycck8', formats.rgba8.read, formats.rgba8.write)
 
+--formats from other submodules
+autoload(formats, {
+	rgbaf = 'bitmap_rgbaf',
+	rgbad = 'bitmap_rgbaf',
+})
+
 --converters between different standard colortypes
 
-local conv = {rgba8 = {}, rgba16 = {}, ga8 = {}, ga16 = {}, cmyk8 = {}, ycc8 = {}, ycck8 = {}}
+local module_of_rgbaf = {rgbaf = 'bitmap_rgbaf'}
+local function L(t) return autoload(t, module_of_rgbaf) end
+local conv = L{rgba8 = L{}, rgba16 = L{}, ga8 = L{}, ga16 = L{}, cmyk8 = L{}, ycc8 = L{}, ycck8 = L{}}
 
 function conv.rgba8.rgba16(r, g, b, a)
 	return
@@ -618,15 +639,7 @@ end
 
 if not ... then require'bitmap_demo' end
 
-local autoload = {
-	dither    = 'bitmap_dither',
-	invert    = 'bitmap_effects',
-	grayscale = 'bitmap_effects',
-	convolve  = 'bitmap_effects',
-	blend     = 'bitmap_blend',
-}
-
-return setmetatable({
+return autoload({
 	--format/stride math
 	valid_format = valid_format,
 	aligned_stride = aligned_stride,
@@ -653,10 +666,11 @@ return setmetatable({
 	dumpinfo = dumpinfo,
 	--utils
 	rgb2g = rgb2g,
-}, {__index = function(t, k)
-	if autoload[k] then
-		require(autoload[k])
-	end
-	return rawget(t, k)
-end})
+}, {
+	dither    = 'bitmap_dither',
+	invert    = 'bitmap_effects',
+	grayscale = 'bitmap_effects',
+	convolve  = 'bitmap_effects',
+	blend     = 'bitmap_blend',
+})
 

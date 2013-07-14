@@ -1,4 +1,5 @@
---bitmap blending submodule. loaded automatically on-demand by the bitmap module.
+--bitmap porter-duff blending submodule. loaded automatically on-demand by the bitmap module.
+--TODO: should I bother implementing an integer-only fast variant for 8bpc rgba types?
 local bitmap = require'bitmap'
 
 local op = {}
@@ -130,8 +131,6 @@ function op.saturate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 		Da
 end
 
-require'bitmap_rgbaf'
-
 function bitmap.blend(src, dst, operator)
 	local operator = assert(op[operator], 'invalid operator')
 	local src_getpixel = bitmap.pixel_interface(src, 'rgbaf')
@@ -144,4 +143,7 @@ function bitmap.blend(src, dst, operator)
 		end
 	end
 end
+
+
+if not ... then require'bitmap_demo' end
 

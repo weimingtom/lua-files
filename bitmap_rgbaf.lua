@@ -60,4 +60,5 @@ function bitmap.converters.ycck8.rgbaf(y, cb, cr, k)
 		1
 end
 
+
 if not ... then require'bitmap_demo' end
