@@ -6,8 +6,6 @@ local arc = require'path_arc'
 local bezier2 = require'path_bezier2'
 local bezier3 = require'path_bezier3'
 local svgarc = require'path_svgarc'
-bezier3.hit = require'path_bezier3_hit'
-bezier2.hit = require'path_bezier2_hit'
 local cairo = require'cairo'
 
 local i = 0

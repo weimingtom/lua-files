@@ -2,6 +2,7 @@
 --where (x2, y2) and (x3, y3) are the control points and (x1, y1) and (x4, y4) are the end points.
 
 local length_function = require'path_bezier_length'
+local glue = require'glue' --autoload
 
 local min, max, sqrt = math.min, math.max, math.sqrt
 
@@ -110,12 +111,15 @@ end
 
 if not ... then require'path_hit_demo' end
 
-return {
+return glue.autoload({
 	bounding_box = bounding_box,
 	to_bezier2 = to_bezier2,
 	--hit & split API
 	point = point,
 	length = length,
 	split = split,
-}
+}, {
+	hit = 'path_bezier3_hit',
+	interpolate = 'path_bezier3_ai',
+})
 

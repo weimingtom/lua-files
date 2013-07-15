@@ -148,8 +148,8 @@ function player:window(t)
 		visible = false,
 		x = t.x or 100,
 		y = t.y or 100,
-		w = t.w or 1200,
-		h = t.h or 600,
+		w = t.w or 1300,
+		h = t.h or 700,
 	}
 
 	self.window = window --needed by filebox

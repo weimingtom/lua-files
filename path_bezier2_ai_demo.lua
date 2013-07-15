@@ -1,5 +1,5 @@
 local player = require'cairo_player'
-local bezier2 = require'path_bezier2_ai'
+local bezier2 = require'path_bezier2'
 local glue = require'glue'
 
 local scale = 1
@@ -31,7 +31,7 @@ function player:on_render(cr)
 		dots = {}
 		cr:move_to(cpx,cpy)
 		glue.append(dots, cpx, cpy)
-		bezier2(write, cpx, cpy, x2, y2, x3, y3, scale)
+		bezier2.interpolate(write, cpx, cpy, x2, y2, x3, y3, scale)
 		cr:set_source_rgb(1,1,1)
 		cr:set_line_width(2)
 		cr:stroke()

@@ -1,15 +1,25 @@
 --finding the nearest-point on a quad bezier curve using closed form (3rd degree equation) solution.
 --solution from http://blog.gludion.com/2009/08/distance-to-quadratic-bezier-curve.html adapted by Cosmin Apreutesei.
 
+local bezier2 = require'path_bezier2'
 local solve_equation3 = require'math_eq3'
 local distance2 = require'path_point'.distance2
-local point = require'path_bezier2'.point
+local point = bezier2.point
 
-local test_solution --forward decl.
+local function test_solution(mind, minx, miny, mint, t, x0, y0, x1, y1, x2, y2, x3, y3)
+	if t and t >= 0 and t <= 1 then
+		local x, y = point(t, x1, y1, x2, y2, x3, y3)
+		local d = distance2(x0, y0, x, y)
+		if d < mind then
+			mind, minx, miny, mint = d, x, y, t
+		end
+	end
+	return mind, minx, miny, mint
+end
 
 --shortest distance-squared from point (x0, y0) to a quad bezier curve, plus the touch point,
 --and the parametric value t on the curve where the touch point splits the curve.
-local function hit(x0, y0, x1, y1, x2, y2, x3, y3)
+function bezier2.hit(x0, y0, x1, y1, x2, y2, x3, y3)
 	local Ax, Ay = x2 - x1, y2 - y1                  --A = P2-P1
 	local Bx, By = x3 - x2 - Ax, y3 - y2 - Ay        --B = P3-P2-A, also P3-2*P2+P1
 	local Mx, My = x1 - x0, y1 - y0                  --M = P1-P0
@@ -39,18 +49,5 @@ local function hit(x0, y0, x1, y1, x2, y2, x3, y3)
 	return mind, minx, miny, mint
 end
 
-function test_solution(mind, minx, miny, mint, t, x0, y0, x1, y1, x2, y2, x3, y3)
-	if t and t >= 0 and t <= 1 then
-		local x, y = point(t, x1, y1, x2, y2, x3, y3)
-		local d = distance2(x0, y0, x, y)
-		if d < mind then
-			mind, minx, miny, mint = d, x, y, t
-		end
-	end
-	return mind, minx, miny, mint
-end
-
 if not ... then require'path_hit_demo' end
-
-return hit
 

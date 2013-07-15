@@ -1,8 +1,8 @@
 --finding the nearest-point on a cubic bezier curve.
 --solution from Graphics Gems (NearestPoint.c) adapted by Cosmin Apreutesei.
 
+local bezier3 = require'path_bezier3'
 local distance2 = require'path_point'.distance2
-local bezier3_point = require'path_bezier3'.point
 
 local min, max = math.min, math.max
 
@@ -18,7 +18,7 @@ local bezier5_split_in_half
 
 --shortest distance-squared from point (x0, y0) to a cubic bezier curve, plus the touch point,
 --and the parametric value t on the curve where the touch point splits the curve.
-local function bezier3_hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
+function bezier3.hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 	--convert problem to 5th-degree Bezier form
 	local ax1, ay1, ax2, ay2, ax3, ay3, ax4, ay4, ax5, ay5, ax6, ay6 =
 		bezier3_to_bezier5(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
@@ -28,7 +28,7 @@ local function bezier3_hit(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4)
 	--find all roots in [0, 1] interval for the 5th-degree equation and see which has the shortest distance.
 	local function test_solution(t)
 		assert(t >= 0 and t <= 1)
-		local x, y = bezier3_point(t, x1, y1, x2, y2, x3, y3, x4, y4)
+		local x, y = bezier3.point(t, x1, y1, x2, y2, x3, y3, x4, y4)
 		local d = distance2(x0, y0, x, y)
 		if d < mind then
 			mind, minx, miny, mint = d, x, y, t
@@ -236,7 +236,6 @@ function bezier5_xintercept(x1, y1, x6, y6)
 	return X
 end
 
-if not ... then require'path_bezier3_hit_test' end
 
-return bezier3_hit
+if not ... then require'path_bezier3_hit_test' end
 

@@ -634,7 +634,8 @@ for s,simplify_nt in pairs(simplify_no_transform) do
 			--if composite commands could have written other types of commands, we would not have had this branch.
 			simplify_nt(write, ...)
 		else
-			--composite commands don't need a state to start with, and they don't leave any state behind.
+			--we use simplification only to transform the points, we know we're only dealing with simple commands.
+			--note: composite commands don't need a state to start with, and they don't leave any state behind.
 			--we can't access the initial state from here anyway, and we can't return the final state either.
 			local decoder = command_decoder(simplify_processor, write, mt)
 			simplify_nt(decoder, ...)

@@ -3,6 +3,7 @@
 
 local distance = require'path_point'.distance
 local length_function = require'path_bezier_length'
+local glue = require'glue' --autoload
 
 local min, max, sqrt, log = math.min, math.max, math.sqrt, math.log
 
@@ -109,7 +110,7 @@ end
 
 if not ... then require'path_hit_demo' end
 
-return {
+return glue.autoload({
 	bounding_box = bounding_box,
 	to_bezier3 = to_bezier3,
 	_3point_control_point = _3point_control_point,
@@ -117,5 +118,8 @@ return {
 	point = point,
 	length = length,
 	split = split,
-}
+}, {
+	hit = 'path_bezier2_hit',
+	interpolate = 'path_bezier2_ai',
+})
 

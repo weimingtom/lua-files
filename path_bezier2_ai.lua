@@ -1,6 +1,8 @@
 --2d quadratic bezier adaptive interpolation from AGG.
 --adapted from http://www.antigrain.com/research/adaptive_bezier/index.html by Cosmin Apreutesei.
 
+local bezier2 = require'path_bezier2'
+
 local pi, atan2, abs = math.pi, math.atan2, math.abs
 
 local curve_collinearity_epsilon    = 1e-30
@@ -11,7 +13,7 @@ local recursive_bezier --forward decl.
 
 --tip: adjust m_approximation_scale to the scale of the world-to-screen transformation.
 --tip: enable m_angle_tolerance when stroke width * scale > 1.
-local function interpolate(write, x1, y1, x2, y2, x3, y3, m_approximation_scale, m_angle_tolerance)
+function bezier2.interpolate(write, x1, y1, x2, y2, x3, y3, m_approximation_scale, m_angle_tolerance)
 	m_approximation_scale = m_approximation_scale or 1
 	m_angle_tolerance = m_angle_tolerance or 0
 	local m_distance_tolerance2 = (1 / (2 * m_approximation_scale))^2
@@ -69,6 +71,4 @@ function recursive_bezier(write, x1, y1, x2, y2, x3, y3, level, m_distance_toler
 end
 
 if not ... then require'path_bezier2_ai_demo' end
-
-return interpolate
 

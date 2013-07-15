@@ -290,6 +290,19 @@ function glue.fcall(f,...)
 	return assert(fpcall(f,...))
 end
 
+function glue.autoload(t, module_of)
+	local mt = getmetatable(t) or {}
+	assert(not mt.__index, '__index alread assigned')
+	mt.__index = function(t, k)
+		if module_of[k] then
+			require(module_of[k])
+		end
+		return rawget(t, k)
+	end
+	return setmetatable(t, mt)
+end
+
+
 if not ... then require'glue_test' end
 
 return glue

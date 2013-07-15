@@ -2,21 +2,11 @@
 --bitmap conversions between different pixel formats, bitmap orientations, strides and bit depths.
 local ffi = require'ffi'
 local bit = require'bit'
-
---module autoloader
-
-local function autoload(t, module_of)
-	return setmetatable(t, {__index = function(t, k)
-		if module_of[k] then
-			require(module_of[k])
-		end
-		return rawget(t, k)
-	end})
-end
+local glue = require'glue'
 
 --colortypes
 
-local colortypes = autoload({
+local colortypes = glue.autoload({
 	rgba8  = {channels = 'rgba', bpc =  8, max = 0xff},
 	rgba16 = {channels = 'rgba', bpc = 16, max = 0xffff},
 	ga8    = {channels = 'ga',   bpc =  8, max = 0xff},
@@ -260,7 +250,7 @@ formats.ycc8 = format(24, 'uint8_t', 'ycc8', formats.rgb8.read, formats.rgb8.wri
 formats.ycck8 = format(32, 'uint8_t', 'ycck8', formats.rgba8.read, formats.rgba8.write)
 
 --formats from other submodules
-autoload(formats, {
+glue.autoload(formats, {
 	rgbaf = 'bitmap_rgbaf',
 	rgbad = 'bitmap_rgbaf',
 })
@@ -636,7 +626,7 @@ end
 
 if not ... then require'bitmap_demo' end
 
-return autoload({
+return glue.autoload({
 	--format/stride math
 	valid_format = valid_format,
 	aligned_stride = aligned_stride,
