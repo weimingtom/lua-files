@@ -22,7 +22,7 @@ function player:on_render(cr)
 	for y=0,self.h/sz do
 		for x=0,self.w/sz do
 			cr:rectangle(x * sz, y * sz, sz, sz)
-			cr:set_source_rgba(1, 1, 1, 0.03 * ((x + y % 2) % 2))
+			cr:set_source_rgba(1, 1, 1, 0.1 * ((x + y % 2) % 2))
 			cr:fill()
 		end
 	end

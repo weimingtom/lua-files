@@ -113,21 +113,23 @@ function op.screen (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 end
 
 function op.add (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
-	Da = math.max(1, Sa + Da)
+	Da = math.min(1, Sa + Da)
+	local mDa = 1 / Da
 	return
-		(Sr + Dr) / Da,
-		(Sg + Dg) / Da,
-		(Sb + Db) / Da,
+		(Sr + Dr) * mDa,
+		(Sg + Dg) * mDa,
+		(Sb + Db) * mDa,
 		Da
 end
 
 function op.saturate (Sr, Sg, Sb, Sa, Dr, Dg, Db, Da)
 	local Za = math.min(Sa, 1 - Da)
 	Da = math.min(1, Sa + Da)
+	local mDa = 1 / Da
 	return
-		(Za * Sr + Dr) / Da,
-		(Za * Sg + Dg) / Da,
-		(Za * Sb + Db) / Da,
+		(Za * Sr + Dr) * mDa,
+		(Za * Sg + Dg) * mDa,
+		(Za * Sb + Db) * mDa,
 		Da
 end
 
