@@ -3,7 +3,7 @@
 --svg-style elliptical arcs, text, and many composite shapes.
 --supports affine transforms, bounding box, length, shortest-distance-to-point, splitting, editing, etc.
 
-local glue = require'glue'
+local glue = require'glue' --update, shift, index, append
 
 local reflect_point                = require'path_point'.reflect_point
 local reflect_point_distance       = require'path_point'.reflect_point_distance

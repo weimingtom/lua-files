@@ -22,6 +22,6 @@ local function solve_equation2(a, b, c, epsilon)
 	end
 end
 
-if not ... then require'math_eq2_test' end
+if not ... then require'eq2_test' end
 
 return solve_equation2

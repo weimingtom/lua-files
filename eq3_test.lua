@@ -1,4 +1,4 @@
-local solve_equation3 = require'math_eq3'
+local solve_equation3 = require'eq3'
 
 local pformat = require'pp'.pformat
 local function assert_approx(a,b)

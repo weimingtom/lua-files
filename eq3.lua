@@ -2,7 +2,7 @@
 --epsilon controls the precision of the solver.
 --TODO: review this code for catastrophic cancelations and alike.
 
-local solve_equation2 = require'math_eq2'
+local solve_equation2 = require'eq2'
 
 local abs, sqrt, acos, cos, pi = math.abs, math.sqrt, math.acos, math.cos, math.pi
 
@@ -46,7 +46,7 @@ local function solve_equation3(a, b, c, d, epsilon)
 	end
 end
 
-if not ... then require'math_eq3_test' end
+if not ... then require'eq3_test' end
 
 return solve_equation3
 
