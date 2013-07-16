@@ -1,4 +1,5 @@
 local player = require'cairo_player'
+local arc = require'path_arc'
 local svgarc = require'path_svgarc'
 local matrix = require'affine2d'
 
@@ -37,12 +38,14 @@ function player:on_render(cr)
 		cr:curve_to(x2, y2, x3, y3, x4, y4)
 	end
 
-	local world_center_x, world_center_y = 500, 400
+	local world_center_x, world_center_y = 600, 300
 	local mt = matrix():rotate_around(world_center_x, world_center_y, world_rotation)
 
-	local function arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, r, g, b, a)
+	local function draw(x1, y1, rx, ry, rotation, large, sweep, x2, y2, r, g, b, a)
+		if not svgarc.valid(x1, y1, x2, y2, rx, ry) then return end
+
 		cr:move_to(mt(x1, y1))
-		svgarc.to_bezier3(write, x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt)
+		arc.to_bezier3(write, svgarc.to_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt))
 		cr:set_source_rgba(r, g, b, a)
 		cr:stroke()
 	end
@@ -52,10 +55,9 @@ function player:on_render(cr)
 	local x0, y0 = cr:device_to_user(self.mousex or 0, self.mousey or 0)
 	local mind, minx, miny, mint
 	local function hit(x1, y1, rx, ry, rotation, large, sweep, x2, y2)
+		if not svgarc.valid(x1, y1, x2, y2, rx, ry) then return end
 
-		--arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, 1, 1, 1, 1)
-
-		local d, x, y, t = svgarc.hit(x0, y0, x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt)
+		local d, x, y, t = arc.hit(x0, y0, svgarc.to_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt))
 		if not mind or d < mind then
 			mind, minx, miny, mint = d, x, y, t
 		end
@@ -65,14 +67,14 @@ function player:on_render(cr)
 			x21, y21, rx2, ry2, rotation2, large2, sweep2, x22, y22 =
 				svgarc.split(t, x1, y1, rx, ry, rotation, large, sweep, x2, y2)
 
-		arc(x11, y11, rx1, ry1, rotation1, large1, sweep1, x12, y12, 1, 0, 0, 1)
-		arc(x21, y21, rx2, ry2, rotation2, large2, sweep2, x22, y22, 0.3, 0.3, 1, 1)
+		draw(x11, y11, rx1, ry1, rotation1, large1, sweep1, x12, y12, 1, 0, 0, 1)
+		draw(x21, y21, rx2, ry2, rotation2, large2, sweep2, x22, y22, 0.3, 0.3, 1, 1)
 	end
 
-	--the four svg elliptical arcs from http://www.w3.org/TR/SVG/images/paths/arcs02.svg
+	--the four svg elliptic arcs from http://www.w3.org/TR/SVG/images/paths/arcs02.svg
 	local function ellipses(tx, ty, large, sweep)
 		local x1, y1, rx, ry, x2, y2 = tx+125, ty+75, 100, 50, tx+125+100, ty+75+50
-		local cx, cy, crx, cry = svgarc.to_elliptic_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt)
+		local cx, cy, crx, cry = svgarc.to_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt)
 
 		local cmt = cr:get_matrix()
 		cr:rotate_around(world_center_x, world_center_y, math.rad(world_rotation))
@@ -86,16 +88,16 @@ function player:on_render(cr)
 
 		hit(x1, y1, rx, ry, rotation, large, sweep, x2, y2)
 	end
-	ellipses(0, 200, 0, 0)
-	ellipses(400, 200, 0, 1)
-	ellipses(400, 500, 1, 0)
-	ellipses(0, 500, 1, 1)
+	ellipses(200, 100, 0, 0)
+	ellipses(600, 100, 0, 1)
+	ellipses(600, 400, 1, 0)
+	ellipses(200, 400, 1, 1)
 
 	--degenerate arcs
 	hit(700, 100, 100, 0, 0, 0, 0, 800, 200) --zero radius
 	hit(800, 100, 100, 100, 0, 0, 0, 800, 100) --conincident endpoints
 
-	--final hit point
+	--closest hit point
 	cr:set_line_width(1)
 	cr:set_source_rgb(1,1,1)
 	cr:circle(minx, miny, 5)

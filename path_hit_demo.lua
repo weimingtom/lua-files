@@ -1,3 +1,4 @@
+--demo hit testing, length and split for lines, circular arcs, beizer2, bezier3.
 local player = require'cairo_player'
 local glue = require'glue'
 local distance2 = require'path_point'.distance2
@@ -5,7 +6,6 @@ local line = require'path_line'
 local arc = require'path_arc'
 local bezier2 = require'path_bezier2'
 local bezier3 = require'path_bezier3'
-local svgarc = require'path_svgarc'
 local cairo = require'cairo'
 
 local i = 0
@@ -76,18 +76,18 @@ function player:on_render(cr)
 	end
 
 	local function arc_hit(cx,cy,r,a1,a2)
-		local x1,y1,x2,y2 = arc.endpoints(cx,cy,r,a1,a2)
-		cr:rectangle(arc.bounding_box(cx,cy,r,a1,a2)); stroke('#666666')
+		local x1,y1,x2,y2 = arc.endpoints(cx,cy,r,r,a1,a2)
+		cr:rectangle(arc.bounding_box(cx,cy,r,r,a1,a2)); stroke('#666666')
 		draw_arc(cx,cy,r,a1,a2)
-		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,a1,a2)
-		glue.append(dists,d,x,y,t,arc.point(t,cx,cy,r,a1,a2))
+		local d,x,y,t = arc.hit(x0,y0,cx,cy,r,r,a1,a2)
+		glue.append(dists,d,x,y,t,arc.point(t,cx,cy,r,r,a1,a2))
 
-		local acx,acy,ar,aa1,aa2, bcx,bcy,br,ba1,ba2 =
-			arc.split(t,cx,cy,r,a1,a2)
+		local acx,acy,ar,ar,aa1,aa2,_, bcx,bcy,br,br,ba1,ba2 =
+			arc.split(t,cx,cy,r,r,a1,a2)
 		draw_arc(acx,acy,ar,aa1,aa2,'#ff000060',10)
 		draw_arc(bcx,bcy,br,ba1,ba2,'#0000ff60',10)
 
-		lens[#dists] = arc.length(t, cx,cy,r,a1,a2)
+		lens[#dists] = arc.length(t, cx,cy,r,r,a1,a2)
 	end
 
 	local function draw_bezier2(x1,y1,x2,y2,x3,y3,color,width)

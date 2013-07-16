@@ -27,6 +27,8 @@ local function to_circle(x1, y1, x2, y2, x3, y3)
 	return cx, cy, distance(cx, cy, x1, y1)
 end
 
+if not ... then require'path_circle_3p_demo' end
+
 return {
 	to_circle = to_circle,
 }

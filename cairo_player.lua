@@ -337,8 +337,15 @@ end
 
 --theme-aware api
 
+local function hexcolor(s)
+	if s:sub(1,1) ~= '#' then return end
+	local r,g,b,a = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16),
+						 tonumber(s:sub(6,7), 16), tonumber(s:sub(8,9), 16) or 255
+	return {r/255, g/255, b/255, a/255}
+end
+
 function player:setcolor(color)
-	color = assert(self.theme[color], 'invalid color')
+	color = assert(self.theme[color] or hexcolor(color), 'invalid color')
 	self.cr:set_source_rgba(unpack(color))
 end
 
@@ -442,6 +449,7 @@ local autoload = {
 	hsplitter = 'splitter',
 	image = 'image',
 	label = 'label',
+	dragpoint = 'dragpoint',
 }
 
 setmetatable(player, {__index = function(t, k)

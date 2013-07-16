@@ -8,10 +8,9 @@ local glue = require'glue' --update, shift, index, append
 local reflect_point                = require'path_point'.reflect_point
 local reflect_point_distance       = require'path_point'.reflect_point_distance
 local bezier2_3point_control_point = require'path_bezier2'._3point_control_point
+local arc_endpoints                = require'path_arc'.endpoints
 local arc_tangent_vector           = require'path_arc'.tangent_vector
-local elliptic_arc_endpoints       = require'path_elliptic_arc'.endpoints
-local elliptic_arc_tangent_vector  = require'path_elliptic_arc'.tangent_vector
-local svgarc_to_elliptic_arc       = require'path_svgarc'.to_elliptic_arc
+local svgarc_to_arc                = require'path_svgarc'.to_arc
 local arc3p_to_arc                 = require'path_arc_3p'.to_arc
 local circle_3p_to_circle          = require'path_circle_3p'.to_circle
 
@@ -301,14 +300,14 @@ local function next_cp(cpx, cpy, spx, spy, s, ...)
 		cpx, cpy = select(2, ...)
 	elseif s == 'arc' then
 		local cx, cy, r, start_angle, sweep_angle = ...
-		spx, spy, cpx, cpy = elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle)
+		spx, spy, cpx, cpy = arc_endpoints(cx, cy, r, r, start_angle, sweep_angle)
 	elseif s == 'line_arc' then
 		local cx, cy, r, start_angle, sweep_angle = ...
-		cpx, cpy = select(3, elliptic_arc_endpoints(cx, cy, r, r, start_angle, sweep_angle))
+		cpx, cpy = select(3, arc_endpoints(cx, cy, r, r, start_angle, sweep_angle))
 	elseif s == 'elliptic_arc' then
-		spx, spy, cpx, cpy = elliptic_arc_endpoints(...)
+		spx, spy, cpx, cpy = arc_endpoints(...)
 	elseif s == 'line_elliptic_arc' then
-		cpx, cpy = select(3, elliptic_arc_endpoints(...))
+		cpx, cpy = select(3, arc_endpoints(...))
 	elseif s == 'arc_3p' then
 		cpx, cpy = select(3, ...)
 	elseif s == 'svgarc' then
@@ -339,7 +338,7 @@ end
 --tkind is 'quad', 'cubic' or 'tangent'. a symm_curve can only use a cubic tip, a symm_quad_curve can only use a quad tip.
 --smooth curves can use any kind of tip as they only use the vector's angle, neverminding its length.
 --all (and only) commands that leave a current point leave a tangent point, except 'move'.
---TODO: svgarc_to_elliptic_arc() is expensive and yet it's called twice, once in tangent_tip() then again in
+--TODO: svgarc_to_arc() is expensive and yet it's called twice, once in tangent_tip() then again in
 --			context_free_cmd(). find a nice way to reuse the results instead of calling it twice.
 local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	if s == 'line' then
@@ -363,24 +362,25 @@ local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	elseif s == 'smooth_quad_curve' then
 		return 'quad', reflect_point_distance(tx or cpx, ty or cpy, cpx, cpy, (...))
 	elseif s == 'arc' or s == 'line_arc' then
-		return 'tangent', select(3, arc_tangent_vector(1, ...))
+		local cx, cy, r, start_angle, sweep_angle, x2, y2 = ...
+		return 'tangent', select(3, arc_tangent_vector(1, cx, cy, r, r, start_angle, sweep_angle, x2, y2))
 	elseif s == 'elliptic_arc' or s == 'line_elliptic_arc' then
-		return 'tangent', select(3, elliptic_arc_tangent_vector(1, ...))
+		return 'tangent', select(3, arc_tangent_vector(1, ...))
 	elseif s == 'svgarc' then
-		local cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2 = svgarc_to_elliptic_arc(cpx, cpy, ...)
+		local cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2 = svgarc_to_arc(cpx, cpy, ...)
 		if not cx then --invalid parametrization, arc is a line
 			return 'tangent', cpx, cpy
 		else
-			return 'tangent', select(3, elliptic_arc_tangent_vector(1,
+			return 'tangent', select(3, arc_tangent_vector(1,
 													cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2))
 		end
 	elseif s == 'arc_3p' then
 		local xp, yp, x2, y2 = ...
-		local cx, cy, r, start_angle, sweep_angle, x2, y2 = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
+		local cx, cy, rx, ry, start_angle, sweep_angle, x2, y2 = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
 		if not cx then --invalid parametrization, arc is a line
 			return 'tangent', cpx, cpy
 		else
-			return 'tangent', select(3, arc_tangent_vector(1, cx, cy, r, start_angle, sweep_angle, x2, y2))
+			return 'tangent', select(3, arc_tangent_vector(1, cx, cy, rx, ry, start_angle, sweep_angle, x2, y2))
 		end
 	end
 end
@@ -453,13 +453,13 @@ local function context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 		return 'quad_curve', cpx, cpy, x2, y2, x3, y3
 	elseif s == 'arc_3p' then
 		local xp, yp, x2, y2 = ...
-		local cx, cy, r, start_angle, sweep_angle = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
+		local cx, cy, rx, ry, start_angle, sweep_angle = arc3p_to_arc(cpx, cpy, xp, yp, x2, y2)
 		if not cx then --invalid parametrization, arc is a line
 			return 'line', cpx, cpy, x2, y2
 		end
-		return 'carc', cpx, cpy, nil, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2
+		return 'carc', cpx, cpy, nil, cx, cy, rx, ry, start_angle, sweep_angle, 0, x2, y2
 	elseif s == 'svgarc' then
-		local cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2 = svgarc_to_elliptic_arc(cpx, cpy, ...)
+		local cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2 = svgarc_to_arc(cpx, cpy, ...)
 		if not cx then --invalid parametrization, arc is a line
 			return 'line', cpx, cpy, select(6, ...)
 		end
@@ -588,23 +588,23 @@ function simplify.curve(write, mt, x1, y1, x2, y2, x3, y3, x4, y4)
 	write('curve', transform_points(mt, x2, y2, x3, y3, x4, y4))
 end
 
-local elliptic_arc_to_bezier3 = require'path_elliptic_arc'.to_bezier3
+local arc_to_bezier3 = require'path_arc'.to_bezier3
 
 function simplify.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	if connect then
-		local x1, y1 = elliptic_arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local x1, y1 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		write(connect, x1, y1)
 	end
-	elliptic_arc_to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+	arc_to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 end
 
 --note: if rx * ry is negative, the ellipse is drawn counterclockwise.
 function simplify.ellipse(write, mt, cx, cy, rx, ry, rotation)
 	if rx == 0 or ry == 0 then return end --invalid parametrization, skip it
 	local sweep_angle = rx*ry >= 0 and 360 or -360
-	local x1, y1 = elliptic_arc_endpoints(cx, cy, rx, ry, 0, sweep_angle, rotation)
+	local x1, y1 = arc_endpoints(cx, cy, rx, ry, 0, sweep_angle, rotation)
 	write('move', transform_points(mt, x1, y1))
-	elliptic_arc_to_bezier3(write, cx, cy, rx, ry, 0, sweep_angle, rotation, x1, y1, mt)
+	arc_to_bezier3(write, cx, cy, rx, ry, 0, sweep_angle, rotation, x1, y1, mt)
 	write('close')
 end
 
@@ -727,10 +727,10 @@ end
 function bbox.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	if mt or rx ~= ry or rotation ~= 0 then return false end
 	if connect == 'line' then
-		local x1, y1 = elliptic_arc_endpoints(cx, cy, rx, rx, start_angle, sweep_angle)
+		local x1, y1 = arc_endpoints(cx, cy, rx, rx, start_angle, sweep_angle, rotation, x2, y2)
 		write(line_bbox(cpx, cpy, x1, y1))
 	end
-	write(arc_bbox(cx, cy, rx, start_angle, sweep_angle))
+	write(arc_bbox(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2))
 end
 
 function bbox.ellipse(write, mt, cx, cy, rx, ry, rotation)
@@ -794,10 +794,10 @@ end
 function len.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	if mt or rx ~= ry or rotation ~= 0 then return false end
 	if connect == 'line' then
-		local x1, y1 = elliptic_arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
+		local x1, y1 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
 		write(line_len(1, cpx, cpy, x1, y1))
 	end
-	write(arc_len(1, cx, cy, rx, start_angle, sweep_angle))
+	write(arc_len(1, cx, cy, rx, ry, start_angle, sweep_angle))
 end
 
 function len.ellipse(write, mt, cx, cy, rx, ry)
@@ -844,7 +844,6 @@ local distance2        = require'path_point'.distance2
 local line_hit         = require'path_line'.hit
 local quad_curve_hit   = require'path_bezier2_hit'
 local curve_hit        = require'path_bezier3_hit'
-local elliptic_arc_hit = require'path_elliptic_arc'.hit
 local arc_hit          = require'path_arc'.hit
 
 function ht.move(write, mt, i, x0, y0, x2, y2)
@@ -868,14 +867,14 @@ end
 
 function ht.carc(write, mt, i, x0, y0, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	if connect == 'line' then
-		local x1, y1 = elliptic_arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local x1, y1 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		if mt then cpx, cpy = mt(cpx, cpy) end
 		local d, x, y, t = line_hit(x0, y0, cpx, cpy, x1, y1)
 		write(i, d, x, y, t/2)
-		local d, x, y, t = elliptic_arc_hit(x0, y0, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local d, x, y, t = arc_hit(x0, y0, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		write(i, d, x, y, 0.5 + t/2)
 	else
-		write(i, elliptic_arc_hit(x0, y0, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt))
+		write(i, arc_hit(x0, y0, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt))
 	end
 end
 

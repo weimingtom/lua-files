@@ -7,11 +7,12 @@ local distance = require'path_point'.distance
 local point_angle = require'path_point'.point_angle
 local point_around = require'path_point'.point_around
 local point_line_intersection = require'path_line'.point_line_intersection
-local elliptic_arc_endpoints = require'path_elliptic_arc'.endpoints
-local elliptic_arc_tangent_vector = require'path_elliptic_arc'.tangent_vector
 local arc3p_to_arc = require'path_arc_3p'.to_arc
-local svgarc_to_elliptic_arc = require'path_svgarc'.to_elliptic_arc
-local point_at = require'path_elliptic_arc'.point_at
+local svgarc_to_arc = require'path_svgarc'.to_arc
+local arc_endpoints = require'path_arc'.endpoints
+local arc_tangent_vector = require'path_arc'.tangent_vector
+local point_at = require'path_arc'.point_at
+local point_at = require'path_arc'.point_at
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 local star_to_star_2p = require'path_shapes'.star_to_star_2p
 
@@ -398,7 +399,7 @@ local function control_points(path)
 				local cx, cy = points[pcx], points[pcy]
 				local rx, ry, start_angle, sweep_angle = path[crx], path[cry], path[cstart_angle], path[csweep_angle]
 				local rotation = crotation and path[crotation]
-				local x1, y1, x2, y2 = elliptic_arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation)
+				local x1, y1, x2, y2 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation)
 				points[px1] = x1
 				points[py1] = y1
 				--TODO
@@ -449,15 +450,15 @@ local function control_points(path)
 			--endpoints update control points
 			local function set_pts()
 				local cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2 =
-					svgarc_to_elliptic_arc(points[px1], points[py1], path[crx], path[cry], path[crotation],
-													path[clarge_arc_flag], path[csweep_flag], points[px2], points[py2])
+					svgarc_to_arc(points[px1], points[py1], path[crx], path[cry], path[crotation],
+										path[clarge_arc_flag], path[csweep_flag], points[px2], points[py2])
 				if cx then
 					points[pcx], points[pcy] = cx, cy
 					points[prxx], points[prxy] = point_at(0, cx, cy, rx, ry, rotation)
 					points[pryx], points[pryy] = point_at(90, cx, cy, rx, ry, rotation)
 					points[prxx1], points[prxy1] = point_at(180, cx, cy, path[crx], path[cry], rotation)
 					points[pryx1], points[pryy1] = point_at(270, cx, cy, path[crx], path[cry], rotation)
-					points[ptx], points[pty] = select(3, elliptic_arc_tangent_vector(1,
+					points[ptx], points[pty] = select(3, arc_tangent_vector(1,
 																		cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2))
 				else
 					--TODO: find better spots to place these
@@ -523,7 +524,7 @@ local function control_points(path)
 				local x1, y1, xp, yp, x2, y2 = points[px1], points[py1], points[pxp], points[pyp], points[px2], points[py2]
 				local cx, cy, r, start_angle, sweep_angle, x2, y2 = arc3p_to_arc(x1, y1, xp, yp, x2, y2)
 				if cx then
-					x1, y1 = select(3, elliptic_arc_tangent_vector(1, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2))
+					x1, y1 = select(3, arc_tangent_vector(1, cx, cy, r, r, start_angle, sweep_angle, 0, x2, y2))
 				end
 				points[ptx] = x1
 				points[pty] = y1

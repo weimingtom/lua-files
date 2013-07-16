@@ -1,59 +1,68 @@
 local player = require'cairo_player'
-local arc_to_bezier3 = require'path_arc'.to_bezier3
-local arc_endpoints = require'path_arc'.endpoints
+local arc = require'path_arc'
+local affine = require'affine2d'
+local glue = require'glue'
 
-local start_angle = 30
-local sweep_angle = 180
-
-local start_angle2 = 0
-local sweep_angle2 = 0
+local scale = 1
 
 function player:on_render(cr)
 
-	start_angle = self:slider{
-		id = 'start_angle',
-		x = 10, y = 10, w = 200, h = 24, text = 'start angle',
-		i0 = 0,
-		i1 = 360,
-		i = start_angle,
+	scale = self:slider{id = 'scale',
+		x = 10, y = 10, w = 400, h = 24, text = 'scale',
+		i0 = 0.1, i1 = 1500, step = 0.1, i = scale,
 	}
 
-	sweep_angle = self:slider{
-		id = 'sweep_angle',
-		x = 10, y = 40, w = 200, h = 24, text = 'sweep angle',
-		i0 = -360,
-		i1 = 360,
-		i = sweep_angle,
-	}
+	scale = math.max(0.1, scale + scale * self.wheel_delta)
 
-	local function write(command, ...)
-		cr:curve_to(...)
-	end
-	local function arc(...)
-		local x1, y1 = arc_endpoints(...)
+	local function draw_arc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local x1, y1 = arc.endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		cr:move_to(x1, y1)
-		arc_to_bezier3(write, ...)
+		local function write(s, ...)
+			cr:curve_to(...)
+			x1, y1 = select(5, ...)
+			cr:circle(x1, y1, 5)
+			cr:move_to(x1, y1)
+		end
+		arc.to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 	end
 
-	local function draw(x, y, cairo_arc, start_angle, sweep_angle)
-		cr:set_source_rgba(0,1,0,0.3)
-		cr:set_line_width(1)
-		cairo_arc(cr, x, y, 100, math.rad(start_angle), math.rad(start_angle + sweep_angle))
-		cr:stroke()
-		cr:new_path()
-		cr:set_line_width(10)
-		arc(x, y, 100, start_angle, sweep_angle)
+	local function fill(r,g,b)
+		cr:identity_matrix()
+		cr:set_source_rgb(r,g,b)
+		cr:fill()
+	end
+	local function stroke(r,g,b,w)
+		cr:identity_matrix()
+		cr:set_source_rgb(r,g,b)
+		cr:set_line_width(w)
 		cr:stroke()
 	end
-	draw(300, 150, sweep_angle > 0 and cr.arc or cr.arc_negative, start_angle, sweep_angle)
 
-	sweep_angle2 = sweep_angle2 + 2
-	start_angle2 = start_angle2 + 1
-	if sweep_angle2 > 360 then
-		sweep_angle2 = -360
-	end
-	draw(600, 150, sweep_angle2 > 0 and cr.arc or cr.arc_negative, start_angle2, sweep_angle2)
+	cr:set_font_size(16)
+
+	local x0, y0 = self.mousex or 0, self.mousey or 0
+	local cx, cy, rx, ry, start_angle, sweep_angle, rotation = 500, 400, 300, 200, 0, 300, 30
+	local mt = affine():translate(500,300):translate(-cx*scale,-cy/2*scale):scale(scale,scale)
+	mt:translate(cx,cy):rotate(-27):translate(-cx,-cy)
+	draw_arc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, nil, nil, mt); stroke(1,1,1,10)
+	local d,x,y,t = arc.hit(x0, y0, cx, cy, rx, ry, start_angle, sweep_angle, rotation, nil, nil, mt)
+
+	local
+		cx1, cy1, r1x, r1y, start_angle1, sweep_angle1, rotation1,
+		cx2, cy2, r2x, r2y, start_angle2, sweep_angle2, rotation2 =
+			arc.split(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation)
+
+	draw_arc(cx1, cy1, r1x, r1y, start_angle1, sweep_angle1, rotation1, nil, nil, mt); stroke(1,0,0,10)
+	draw_arc(cx2, cy2, r2x, r2y, start_angle2, sweep_angle2, rotation2, nil, nil, mt); stroke(0,0,1,10)
+
+	cr:identity_matrix()
+	cr:circle(x,y,2)
+	fill(0,1,0)
+
+	cr:identity_matrix()
+	cr:move_to(x,y+30)
+	cr:text_path(string.format('t: %4.2f (scale: %d)', t, scale))
+	fill(1,1,1)
 end
 
 player:play()
-
