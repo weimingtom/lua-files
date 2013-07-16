@@ -1,7 +1,7 @@
 --math for 2D elliptic arcs defined as:
 --  (center_x, center_y, radius_x, radius_y, start_angle, sweep_angle, [rotation], [x2, y2]).
 --angles are expressed in degrees, not radians.
---sweep angle is capped between -360..360deg when drawing but otherwise the time on the arc is relative to the full sweep.
+--sweep angle is capped between -360..360deg.
 --x2, y2 is an optional override of arc's second end point to use when numerical exactness of the endpoint is required.
 --mt is an affine transform that applies to the resulted segments.
 --segment_max_sweep is for limiting the arc portion that each bezier segment can cover and is computed automatically.
@@ -41,6 +41,7 @@ end
 
 --angle time on an arc (or outside the arc if outside 0..1 range) for a specified angle.
 local function sweep_time(hit_angle, start_angle, sweep_angle)
+	sweep_angle = observed_sweep(sweep_angle)
 	return sweep_between(start_angle, hit_angle, sweep_angle >= 0) / sweep_angle
 end
 
@@ -68,21 +69,14 @@ end
 
 --evaluate elliptic arc at time t (the time between 0..1 covers the arc over the sweep interval).
 local function point(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
-	--shortcut for circular arcs
-	if rx == ry then
-		local x, y = point_around(cx, cy, abs(rx), start_angle + t * sweep_angle)
-		if mt then
-			x, y = mt(x, y)
-		end
-		return x, y
-	end
-	return point_at(start_angle + t * sweep_angle, cx, cy, rx, ry, rotation, mt)
+	return point_at(start_angle + t * observed_sweep(sweep_angle), cx, cy, rx, ry, rotation, mt)
 end
 
 --tangent vector on elliptic arc at time t based on http://content.gpwiki.org/index.php/Tangents_To_Circles_And_Ellipses.
 --the vector is always oriented towards the sweep of the arc.
 local function tangent_vector(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 	rx, ry = abs(rx), abs(ry)
+	sweep_angle = observed_sweep(sweep_angle)
 	rotation = rotation or 0
 	local a = radians(start_angle + t * sweep_angle)
 	--px,py is the point at time t on the origin-centered, unrotated ellipse (0, 0, rx, ry, 0).
@@ -218,6 +212,7 @@ end
 --where the touch point splits the arc.
 local function circular_arc_hit(x0, y0, cx, cy, r, start_angle, sweep_angle, x2, y2)
 	r = abs(r)
+	sweep_angle = observed_sweep(sweep_angle)
 	if x0 == cx and y0 == cy then --projecting from the center
 		local x, y = point_around(cx, cy, r, start_angle)
 		return r, x, y, 0
@@ -264,6 +259,7 @@ end
 
 local function split(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	t = min(max(t,0),1)
+	sweep_angle = observed_sweep(sweep_angle)
 	local sweep1 = t * sweep_angle
 	local sweep2 = sweep_angle - sweep1
 	local split_angle = start_angle + sweep1
@@ -275,6 +271,7 @@ end
 --from http://www.w3.org/TR/SVG/implnote.html#ArcConversionCenterToEndpoint
 local function to_svgarc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
+	sweep_angle = observed_sweep(sweep_angle)
 	local large = abs(sweep_angle) > 180 and 1 or 0
 	local sweep = sweep_angle >= 0 and 1 or 0
 	return x1, y1, rx, ry, rotation, large, sweep, x2, y2

@@ -5,7 +5,6 @@
 local circle_3p_to_circle = require'path_circle_3p'.to_circle
 local point_angle = require'path_point'.point_angle
 local sweep_between = require'path_arc'.sweep_between
-local line_split = require'path_line'.split
 local arc_split = require'path_arc'.split
 local arc_to_arc_3p = require'path_arc'.to_arc_3p
 

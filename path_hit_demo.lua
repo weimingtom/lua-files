@@ -1,4 +1,4 @@
---demo hit testing, length and split for lines, circular arcs, beizer2, bezier3.
+--demo for hit testing, length and split for lines, arcs, beizer2, bezier3.
 local player = require'cairo_player'
 local glue = require'glue'
 local distance2 = require'path_point'.distance2
