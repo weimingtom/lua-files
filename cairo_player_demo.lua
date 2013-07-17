@@ -140,11 +140,6 @@ function player:on_render(cr)
 	}
 
 	t.splitx = self:vsplitter{id = 'split', x = t.splitx or 950, y = 10, w = 6, h = 300}
-
-	if self:keypressed'ctrl' then
-		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
-	end
-
 end
 
 player:play()

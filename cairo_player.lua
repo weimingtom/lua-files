@@ -231,6 +231,11 @@ function player:window(t)
 		--render the frame
 		self:on_render(self.cr)
 
+		--magnifier glass: so useful it's enabled by default
+		if self:keypressed'ctrl' then
+			self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
+		end
+
 		--reset the one-shot state vars
 		self.clicked = false
 		self.rightclick = false
@@ -350,12 +355,12 @@ function player:setcolor(color)
 end
 
 function player:fill(color)
-	self:setcolor(color)
+	self:setcolor(color or 'normal_bg')
 	self.cr:fill()
 end
 
 function player:stroke(color, line_width)
-	self:setcolor(color)
+	self:setcolor(color or 'normal_fg')
 	self.cr:set_line_width(line_width or 1)
 	self.cr:stroke()
 end
@@ -369,6 +374,8 @@ function player:fillstroke(fill_color, stroke_color, line_width)
 		self:fill(fill_color)
 	elseif stroke_color then
 		self:stroke(stroke_color, line_width)
+	else
+		self:fill('normal_bg')
 	end
 end
 
@@ -380,10 +387,32 @@ end
 
 --graphics helpers
 
+function player:dot(x, y, r, ...)
+	self:rect(x-r, y-r, 2*r, 2*r, ...)
+end
+
 function player:rect(x, y, w, h, ...)
 	self.cr:rectangle(x, y, w, h)
 	self:fillstroke(...)
 end
+
+function player:circle(x, y, r, ...)
+	self.cr:circle(x, y, r)
+	self:fillstroke(...)
+end
+
+function player:line(x1, y1, x2, y2, ...)
+	self.cr:move_to(x1, y1)
+	self.cr:line_to(x2, y2)
+	self:stroke(...)
+end
+
+function player:curve(x1, y1, x2, y2, x3, y3, x4, y4, ...)
+	self.cr:move_to(x1, y1)
+	self.cr:curve_to(x2, y2, x3, y3, x4, y4)
+	self:stroke(...)
+end
+
 
 local function aligntext(cr, text, font_size, halign, valign, x, y, w, h)
 	cr:set_font_size(font_size)
@@ -429,35 +458,29 @@ end
 
 --submodule autoloader
 
-local autoload = {
-	editbox = 'editbox',
-	vscrollbar = 'scrollbars',
-	hscrollbar = 'scrollbars',
-	scrollbox = 'scrollbars',
-	button = 'buttons',
-	mbutton = 'buttons',
-	togglebutton = 'buttons',
-	tabs = 'buttons',
-	slider = 'slider',
-	menu = 'menu',
-	combobox = 'combobox',
-	filebox = 'filebox',
-	grid = 'grid',
-	treeview = 'treeview',
-	magnifier = 'magnifier',
-	vsplitter = 'splitter',
-	hsplitter = 'splitter',
-	image = 'image',
-	label = 'label',
-	dragpoint = 'dragpoint',
-}
-
-setmetatable(player, {__index = function(t, k)
-	if autoload[k] then
-		require('cplayer.' .. autoload[k])
-		return rawget(t, k)
-	end
-end})
+glue.autoload(player, {
+	editbox      = 'cplayer.editbox',
+	vscrollbar   = 'cplayer.scrollbars',
+	hscrollbar   = 'cplayer.scrollbars',
+	scrollbox    = 'cplayer.scrollbars',
+	button       = 'cplayer.buttons',
+	mbutton      = 'cplayer.buttons',
+	togglebutton = 'cplayer.buttons',
+	tabs         = 'cplayer.buttons',
+	slider       = 'cplayer.slider',
+	menu         = 'cplayer.menu',
+	combobox     = 'cplayer.combobox',
+	filebox      = 'cplayer.filebox',
+	grid         = 'cplayer.grid',
+	treeview     = 'cplayer.treeview',
+	magnifier    = 'cplayer.magnifier',
+	vsplitter    = 'cplayer.splitter',
+	hsplitter    = 'cplayer.splitter',
+	image        = 'cplayer.image',
+	label        = 'cplayer.label',
+	dragpoint    = 'cplayer.dragpoint',
+	dragpoints   = 'cplayer.dragpoint',
+})
 
 --main loop
 

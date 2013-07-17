@@ -276,10 +276,6 @@ function player:on_render(cr)
 		gradient:destroy()
 	end
 
-	if self:keypressed'ctrl' then
-		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
-	end
-
 	face:free()
 end
 

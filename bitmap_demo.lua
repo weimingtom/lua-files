@@ -158,10 +158,6 @@ function player:on_render(cr)
 	--show'media/bmp/parrot.bmp'
 	--show'media/bmp/rgb_3bit.bmp'
 	--show'media/bmp/rgb_24bit.bmp'
-
-	if self:keypressed'ctrl' then
-		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
-	end
 end
 
 player:play()

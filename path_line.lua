@@ -88,7 +88,7 @@ local function to_bezier3(x1, y1, x2, y2)
 		x2, y2
 end
 
-if not ... then require'path_hit_demo' end
+if not ... then require'path_line_demo' end
 
 return {
 	point_line_intersection = point_line_intersection,

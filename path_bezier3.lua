@@ -109,7 +109,7 @@ local function split(t, x1, y1, x2, y2, x3, y3, x4, y4)
 		x1234, y1234, x234, y234, x34, y34, x4, y4 --second curve
 end
 
-if not ... then require'path_hit_demo' end
+if not ... then require'path_bezier3_demo' end
 
 return glue.autoload({
 	bounding_box = bounding_box,

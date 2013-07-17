@@ -21,9 +21,23 @@ function player:dragpoint(t)
 		end
 	end
 
-	self:rect(x-radius, y-radius, 2*radius, 2*radius,
-				t.fill or self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
+	self:dot(x, y, radius, t.fill or self.active == id and 'selected_bg' or hot and 'hot_bg' or 'normal_bg')
 
 	return x, y
+end
+
+function player:dragpoints(t)
+	local id = assert(t.id, 'id missing')
+	local radius = t.radius or 5
+	local threshold = t.threshold or radius + 2
+	local points = assert(t.points or 'points missing')
+
+	for i=1,#points,2 do
+		points[i], points[i+1] = self:dragpoint{
+			id = id..'_p'..tostring(i), radius = radius, threshold = threshold,
+			x = points[i], y = points[i+1]}
+	end
+
+	return points
 end
 

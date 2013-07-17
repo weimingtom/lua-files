@@ -176,11 +176,6 @@ function player:on_render(cr)
 		y = y + i
 	end
 	sub = sub + 1/256
-
-	if self:keypressed'ctrl' then
-		self:magnifier{id = 'mag', x = self.mousex - 300, y = self.mousey - 200, w = 600, h = 400, zoom_level = 6}
-	end
-
 end
 
 player:play()
