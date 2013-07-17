@@ -268,30 +268,13 @@ local function split(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, 
 		cx, cy, rx, ry, split_angle, sweep2, rotation, x2, y2 --second arc
 end
 
---from http://www.w3.org/TR/SVG/implnote.html#ArcConversionCenterToEndpoint
-local function to_svgarc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	sweep_angle = observed_sweep(sweep_angle)
-	local large = abs(sweep_angle) > 180 and 1 or 0
-	local sweep = sweep_angle >= 0 and 1 or 0
-	return x1, y1, rx, ry, rotation, large, sweep, x2, y2
-end
-
---convert to a 3-point parametric arc (only for circular arcs).
-local function to_arc_3p(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	if rx ~= ry then return end
-	local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	local xp, yp = point_around(cx, cy, rx, start_angle + observed_sweep(sweep_angle) / 2)
-	return x1, y1, xp, yp, x2, y2
-end
-
 --length of circular arc at time t.
 local function circular_arc_length(t, cx, cy, r, start_angle, sweep_angle)
 	return abs(t * radians(sweep_angle) * r)
 end
 
-local function length(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	if rx == ry then
+local function length(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+	if rx == ry and not mt then
 		return circular_arc_length(t, cx, cy, rx, start_angle, sweep_angle)
 	else
 		--TODO: compute length using gauss quadrature
@@ -319,12 +302,29 @@ local function circular_arc_bounding_box(cx, cy, r, start_angle, sweep_angle, x2
 	return x1, y1, x2-x1, y2-y1
 end
 
-local function bounding_box(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	if rx == ry then
+local function bounding_box(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+	if rx == ry and not mt then
 		return circular_arc_bounding_box(cx, cy, rx, start_angle, sweep_angle, x2, y2)
 	else
 		--TODO: is there a shortcut or should we convert to beziers?
 	end
+end
+
+--from http://www.w3.org/TR/SVG/implnote.html#ArcConversionCenterToEndpoint
+local function to_svgarc(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
+	local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
+	sweep_angle = observed_sweep(sweep_angle)
+	local large = abs(sweep_angle) > 180 and 1 or 0
+	local sweep = sweep_angle >= 0 and 1 or 0
+	return x1, y1, rx, ry, rotation, large, sweep, x2, y2
+end
+
+--convert to a 3-point parametric arc (only for circular arcs).
+local function to_arc_3p(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
+	if rx ~= ry then return end
+	local x1, y1, x2, y2 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
+	local xp, yp = point_around(cx, cy, rx, start_angle + observed_sweep(sweep_angle) / 2)
+	return x1, y1, xp, yp, x2, y2
 end
 
 if not ... then require'path_arc_demo' end

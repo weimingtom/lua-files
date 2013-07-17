@@ -32,7 +32,14 @@ local function new(hash, blocksize)
 	end
 end
 
-return {
+local glue = require'glue'
+
+return glue.autoload({
 	new = new,
 	compute = compute,
-}
+}, {
+	md5 = 'hmac_md5',
+	sha256 = 'hmac_sha2',
+	sha384 = 'hmac_sha2',
+	sha512 = 'hmac_sha2',
+})

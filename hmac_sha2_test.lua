@@ -1,5 +1,4 @@
 local hmac = require'hmac'
-require'hmac_sha2'
 local glue = require'glue'
 
 --from http://tools.ietf.org/html/rfc4231
@@ -66,9 +65,10 @@ local mac = glue.fromhex'35a71ef94dc0cf83a137bb484aa82cd6f74b0470448a359c05e0aa2
 local key = '1234567890' --per amazon (their dummy key)
 local b64_mac = 'Nace+U3Az4OhN7tISqgs1vdLBHBEijWcBeCqL5xN9xg=' --per amazon
 
-assert(b64.encode_string(mac) == b64_mac) --so our base64 encoder is good compared to HashCalc's hmac and sha
-assert(b64.decode_string(b64_mac) == mac) --so our base64 decoder is good compared to HashCalc's hmac and sha
+assert(b64.encode(mac) == b64_mac) --so our base64 encoder is good compared to HashCalc's hmac and sha
+assert(b64.decode(b64_mac) == mac) --so our base64 decoder is good compared to HashCalc's hmac and sha
 assert(sha2.sha256(message) == sha) --so our sha256 is good
 
 assert(hmac.sha256(message, key) == mac) --so our hmac is good
-assert(b64.encode_string(hmac.sha256(message, key)) == b64_mac) --so our hmac is good
+assert(b64.encode(hmac.sha256(message, key)) == b64_mac) --so our hmac is good
+

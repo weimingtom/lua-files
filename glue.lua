@@ -290,12 +290,16 @@ function glue.fcall(f,...)
 	return assert(fpcall(f,...))
 end
 
-function glue.autoload(t, module_of)
+function glue.autoload(t, submodules)
 	local mt = getmetatable(t) or {}
 	assert(not mt.__index, '__index alread assigned')
 	mt.__index = function(t, k)
-		if module_of[k] then
-			require(module_of[k])
+		if submodules[k] then
+			if type(submodules[k]) == 'string' then
+				require(submodules[k])
+			else
+				submodules[k](k)
+			end
 		end
 		return rawget(t, k)
 	end

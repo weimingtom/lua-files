@@ -1,4 +1,4 @@
---demo for hit testing, length and split for lines, arcs, beizer2, bezier3.
+--demo for hit testing, length, split and bbox for lines, arcs, beizer2, bezier3.
 local player = require'cairo_player'
 local glue = require'glue'
 local distance2 = require'path_point'.distance2
@@ -177,6 +177,10 @@ function player:on_render(cr)
 		--cr:circle(x1,y1,5); fill('#00ff00')
 		cr:move_to(x0+20,y0+24); cr:text_path(string.format('t: %.2f', t1)); fill('#ffffff')
 		cr:move_to(x0+20,y0+38); cr:text_path(string.format('length: %.2f', len)); fill('#ffffff')
+	end
+
+	if self:keypressed'ctrl' then
+		self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
 	end
 end
 
