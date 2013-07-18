@@ -1,0 +1,14 @@
+<html>
+<head>
+<script language="javascript">
+	var mimetype = navigator.mimeTypes["application/x-cairoplayer"]
+	var plugin = mimetype.enabledPlugin
+	if(!plugin) alert("plugin not found")
+	console.log(plugin.name)
+	console.log(plugin.description)
+</script>
+</head>
+<body>
+	<embed type="application/x-cairoplayer" width="1300" height="700"></embed>
+</body>
+</html>

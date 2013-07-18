@@ -1,0 +1,27 @@
+cplayer-plugin is a browser plugin that runs a cairo player instance in a browser window.
+
+TIPS:
+
+- get NPAPI headers from https://code.google.com/p/npapi-sdk/
+	- I stripped them of cruft (they were mostly cruft)
+- dll exported functions must be __stdcall
+	- gcc mangles __stdcall names
+		- pass -Wl,--kill-at to demangle
+- firefox loads a plugin either from a xpi package or from known locations.
+	- known locations are either the registry or %APPDATA%\Mozilla\plugins
+		- for loading from %APPDATA%, link the .rc file that declares the name and the mime type in dll's VERSIONINFO.
+			- BLOCK "040904E4" and "Translation" 0x0409, 0x04E4 must be hardcoded like that or the plugin won't install.
+			- the dll must be named np*.dll or it won't be found.
+			- the "MIMEType" value must be declared or the plugin won't install.
+		- for loading via registry, run the .reg file that declares the name, location and the mime types for the plugin.
+	- for xpi loading see the xpi dir and the build script that creates the xpi file.
+	- to check if plugin loads use:
+		- about:plugins
+		- use javascript:
+			var mimetype = navigator.mimeTypes["application/x-cairoplayer"]
+			var plugin = mimetype.enabledPlugin
+			console.log(plugin.name)
+			console.log(plugin.description)
+		- use html:
+			<embed type="application/x-cairoplayer" width="1300" height="700"></embed>
+

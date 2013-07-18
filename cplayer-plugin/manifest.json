@@ -1,0 +1,6 @@
+{
+  "name": "Cairo Player",
+  "plugins": [
+    { "xpi/plugins/npc": "content_plugin.dll", "public": true },
+  ],
+}

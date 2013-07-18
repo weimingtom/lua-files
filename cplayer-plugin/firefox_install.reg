@@ -1,0 +1,17 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\MozillaPlugins\@lua-files.org/CairoPlayer,version=1.0]
+@=""
+"Description"="Cairo Player Plugin"
+"Path"="x:\\work\\lua-files\\cplayer-plugin\\xpi\\plugins\\npcplayer.dll"
+"ProductName"="Cairo Player Plugin"
+"Vendor"="Cosmin Apreutesei"
+"Version"="1.0"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\MozillaPlugins\@lua-files.org/CairoPlayer,version=1.0\MimeTypes]
+@="application/x-cairoplayer"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\MozillaPlugins\@lua-files.org/CairoPlayer,version=1.0\MimeTypes\application/x-cairoplayer]
+@=""
+"Description"="Lua Script for Cairo Player Plugin"
+

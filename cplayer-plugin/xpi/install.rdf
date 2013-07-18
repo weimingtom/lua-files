@@ -1,0 +1,20 @@
+<RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+  <Description about="urn:mozilla:install-manifest">
+    <em:id>cosmin.apreutesei@gmail.com</em:id>
+    <em:name>Cairo Player</em:name>
+    <em:version>1.0</em:version>
+    <em:targetApplication>
+      <Description>
+        <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
+        <em:minVersion>3.*</em:minVersion>
+        <em:maxVersion>99.*</em:maxVersion>
+      </Description>
+    </em:targetApplication>
+    <em:unpack>true</em:unpack>
+    <em:updateURL>https://lua-files.googlecode.com/hg/npapi/update.rdf</em:updateURL>
+    <em:homepageURL>http://lua-files.org/</em:homepageURL>
+    <em:targetPlatform>WINNT_x86-msvc</em:targetPlatform>
+	 <em:creator>Cosmin Apreutesei</em:creator>
+    <em:description>Cairo Player allows you to run lua-files.org demos directly in your browser.</em:description>
+</Description>
+</RDF>

@@ -1,0 +1,30 @@
+// Executable version information.
+1 VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x17L
+ FILEFLAGS 0x0L
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "CompanyName", "Cosmin Apreutesei"
+            VALUE "FileDescription", "Cairo Player from lua-files.org"
+            VALUE "FileVersion", "1, 0, 0, 0"
+            VALUE "InternalName", "CairoPlayer"
+            VALUE "LegalCopyright", "Cosmin Apreutesei"
+            VALUE "OriginalFilename", "npcplayer.dll"
+            VALUE "ProductName", "Cairo Player"
+            VALUE "ProductVersion", "1, 0, 0, 0"
+				VALUE "MIMEType", "application/x-cairoplayer"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04E4
+    END
+END
