@@ -1,10 +1,9 @@
-LuaLanes v3.4.1 from https://github.com/LuaLanes/lanes (MIT license)
+LuaLanes v3.6.2 from https://github.com/LuaLanes/lanes (MIT license)
 
 lanes.lua moved to root dir.
+changed protect_allocator = true in default_params in lanes.lua.
 
 failing tests:
-  tests\finalizer.lua
-  tests\parallel_os_calls.lua
-  tests\protectproxy.lua
-  tests\require.lua
-  tests\rupval.lua
+
+	atexit.lua, finalizer.lua, func_is_string.lua, launchtest.lua crash intermitently.
+	require fail specifically because of luajit.

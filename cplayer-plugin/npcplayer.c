@@ -154,31 +154,31 @@ typedef struct _NPPluginFuncs {
 	NPP_DidCompositePtr didComposite;
 } NPPluginFuncs;
 
-NPError __stdcall NP_Initialize(void* bfuncs) {
+NPError __stdcall NP_Initialize(void* browser_funcs) {
 	say("NP_Initialize");
 	return 0;
 }
 
 char* __stdcall NP_GetPluginVersion() {
-	say("NP_GetPluginVersion");
+	say("NP_GetPluginVersion -> %s", PLUGIN_VERSION);
 	return PLUGIN_VERSION;
 }
 
 const char* NP_GetMIMEDescription() {
-	say("NP_GetMIMEDescription");
+	say("NP_GetMIMEDescription -> %s", MIME_DESCRIPTION);
 	return MIME_DESCRIPTION;
 }
 
 #define NPERR_INVALID_PARAM 9
 
-NPError __stdcall NP_GetValue(void* future, NPPVariable aVariable, void* aValue) {
-	say("NP_GetValue");
-	switch (aVariable) {
+NPError __stdcall NP_GetValue(void* future, NPPVariable var, void* val) {
+	say("NP_GetValue %d", var);
+	switch (var) {
 		case NPPVpluginNameString:
-			*((char**)aValue) = PLUGIN_NAME;
+			*((char**)val) = PLUGIN_NAME;
 			break;
 		case NPPVpluginDescriptionString:
-			*((char**)aValue) = PLUGIN_DESCRIPTION;
+			*((char**)val) = PLUGIN_DESCRIPTION;
 			break;
 		default:
 			return NPERR_INVALID_PARAM;
@@ -192,10 +192,13 @@ NPError __stdcall NP_Shutdown() {
 	return 0;
 }
 
-NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode,
+#define NP_EMBED 1 // Instance was created by an EMBED tag and shares the browser window with other content.
+#define NP_FULL  2 // Instance was created by a separate file and is the primary content in the window.
+
+NPError NPP_New(NPMIMEType mime_type, NPP instance, uint16_t mode,
 						int16_t argc, char* argn[], char* argv[], NPSavedData* saved) {
 
-	say("NPP_New");
+	say("NPP_New %s, %s", mime_type, mode == NP_EMBED ? "NP_EMBED" : (mode == NP_FULL ? "NP_FULL" : "?"));
 	int i;
 	for(i = 0; i < argc; i++)
 		say("   %-26s %s", argn[i], argv[i]);
@@ -230,8 +233,8 @@ NPError NPP_SetWindow(NPP instance, NPWindow* window) {
 	say("   %-26s %d", "window->clipRect.left",   window->clipRect.left);
 	say("   %-26s %d", "window->clipRect.bottom", window->clipRect.bottom);
 	say("   %-26s %d", "window->clipRect.right",  window->clipRect.right);
-	say("   %-26s %d", "window->type",            window->type == NPWindowTypeWindow ?
-																"NPWindowTypeWindow" : "NPWindowTypeDrawable", 0);
+	say("   %-26s %s", "window->type",            window->type == NPWindowTypeWindow ?
+		"NPWindowTypeWindow" : (window->type == NPWindowTypeDrawable ? "NPWindowTypeDrawable" : "?"));
 
 	//InstanceData* instanceData = (InstanceData*)(instance->pdata);
 	//instanceData->window = *window;

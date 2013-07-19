@@ -42,7 +42,7 @@ THE SOFTWARE.
 #include "threading.h"
 #include "lua.h"
 
-#if !defined( PLATFORM_WIN32) && !defined( PLATFORM_POCKETPC)
+#if !defined( PLATFORM_XBOX) && !defined( PLATFORM_WIN32) && !defined( PLATFORM_POCKETPC)
 # include <sys/time.h>
 #endif // non-WIN32 timing
 
@@ -83,7 +83,7 @@ THE SOFTWARE.
 * FAIL is for unexpected API return values - essentially programming 
 * error in _this_ code. 
 */
-#if defined( PLATFORM_WIN32) || defined( PLATFORM_POCKETPC)
+#if defined( PLATFORM_XBOX) || defined( PLATFORM_WIN32) || defined( PLATFORM_POCKETPC)
 static void FAIL( const char *funcname, int rc ) {
     fprintf( stderr, "%s() failed! (%d)\n", funcname, rc );
 #ifdef _MSC_VER
@@ -102,7 +102,7 @@ static void FAIL( const char *funcname, int rc ) {
 */
 time_d now_secs(void) {
 
-#if defined( PLATFORM_WIN32) || defined( PLATFORM_POCKETPC)
+#if defined( PLATFORM_XBOX) || defined( PLATFORM_WIN32) || defined( PLATFORM_POCKETPC)
     /*
     * Windows FILETIME values are "100-nanosecond intervals since 
     * January 1, 1601 (UTC)" (MSDN). Well, we'd want Unix Epoch as
@@ -226,7 +226,7 @@ static void prepare_timeout( struct timespec *ts, time_d abs_secs ) {
 //                      valid values N * 4KB
 //
 #ifndef _THREAD_STACK_SIZE
-# if (defined PLATFORM_WIN32) || (defined PLATFORM_POCKETPC) || (defined PLATFORM_CYGWIN)
+# if defined( PLATFORM_XBOX) || defined( PLATFORM_WIN32) || defined( PLATFORM_POCKETPC) || defined( PLATFORM_CYGWIN)
 #  define _THREAD_STACK_SIZE 0
       // Win32: does it work with less?
 # elif (defined PLATFORM_OSX)
@@ -243,6 +243,8 @@ static void prepare_timeout( struct timespec *ts, time_d abs_secs ) {
 #endif
 
 #if THREADAPI == THREADAPI_WINDOWS
+
+#if WINVER <= 0x0400 // Windows NT4: Use Mutexes with Events
   //
   void MUTEX_INIT( MUTEX_T *ref ) {
      *ref= CreateMutex( NULL /*security attr*/, FALSE /*not locked*/, NULL );
@@ -260,6 +262,8 @@ static void prepare_timeout( struct timespec *ts, time_d abs_secs ) {
     if (!ReleaseMutex(*ref))
         FAIL( "ReleaseMutex", GetLastError() );
   }
+#endif // Windows NT4
+
     /* MSDN: "If you would like to use the CRT in ThreadProc, use the
               _beginthreadex function instead (of CreateThread)."
        MSDN: "you can create at most 2028 threads"
@@ -311,10 +315,15 @@ bool_t THREAD_WAIT_IMPL( THREAD_T *ref, double secs)
     return TRUE;
   }
   //
-  void THREAD_KILL( THREAD_T *ref ) {
-    if (!TerminateThread( *ref, 0 )) FAIL("TerminateThread", GetLastError());
-    *ref= NULL;
-  }
+	void THREAD_KILL( THREAD_T *ref )
+	{
+		// nonexistent on Xbox360, simply disable until a better solution is found
+		#if !defined( PLATFORM_XBOX)
+		// in theory no-one should call this as it is very dangerous (memory and mutex leaks, no notification of DLLs, etc.)
+		if (!TerminateThread( *ref, 0 )) FAIL("TerminateThread", GetLastError());
+		#endif // PLATFORM_XBOX
+		*ref= NULL;
+	}
 
 #if !defined __GNUC__
 	//see http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
@@ -349,6 +358,7 @@ bool_t THREAD_WAIT_IMPL( THREAD_T *ref, double secs)
 #endif // !__GNUC__
 	}
 
+#if WINVER <= 0x0400 // Windows NT4: Use PulseEvent, although it is unreliable, but then...
 
   //
   void SIGNAL_INIT( SIGNAL_T *ref ) {
@@ -421,6 +431,66 @@ bool_t THREAD_WAIT_IMPL( THREAD_T *ref, double secs)
     if (!PulseEvent( *ref ))
         FAIL( "PulseEvent", GetLastError() );
   }
+
+#else // Windows Vista and above: condition variables exist, use them
+
+	//
+	void SIGNAL_INIT( SIGNAL_T *ref )
+	{
+		InitializeConditionVariable( ref);
+	}
+
+	void SIGNAL_FREE( SIGNAL_T *ref )
+	{
+		// nothing to do
+		ref;
+	}
+
+	bool_t SIGNAL_WAIT( SIGNAL_T *ref, MUTEX_T *mu_ref, time_d abs_secs)
+	{
+		long ms;
+
+		if( abs_secs < 0.0)
+			ms = INFINITE;
+		else if( abs_secs == 0.0)
+			ms = 0;
+		else
+		{
+			ms = (long) ((abs_secs - now_secs())*1000.0 + 0.5);
+
+			// If the time already passed, still try once (ms==0). A short timeout
+			// may have turned negative or 0 because of the two time samples done.
+			//
+			if( ms < 0)
+				ms = 0;
+		}
+
+		if( !SleepConditionVariableCS( ref, mu_ref, ms))
+		{
+			if( GetLastError() == ERROR_TIMEOUT)
+			{
+				return FALSE;
+			}
+			else
+			{
+				FAIL( "SleepConditionVariableCS", GetLastError());
+			}
+		}
+		return TRUE;
+	}
+
+	void SIGNAL_ONE( SIGNAL_T *ref )
+	{
+		WakeConditionVariable( ref);
+	}
+
+	void SIGNAL_ALL( SIGNAL_T *ref )
+	{
+		WakeAllConditionVariable( ref);
+	}
+
+#endif // Windows Vista and above
+
 #else // THREADAPI == THREADAPI_PTHREAD
   // PThread (Linux, OS X, ...)
   //

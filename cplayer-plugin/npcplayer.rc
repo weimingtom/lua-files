@@ -1,4 +1,5 @@
-// Executable version information.
+// executable version information.
+// needed for a firefox plugin that will be loaded from a known place (as opposed to installed from a xpi package).
 1 VERSIONINFO
  FILEVERSION 1,0,0,0
  PRODUCTVERSION 1,0,0,0
