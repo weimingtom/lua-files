@@ -17,7 +17,7 @@ lua_State* run_lua_script(const char* filename) {
 	status = luaL_loadfile(L, filename);
 	if (status) {
 		/* If something went wrong, error message is at the top of the stack */
-		say("script load error: %s", lua_tostring(L, -1), 0);
+		say("script load error: %s", lua_tostring(L, -1));
 		return 0;
 	}
 
@@ -55,14 +55,14 @@ lua_State* run_lua_script(const char* filename) {
 	/* Ask Lua to run our little script */
 	result = lua_pcall(L, 0, LUA_MULTRET, 0);
 	if (result) {
-		say("failed to run script: %s", lua_tostring(L, -1), 0);
+		say("failed to run script: %s", lua_tostring(L, -1));
 		return 0;
 	}
 
 	/* Get the returned value at the top of the stack (index -1) */
 	sum = lua_tonumber(L, -1);
 
-	sayn("script returned: %.0f", sum);
+	say("script returned: %.0f", sum);
 
 	lua_pop(L, 1);  /* Take the returned value out of the stack */
 	lua_close(L);   /* Cya, Lua */

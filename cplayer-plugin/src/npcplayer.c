@@ -1,5 +1,11 @@
 //go@ bash build-mingw32.sh
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+
 /* config */
 
 #define PLUGIN_NAME        "Cairo Player"
@@ -8,27 +14,17 @@
 #define MIME_DESCRIPTION   "application/x-cairoplayer"
 #define PLUGIN_LOGFILE     "x:/work/lua-files/cplayer-plugin/log.txt"
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
 /* logging */
 
 FILE* logfile;
 
-void say(const char* format, const char* arg1, const char* arg2) {
+void say(const char* format, ...) {
+	va_list args;
 	if (!logfile && PLUGIN_LOGFILE)
 		logfile = fopen(PLUGIN_LOGFILE, "w");
-	fprintf(logfile, format, arg1, arg2);
-	fprintf(logfile, "\n");
-	fflush(logfile);
-}
-
-void sayn(const char* format, int32_t arg1) {
-	if (!logfile)
-		logfile = fopen("x:/work/lua-files/cplayer-plugin/log.txt", "w");
-	fprintf(logfile, format, arg1);
+	va_start(args, format);
+	vfprintf(logfile, format, args);
+	va_end(args);
 	fprintf(logfile, "\n");
 	fflush(logfile);
 }
@@ -159,24 +155,24 @@ typedef struct _NPPluginFuncs {
 } NPPluginFuncs;
 
 NPError __stdcall NP_Initialize(void* bfuncs) {
-	say("NP_Initialize", 0, 0);
+	say("NP_Initialize");
 	return 0;
 }
 
 char* __stdcall NP_GetPluginVersion() {
-	say("NP_GetPluginVersion", 0, 0);
+	say("NP_GetPluginVersion");
 	return PLUGIN_VERSION;
 }
 
 const char* NP_GetMIMEDescription() {
-	say("NP_GetMIMEDescription", 0, 0);
+	say("NP_GetMIMEDescription");
 	return MIME_DESCRIPTION;
 }
 
 #define NPERR_INVALID_PARAM 9
 
 NPError __stdcall NP_GetValue(void* future, NPPVariable aVariable, void* aValue) {
-	say("NP_GetValue", 0, 0);
+	say("NP_GetValue");
 	switch (aVariable) {
 		case NPPVpluginNameString:
 			*((char**)aValue) = PLUGIN_NAME;
@@ -192,17 +188,17 @@ NPError __stdcall NP_GetValue(void* future, NPPVariable aVariable, void* aValue)
 }
 
 NPError __stdcall NP_Shutdown() {
-	say("NP_Shutdown", 0, 0);
+	say("NP_Shutdown");
 	return 0;
 }
 
 NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode,
 						int16_t argc, char* argn[], char* argv[], NPSavedData* saved) {
 
-	say("NPP_New", 0, 0);
+	say("NPP_New");
 	int i;
 	for(i = 0; i < argc; i++)
-		say("   %-16s %s", argn[i], argv[i]);
+		say("   %-26s %s", argn[i], argv[i]);
 
 	/*
 	// set up our our instance data
@@ -217,7 +213,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode,
 }
 
 NPError NPP_Destroy(NPP instance, NPSavedData** save) {
-	say("NPP_Destroy", 0, 0);
+	say("NPP_Destroy");
 
 	//InstanceData* instanceData = (InstanceData*)(instance->pdata);
 	//free(instanceData);
@@ -225,16 +221,17 @@ NPError NPP_Destroy(NPP instance, NPSavedData** save) {
 }
 
 NPError NPP_SetWindow(NPP instance, NPWindow* window) {
-	say("NPP_SetWindow", 0, 0);
-	sayn("   window->x        %d", window->x);
-	sayn("   window->y        %d", window->y);
-	sayn("   window->w        %d", window->width);
-	sayn("   window->h        %d", window->height);
-	sayn("   clipRect.top     %d", window->clipRect.top);
-	sayn("   clipRect.left    %d", window->clipRect.left);
-	sayn("   clipRect.bottom  %d", window->clipRect.bottom);
-	sayn("   clipRect.right   %d", window->clipRect.right);
-	say ("   type             %s", window->type == NPWindowTypeWindow ? "NPWindowTypeWindow" : "NPWindowTypeDrawable", 0);
+	say("NPP_SetWindow");
+	say("   %-26s %d", "window->x",               window->x);
+	say("   %-26s %d", "window->y",               window->y);
+	say("   %-26s %d", "window->width",           window->width);
+	say("   %-26s %d", "window->height",          window->height);
+	say("   %-26s %d", "window->clipRect.top",    window->clipRect.top);
+	say("   %-26s %d", "window->clipRect.left",   window->clipRect.left);
+	say("   %-26s %d", "window->clipRect.bottom", window->clipRect.bottom);
+	say("   %-26s %d", "window->clipRect.right",  window->clipRect.right);
+	say("   %-26s %d", "window->type",            window->type == NPWindowTypeWindow ?
+																"NPWindowTypeWindow" : "NPWindowTypeDrawable", 0);
 
 	//InstanceData* instanceData = (InstanceData*)(instance->pdata);
 	//instanceData->window = *window;
@@ -242,35 +239,35 @@ NPError NPP_SetWindow(NPP instance, NPWindow* window) {
 }
 
 NPError NPP_NewStream(NPP instance, NPMIMEType type, NPStream* stream, NPBool seekable, uint16_t* stype) {
-	say("NPP_NewStream", 0, 0);
+	say("NPP_NewStream");
 	return 1;
 }
 
 NPError NPP_DestroyStream(NPP instance, NPStream* stream, NPReason reason) {
-	say("NPP_DestroyStream", 0, 0);
+	say("NPP_DestroyStream");
 	return 1;
 }
 
 int32_t NPP_WriteReady(NPP instance, NPStream* stream) {
-	say("NPP_WriteReady", 0, 0);
+	say("NPP_WriteReady");
 	return 0;
 }
 
 int32_t NPP_Write(NPP instance, NPStream* stream, int32_t offset, int32_t len, void* buffer) {
-	say("NPP_Write", 0, 0);
+	say("NPP_Write");
 	return 0;
 }
 
 void NPP_StreamAsFile(NPP instance, NPStream* stream, const char* fname) {
-	say("NPP_StreamAsFile", 0, 0);
+	say("NPP_StreamAsFile");
 }
 
 void NPP_Print(NPP instance, NPPrint* platformPrint) {
-	say("NPP_Print", 0, 0);
+	say("NPP_Print");
 }
 
 int16_t NPP_HandleEvent(NPP instance, void* event) {
-	say("NPP_HandleEvent", 0, 0);
+	say("NPP_HandleEvent");
 	return 1;
 }
 
@@ -279,18 +276,18 @@ void NPP_URLNotify(NPP instance, const char* URL, NPReason reason, void* notifyD
 }
 
 NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value) {
-	say("NPP_GetValue", 0, 0);
+	say("NPP_GetValue");
 	return 1;
 }
 
 NPError NPP_SetValue(NPP instance, NPNVariable variable, void *value) {
-	say("NPP_SetValue", 0, 0);
+	say("NPP_SetValue");
 	return 1;
 }
 
 
 NPError __stdcall NP_GetEntryPoints(NPPluginFuncs* pFuncs) {
-	say("NP_GetEntryPoints", 0, 0);
+	say("NP_GetEntryPoints");
 	pFuncs->newp = NPP_New;
 	pFuncs->destroy = NPP_Destroy;
 	pFuncs->setwindow = NPP_SetWindow;
