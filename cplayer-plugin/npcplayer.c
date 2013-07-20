@@ -1,20 +1,13 @@
 //go@ bash build-mingw32.sh
-
+//NPAPI plugin that forwards NPAPI calls to a Lua script
 #include <stdint.h>
+#include <lua.h>
+#include <lauxlib.h>
 #include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdarg.h>
-
-/* config */
-
-#define PLUGIN_NAME        "Cairo Player"
-#define PLUGIN_DESCRIPTION PLUGIN_NAME
-#define PLUGIN_VERSION     "1.0.0.0"
-#define MIME_DESCRIPTION   "application/x-cairoplayer"
-#define PLUGIN_LOGFILE     "x:/work/lua-files/cplayer-plugin/log.txt"
 
 /* logging */
+
+#define PLUGIN_LOGFILE "x:/work/lua-files/cplayer-plugin/clog.txt"
 
 FILE* logfile;
 
@@ -29,280 +22,73 @@ void say(const char* format, ...) {
 	fflush(logfile);
 }
 
-/* running lua scripts */
+/* Lua */
 
-#include "script.c"
+lua_State *L;
+int rpc_func_ref;
 
-/* basic types */
-
-typedef unsigned char NPBool;
-typedef int16_t       NPError;
-typedef int16_t       NPReason;
-typedef char*         NPMIMEType;
-
-/* types and enums that we don't are about: make opaque */
-
-typedef struct        NPStream_ NPStream;
-typedef struct        NPSavedData_ NPSavedData;
-typedef struct        NPPrint_ NPPrint;
-typedef int           NPNVariable;
-typedef int           NPFocusDirection;
-
-/* types and enums that we do care about */
-
-typedef struct _NPP {
-  void* pdata;      /* plug-in private data */
-  void* ndata;      /* netscape private data */
-} NPP_t;
-
-typedef NPP_t*  NPP;
-
-typedef struct _NPRect
-{
-	uint16_t top;
-	uint16_t left;
-	uint16_t bottom;
-	uint16_t right;
-} NPRect;
-
-typedef enum {
-	NPWindowTypeWindow = 1,
-	NPWindowTypeDrawable
-} NPWindowType;
-
-typedef struct _NPWindow
-{
-	void* window;      /* Platform specific window handle */
-	int32_t  x;        /* Position of top left corner relative */
-	int32_t  y;        /* to a netscape page. */
-	uint32_t width;    /* Maximum window size */
-	uint32_t height;
-	NPRect   clipRect; /* Clipping rectangle in port coordinates */
-	NPWindowType type; /* Is this a window or a drawable? */
-} NPWindow;
-
-typedef enum {
-	NPPVpluginNameString = 1,
-	NPPVpluginDescriptionString,
-	NPPVpluginWindowBool,
-	NPPVpluginTransparentBool,
-	NPPVjavaClass,
-	NPPVpluginWindowSize,
-	NPPVpluginTimerInterval,
-	NPPVpluginScriptableInstance = 10,
-	NPPVpluginScriptableIID = 11,
-	NPPVjavascriptPushCallerBool = 12,
-	NPPVpluginKeepLibraryInMemory = 13,
-	NPPVpluginNeedsXEmbed         = 14,
-	NPPVpluginScriptableNPObject  = 15,
-	NPPVformValue = 16,
-	NPPVpluginUrlRequestsDisplayedBool = 17,
-	NPPVpluginWantsAllNetworkStreams = 18,
-	NPPVpluginNativeAccessibleAtkPlugId = 19,
-	NPPVpluginCancelSrcStream = 20,
-	NPPVsupportsAdvancedKeyHandling = 21,
-	NPPVpluginUsesDOMForCursorBool = 22,
-	NPPVpluginDrawingModel = 1000,
-	NPPVpluginEventModel = 1001,
-	NPPVpluginCoreAnimationLayer = 1003
-} NPPVariable;
-
-/* plugin-side callbacks */
-
-typedef NPError  (* NPP_NewProcPtr)(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc, char* argn[], char* argv[], NPSavedData* saved);
-typedef NPError  (* NPP_DestroyProcPtr)(NPP instance, NPSavedData** save);
-typedef NPError  (* NPP_SetWindowProcPtr)(NPP instance, NPWindow* window);
-typedef NPError  (* NPP_NewStreamProcPtr)(NPP instance, NPMIMEType type, NPStream* stream, NPBool seekable, uint16_t* stype);
-typedef NPError  (* NPP_DestroyStreamProcPtr)(NPP instance, NPStream* stream, NPReason reason);
-typedef int32_t  (* NPP_WriteReadyProcPtr)(NPP instance, NPStream* stream);
-typedef int32_t  (* NPP_WriteProcPtr)(NPP instance, NPStream* stream, int32_t offset, int32_t len, void* buffer);
-typedef void     (* NPP_StreamAsFileProcPtr)(NPP instance, NPStream* stream, const char* fname);
-typedef void     (* NPP_PrintProcPtr)(NPP instance, NPPrint* platformPrint);
-typedef int16_t  (* NPP_HandleEventProcPtr)(NPP instance, void* event);
-typedef void     (* NPP_URLNotifyProcPtr)(NPP instance, const char* url, NPReason reason, void* notifyData);
-typedef NPError  (* NPP_GetValueProcPtr)(NPP instance, NPPVariable variable, void *ret_value);
-typedef NPError  (* NPP_SetValueProcPtr)(NPP instance, NPNVariable variable, void *value);
-typedef NPBool   (* NPP_GotFocusPtr)(NPP instance, NPFocusDirection direction);
-typedef void     (* NPP_LostFocusPtr)(NPP instance);
-typedef void     (* NPP_URLRedirectNotifyPtr)(NPP instance, const char* url, int32_t status, void* notifyData);
-typedef NPError  (* NPP_ClearSiteDataPtr)(const char* site, uint64_t flags, uint64_t maxAge);
-typedef char**   (* NPP_GetSitesWithDataPtr)(void);
-typedef void     (* NPP_DidCompositePtr)(NPP instance);
-
-typedef struct _NPPluginFuncs {
-	uint16_t size;
-	uint16_t version;
-	NPP_NewProcPtr newp;
-	NPP_DestroyProcPtr destroy;
-	NPP_SetWindowProcPtr setwindow;
-	NPP_NewStreamProcPtr newstream;
-	NPP_DestroyStreamProcPtr destroystream;
-	NPP_StreamAsFileProcPtr asfile;
-	NPP_WriteReadyProcPtr writeready;
-	NPP_WriteProcPtr write;
-	NPP_PrintProcPtr print;
-	NPP_HandleEventProcPtr event;
-	NPP_URLNotifyProcPtr urlnotify;
-	void* javaClass;
-	NPP_GetValueProcPtr getvalue;
-	NPP_SetValueProcPtr setvalue;
-	NPP_GotFocusPtr gotfocus;
-	NPP_LostFocusPtr lostfocus;
-	NPP_URLRedirectNotifyPtr urlredirectnotify;
-	NPP_ClearSiteDataPtr clearsitedata;
-	NPP_GetSitesWithDataPtr getsiteswithdata;
-	NPP_DidCompositePtr didComposite;
-} NPPluginFuncs;
-
-NPError __stdcall NP_Initialize(void* browser_funcs) {
-	say("NP_Initialize");
-	return 0;
-}
-
-char* __stdcall NP_GetPluginVersion() {
-	say("NP_GetPluginVersion -> %s", PLUGIN_VERSION);
-	return PLUGIN_VERSION;
-}
-
-const char* NP_GetMIMEDescription() {
-	say("NP_GetMIMEDescription -> %s", MIME_DESCRIPTION);
-	return MIME_DESCRIPTION;
-}
-
-#define NPERR_INVALID_PARAM 9
-
-NPError __stdcall NP_GetValue(void* future, NPPVariable var, void* val) {
-	say("NP_GetValue %d", var);
-	switch (var) {
-		case NPPVpluginNameString:
-			*((char**)val) = PLUGIN_NAME;
-			break;
-		case NPPVpluginDescriptionString:
-			*((char**)val) = PLUGIN_DESCRIPTION;
-			break;
-		default:
-			return NPERR_INVALID_PARAM;
-			break;
+// pcall the function at the top of the Lua stack
+int pcall(int nargs, int nresults) {
+	if (lua_pcall(L, nargs, nresults, 0)) {
+		say("lua_pcall error: %s", lua_tostring(L, -1));
+		return 1;
 	}
 	return 0;
 }
 
-NPError __stdcall NP_Shutdown() {
-	say("NP_Shutdown");
+// load and run a Lua script that returns the RPC function.
+int load_script() {
+	if (L) return 0;
+	L = luaL_newstate();
+	if (!L) {
+		say("luaL_newstate error");
+		return 1;
+	}
+	luaL_openlibs(L);
+	if (luaL_loadfile(L, "npcplayer.lua")) {
+		say("luaL_loadfile error: %s", lua_tostring(L, -1));
+		return 1;
+	}
+	if (pcall(0, 1)) return 1;
+	//running the script returned our RPC function that we keep a reference of in the registry table.
+	rpc_func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (rpc_func_ref == LUA_NOREF || rpc_func_ref == LUA_REFNIL) {
+		say("rpc caller returned nothing");
+		return 1;
+	}
 	return 0;
 }
 
-#define NP_EMBED 1 // Instance was created by an EMBED tag and shares the browser window with other content.
-#define NP_FULL  2 // Instance was created by a separate file and is the primary content in the window.
-
-NPError NPP_New(NPMIMEType mime_type, NPP instance, uint16_t mode,
-						int16_t argc, char* argn[], char* argv[], NPSavedData* saved) {
-
-	say("NPP_New %s, %s", mime_type, mode == NP_EMBED ? "NP_EMBED" : (mode == NP_FULL ? "NP_FULL" : "?"));
-	int i;
-	for(i = 0; i < argc; i++)
-		say("   %-26s %s", argn[i], argv[i]);
-
-	/*
-	// set up our our instance data
-	InstanceData* instanceData = (InstanceData*)malloc(sizeof(InstanceData));
-	if (!instanceData)
-	 return NPERR_OUT_OF_MEMORY_ERROR;
-	memset(instanceData, 0, sizeof(InstanceData));
-	instanceData->npp = instance;
-	instance->pdata = instanceData;
-	*/
+// luad the RPC function and its first argument, the RPC function name to call, into the Lua stack.
+int rpc(const char* function_name) {
+	say(function_name);
+	if (load_script()) return 1;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, rpc_func_ref);
+	lua_pushstring(L, function_name);
 	return 0;
 }
 
-NPError NPP_Destroy(NPP instance, NPSavedData** save) {
-	say("NPP_Destroy");
+/* NPAPI */
 
-	//InstanceData* instanceData = (InstanceData*)(instance->pdata);
-	//free(instanceData);
+int16_t __stdcall NP_GetEntryPoints(void* plugin_funcs) {
+	if (rpc("NP_GetEntryPoints")) return 1;
+	lua_pushlightuserdata(L, plugin_funcs);
+	if (pcall(2, 0)) return 1;
 	return 0;
 }
 
-NPError NPP_SetWindow(NPP instance, NPWindow* window) {
-	say("NPP_SetWindow");
-	say("   %-26s %d", "window->x",               window->x);
-	say("   %-26s %d", "window->y",               window->y);
-	say("   %-26s %d", "window->width",           window->width);
-	say("   %-26s %d", "window->height",          window->height);
-	say("   %-26s %d", "window->clipRect.top",    window->clipRect.top);
-	say("   %-26s %d", "window->clipRect.left",   window->clipRect.left);
-	say("   %-26s %d", "window->clipRect.bottom", window->clipRect.bottom);
-	say("   %-26s %d", "window->clipRect.right",  window->clipRect.right);
-	say("   %-26s %s", "window->type",            window->type == NPWindowTypeWindow ?
-		"NPWindowTypeWindow" : (window->type == NPWindowTypeDrawable ? "NPWindowTypeDrawable" : "?"));
-
-	//InstanceData* instanceData = (InstanceData*)(instance->pdata);
-	//instanceData->window = *window;
+int16_t __stdcall NP_Initialize(void* browser_funcs) {
+	if (rpc("NP_Initialize")) return 1;
+	lua_pushlightuserdata(L, browser_funcs);
+	if (pcall(2, 0)) return 1;
 	return 0;
 }
 
-NPError NPP_NewStream(NPP instance, NPMIMEType type, NPStream* stream, NPBool seekable, uint16_t* stype) {
-	say("NPP_NewStream");
-	return 1;
-}
-
-NPError NPP_DestroyStream(NPP instance, NPStream* stream, NPReason reason) {
-	say("NPP_DestroyStream");
-	return 1;
-}
-
-int32_t NPP_WriteReady(NPP instance, NPStream* stream) {
-	say("NPP_WriteReady");
+int16_t __stdcall NP_Shutdown() {
+	if (rpc("NP_Shutdown")) return 1;
+	if (pcall(1, 0)) return 1;
+	lua_close(L);
+	L = 0;
 	return 0;
-}
-
-int32_t NPP_Write(NPP instance, NPStream* stream, int32_t offset, int32_t len, void* buffer) {
-	say("NPP_Write");
-	return 0;
-}
-
-void NPP_StreamAsFile(NPP instance, NPStream* stream, const char* fname) {
-	say("NPP_StreamAsFile");
-}
-
-void NPP_Print(NPP instance, NPPrint* platformPrint) {
-	say("NPP_Print");
-}
-
-int16_t NPP_HandleEvent(NPP instance, void* event) {
-	say("NPP_HandleEvent");
-	return 1;
-}
-
-void NPP_URLNotify(NPP instance, const char* URL, NPReason reason, void* notifyData) {
-	say("NPP_URLNotify %s", URL, 0);
-}
-
-NPError NPP_GetValue(NPP instance, NPPVariable variable, void *value) {
-	say("NPP_GetValue");
-	return 1;
-}
-
-NPError NPP_SetValue(NPP instance, NPNVariable variable, void *value) {
-	say("NPP_SetValue");
-	return 1;
-}
-
-
-NPError __stdcall NP_GetEntryPoints(NPPluginFuncs* pFuncs) {
-	say("NP_GetEntryPoints");
-	pFuncs->newp = NPP_New;
-	pFuncs->destroy = NPP_Destroy;
-	pFuncs->setwindow = NPP_SetWindow;
-	pFuncs->newstream = NPP_NewStream;
-	pFuncs->destroystream = NPP_DestroyStream;
-	pFuncs->asfile = NPP_StreamAsFile;
-	pFuncs->writeready = NPP_WriteReady;
-	pFuncs->write = NPP_Write;
-	pFuncs->print = NPP_Print;
-	pFuncs->event = NPP_HandleEvent;
-	pFuncs->urlnotify = NPP_URLNotify;
-	pFuncs->getvalue = NPP_GetValue;
-	pFuncs->setvalue = NPP_SetValue;
 }
 
