@@ -1,5 +1,5 @@
 --cairo player: procedural graphics player with immediate mode gui toolkit
-local CPanel = require'winapi.cairopanel'
+local CairoPanel = require'winapi.cairopanel'
 local winapi = require'winapi'
 require'winapi.messageloop'
 require'winapi.vkcodes'
@@ -142,19 +142,27 @@ function player:window(t)
 	local referer = self
 	local self = setmetatable({}, {__index = player})
 
-	local window = winapi.Window{
-		--if the window is created from the player class then it's the main window
-		autoquit = referer == player and true,
-		visible = false,
-		x = t.x or 100,
-		y = t.y or 100,
-		w = t.w or 1300,
-		h = t.h or 700,
-	}
+	local panel, window
+
+	if not t.parent then --player has no parent window, so we make a standalone window for it
+		window = winapi.Window{
+			--if the window is created from the player class then it's the main window
+			autoquit = referer == player and true,
+			visible = false,
+			x = t.x or 100,
+			y = t.y or 100,
+			w = t.w or 1300,
+			h = t.h or 700,
+		}
+	elseif type(t.parent) == 'table' then --parent is a winapi.Window object
+		window = t.parent
+	else --parent is a HWND (window handle): wrap it into a winapi.BaseWindow object
+		window = winapi.BaseWindow{hwnd = t.parent}
+	end
 
 	self.window = window --needed by filebox
 
-	local panel = CPanel{
+	panel = CairoPanel{
 		parent = window, w = window.client_w, h = window.client_h,
 		anchors = {left=true, right=true, top=true, bottom=true}
 	}
@@ -484,7 +492,10 @@ glue.autoload(player, {
 
 --main loop
 
-function player:play()
+function player:play(...)
+	if ... then --player loaded as module, return it instead of running it
+		return player
+	end
 	self.main = self:window{on_render = self.on_render}
 	return winapi.MessageLoop()
 end

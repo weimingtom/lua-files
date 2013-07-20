@@ -42,4 +42,4 @@ function player:on_render(cr)
 	draw('l2', l2)
 end
 
-player:play()
+return player:play(...)

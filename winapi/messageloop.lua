@@ -9,7 +9,7 @@ WM_UNREGISTER_CLASS = WM_APP+1 --unregister window class after window destructio
 function ProcessMessage(msg)
 	local window = Windows.active_window
 	if window then
-		if window.accelerators.haccel then
+		if window.accelerators and window.accelerators.haccel then
 			if TranslateAccelerator(window.hwnd, window.accelerators.haccel, msg) then --make hotkeys work
 				return
 			end
@@ -24,7 +24,7 @@ function ProcessMessage(msg)
 	DispatchMessage(msg) --make everything else work
 end
 
-function MessageLoop() --you can do os.exit(MessageLoop())
+function MessageLoop(after_process) --you can do os.exit(MessageLoop())
 	local msg = types.MSG()
 	local ret
 	while true do
@@ -33,6 +33,9 @@ function MessageLoop() --you can do os.exit(MessageLoop())
 		ProcessMessage(msg)
 		if msg.message == WM_UNREGISTER_CLASS then
 			UnregisterClass(msg.wParam)
+		end
+		if after_process then
+			after_process(msg)
 		end
 	end
 	return msg.signed_wParam --WM_QUIT returns 0 and an int exit code in wParam

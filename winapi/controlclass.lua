@@ -17,8 +17,9 @@ Control = subclass({
 function Control:__before_create(info, args)
 	Control.__index.__before_create(self, info, args)
 	self.anchors = info.anchors
-	args.style = bit.bor(args.style, info.parent and WS_CHILD or WS_POPUP, WS_CLIPSIBLINGS, WS_CLIPCHILDREN)
-	args.parent = info.parent and info.parent.hwnd
+	--parent is either a window object or a handle. if it's a handle, self.parent will return nil.
+	args.parent = info.parent and info.parent.hwnd or info.parent
+	args.style = bit.bor(args.style, args.parent and WS_CHILD or WS_POPUP, WS_CLIPSIBLINGS, WS_CLIPCHILDREN)
 end
 
 function Control:__init(info)

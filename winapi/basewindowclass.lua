@@ -205,12 +205,16 @@ function BaseWindow:__after_create(info, args) end --stub
 function BaseWindow:__init(info)
 	BaseWindow.__index.__init(self)
 	info = inherit(info or {}, self.__defaults)
-	self.__state = {}
-	local args = {}
-	self:__before_create(info, args)
-	self.hwnd = CreateWindow(args)
-	self.font = info.font or GetStockObject(DEFAULT_GUI_FONT)
-	self:__after_create(info, args)
+	if not info.hwnd then
+		self.__state = {}
+		local args = {}
+		self:__before_create(info, args)
+		self.hwnd = CreateWindow(args)
+		self.font = info.font or GetStockObject(DEFAULT_GUI_FONT)
+		self:__after_create(info, args)
+	else --we can also wrap an exisiting window given its handle
+		self.hwnd = info.hwnd
+	end
 	Windows:add(self) --register the window so we can find it by hwnd
 	if info.visible ~= self.visible then --WS_VISIBLE on the first created window is ignored in some cases
 		self.visible = info.visible

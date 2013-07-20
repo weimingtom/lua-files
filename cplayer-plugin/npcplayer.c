@@ -28,7 +28,7 @@ void say(const char* format, ...) {
 /* Lua */
 
 lua_State *L;
-int rpc_func_ref;
+int np_func_ref;
 
 // pcall the function at the top of the Lua stack
 int pcall(int nargs, int nresults) {
@@ -39,7 +39,7 @@ int pcall(int nargs, int nresults) {
 	return 0;
 }
 
-// load and run a Lua script that returns the RPC function.
+// load and run a Lua script that returns the NP forwarding function.
 int load_script() {
 	if (L) return 0;
 	L = luaL_newstate();
@@ -53,20 +53,20 @@ int load_script() {
 		return 1;
 	}
 	if (pcall(0, 1)) return 1;
-	//running the script returned our RPC function that we keep a reference of in the registry table.
-	rpc_func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	if (rpc_func_ref == LUA_NOREF || rpc_func_ref == LUA_REFNIL) {
-		say("rpc caller returned nothing");
+	if (!lua_isfunction(L, -1)) {
+		say("error: function expected");
 		return 1;
 	}
+	//running the script returned our NP API forwarding function that we keep a reference of in the registry table.
+	np_func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	return 0;
 }
 
-// luad the RPC function and its first argument, the RPC function name to call, into the Lua stack.
-int rpc(const char* function_name) {
+// luad the NP forwarding function and its first argument (the name of the NP function to call), into the Lua stack.
+int forward(const char* function_name) {
 	say(function_name);
 	if (load_script()) return 1;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, rpc_func_ref);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, np_func_ref);
 	lua_pushstring(L, function_name);
 	return 0;
 }
@@ -74,21 +74,21 @@ int rpc(const char* function_name) {
 /* NPAPI */
 
 int16_t __stdcall NP_GetEntryPoints(void* plugin_funcs) {
-	if (rpc("NP_GetEntryPoints")) return 1;
+	if (forward("NP_GetEntryPoints")) return 1;
 	lua_pushlightuserdata(L, plugin_funcs);
 	if (pcall(2, 0)) return 1;
 	return 0;
 }
 
 int16_t __stdcall NP_Initialize(void* browser_funcs) {
-	if (rpc("NP_Initialize")) return 1;
+	if (forward("NP_Initialize")) return 1;
 	lua_pushlightuserdata(L, browser_funcs);
 	if (pcall(2, 0)) return 1;
 	return 0;
 }
 
 int16_t __stdcall NP_Shutdown() {
-	if (rpc("NP_Shutdown")) return 1;
+	if (forward("NP_Shutdown")) return 1;
 	if (pcall(1, 0)) return 1;
 	lua_close(L);
 	L = 0;

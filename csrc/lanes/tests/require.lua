@@ -10,7 +10,7 @@ local function a_lane()
     -- To require 'math' we still actually need to have it initialized for
     -- the lane.
     --
-    require "math"
+	 require "math"
     assert( math and math.sqrt )
     assert( math.sqrt(4)==2 )
 
@@ -24,7 +24,7 @@ local function a_lane()
     return v==42
 end
 
-local gen= lanes.gen( "math,package,string,table", a_lane )
+local gen= lanes.gen( "*", a_lane )
 
 local h= gen()
 local ret= h[1]

@@ -4,3 +4,4 @@ bin/libvlc*
 *.zip
 lxsh/
 password.txt
+cplayer-plugin/*log*.txt
