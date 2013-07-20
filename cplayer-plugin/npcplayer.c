@@ -7,19 +7,22 @@
 
 /* logging */
 
+// comment the next line if you don't want logging
 #define PLUGIN_LOGFILE "x:/work/lua-files/cplayer-plugin/clog.txt"
 
 FILE* logfile;
 
 void say(const char* format, ...) {
+#ifdef PLUGIN_LOGFILE
 	va_list args;
-	if (!logfile && PLUGIN_LOGFILE)
+	if (!logfile)
 		logfile = fopen(PLUGIN_LOGFILE, "w");
 	va_start(args, format);
 	vfprintf(logfile, format, args);
 	va_end(args);
 	fprintf(logfile, "\n");
 	fflush(logfile);
+#endif
 }
 
 /* Lua */
