@@ -52,7 +52,8 @@ int load_script() {
 		say("luaL_loadfile error: %s", lua_tostring(L, -1));
 		return 1;
 	}
-	if (pcall(0, 1)) return 1;
+	lua_pushstring(L, "npcplayer"); //module name, like require() would send
+	if (pcall(1, 1)) return 1;
 	if (!lua_isfunction(L, -1)) {
 		say("error: function expected");
 		return 1;

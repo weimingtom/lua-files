@@ -3,6 +3,7 @@ setfenv(1, require'winapi')
 require'winapi.controlclass'
 require'winapi.cursor'
 require'winapi.color'
+require'winapi.winbase' --GetCurrentThreadId
 
 Panel = subclass({
 	__class_style_bitmask = bitmask{ --only static, frame styles here
@@ -24,14 +25,11 @@ Panel = subclass({
 	},
 }, Control)
 
-local function name_generator(format)
-	local n = 0
-	return function()
-		n = n + 1
-		return string.format(format, n)
-	end
+local i = 0
+local function gen_classname()
+	i = i + 1
+	return string.format('Panel_%d_%d', GetCurrentThreadId(), i)
 end
-local gen_classname = name_generator'Panel%d'
 
 function Panel:__before_create(info, args)
 	Panel.__index.__before_create(self, info, args)

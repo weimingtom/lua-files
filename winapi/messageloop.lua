@@ -26,9 +26,8 @@ end
 
 function MessageLoop(after_process) --you can do os.exit(MessageLoop())
 	local msg = types.MSG()
-	local ret
 	while true do
-		ret = GetMessage(nil, 0, 0, msg)
+		local ret = GetMessage(nil, 0, 0, msg)
 		if ret == 0 then break end
 		ProcessMessage(msg)
 		if msg.message == WM_UNREGISTER_CLASS then

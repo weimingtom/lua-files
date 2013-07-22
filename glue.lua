@@ -47,7 +47,7 @@ function glue.merge(dt,...)
 	return dt
 end
 
---TODO: document and test this if it's a keeper
+--TODO: document and test this if it's a keeper (used only for inspect functions)
 local keys = glue.keys
 function glue.sortedpairs(t, cmp)
 	local kt = keys(t, cmp)

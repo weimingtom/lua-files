@@ -160,12 +160,13 @@ function player:window(t)
 		window = winapi.BaseWindow{hwnd = t.parent}
 	end
 
-	self.window = window --needed by filebox
-
 	panel = CairoPanel{
 		parent = window, w = window.client_w, h = window.client_h,
 		anchors = {left=true, right=true, top=true, bottom=true}
 	}
+
+	self.window = window --needed by filebox
+	self.panel = panel --needed by self.close
 
 	--window state
 	self.w = panel.client_w
