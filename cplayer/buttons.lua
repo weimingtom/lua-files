@@ -44,7 +44,7 @@ end
 function player:button(t)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
-	local text = t.text or 'OK'
+	local text = t.text or id
 	local cut = t.cut
 	local selected = t.selected
 	local enabled = t.enabled == nil and true or t.enabled

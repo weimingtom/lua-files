@@ -208,6 +208,18 @@ local function segment_time_to_arc_time(i, t, sweep_angle, segment_max_sweep)
 	return (i-1+t) / segments
 end
 
+--given the time t on an arc return the corresponding segment number and the time on that segment.
+local function arc_time_to_segment_time(t, sweep_angle, segment_max_sweep)
+	local sweep_angle = abs(observed_sweep(sweep_angle))
+	if sweep_angle < angle_epsilon then
+		return 1, t
+	end
+	local segments = ceil(sweep_angle / segment_max_sweep)
+	local d = t * segments
+	local i = math.floor(d)
+	return i+1, d-i
+end
+
 --shortest distance-squared from point (x0, y0) to a circular arc, plus the touch point, and the time in the arc
 --where the touch point splits the arc.
 local function circular_arc_hit(x0, y0, cx, cy, r, start_angle, sweep_angle, x2, y2)
@@ -273,11 +285,25 @@ local function circular_arc_length(t, cx, cy, r, start_angle, sweep_angle)
 	return abs(t * radians(sweep_angle) * r)
 end
 
-local function length(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+local bezier3_length = require'path_bezier3'.length
+
+local function length(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
 	if rx == ry and not mt then
 		return circular_arc_length(t, cx, cy, rx, start_angle, sweep_angle)
 	else
-		--TODO: compute length using gauss quadrature
+		--decompose and compute the sum of the lengths of the segments
+		segment_max_sweep = segment_max_sweep or best_segment_max_sweep(mt, rx, ry)
+		local maxseg, segt = arc_time_to_segment_time(t, sweep_angle, segment_max_sweep)
+		local x1, y1 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local cseg, len = 0, 0
+		local function write(_, x2, y2, x3, y3, x4, y4)
+			cseg = cseg + 1
+			if cseg > maxseg or (cseg == maxseg and segt == 0) then return end
+			len = len + bezier3_length(cseg < maxseg and 1 or segt, x1, y1, x2, y2, x3, y3, x4, y4)
+			x1, y1 = x4, y4
+		end
+		to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
+		return len
 	end
 end
 
@@ -302,11 +328,35 @@ local function circular_arc_bounding_box(cx, cy, r, start_angle, sweep_angle, x2
 	return x1, y1, x2-x1, y2-y1
 end
 
-local function bounding_box(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+local bezier3_bounding_box = require'path_bezier3'.bounding_box
+
+--return a function that computes an ever-growing bbox made of other bboxes.
+--calling it with no args returns the final bbox.
+local function bbox_adder()
+	local bx1, by1, bx2, by2 = 1/0, 1/0, -1/0, -1/0
+	return function(x, y, w, h)
+		if not x then return bx1, by1, bx2-bx1, by2-by1 end
+		local ax1, ay1, ax2, ay2 = x, y, x+w, y+h
+		bx1 = min(bx1, ax1, ax2)
+		by1 = min(by1, ay1, ay2)
+		bx2 = max(bx2, ax1, ax2)
+		by2 = max(by2, ay1, ay2)
+	end
+end
+
+local function bounding_box(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
 	if rx == ry and not mt then
 		return circular_arc_bounding_box(cx, cy, rx, start_angle, sweep_angle, x2, y2)
 	else
-		--TODO: is there a shortcut or should we convert to beziers?
+		--decompose and compute the bbox of the bboxes of the segments
+		local add_bbox = bbox_adder()
+		local x1, y1 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local function write(_, x2, y2, x3, y3, x4, y4)
+			add_bbox(bezier3_bounding_box(x1, y1, x2, y2, x3, y3, x4, y4))
+			x1, y1 = x4, y4
+		end
+		to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
+		return add_bbox()
 	end
 end
 

@@ -242,6 +242,7 @@ function player:window(t)
 
 		--magnifier glass: so useful it's enabled by default
 		if self:keypressed'ctrl' then
+			self.cr:identity_matrix()
 			self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
 		end
 

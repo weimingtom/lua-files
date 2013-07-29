@@ -181,77 +181,84 @@ local only_x1y1 = glue.index{'arc', 'elliptic_arc', 'line_arc', 'line_elliptic_a
 										'rect', 'round_rect', 'elliptic_rect', 'ellipse',
 										'circle', 'superformula', 'text'}
 
---given current point and an unpacked command and its args, return the command in absolute form.
-local function abs_cmd(cpx, cpy, s, ...)
-	if rel_names[s] ~= s then return s, ... end
+--given a point and an unpacked command and its args, return the args with the point added to them.
+local function translate_cmd(cpx, cpy, s, ...)
 	assert(cpx and cpy, 'no current point')
 	s = abs_name(s)
 	if s == 'move' or s == 'line' then
 		local x2, y2 = ...
-		return s, cpx + x2, cpy + y2
+		return cpx + x2, cpy + y2
 	elseif s == 'close' then
-		return s
+		return
 	elseif s == 'hline' then
-		return s, cpx + ...
+		return cpx + ...
 	elseif s == 'vline' then
-		return s, cpy + ...
+		return cpy + ...
 	elseif s == 'curve' then
 		local x2, y2, x3, y3, x4, y4 = ...
-		return s, cpx + x2, cpy + y2, cpx + x3, cpy + y3, cpx + x4, cpy + y4
+		return cpx + x2, cpy + y2, cpx + x3, cpy + y3, cpx + x4, cpy + y4
 	elseif s == 'symm_curve' then
 		local x3, y3, x4, y4 = ...
-		return s, cpx + x3, cpy + y3, cpx + x4, cpy + y4
+		return cpx + x3, cpy + y3, cpx + x4, cpy + y4
 	elseif s == 'smooth_curve' then
 		local len, x3, y3, x4, y4 = ...
-		return s, len, cpx + x3, cpy + y3, cpx + x4, cpy + y4
+		return len, cpx + x3, cpy + y3, cpx + x4, cpy + y4
 	elseif s == 'quad_curve' or s == 'quad_curve_3p' then
 		local x2, y2, x3, y3 = ...
-		return s, cpx + x2, cpy + y2, cpx + x3, cpy + y3
+		return cpx + x2, cpy + y2, cpx + x3, cpy + y3
 	elseif s == 'symm_quad_curve' then
 		local x3, y3 = ...
-		return s, cpx + x3, cpy + y3
+		return cpx + x3, cpy + y3
 	elseif s == 'smooth_quad_curve' then
 		local len, x3, y3 = ...
-		return s, len, cpx + x3, cpy + y3
+		return len, cpx + x3, cpy + y3
 	elseif s == 'arc_3p' then
 		local xp, yp, x2, y2 = ...
-		return s, cpx + xp, cpy + yp, cpx + x2, cpy + y2
+		return cpx + xp, cpy + yp, cpx + x2, cpy + y2
 	elseif s == 'circle_3p' then
 		local x1, y1, x2, y2, x3, y3 = ...
-		return s, cpx + x1, cpy + y1, cpx + x2, cpy + y2, cpx + x3, cpy + y3
+		return cpx + x1, cpy + y1, cpx + x2, cpy + y2, cpx + x3, cpy + y3
 	elseif s == 'svgarc' then
 		local rx, ry, rotation, large_arc_flag, sweep_flag, x2, y2 = ...
-		return s, rx, ry, rotation, large_arc_flag, sweep_flag, cpx + x2, cpy + y2
+		return rx, ry, rotation, large_arc_flag, sweep_flag, cpx + x2, cpy + y2
 	elseif only_x1y1[s] then
 		local x, y = ...
-		return s, cpx + x, cpy + y, select(3, ...)
+		return cpx + x, cpy + y, select(3, ...)
 	elseif s == 'star' then
 		local cx, cy, x1, y1, r2, n = ...
-		return s, cpx + cx, cpy + cy, cpx + x1, cpy + y1, r2, n
+		return cpx + cx, cpy + cy, cpx + x1, cpy + y1, r2, n
 	elseif s == 'star_2p' then
 		local cx, cy, x1, y1, x2, y2, n = ...
-		return s, cpx + cx, cpy + cy, cpx + x1, cpy + y1, cpx + x2, cpy + y2, n
+		return cpx + cx, cpy + cy, cpx + x1, cpy + y1, cpx + x2, cpy + y2, n
 	elseif s == 'rpoly' then
 		local cx, cy, x1, y1, n = ...
-		return s, cpx + cx, cpy + cy, cpx + x1, cpy + y1, n
+		return cpx + cx, cpy + cy, cpx + x1, cpy + y1, n
 	elseif s == 'text' then
 		local x, y, font, text = ...
-		return s, cpx + x, cpy + y, font, text
+		return cpx + x, cpy + y, font, text
 	else
 		error'invalid command'
 	end
+end
+
+--given current point and an unpacked command and its args, return the command in absolute form.
+local function abs_cmd(cpx, cpy, s, ...)
+	if not is_rel(s) then return s, ... end
+	return abs_name(s), translate_cmd(cpx, cpy, s, ...)
+end
+
+--given current point and an unpacked command and its args, return the command in relative form.
+local function rel_cmd(cpx, cpy, s, ...)
+	if is_rel(s) then return s, ... end
+	return rel_name(s), translate_cmd(-cpx, -cpy, s, ...)
 end
 
 --adding, replacing and removing path commands, in relative or absolute form ---------------------------------------------
 
 --given a rel. or abs. command name and its args in abs. form, encode the command as relative if the name is relative.
 local function to_rel(cpx, cpy, s, ...)
-	if is_rel(s) then
-		assert(cpx and cpy, 'no current point')
-		return s, select(2, abs_cmd(-cpx, -cpy, s, ...))
-	else
-		return s, ...
-	end
+	if not is_rel(s) then return s, ... end
+	return s, translate_cmd(-cpx, -cpy, s, ...)
 end
 
 local function append_rel_cmd(path, cpx, cpy, s, ...)
@@ -339,7 +346,7 @@ end
 --smooth curves can use any kind of tip as they only use the vector's angle, neverminding its length.
 --all (and only) commands that leave a current point leave a tangent point, except 'move'.
 --TODO: svgarc_to_arc() is expensive and yet it's called twice, once in tangent_tip() then again in
---			context_free_cmd(). find a nice way to reuse the results instead of calling it twice.
+--			simple_cmd(). find a nice way to reuse the results instead of calling it twice.
 local function tangent_tip(cpx, cpy, tkind, tx, ty, s, ...)
 	if s == 'line' then
 		return 'tangent', cpx, cpy
@@ -430,9 +437,10 @@ local function to_cusp(cpx, cpy, tkind, tx, ty, s, ...)
 	end
 end
 
---given a command in abs. form and current state, return the command in canonical context-free form,
---adding the current point, removing line, curve and arc variations, and dealing with invalid parametrization.
-local function context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
+--given a command in abs. form and current state, return the command in simplified context-free form,
+--prepending the current point, removing line, curve and arc variations, and dealing with invalid parametrization.
+--'carc' means canonical arc, which is an elliptic arc optionally connected to the path by a line.
+local function simple_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 	if s == 'move' then
 		return s, ...
 	elseif s == 'line' or s == 'curve' or s == 'quad_curve' then
@@ -492,8 +500,8 @@ end
 
 --given an abs. path command and current state, decode it and pass it to a processor function and then
 --return the next state. the processor will usually write its output using the supplied write function.
-local function decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
-	process(write, mt, i, context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...))
+local function decode_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
+	process(write, mt, i, simple_cmd(cpx, cpy, spx, spy, tkind, tx, ty, s, ...))
 	return next_state(cpx, cpy, spx, spy, tkind, tx, ty, s, ...)
 end
 
@@ -502,7 +510,7 @@ end
 local function decode_path(process, write, path, mt, cpx, cpy, spx, spy, tkind, tx, ty)
 	for i,s in commands(path) do
 		cpx, cpy, spx, spy, tkind, tx, ty =
-			decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
+				 decode_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
 					 abs_cmd(cpx, cpy,
 						  cmd(path, i)))
 	end
@@ -514,7 +522,7 @@ end
 local function command_decoder(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty)
 	return function(s, ...)
 		cpx, cpy, spx, spy, tkind, tx, ty =
-			decode_abs_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
+				 decode_cmd(process, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
 					 abs_cmd(cpx, cpy, s, ...))
 	end, function()
 		return cpx, cpy, spx, spy, tkind, tx, ty
@@ -550,47 +558,47 @@ local function transform_points(mt, ...)
 	assert(false)
 end
 
---path simplification ----------------------------------------------------------------------------------------------------
+--path decomposition -----------------------------------------------------------------------------------------------------
 
-local simplify = {}
+local decompose = {}
 
---the processor function for path simplification.
-local function simplify_processor(write, mt, i, s, ...)
-	simplify[s](write, mt, ...)
+--the processor function for path decomposition.
+local function decompose_processor(write, mt, i, s, ...)
+	decompose[s](write, mt, ...)
 end
 
---given a path and optionally a transformation matrix, simplify a path to down to primitive commands.
+--given a path and optionally a transformation matrix, decompose a path into primitive commands.
 --primitive commands are: move, close, line, curve, quad_curve.
-local function simplify_path(write, path, mt)
-	decode_path(simplify_processor, write, path, mt)
+local function decompose_path(write, path, mt)
+	decode_path(decompose_processor, write, path, mt)
 end
 
-function simplify.move(write, mt, x2, y2)
+function decompose.move(write, mt, x2, y2)
 	write('move', transform_points(mt, x2, y2))
 end
 
-function simplify.close(write, mt, cpx, cpy, spx, spy)
+function decompose.close(write, mt, cpx, cpy, spx, spy)
 	if cpx ~= spx or cpy ~= spy then
 		write('line', transform_points(mt, spx, spy))
 	end
 	write('close')
 end
 
-function simplify.line(write, mt, x1, y1, x2, y2)
+function decompose.line(write, mt, x1, y1, x2, y2)
 	write('line', transform_points(mt, x2, y2))
 end
 
-function simplify.quad_curve(write, mt, x1, y1, x2, y2, x3, y3)
+function decompose.quad_curve(write, mt, x1, y1, x2, y2, x3, y3)
 	write('quad_curve', transform_points(mt, x2, y2, x3, y3))
 end
 
-function simplify.curve(write, mt, x1, y1, x2, y2, x3, y3, x4, y4)
+function decompose.curve(write, mt, x1, y1, x2, y2, x3, y3, x4, y4)
 	write('curve', transform_points(mt, x2, y2, x3, y3, x4, y4))
 end
 
 local arc_to_bezier3 = require'path_arc'.to_bezier3
 
-function simplify.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
+function decompose.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	if connect then
 		local x1, y1 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
 		write(connect, x1, y1)
@@ -599,7 +607,7 @@ function simplify.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle
 end
 
 --note: if rx * ry is negative, the ellipse is drawn counterclockwise.
-function simplify.ellipse(write, mt, cx, cy, rx, ry, rotation)
+function decompose.ellipse(write, mt, cx, cy, rx, ry, rotation)
 	if rx == 0 or ry == 0 then return end --invalid parametrization, skip it
 	local sweep_angle = rx*ry >= 0 and 360 or -360
 	local x1, y1 = arc_endpoints(cx, cy, rx, ry, 0, sweep_angle, rotation)
@@ -610,14 +618,14 @@ end
 
 local rect_to_lines = require'path_shapes'.rect_to_lines
 
-function simplify.rect(write, mt, x1, y1, w, h)
+function decompose.rect(write, mt, x1, y1, w, h)
 	rect_to_lines(write, x1, y1, w, h, mt)
 end
 
---these shapes can draw themselves but can't transform themselves so we must write custom simplifiers for them.
+--these shapes can draw themselves but can't transform themselves so we must write custom decomposers for them.
 --shapes can draw themselves using only primitive commands, starting in an empty state.
 --the ability to draw composites using arbitrary path commands can be enabled in the code below (see comments).
-local simplify_no_transform = {
+local decompose_no_transform = {
 	round_rect    = require'path_shapes'.round_rect_to_bezier3,
 	elliptic_rect = require'path_shapes'.elliptic_rect_to_bezier3,
 	star          = require'path_shapes'.star_to_lines,
@@ -627,30 +635,30 @@ local simplify_no_transform = {
 	text          = require'path_text'.to_bezier3,
 }
 
-for s,simplify_nt in pairs(simplify_no_transform) do
-	simplify[s] = function(write, mt, ...)
+for s,decompose_nt in pairs(decompose_no_transform) do
+	decompose[s] = function(write, mt, ...)
 		if not mt then
 			--we know that composite commands draw themselves with only primitive commands so we write them directly.
 			--if composite commands could have written other types of commands, we would not have had this branch.
-			simplify_nt(write, ...)
+			decompose_nt(write, ...)
 		else
-			--we use simplification only to transform the points, we know we're only dealing with simple commands.
+			--we use decomposition only to transform the points, we know we're only dealing with primitive commands.
 			--note: composite commands don't need a state to start with, and they don't leave any state behind.
 			--we can't access the initial state from here anyway, and we can't return the final state either.
-			local decoder = command_decoder(simplify_processor, write, mt)
-			simplify_nt(decoder, ...)
+			local decoder = command_decoder(decompose_processor, write, mt)
+			decompose_nt(decoder, ...)
 		end
 	end
 end
 
-function simplify.text(write, mt, x, y, font, text)
+function decompose.text(write, mt, x, y, font, text)
 	--write('text', x, y, font, text)
 end
 
 --recursive path decoding ------------------------------------------------------------------------------------------------
 
 --decode a path and process its commands using a conditional processor. the processor will be tried for each command.
---for commands for which the processor returns false, simplify the command and then process the resulted segments.
+--for commands for which the processor returns false, decompose the command and then process the resulted segments.
 --processors for primitive commands must never return false otherwise infinite recursion occurs.
 local function decode_recursive(process, write, path, mt)
 	local cpx, cpy, spx, spy, tkind, tx, ty
@@ -658,15 +666,15 @@ local function decode_recursive(process, write, path, mt)
 	local function recursive_processor(write, mt, i, s, ...)
 		if process(write, mt, i, s, ...) == false then
 			local decoder = command_decoder(recursive_processor, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty)
-			simplify_processor(decoder, nil, i, s, ...)
+			decompose_processor(decoder, nil, i, s, ...)
 		end
 	end
 
 	for i,s in commands(path) do
 		cpx, cpy, spx, spy, tkind, tx, ty =
-			decode_abs_cmd(recursive_processor, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
-					 abs_cmd(cpx, cpy,
-						  cmd(path, i)))
+			 decode_cmd(recursive_processor, write, mt, i, cpx, cpy, spx, spy, tkind, tx, ty,
+				 abs_cmd(cpx, cpy,
+					  cmd(path, i)))
 	end
 end
 
@@ -727,7 +735,7 @@ end
 function bbox.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 	if mt or rx ~= ry or rotation ~= 0 then return false end
 	if connect == 'line' then
-		local x1, y1 = arc_endpoints(cx, cy, rx, rx, start_angle, sweep_angle, rotation, x2, y2)
+		local x1, y1 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
 		write(line_bbox(cpx, cpy, x1, y1))
 	end
 	write(arc_bbox(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2))
@@ -792,12 +800,15 @@ function len.quad_curve(write, mt, x1, y1, x2, y2, x3, y3)
 end
 
 function len.carc(write, mt, cpx, cpy, connect, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2)
-	if mt or rx ~= ry or rotation ~= 0 then return false end
 	if connect == 'line' then
 		local x1, y1 = arc_endpoints(cx, cy, rx, ry, start_angle, sweep_angle)
+		if mt then
+			cpx, cpy = mt(cpx, cpy)
+			x1, y1 = mt(x1, y1)
+		end
 		write(line_len(1, cpx, cpy, x1, y1))
 	end
-	write(arc_len(1, cx, cy, rx, ry, start_angle, sweep_angle))
+	write(arc_len(1, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2))
 end
 
 function len.ellipse(write, mt, cx, cy, rx, ry)
@@ -946,9 +957,9 @@ local function split_path(path, i, t)
 		local as = abs_cmd(rs)
 		split[s](path, i, t, as, rs, ...)
 	end
-	process(context_free_cmd(cpx, cpy, spx, spy, tkind, tx, ty,
-						  abs_cmd(cpx, cpy,
-							   cmd(path, i))))
+	process(simple_cmd(cpx, cpy, spx, spy, tkind, tx, ty,
+				  abs_cmd(cpx, cpy,
+					   cmd(path, i))))
 end
 
 --path to abs/rel conversion ---------------------------------------------------------------------------------------------
@@ -1355,23 +1366,23 @@ return {
 	insert_cmd = insert_cmd,
 	replace_cmd = replace_cmd,
 	remove_cmd = remove_cmd,
-
-	append_rel_cmd = append_rel_cmd,
-	insert_rel_cmd = insert_rel_cmd,
-	replace_rel_cmd = replace_rel_cmd,
-	--decoding
+	--decoding: rel->abs
 	is_rel = is_rel,
 	abs_name = abs_name,
+	rel_name = rel_name,
 	abs_cmd = abs_cmd,
+	rel_cmd = rel_cmd,
+	--decoding: command state: current point
 	next_cp = next_cp,
 	cp_at = cp_at,
-	tangent_tip = tangent_tip,
+	--decoding: command state: current point + tangent tip
 	next_state = next_state,
 	state_at = state_at,
-	context_free_cmd = context_free_cmd,
+	--decoding: simplifying
 	decode = decode_path,
 	command_decoder = command_decoder,
-	simplify = simplify_path,
+	--decoding: decomposing and transforming
+	decompose = decompose_path,
 	decode_recursive = decode_recursive,
 	--measuring and hit testing
 	bounding_box = path_bbox,

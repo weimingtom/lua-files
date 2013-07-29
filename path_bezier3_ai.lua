@@ -1,10 +1,6 @@
 --2D cubic bezier adaptive interpolation from AGG.
 --adapted from http://www.antigrain.com/research/adaptive_bezier/index.html by Cosmin Apreutesei.
 
---NOTE: collinearity detection in AGG is not cheap but results in versatile curves. Since the approximation error
---is adapted to both angle and scale, offsets look good, you can apply non-linear transformations on the resulted
---segments, and you can render the curve with a scanline rasterizer.
-
 local bezier3 = require'path_bezier3'
 local distance2 = require'path_point'.distance2
 
@@ -19,9 +15,10 @@ local recursive_bezier --forward decl.
 --tip: adjust m_approximation_scale to the scale of the world-to-screen transformation.
 --tip: enable m_angle_tolerance when stroke width * scale > 1.
 --tip: m_cusp_limit should not exceed 10-15 degrees.
-function bezier3.interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4, m_approximation_scale, m_angle_tolerance, m_cusp_limit)
+function bezier3.interpolate(write, x1, y1, x2, y2, x3, y3, x4, y4,
+												m_approximation_scale, m_angle_tolerance, m_cusp_limit)
 	m_approximation_scale = m_approximation_scale or 1
-	m_angle_tolerance = m_angle_tolerance or 0
+	m_angle_tolerance = m_angle_tolerance and radians(m_angle_tolerance) or 0
 	m_cusp_limit = m_cusp_limit and m_cusp_limit ~= 0 and pi - radians(m_cusp_limit) or 0
 	local m_distance_tolerance2 = (1 / (2 * m_approximation_scale))^2
 
@@ -202,5 +199,5 @@ function recursive_bezier(write, x1, y1, x2, y2, x3, y3, x4, y4, level,
 end
 
 
-if not ... then require'path_bezier3_ai_demo' end
+if not ... then require'path_bezier3_demo' end
 

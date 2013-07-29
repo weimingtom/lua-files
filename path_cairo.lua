@@ -32,7 +32,7 @@ local function draw_function(cr)
 	end
 	local function draw(path_, mt)
 		cr:new_sub_path()
-		path.simplify(write, path_, mt)
+		path.decompose(write, path_, mt)
 	end
 
 	return draw

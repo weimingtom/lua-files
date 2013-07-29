@@ -3,7 +3,7 @@
 
 local bezier2 = require'path_bezier2'
 
-local pi, atan2, abs = math.pi, math.atan2, math.abs
+local pi, atan2, abs, radians = math.pi, math.atan2, math.abs, math.rad
 
 local curve_collinearity_epsilon    = 1e-30
 local curve_angle_tolerance_epsilon = 0.01
@@ -15,7 +15,7 @@ local recursive_bezier --forward decl.
 --tip: enable m_angle_tolerance when stroke width * scale > 1.
 function bezier2.interpolate(write, x1, y1, x2, y2, x3, y3, m_approximation_scale, m_angle_tolerance)
 	m_approximation_scale = m_approximation_scale or 1
-	m_angle_tolerance = m_angle_tolerance or 0
+	m_angle_tolerance = m_angle_tolerance and radians(m_angle_tolerance) or 0
 	local m_distance_tolerance2 = (1 / (2 * m_approximation_scale))^2
 
 	recursive_bezier(write, x1, y1, x2, y2, x3, y3, 0, m_distance_tolerance2, m_angle_tolerance)
@@ -70,5 +70,5 @@ function recursive_bezier(write, x1, y1, x2, y2, x3, y3, level, m_distance_toler
 	recursive_bezier(write, x123, y123, x23, y23, x3, y3, level + 1, m_distance_tolerance2, m_angle_tolerance)
 end
 
-if not ... then require'path_bezier2_ai_demo' end
+if not ... then require'path_bezier2_demo' end
 

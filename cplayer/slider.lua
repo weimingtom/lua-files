@@ -16,7 +16,7 @@ function player:slider(t)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
 	local font_size = t.font_size or h / 2
-	local text = t.text
+	local text = t.text or id
 
 	local i0, i1, step = t.i0 or 0, t.i1 or 100, t.step or 1
 	local i = t.i or i0
