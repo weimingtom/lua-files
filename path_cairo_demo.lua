@@ -90,8 +90,6 @@ local p = {
 
 function player:on_render(cr)
 	i=i+1
-	cr:set_source_rgb(0,0,0)
-	cr:paint()
 
 	local draw = draw_function(cr)
 	local mt --= require'affine2d'():translate(100, 200):scale(1, .7):rotate_around(500, 300, i/10)

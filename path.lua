@@ -853,8 +853,8 @@ end
 
 local distance2        = require'path_point'.distance2
 local line_hit         = require'path_line'.hit
-local quad_curve_hit   = require'path_bezier2_hit'
-local curve_hit        = require'path_bezier3_hit'
+local quad_curve_hit   = require'path_bezier2'.hit
+local curve_hit        = require'path_bezier3'.hit
 local arc_hit          = require'path_arc'.hit
 
 function ht.move(write, mt, i, x0, y0, x2, y2)
@@ -1352,7 +1352,7 @@ end
 
 --public API -------------------------------------------------------------------------------------------------------------
 
-if not ... then require'path_cairo_demo' end
+if not ... then require'path_demo' end
 
 return {
 	--iterating

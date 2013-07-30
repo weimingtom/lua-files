@@ -56,7 +56,8 @@ function player:on_render(cr)
 	self:dot(x2, y2, 4, '#22466A')
 
 	--hit -> point & time
-	local d,x,y,t = arc.hit(self.mousex, self.mousey, cx, cy, rx, ry, start_angle, sweep_angle, rotation, nil, nil, mt, max_segment_sweep)
+	local d,x,y,t = arc.hit(self.mousex, self.mousey, cx, cy, rx, ry, start_angle, sweep_angle, rotation,
+										nil, nil, mt, max_segment_sweep)
 
 	--split -> draw #1, draw #2
 	local
@@ -64,8 +65,8 @@ function player:on_render(cr)
 		cx2, cy2, r2x, r2y, start_angle2, sweep_angle2, rotation2 =
 			arc.split(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation)
 
-	draw(cx1, cy1, r1x, r1y, start_angle1, sweep_angle1, rotation1, nil, nil, mt, '#9C6EA4')
-	draw(cx2, cy2, r2x, r2y, start_angle2, sweep_angle2, rotation2, nil, nil, mt, '#22466A')
+	draw(cx1, cy1, r1x, r1y, start_angle1, sweep_angle1, rotation1, nil, nil, mt, '#ffff00')
+	draw(cx2, cy2, r2x, r2y, start_angle2, sweep_angle2, rotation2, nil, nil, mt, '#ff00ff')
 
 	--exact hit/split point
 	self:circle(x, y, 2, '#00ff00')

@@ -14,6 +14,8 @@ local bezier3 = require'path_bezier3'
 local point_around = require'path_point'.point_around
 local point_angle = require'path_point'.point_angle
 local distance2 = require'path_point'.distance2
+local bezier3_length = require'path_bezier3'.length
+local bezier3_bounding_box = require'path_bezier3'.bounding_box
 
 local abs, min, max, sqrt, ceil, sin, cos, radians =
 	math.abs, math.min, math.max, math.sqrt, math.ceil, math.sin, math.cos, math.rad
@@ -285,8 +287,6 @@ local function circular_arc_length(t, cx, cy, r, start_angle, sweep_angle)
 	return abs(t * radians(sweep_angle) * r)
 end
 
-local bezier3_length = require'path_bezier3'.length
-
 local function length(t, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
 	if rx == ry and not mt then
 		return circular_arc_length(t, cx, cy, rx, start_angle, sweep_angle)
@@ -328,35 +328,30 @@ local function circular_arc_bounding_box(cx, cy, r, start_angle, sweep_angle, x2
 	return x1, y1, x2-x1, y2-y1
 end
 
-local bezier3_bounding_box = require'path_bezier3'.bounding_box
-
---return a function that computes an ever-growing bbox made of other bboxes.
---calling it with no args returns the final bbox.
-local function bbox_adder()
-	local bx1, by1, bx2, by2 = 1/0, 1/0, -1/0, -1/0
-	return function(x, y, w, h)
-		if not x then return bx1, by1, bx2-bx1, by2-by1 end
-		local ax1, ay1, ax2, ay2 = x, y, x+w, y+h
-		bx1 = min(bx1, ax1, ax2)
-		by1 = min(by1, ay1, ay2)
-		bx2 = max(bx2, ax1, ax2)
-		by2 = max(by2, ay1, ay2)
-	end
+--grow a bounding box with another bounding box
+local function grow_bbox(bx, by, bw, bh, x, y, w, h)
+	local ax1, ay1, ax2, ay2 = x, y, x+w, y+h
+	local bx1, by1, bx2, by2 = bx, by, bx+bw, by+bh
+	bx1 = min(bx1, ax1, ax2)
+	by1 = min(by1, ay1, ay2)
+	bx2 = max(bx2, ax1, ax2)
+	by2 = max(by2, ay1, ay2)
+	return bx1, by1, bx2-bx1, by2-by1
 end
 
 local function bounding_box(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
-	if rx == ry and not mt then
+	if rx == ry and not mt then --TODO: or mt:straight() ...
 		return circular_arc_bounding_box(cx, cy, rx, start_angle, sweep_angle, x2, y2)
 	else
 		--decompose and compute the bbox of the bboxes of the segments
-		local add_bbox = bbox_adder()
 		local x1, y1 = endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt)
+		local bx, by, bw, bh = 1/0, 1/0, -1/0, -1/0
 		local function write(_, x2, y2, x3, y3, x4, y4)
-			add_bbox(bezier3_bounding_box(x1, y1, x2, y2, x3, y3, x4, y4))
+			bx, by, bw, bh = grow_bbox(bx, by, bw, bh, bezier3_bounding_box(x1, y1, x2, y2, x3, y3, x4, y4))
 			x1, y1 = x4, y4
 		end
 		to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation, x2, y2, mt, segment_max_sweep)
-		return add_bbox()
+		return bx, by, bw, bh
 	end
 end
 

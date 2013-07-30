@@ -13,47 +13,47 @@ local player = {}
 player.themes = {}
 
 player.themes.dark = {
-	window_bg = {0,0,0,1},
-	faint_bg  = {1,1,1,0.2},
-	normal_bg = {1,1,1,0.3},
-	normal_fg = {1,1,1,1},
-	normal_border = {1,1,1,0.4},
-	hot_bg = {1,1,1,0.6},
-	hot_fg = {0,0,0,1},
-	selected_bg = {1,1,1,1},
-	selected_fg = {0,0,0,1},
-	disabled_bg = {1,1,1,0.3},
-	disabled_fg = {.6,.6,.6,1},
-	error_bg = {1,0,0,0.7},
-	error_fg = {1,1,1,1},
+	window_bg     = '#000000',
+	faint_bg      = '#ffffff33',
+	normal_bg     = '#ffffff4c',
+	normal_fg     = '#ffffff',
+	normal_border = '#ffffff66',
+	hot_bg        = '#ffffff99',
+ 	hot_fg        = '#000000',
+	selected_bg   = '#ffffff',
+	selected_fg   = '#000000',
+	disabled_bg   = '#ffffff4c',
+	disabled_fg   = '#999999',
+	error_bg      = '#ff0000b2',
+	error_fg      = '#ffffff',
 }
 
 player.themes.light = {
-	window_bg = {1,1,1,1},
-	faint_bg  = {0,0,0,0.2},
-	normal_bg = {0,0,0,0.3},
-	normal_fg = {0,0,0,1},
-	normal_border = {0,0,0,0.4},
-	hot_bg = {0,0,0,0.6},
-	hot_fg = {1,1,1,1},
-	selected_bg = {0,0,0,0.9},
-	selected_fg = {1,1,1,1},
-	disabled_bg = {0,0,0,0.3},
-	disabled_fg = {0.4,0.4,0.4,1},
-	error_bg = {1,0,0,0.7},
-	error_fg = {1,1,1,1},
+	window_bg     = '#ffffff',
+	faint_bg      = '#00000033',
+	normal_bg     = '#0000004c',
+	normal_fg     = '#000000',
+	normal_border = '#00000066',
+	hot_bg        = '#00000099',
+	hot_fg        = '#ffffff',
+	selected_bg   = '#000000e5',
+	selected_fg   = '#ffffff',
+	disabled_bg   = '#0000004c',
+	disabled_fg   = '#666666',
+	error_bg      = '#ff0000b2',
+	error_fg      = '#ffffff',
 }
 
 player.themes.red = glue.merge({
-	normal_bg = {1,0,0,0.7},
-	normal_fg = {1,1,1,1},
-	normal_border = {1,1,1,0.4},
-	hot_bg = {1,0,0,0.9},
-	hot_fg = {1,1,1,1},
-	selected_bg = {1,1,1,1},
-	selected_fg = {0,0,0,1},
-	disabled_bg = {1,0,0,0.7},
-	disabled_fg = {.6,.6,.6,1},
+	normal_bg      = '#ff0000b2',
+	normal_fg      = '#ffffff',
+	normal_border  = '#ffffff66',
+	hot_bg         = '#ff0000e5',
+	hot_fg         = '#ffffff',
+	selected_bg    = '#ffffff',
+	selected_fg    = '#000000',
+	disabled_bg    = '#ff0000b2',
+	disabled_fg    = '#999999',
 }, player.themes.dark)
 
 --winapi keycodes. key codes for 0-9 and A-Z keys are ascii codes.
@@ -228,7 +228,7 @@ function player:window(t)
 		self.cr:identity_matrix()
 
 		--paint the background
-		self.cr:set_source_rgba(unpack(self.theme.window_bg))
+		self:setcolor'window_bg'
 		self.cr:paint()
 
 		--set the wall clock
@@ -356,12 +356,19 @@ local function hexcolor(s)
 	if s:sub(1,1) ~= '#' then return end
 	local r,g,b,a = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16),
 						 tonumber(s:sub(6,7), 16), tonumber(s:sub(8,9), 16) or 255
-	return {r/255, g/255, b/255, a/255}
+	return r/255, g/255, b/255, a/255
+end
+
+local function parse_color(c)
+	if type(c) == 'string' then
+		return hexcolor(c)
+	elseif type(c) == 'table' then
+		return unpack(c)
+	end
 end
 
 function player:setcolor(color)
-	color = assert(self.theme[color] or hexcolor(color), 'invalid color')
-	self.cr:set_source_rgba(unpack(color))
+	self.cr:set_source_rgba(parse_color(self.theme[color] or color))
 end
 
 function player:fill(color)

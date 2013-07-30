@@ -11,6 +11,7 @@ function player:label(t)
 	local text = assert(t.text, 'text missing')
 
 	for text in glue.gsplit(text, '\n') do
+		--TODO: align bottom with multiline text
 		self:text(text, font_size, t.color or 'normal_fg',
 					t.halign or 'left',
 					t.valign or 'top', x, y, w, h)

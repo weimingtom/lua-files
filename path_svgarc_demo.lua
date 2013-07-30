@@ -52,12 +52,12 @@ function player:on_render(cr)
 
 	cr:set_line_width(2)
 
-	local x0, y0 = cr:device_to_user(self.mousex or 0, self.mousey or 0)
 	local mind, minx, miny, mint
 	local function hit(x1, y1, rx, ry, rotation, large, sweep, x2, y2)
 		if not svgarc.valid(x1, y1, x2, y2, rx, ry) then return end
 
-		local d, x, y, t = arc.hit(x0, y0, svgarc.to_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt))
+		local x, y = cr:device_to_user(self.mousex, self.mousey)
+		local d, x, y, t = arc.hit(x, y, svgarc.to_arc(x1, y1, rx, ry, rotation, large, sweep, x2, y2, mt))
 		if not mind or d < mind then
 			mind, minx, miny, mint = d, x, y, t
 		end
