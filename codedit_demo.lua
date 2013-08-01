@@ -1,11 +1,10 @@
-local lines = require'codedit_lines'
-local move = require'codedit_move'
-
-local ce = require'codedit'
+local codedit = require'codedit'
 local player = require'cairo_player'
-local glue = require'glue'
 
-local text = [[
+local s = [[
+A	BB	C
+AA	B	C
+AAA	BB	C
 function lines.pos(s, lnum)
 	if lnum < 1 then return end
 	local n = 0
@@ -16,43 +15,27 @@ function lines.pos(s, lnum)
 end
 ]]
 
-local ed = ce.editor:new(text)
-local vwer = ce.viewer:new(300, 50, 800, 400, hliter)
-local car = ce.caret:new(ed)
-
-local tabsize
+local v = codedit.view:new{id = 'view', x = 200, y = 10, w = 300, h = 150}
+local b = codedit.buffer:new{string = s}
+local c = codedit.cursor:new{buffer = b, view = v}
 
 function player:on_render(cr)
 
-	--[[
-	local i, j, n = lines.pos(ed.s, car.lnum)
-	local vcnum = lines.view_cnum(ed.s, car.lnum, car.cnum, car.tabsize)
-	self:label{x = 10, y = 10, text = string.format('lnum: %d, cnum: %d | line: %d, size: %d | vcnum: %d',
-																	car.lnum, car.cnum, n, j - i + 2, vcnum)}
-	]]
+	--c.restrict_eol = false
+	--c.restrict_eof = false
 
-	car.tabsize = self:slider{id = 'tabsize', x = 10, y = 40, w = 90, h = 24, i0 = 1, i1 = 8, i = car.tabsize}
-	car.restrict_right = self:togglebutton{id = 'restrict_right', x = 10, y = 70, w = 90, h = 24, selected = car.restrict_right}
-	car.restrict_down = self:togglebutton{id = 'restrict_down', x = 10, y = 100, w = 90, h = 24, selected = car.restrict_down}
-	vwer.linesize = self:slider{id = 'linesize', x = 10, y = 130, w = 90, h = 24, i0 = 10, i1 = 30, i = vwer.linesize}
-	vwer.tabsize = car.tabsize
+	v.tabsize = self:slider{id = 'tabsize', x = 10, y = 10, w = 80, h = 24, i0 = 1, i1 = 8, i = v.tabsize}
+	v.linesize = self:slider{id = 'linesize', x = 10, y = 40, w = 80, h = 24, i0 = 10, i1 = 30, i = v.linesize}
+	b.line_terminator = self:mbutton{id = 'term', x = 10, y = 70, w = 80, h = 24,
+		values = {'\r\n', '\r', '\n'}, texts = {['\r\n'] = 'CRLF', ['\n'] = 'LF', ['\r'] = 'CR'},
+		selected = b.line_terminator}
 
-	car.gettime = function() return self.clock end
+	c:keypress(self.key, self.char, self.ctrl, self.shift)
 
-	if self.key == 'left' then
-		car:move_left()
-	elseif self.key == 'right' then
-		car:move_right()
-	elseif self.key == 'up' then
-		car:move_up()
-	elseif self.key == 'down' then
-		car:move_down()
-	elseif self.key == 'insert' then
-		car.insert_mode = not car.insert_mode
-	end
-
-	vwer:render_text(cr, ed.s)
-	vwer:render_caret(cr, car, ed)
+	--v:render_selection(codedit.selection:new{buffer = b, line1 = 2, line2 = 2, col1 = 2, col2 = 0}, self)
+	v:render_selection(c.selection, self)
+	v:render_buffer(b, self)
+	v:render_cursor(c, self)
 
 end
 
