@@ -1,32 +1,22 @@
 - tabs and indentation:
-	- tabsize - expand tabs when positioning the text and jump through tabs when moving the caret.
 	- smart tabs - write tabs for indentation, but write spaces for alignment (inside the line).
 	- space tabs - always write spaces when pressing tab.
 	* smart space tabs - the number of spaces is such that the caret aligns to the closest upper/lower text.
 	* tab stops, like in word processors
 	* automatic table formatting - keep everything aligned while typing inside the aligned "cells" of the table
 	* jump through spaces - jump left/right through spaces as if they were tabs or smart space tabs.
-	- preserve indentation - pressing enter moves caret down at the same indentation as current line.
 - carets:
-	- multiple carets - display and move secondary carets.
 	- jump through words - ctrl+left/right jumps to the beginning of the next/prev. word.
-	- EOL restrict - don't allow caret past EOL but remember the vert. pos for when moving up/down to a longer line.
-	- EOF restrict - don't allow caret past EOF. move to the start of the next line when moving past EOL.
 	- EOL free - allow caret past EOL - pad with spaces if inserting text at caret.
 	- EOF free - allow caret past EOF - pad with lines if inserting text at caret.
 	- scroll view - pressing ctrl+up/down scrolls the view without moving the caret.
 	- scroll margins - moving the caret outside the view minus some margin scrolls the view in that direction.
 	- smart right scroll - scroll right as if the view is springed on the left (i.e. scroll back when moving left).
 - normalization:
-	* autodetect newline format on opening
 	* autodetect tabsize and space tabs on opening
-	* force newline format on all lines on saving
 	* convert spaces to tabs or tabs to spaces everywhere on saving
-	* remove whitespace at EOL on saving
 	* remove whitespace/empty lines at EOF on saving
-	* new file created with newline format and tab options of current file
 - rendering:
-	- monospace fonts only
 	- single-function API renderer: text(x, y, s)
 	* syntax highlighting with embedded lexers (js and css in html etc.)
 	- autodetect lexer to use based on file extension
