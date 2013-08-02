@@ -1,7 +1,11 @@
 local codedit = require'codedit'
 local player = require'cairo_player'
 
-local s = [[
+local v = codedit.view:new{id = 'view', x = 200, y = 10, w = 300, h = 150}
+local b = codedit.buffer:new()
+local c = codedit.cursor:new{buffer = b, view = v}
+
+b:load[[
 A	BB	C
 AA	B	C
 AAA	BB	C
@@ -15,10 +19,6 @@ function lines.pos(s, lnum)
 end
 ]]
 
-local v = codedit.view:new{id = 'view', x = 200, y = 10, w = 300, h = 150}
-local b = codedit.buffer:new{string = s}
-local c = codedit.cursor:new{buffer = b, view = v}
-
 function player:on_render(cr)
 
 	--c.restrict_eol = false
@@ -30,7 +30,9 @@ function player:on_render(cr)
 		values = {'\r\n', '\r', '\n'}, texts = {['\r\n'] = 'CRLF', ['\n'] = 'LF', ['\r'] = 'CR'},
 		selected = b.line_terminator}
 
+	c.keypressed = c.keypressed or function(key) return self:keypressed(key) end
 	c:keypress(self.key, self.char, self.ctrl, self.shift)
+	b:keypress(self.key, self.char, self.ctrl, self.shift)
 
 	--v:render_selection(codedit.selection:new{buffer = b, line1 = 2, line2 = 2, col1 = 2, col2 = 0}, self)
 	v:render_selection(c.selection, self)

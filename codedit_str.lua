@@ -165,6 +165,7 @@ assert(str.first_nonspace(' ') == 2)
 assert(str.first_nonspace(' x') == 2)
 assert(str.first_nonspace(' x ') == 2)
 assert(str.first_nonspace('x ') == 1)
+
 assert(str.last_nonspace('') == 0)
 assert(str.last_nonspace(' ') == 0)
 assert(str.last_nonspace('x') == 1)

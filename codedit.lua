@@ -7,14 +7,22 @@ local str = require'codedit_str'
 --helpers for dealing with tabs.
 --real columns map 1:1 to char indices, while visual columns represent screen columns after tab expansion.
 
+local tabview = {
+	tabsize = 3,
+}
+
+function tabview:new(tabsize)
+	return glue.inherit({tabsize = tabsize}, self)
+end
+
 --how many spaces from a visual column to the next tabstop, for a specific tabsize.
-local function tabstop_distance(vcol, tabsize)
-	return math.floor((vcol + tabsize) / tabsize) * tabsize - vcol
+function tabview:tabstop_distance(vcol)
+	return math.floor((vcol + self.tabsize) / self.tabsize) * self.tabsize - vcol
 end
 
 --visual column coresponding to a real column for a specific tabsize.
 --the real column can be past string's end, in which case vcol will expand to the same amount.
-local function visual_col(s, col, tabsize)
+function tabview:visual_col(s, col)
 	local col1 = 0
 	local vcol = 1
 	for i in str.indices(s) do
@@ -22,7 +30,7 @@ local function visual_col(s, col, tabsize)
 		if col1 >= col then
 			return vcol
 		end
-		vcol = vcol + (str.istab(s, i) and tabstop_distance(vcol - 1, tabsize) or 1)
+		vcol = vcol + (str.istab(s, i) and self:tabstop_distance(vcol - 1) or 1)
 	end
 	vcol = vcol + col - col1 - 1 --extend vcol past eol
 	return vcol
@@ -30,12 +38,12 @@ end
 
 --real column corresponding to a visual column for a specific tabsize.
 --if the target vcol is between two possible vcols, return the vcol that is closer.
-local function real_col(s, vcol, tabsize)
+function tabview:real_col(s, vcol)
 	local vcol1 = 1
 	local col = 0
 	for i in str.indices(s) do
 		col = col + 1
-		local vcol2 = vcol1 + (str.istab(s, i) and tabstop_distance(vcol1 - 1, tabsize) or 1)
+		local vcol2 = vcol1 + (str.istab(s, i) and self:tabstop_distance(vcol1 - 1) or 1)
 		if vcol >= vcol1 and vcol <= vcol2 then --vcol is between the current and the next vcol
 			return col + (vcol - vcol1 > vcol2 - vcol and 1 or 0)
 		end
@@ -45,9 +53,26 @@ local function real_col(s, vcol, tabsize)
 	return col
 end
 
---buffer object: holds the lines in a list, for displaying and changing
+--buffer object: holds the lines in a list, for displaying, changing and saving
 
-local buffer = {}
+local buffer = {
+	eol_spaces = 'leave', --'leave', 'remove'
+	eof_lines = 'leave', -- 'leave', 'remove', 'always'
+}
+
+function buffer:new(t)
+	self = glue.inherit(t or {}, self)
+	self:load('')
+	return self
+end
+
+function buffer:load(s, line_terminator)
+	self.line_terminator = line_terminator or self:detect_line_terminator(s)
+	self.lines = {}
+	for s in glue.gsplit(s, self.line_terminator) do
+		self.lines[#self.lines + 1] = s
+	end
+end
 
 --class method that returns the most common line terminator in a string, or '\n' if there are no terminators
 function buffer:detect_line_terminator(s)
@@ -61,23 +86,6 @@ function buffer:detect_line_terminator(s)
 	else
 		return '\n'
 	end
-end
-
-function buffer:new(t)
-	local s = t.string or ''
-	local lines = {}
-	local term = self:detect_line_terminator(s)
-	for s in glue.gsplit(s, term) do
-		lines[#lines + 1] = s
-	end
-	t = glue.update({
-		eol_spaces = 'leave', --'leave', 'remove'
-		eof_lines = 'leave', -- 'leave', 'remove', 'always'
-		line_terminator = term,
-	}, t)
-	t.string = nil --release the ref. to the string
-	t.lines = lines
-	return glue.inherit(t, self)
 end
 
 function buffer:normalize()
@@ -105,28 +113,26 @@ function buffer:save()
 	return table.concat(self.lines, self.line_terminator)
 end
 
-function buffer:len(line)
-	return str.len(assert(self.lines[line], 'invalid line'))
+function buffer:keypress(key, char, ctrl, shift)
+	if ctrl and key == 'S' then
+		return self:save()
+	end
 end
 
-function buffer:restrict_line(line)
-	return math.min(math.max(line, 1), #self.lines)
-end
-
-function buffer:restrict_col(line, col, over_min, over_max)
-	return math.min(math.max(col, 1 - (over_min or 0)), self:len(line) + (over_max or 0))
-end
-
---selection object: provides selection
+--selection object: selecting text between two line,col pairs in two steps: reset and move.
 
 local selection = {}
 
 function selection:new(t)
 	assert(t.buffer, 'buffer missing')
-	t = glue.update({
-		line1 = 1, line2 = 1, col1 = 1, col2 = 1,
-	}, t)
-	return glue.inherit(t, self)
+	self = glue.inherit(t, self)
+	--internal state
+	self.anchor_line = 1
+	self.anchor_col = 1
+	--output state
+	self.line1 = 1; self.col1 = 1 --start cursor: over the first selected char
+	self.line2 = 1; self.col2 = 1 --end cursor: right after the last selected char (and always after the start cursor)
+	return self
 end
 
 function selection:isempty()
@@ -145,10 +151,8 @@ function selection:move(line2, col2)
 	if line2 < line1 then
 		line2, line1 = line1, line2
 		col2, col1 = col1, col2
-	elseif line2 == line1 then
-		if col2 < col1 then
-			col2, col1 = col1, col2
-		end
+	elseif line2 == line1 and col2 < col1 then
+		col2, col1 = col1, col2
 	end
 	self.line1, self.col1 = line1, col1
 	self.line2, self.col2 = line2, col2
@@ -165,49 +169,51 @@ function selection:vcols(line, self.tabsize)
 
 --cursor object: provides caret-based navigation and editing
 
-local cursor = {}
+local cursor = {
+	insert_mode = true, --insert or overwrite when typing characters
+	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
+	restrict_eol = true, --don't allow caret past end-of-line
+	restrict_eof = true, --don't allow caret past end-of-file
+}
 
 function cursor:new(t)
 	assert(t.buffer, 'buffer msising')
 	assert(t.view, 'view missing')
-	t = glue.update({
-		--state
-		line = 1,
-		col = 1, --real column
-		vcol = 1, --visual column (tabs expanded)
-		wanted_vcol = 1, --unrestricted visual column
-		selection = selection:new{buffer = t.buffer},
-		--options
-		insert_mode = true, --insert or overwrite when typing characters
-		auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
-		restrict_eol = true, --don't allow caret past end-of-line
-		restrict_eof = true, --don't allow caret past end-of-file
-	}, t)
-	return glue.inherit(t, self)
-end
-
-function cursor:getline(line)
-	return self.buffer.lines[line or self.line]
-end
-
-function cursor:setline(s, line)
-	self.buffer.lines[line or self.line] = s
-end
-
-function cursor:insert_line(s, line)
-	return table.insert(self.buffer.lines, line or self.line, s)
-end
-
-function cursor:remove_line(line)
-	return table.remove(self.buffer.lines, line or self.line)
+	self = glue.inherit(t, self)
+	self.line = 1
+	self.col = 1 --real columnself.
+	self.vcol = 1 --visual column (tabs expanded)
+	self.wanted_vcol = 1 --unrestricted visual column
+	self.selection = selection:new{buffer = self.buffer}
+	return self
 end
 
 function cursor:last_line()
 	return #self.buffer.lines
 end
 
-function cursor:last_col(line)
-	return str.len(self:getline(line))
+function cursor:last_col()
+	return str.len(self:getline())
+end
+
+function cursor:getline()
+	return self.buffer.lines[self.line]
+end
+
+function cursor:setline(s)
+	self.buffer.lines[self.line] = s
+end
+
+function cursor:insert_line(s)
+	return table.insert(self.buffer.lines, self.line, s)
+end
+
+function cursor:remove_line(line)
+	line = line or self.line
+	if line == self:last_line() then
+		self.line = self:lastline() - 1
+	end
+	return table.remove(self.buffer.lines, line or self.line)
 end
 
 function cursor:indent_col() --return the column where the indented text starts
@@ -218,7 +224,7 @@ end
 function cursor:_setvcol()
 	local s = self:getline()
 	if s then
-		self.vcol = visual_col(s, self.col, self.view.tabsize)
+		self.vcol = self.view:visual_col(s, self.col)
 	else
 		self.vcol = self.col --outside eof visual columns and real columns are the same
 	end
@@ -228,7 +234,7 @@ end
 function cursor:_setcol()
 	local s = self:getline()
 	if s then
-		self.col = real_col(s, self.vcol, self.view.tabsize)
+		self.col = self.view:real_col(s, self.vcol)
 		if self.restrict_eol then
 			self.col = math.min(self.col, self:last_col() + 1)
 		end
@@ -338,18 +344,19 @@ end
 
 function cursor:newline()
 	local s = self:getline()
-	local indent_col, indent = 1, ''
+	local landing_col, indent = 1, ''
 	if self.auto_indent then
-		indent_col = self:indent_col()
-		indent = str.sub(s, 1, indent_col - 1)
+		landing_col = self:indent_col()
+		indent = str.sub(s, 1, landing_col - 1)
 	end
 	local s1 = str.sub(s, 1, self.col - 1)
 	local s2 = indent .. str.sub(s, self.col)
 	self:setline(s1)
-	self:insert_line(s2, self.line + 1)
 	self.line = self.line + 1
-	self.col = indent_col
+	self:insert_line(s2)
+	self.col = landing_col
 	self:_setvcol()
+	self.wanted_vcol = self.vcol
 end
 
 function cursor:insert(c)
@@ -368,6 +375,7 @@ function cursor:delete_before()
 			self:setline(s0 .. s)
 			self.col = str.len(s0) + 1
 			self:_setvcol()
+			self.wanted_vcol = self.vcol
 		end
 	else
 		local s = self:getline()
@@ -384,17 +392,29 @@ function cursor:delete_after()
 		end
 		--self.col = math.min(self.col, #self.buffer.lines[self.line] + 1)
 		--self:_setvcol()
+		--self.wanted_vcol = self.vcol
 	else
 		local s = self:getline()
 		self:setline(str.sub(s, 1, self.col - 1) .. str.sub(s, self.col + 1))
 	end
 end
 
+function cursor:_helpmove(ctrl, shift)
+	if not self.keypressed then return end
+	if self.keypressed'up' then
+		self:move_up(1, shift)
+	elseif self.keypressed'down' then
+		self:move_down(1, shift)
+	end
+end
+
 function cursor:keypress(key, char, ctrl, shift)
 	if key == 'left' then
 		self:move_left(1, shift)
+		self:_helpmove(ctrl, shift)
 	elseif key == 'right' then
 		self:move_right(1, shift)
+		self:_helpmove(ctrl, shift)
 	elseif key == 'up' then
 		self:move_up(1, shift)
 	elseif key == 'down' then
@@ -407,16 +427,23 @@ function cursor:keypress(key, char, ctrl, shift)
 		self:delete_after()
 	elseif key == 'return' then
 		self:newline()
-	elseif ctrl and key == 'S' then
-		return self.buffer:save()
-	elseif char then
+	elseif char and not ctrl then
 		self:insert(char)
 	end
 end
 
 --view: displaying the text and the cursor
 
-local view = {}
+local view = glue.update({
+	font_face = 'Fixedsys',
+	tabsize = 3,
+	linesize = 16,
+	charsize = 8,
+	charvsize = 10,
+	caret_width = 2,
+	eol_markers = true,
+	smooth_scrolling = false,
+}, tabview)
 
 function view:new(t)
 	assert(t.id, 'id missing')
@@ -424,16 +451,6 @@ function view:new(t)
 	assert(t.y, 'y missing')
 	assert(t.w, 'w missing')
 	assert(t.h, 'h missing')
-	t = glue.update({
-		font_face = 'Fixedsys',
-		tabsize = 3,
-		linesize = 16,
-		charsize = 8,
-		charvsize = 10,
-		caret_width = 2,
-		eol_markers = true,
-		smooth_scrolling = false,
-	}, t)
 	return glue.inherit(t, self)
 end
 
@@ -453,7 +470,7 @@ function view:expand_tabs(s)
 	for i in str.indices(s) do
 		col = col + 1
 		if str.istab(s, i) then
-			ds = ds .. (' '):rep(tabstop_distance(#ds, self.tabsize))
+			ds = ds .. (' '):rep(self:tabstop_distance(#ds))
 		else
 			ds = ds .. s:sub(col, col) --str.sub(s, col, col)
 		end
@@ -471,7 +488,7 @@ function view:render_buffer(buffer, player)
 	--find the maximum visual line length
 	local maxlen = 0
 	for i,line in ipairs(buffer.lines) do
-		local len = visual_col(line, str.len(line), self.tabsize)
+		local len = self:visual_col(line, str.len(line))
 		if len > maxlen then
 			maxlen = len
 		end
@@ -529,7 +546,7 @@ end
 function view:over_caret_rect(cursor)
 	local x, y = self:coords(cursor.vcol, cursor.line)
 	local w = self.charsize *
-		(str.istab(cursor:getline(), cursor.col) and tabstop_distance(cursor.vcol - 1, self.tabsize) or 1)
+		(str.istab(cursor:getline(), cursor.col) and self:tabstop_distance(cursor.vcol - 1) or 1)
 	local h = self.caret_width
 	y = y + self.linesize
 	y = y - math.floor((self.linesize - self.charvsize) / 2) + 1
@@ -561,7 +578,7 @@ end
 
 function view:selection_xcoord(s, col)
 	col = math.min(math.max(col, 1), str.len(s) + 1.5)
-	local vcol = visual_col(s, col, self.tabsize)
+	local vcol = self:visual_col(s, col)
 	return (vcol - 1) * self.charsize
 end
 
