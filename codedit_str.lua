@@ -102,7 +102,7 @@ function str.count(s, sub)
 	return count
 end
 
---first occurence of a non-space char (#s + 1 if none)
+--first occurence of a non-space char (#s + 1 if none); returns the byte index, same as char index
 function str.first_nonspace(s)
 	for i in str.indices(s) do
 		if not str.isspace(s, i) then
@@ -112,7 +112,7 @@ function str.first_nonspace(s)
 	return #s + 1
 end
 
---last occurence of a non-space char (0 if none)
+--last occurence of a non-space char (0 if none); returns byte index
 function str.last_nonspace(s)
 	local space_starts
 	for i in str.indices(s) do
@@ -130,6 +130,27 @@ function str.rtrim(s)
 	return s:sub(1, str.last_nonspace(s))
 end
 
+function str.replace(s, what, with)
+	return s:gsub(what, with)
+	--[[ --TODO:
+	assert(#s1 > 0)
+	local t = {}
+	local i = 1
+	local lasti = 1
+	while i do
+		if str.contains(s, i, what) then
+			t[#t+1] = s:sub(i0, i-1)
+			t[#t+1] = with
+			lasti = i
+			i = i + #what
+			if i > #s then i = nil end
+		else
+			i = str.next(s, i)
+		end
+	end
+	return table.concat(t)
+	]]
+end
 
 if not ... then
 

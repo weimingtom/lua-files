@@ -21,8 +21,9 @@ end
 
 function player:on_render(cr)
 
-	c.restrict_eol = false
-	c.restrict_eof = false
+	--c.restrict_eol = false
+	--c.restrict_eof = false
+	--c.use_tabs = false
 
 	v.smooth_vscroll = true
 	v.smooth_hscroll = true
@@ -36,7 +37,21 @@ function player:on_render(cr)
 
 	c.keypressed = c.keypressed or function(key) return self:keypressed(key) end
 	c:keypress(self.key, self.char, self.ctrl, self.shift)
-	b:keypress(self.key, self.char, self.ctrl, self.shift)
+
+	if self.lbutton then
+		if not c.selecting then
+			c.selecting = true
+			c:mousefocus(self.mousex, self.mousey)
+		else
+			local line, vcol = c.view:cursor_at(self.mousex, self.mousey)
+			local col = c.view:real_col(c.buffer.lines[c.line], vcol) - 1
+			c.selection:move(line, col, true)
+			c.line = line
+			c.col = col
+		end
+	else
+		c.selecting = false
+	end
 
 	--v:render_selection(codedit.selection:new{buffer = b, line1 = 2, line2 = 2, col1 = 2, col2 = 0}, self)
 	v:render_selection(c.selection, self)

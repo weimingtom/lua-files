@@ -19,7 +19,26 @@ function player:on_render(cr)
 
 	cursor.keypressed = cursor.keypressed or function(key) return self:keypressed(key) end
 	cursor:keypress(self.key, self.char, self.ctrl, self.shift)
-	buffer:keypress(self.key, self.char, self.ctrl, self.shift)
+
+	if self.ctrl and self.key == 'S' then
+		return buffer:save()
+	end
+
+	local c = cursor
+	if self.lbutton then
+		if not c.selecting then
+			c.selecting = true
+			c:mousefocus(self.mousex, self.mousey)
+		else
+			local line, vcol = c.view:cursor_at(self.mousex, self.mousey)
+			local col = c.view:real_col(c.buffer.lines[c.line], vcol) - 1
+			c.selection:move(line, col, true)
+			c.line = c.selection.line2
+			c.col = c.selection.col2
+		end
+	else
+		c.selecting = false
+	end
 
 	view:render_selection(cursor.selection, self)
 	view:render_buffer(buffer, self)
