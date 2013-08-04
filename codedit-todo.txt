@@ -1,32 +1,74 @@
-- tabs and indentation:
-	- smart tabs - write tabs for indentation, but write spaces for alignment (inside the line).
-	- space tabs - always write spaces when pressing tab.
-	* smart space tabs - the number of spaces is such that the caret aligns to the closest upper/lower text.
-	* tab stops, like in word processors
-	* automatic table formatting - keep everything aligned while typing inside the aligned "cells" of the table
-	* jump through spaces - jump left/right through spaces as if they were tabs or smart space tabs.
+- autodetect tabs mode and tabsize
+	- skip empty lines
+	- count the number of lines that use tabs exclusively for indentation
+	- count the number of lines that use spaces exclusively for indentation
+	- count the number of lines that use a mixture of tabs and spaces for indentation
+	- count the number of lines that use tabs inside the line
+	- count the number of lines that use multiple spaces inside the line
+
+- tab_align_args
+	- enable if
+		- indenting
+		- indenting to > 1 the above indent
+		- line > 1
+		- above line has '(' after current vcol
+	- add spaces up to and including the col of the found '('
+	- replace the indent tab surplus of the above indent if using tabs
+
+- tab_align_list
+	- enable if
+		- not indenting
+		- line > 1
+		- above line has a word after at least 2 spaces (or 1 tab) after vcol-1
+	- add spaces up to the col of the found word - 1
+
+- fixed tab stops
+	- tab stops with left, right or center align
+	- shortcut to align a line to tabstops, using double+ spaces or tabs as separators
+	- automatic formatting
+		- keep everything aligned while typing inside the aligned "cells" of the table
+		- typing two spaces or a tab skips to the next "cell"
+
+- jump through virtual tabs
+	- jump through fixed (tabsize) virtual tabs
+	- jump through autoalign_list virtual tabs
+	- jump through autoalign_args virtual tabs
+	- jump through tabstop cells
+
 - carets:
 	- jump through words - ctrl+left/right jumps to the beginning of the next/prev. word.
 	- EOL free - allow caret past EOL - pad with spaces if inserting text at caret.
 	- EOF free - allow caret past EOF - pad with lines if inserting text at caret.
-	- scroll view - pressing ctrl+up/down scrolls the view without moving the caret.
 	- scroll margins - moving the caret outside the view minus some margin scrolls the view in that direction.
 	- smart right scroll - scroll right as if the view is springed on the left (i.e. scroll back when moving left).
+
 - normalization:
-	* autodetect tabsize and space tabs on opening
-	* convert spaces to tabs or tabs to spaces everywhere on saving
-	* remove whitespace/empty lines at EOF on saving
+	* convert spaces to tabs everywhere on saving
+
 - rendering:
-	- single-function API renderer: text(x, y, s)
-	* syntax highlighting with embedded lexers (js and css in html etc.)
-	- autodetect lexer to use based on file extension
+	- syntax highlighting with embedded lexers (js and css in html etc.)
+
+
+CODEDITOR
+---------
+- file tabs
+	- nav with ctrl+tab, ctrl+shift+tab
+	- ctrl+n new
+	- ctrl+o open
+	- ctrl+w close
+	- drag to reorder
+	- top or bottom display
+- f11 full screen
 - sessions:
-	* save and restore all open buffers along with view, caret and selection state.
-	- per-project sessions.
+	- save and restore all open buffers along with view, caret and selection state
 - customization:
 	- global, local (per-project), per-filetype, per-user config files (like scite).
-	- reload config on the fly on saving the config file.
+	- reload config on the fly when saving the config file.
 	- custom key bindings.
+
+
+QUESTIONS
+---------
 - find/replace macros:
 	- make a table based on separators (see automatic table formatting above)
 - bookmarks:
