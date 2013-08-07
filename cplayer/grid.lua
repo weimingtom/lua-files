@@ -1,5 +1,4 @@
 --immediate mode grid widget
-
 local player = require'cairo_player'
 
 function player:grid(t)
@@ -42,7 +41,7 @@ function player:grid(t)
 	end
 	local ch = (1 + #rows) * row_h
 
-	local cx, cy, bx, by, bw, bh = self:scrollbox{
+	state.cx, state.cy = self:scrollbox{
 		id = id .. '_scrollbox',
 		x = x, y = y, w = w, h = h,
 		cw = cw,
@@ -53,13 +52,11 @@ function player:grid(t)
 		hscroll = 'auto',
 	}
 
-	state.cx = cx
-	state.cy = cy
-
-	self.cr:rectangle(bx, by, bw, bh)
-	self.cr:save()
-	self.cr:clip()
-	self.cr:translate(bx + cx, by + cy)
+	local cr = self.cr
+	cr:save()
+	cr:rectangle(x, y, w, h)
+	cr:clip()
+	cr:translate(x + state.cx, y + state.cy)
 
 	self:rect(0, 0, cw, ch, 'normal_bg')
 	self:rect(0, 0, cw, row_h, 'selected_bg')
@@ -75,7 +72,7 @@ function player:grid(t)
 			if not self.active then
 				self.active = id
 				self.ui.resize_col = name
-				self.ui.field_x = field_x + cx
+				self.ui.field_x = field_x
 			end
 		end
 
@@ -115,10 +112,9 @@ function player:grid(t)
 		field_x = 0
 	end
 
-	self.cr:restore()
-
+	cr:restore()
 	return state
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then assert(loadfile('../cairo_player_demo.lua'))() end
 

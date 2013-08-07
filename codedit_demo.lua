@@ -1,11 +1,9 @@
 local codedit = require'codedit'
 local player = require'cairo_player'
 
-local v = codedit.view:new{x = 200, y = 10, w = 300, h = 150}
-local b = codedit.buffer:new()
-local e = codedit.editor:new{id = 'view', buffer = b, view = v}
-
-b:load[[
+local e = {}
+e.buffer = codedit.buffer:new()
+e.buffer:load[[
 A	BB	C
 AA	B	C
 AAA	BB	C
@@ -20,6 +18,8 @@ end
 ]]
 
 function player:on_render(cr)
+
+	e = self:code_editor(e or {id = 'code_editor', x = 200, y = 10, w = 300, h = 150})
 
 	--e.cursor.restrict_eol = false
 	--e.cursor.restrict_eof = false

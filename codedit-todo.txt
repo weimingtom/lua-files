@@ -1,3 +1,10 @@
+- carets:
+	- jump through words - ctrl+left/right jumps to the beginning of the next/prev. word.
+	- EOL free - allow caret past EOL - pad with spaces if inserting text at caret.
+	- EOF free - allow caret past EOF - pad with lines if inserting text at caret.
+	- scroll margins - moving the caret outside the view minus some margin scrolls the view in that direction.
+	- smart right scroll - scroll right as if the view is springed on the left (i.e. scroll back when moving left).
+
 - autodetect tabs mode and tabsize
 	- skip empty lines
 	- count the number of lines that use tabs exclusively for indentation
@@ -34,13 +41,6 @@
 	- jump through autoalign_list virtual tabs
 	- jump through autoalign_args virtual tabs
 	- jump through tabstop cells
-
-- carets:
-	- jump through words - ctrl+left/right jumps to the beginning of the next/prev. word.
-	- EOL free - allow caret past EOL - pad with spaces if inserting text at caret.
-	- EOF free - allow caret past EOF - pad with lines if inserting text at caret.
-	- scroll margins - moving the caret outside the view minus some margin scrolls the view in that direction.
-	- smart right scroll - scroll right as if the view is springed on the left (i.e. scroll back when moving left).
 
 - normalization:
 	* convert spaces to tabs everywhere on saving

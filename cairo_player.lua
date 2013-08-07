@@ -497,6 +497,7 @@ glue.autoload(player, {
 	label        = 'cplayer.label',
 	dragpoint    = 'cplayer.dragpoint',
 	dragpoints   = 'cplayer.dragpoint',
+	code_editor  = 'cplayer.code_editor',
 })
 
 --main loop

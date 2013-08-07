@@ -85,13 +85,16 @@ function player:on_render(cr)
 	end
 
 	local x, y, w, h
-	self.cx, self.cy, x, y, w, h =
-		self:scrollbox{id = 'scrollbox', x = 300, y = 10, w = 200, h = 200, cx = self.cx, cy = self.cy, cw = 500, ch = 500}
-
-	self.cr:rectangle(x, y, w, h)
-	self.cr:clip()
-	self:rect(300 + self.cx, 10 + self.cy, 500, 500, 'normal_bg', 'normal_border', 10)
-	self.cr:reset_clip()
+	t.sb_cx, t.sb_cy, x, y, w, h =
+		self:scrollbox{id = 'scrollbox', x = 300, y = 10, w = 200, h = 200,
+							cx = t.sb_cx, cy = t.sb_cy, cw = 500, ch = 500}
+	cr:save()
+	cr:rectangle(x, y, w, h)
+	cr:clip()
+	cr:translate(t.sb_cx, t.sb_cy)
+	self:rect(300, 10, 500, 500, 'normal_bg', 'normal_border', 10)
+	cr:translate(-t.sb_cx, -t.sb_cy)
+	cr:restore()
 
 	t.grid_state =
 	self:grid{id = 'grid', x = 530, y = 10, w = 400, h = 200,
