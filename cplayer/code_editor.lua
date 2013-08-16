@@ -1,209 +1,127 @@
 --code editor based on codedit.
 local codedit = require'codedit'
+local str = require'codedit_str'
 local glue = require'glue'
+local player = require'cairo_player'
 
-local view = {
+local editor = glue.inherit({
+	--font metrics
 	font_face = 'Fixedsys',
 	linesize = 16,
 	charsize = 8,
-	charvsize = 10,
-	caret_width = 2,
+	charvsize = 12,
+	--scrollbox options
+	vscroll = 'always',
+	hscroll = 'auto',
+	vscroll_w = nil, --use default
+	hscroll_h = nil, --use default
+	scroll_page_size = nil,
+	--colors
+	colors = {
+		background = '#333333',
+		selection_background = '#999999',
+		selection_text = '#333333',
+		cursor = '#ffffff',
+		text = '#ffffff',
+	},
 	eol_markers = true,
-}
+}, codedit)
 
-local function new(self, t)
-	self = glue.inherit(t, self)
-	self.buffer = self.buffer or codedit.buffer:new()
-	self.cursor = self.cursor or cursor:new{buffer = self.buffer, view = self.view}
-	self.selection = selection:new{buffer = self.buffer}
-	self:update(t)
-	return self
+function editor:draw_scrollbox()
+	local x, y, w, h = self.player:getbox(self)
+	local cw, ch = self:size()
+	local scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h = self.player:scrollbox{
+		id = self.id..'_scrollbox',
+		x = self.x,
+		y = self.y,
+		w = self.w,
+		h = self.h,
+		cx = self.scroll_x,
+		cy = self.scroll_y,
+		cw = cw,
+		ch = ch,
+		vscroll = self.vscroll,
+		hscroll = self.hscroll,
+		vscroll_w = self.vscroll_w,
+		hscroll_h = self.hscroll_h,
+		page_size = self.scroll_page_size}
+
+	self.player.cr:translate(self.x, self.y)
+	--self.player.cr:rectangle(0, 0, clip_w, clip_h)
+	--self.player.cr:clip()
+	self.player.cr:translate(scroll_x, scroll_y)
+
+	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
 end
 
-function view:render_scrollbox(player, id, buffer)
-	local maxlen = self:max_visual_col(buffer.lines)
-	local cw = self.charsize * maxlen
-	local ch = self.linesize * #buffer.lines
-	player:scrollbox{id = id,
-							x = self.x, y = self.y, w = self.w, h = self.h,
-							cx = self.cx, cy = self.cy, cw = cw, ch = ch,
-							vscroll = self.vscroll,
-							hscroll = self.hscroll,
-							vscroll_w = self.vscroll_w,
-							hscroll_h = self.hscroll_h,
-							page_size = self.scroll_page_size}
+function editor:draw_rect(x, y, w, h, color)
+	self.player:rect(x, y, w, h, self.colors[color])
 end
 
-function view:expand_tabs(s)
-	local ts = self.tabsize
-	local ds = ''
-	local col = 0
-	for i in str.indices(s) do
-		col = col + 1
-		if str.istab(s, i) then
-			ds = ds .. (' '):rep(self:tabstop_distance(#ds))
-		else
-			ds = ds .. str.sub(s, col, col)
-		end
-	end
-	return ds
+function editor:draw_char(x, y, s, i, color)
+	self.player:setcolor(self.colors[color])
+	self.player.cr:select_font_face(self.font_face, 0, 0)
+	self.player.cr:move_to(x, y)
+	--TODO: prevent string creation by using show_glyphs, and use harfbuzz for shaping anyway
+	self.player.cr:show_text(s:sub(i, (str.next(s, i) or #s + 1) - 1))
 end
 
-function view:render_buffer(player, buffer, x, y, w, h)
-
-	self:scroll(cx, cy)
-
-	local cr = player.cr
-
-	cr:select_font_face(self.font_face, 0, 0)
-	cr:set_source_rgba(1, 1, 1, 0.02)
-	cr:paint()
-
-	local first_visible_line = math.floor(-self.cy / self.linesize) + 1
-	local last_visible_line = math.ceil((-self.cy + self.h) / self.linesize) - 1
-
-	local x = self.cx + self.x
-	local y = self.cy + self.y + first_visible_line * self.linesize - math.floor((self.linesize - self.charvsize) / 2)
-
-	for i = first_visible_line, last_visible_line do
-
-		local s = self:expand_tabs(buffer.lines[i])
-
-		if self.eol_markers then
-			--s = s .. string.char(0xE2, 0x81, 0x8B) --REVERSE PILCROW SIGN
-		end
-
-		cr:move_to(x, y)
-		cr:set_source_rgba(1, 1, 1, 1)
-		cr:show_text(s)
-
-		if self.eol_markers then
-			--draw a reverse pilcrow at eol
-			local x = x + str.len(s) * self.charsize + 2.5
-			local yspacing = math.floor(self.linesize - self.charvsize) / 2 + 0.5
-			local y = y - self.linesize + yspacing
-			cr:move_to(x, y);     cr:rel_line_to(0, self.linesize - 0.5)
-			cr:move_to(x + 3, y); cr:rel_line_to(0, self.linesize - 0.5)
-			cr:set_source_rgba(1, 1, 1, 0.4)
-			cr:move_to(x - 2.5, y)
-			cr:line_to(x + 3.5, y)
-			cr:stroke()
-			cr:arc(x + 2.5, y + 3.5, 4, - math.pi / 2 + 0.2, - 3 * math.pi / 2 - 0.2)
-			cr:close_path()
-			cr:fill()
-		end
-
-		y = y + self.linesize
-	end
-
-	return self.cx, self.cy
-end
-
-function view:render_cursor(cursor, player)
-	local cr = player.cr
-	cr:set_source_rgba(1, 1, 1, 1)
-	local x, y, w, h = self:caret_rect(cursor)
-	cr:rectangle(self.cx + self.x + x, self.cy + self.y + y, w, h)
-	cr:fill()
-end
-
-function view:scroll_into_view(cursor)
-	local x, y, w, h = self:caret_rect(cursor)
-	if y + w > self.clipbox[2] + self.clipbox[4] then
-		self:scroll(self.cx, self.clipbox[2] - y + self.linesize)
-	end
-end
-
-function view:render_selection(sel, player)
-	local cr = player.cr
-	if sel:isempty() then return end
-	cr:new_path()
-	for line = sel.line1, sel.line2 do
-		cr:rectangle(self.view:selection_rect(sel, line)
-	end
+--draw a reverse pilcrow at eol
+function editor:render_eol_marker(line)
+	local x, y = self:text_coords(line, self:visual_col(line, str.len(self.lines[line]) + 1))
+	local x = x + 2.5
+	local y = y - self.linesize + 3.5
+	local cr = self.player.cr
+	cr:move_to(x, y)
+	cr:rel_line_to(0, self.linesize - 0.5)
+	cr:move_to(x + 3, y)
+	cr:rel_line_to(0, self.linesize - 0.5)
 	cr:set_source_rgba(1, 1, 1, 0.4)
+	cr:move_to(x - 2.5, y)
+	cr:line_to(x + 3.5, y)
+	cr:stroke()
+	cr:arc(x + 2.5, y + 3.5, 4, - math.pi / 2 + 0.2, - 3 * math.pi / 2 - 0.2)
+	cr:close_path()
 	cr:fill()
 end
 
-function editor:_helpmove(ctrl, shift, player)
-	if player:keypressed'up' then
-		self.cursor:move_up(1, shift)
-	elseif player:keypressed'down' then
-		self.cursor:move_down(1, shift)
+function editor:render()
+	codedit.render(self)
+	if self.eol_markers then
+		local line1, line2 = self:visible_lines()
+		for line = line1, line2 do
+			self:render_eol_marker(line)
+		end
 	end
 end
 
-function editor:save(s) end --stub
-
-function editor:render(player)
-
-	local key, char, ctrl, shift, lbutton, mousex, mousey =
-		player.key, player.char, player.ctrl, player.shift, player.lbutton, player.mousex, player.mousey
-
-	if ctrl and key == 'up' then
-		self.view:scroll(self.view.cx, self.view.cy + self.view.linesize)
-	elseif ctrl and key == 'down' then
-		self.view:scroll(self.view.cx, self.view.cy - self.view.linesize)
-	elseif key == 'left' then
-		self.cursor:move_left()
-		self.selection:move(self.cursor.line, self.cursor.col, shift)
-		self:_helpmove(ctrl, shift, player)
-	elseif key == 'right' then
-		self.cursor:move_right()
-		self.selection:move(self.cursor.line, self.cursor.col, shift)
-		self:_helpmove(ctrl, shift, player)
-	elseif key == 'up' then
-		self.cursor:move_up()
-		self.selection:move(self.cursor.line, self.cursor.col, shift)
-	elseif key == 'down' then
-		self.cursor:move_down()
-		self.view:scroll_into_view(self.cursor)
-		self.selection:move(self.cursor.line, self.cursor.col, shift)
-	elseif ctrl and key == 'A' then
-		self.selection:move(1, 1)
-		self.selection:move(1/0, 1/0, true)
-	elseif key == 'insert' then
-		self.cursor.insert_mode = not self.cursor.insert_mode
-	elseif key == 'backspace' then
-		self.cursor:delete_before()
-	elseif key == 'delete' then
-		self.cursor:delete_after()
-	elseif key == 'return' then
-		self.cursor:newline()
-	elseif key == 'esc' then
-		--ignore
-	elseif ctrl and key == 'S' then
-		self:save(buffer:save())
-	elseif char and not ctrl then
-		self.cursor:insert(char)
-	end
-
-	if not player.active and lbutton and player:hotbox(unpack(self.view.clipbox)) then
-		player.active = self.id
-		self.cursor.line, self.cursor.vcol = self.view:cursor_at(mousex, mousey)
-		self.cursor:restore_vcol()
-		self.selection:move(self.cursor.line, self.cursor.col)
-	elseif player.active == self.id then
-		if lbutton then
-			local line, vcol = self.view:cursor_at(mousex, mousey)
-			local col = self.view:real_col(self.cursor:getline(), vcol)
-			self.selection:move(line, col, true)
-			self.cursor.line = line
-			self.cursor.col = col
-		else
-			player.active = nil
-		end
-	end
-
-	self.view:render_selection(self.selection, player)
-	self.view:render_buffer(self.buffer, player, self.id .. '_scrollbox')
-	self.view:render_cursor(self.cursor, player)
-
+function editor:setactive(active)
+	--
 end
 
 function player:code_editor(t)
-	return new(self, t)
+	local id = assert(t.id, 'id missing')
+	local ed = t.editor or editor:new()
+	glue.inherit(t, editor) --t is an editor class now
+	glue.inherit(ed, t) --ed inherits from t now
+	ed.player = self
+	ed:key_pressed(
+		true, --self.focused == ed.id,
+		self.key,
+		self.char,
+		self.ctrl,
+		self.shift,
+		self.alt)
+	ed:mouse_input(
+		self.active == ed.id,
+		self.mousex - ed.x - ed.scroll_x,
+		self.mousey - ed.y - ed.scroll_y,
+		self.lbutton,
+		self.rbutton,
+		self.wheel)
+	ed:render()
+	return ed
 end
 
-if not ... then assert(loadfile('../cairo_player_demo.lua'))() end
+if not ... then assert(loadfile('../codedit_demo.lua'))() end
 

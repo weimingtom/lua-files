@@ -1,9 +1,14 @@
 local codedit = require'codedit'
 local player = require'cairo_player'
 
-local e = {}
-e.buffer = codedit.buffer:new()
-e.buffer:load[[
+local ed
+
+function player:on_render(cr)
+
+	ed = self:code_editor{id = 'code_editor', x = 200, y = 100, w = 300, h = 150, editor = ed}
+
+	if #ed.lines == 1 and ed.lines[1] == '' then
+		ed:load[[
 A	BB	C
 AA	B	C
 AAA	BB	C
@@ -16,25 +21,16 @@ function lines.pos(s, lnum)
 	end
 end
 ]]
+	end
 
-function player:on_render(cr)
-
-	e = self:code_editor(e or {id = 'code_editor', x = 200, y = 10, w = 300, h = 150})
-
-	--e.cursor.restrict_eol = false
-	--e.cursor.restrict_eof = false
-
-	v.smooth_vscroll = true
-	v.smooth_hscroll = true
-
+	--[[
 	v.tabsize = self:slider{id = 'tabsize', x = 10, y = 10, w = 80, h = 24, i0 = 1, i1 = 8, i = v.tabsize}
 	v.linesize = self:slider{id = 'linesize', x = 10, y = 40, w = 80, h = 24, i0 = 10, i1 = 30, i = v.linesize}
 	b.line_terminator = self:mbutton{id = 'term', x = 10, y = 70, w = 80, h = 24,
 		values = {'\r\n', '\r', '\n'}, texts = {['\r\n'] = 'CRLF', ['\n'] = 'LF', ['\r'] = 'CR'},
 		selected = b.line_terminator}
 	v.eol_markers = self:togglebutton{id = 'eol markers', x = 10, y = 100, w = 80, h = 24, selected = v.eol_markers}
-
-	e:render(self)
+	]]
 
 end
 
