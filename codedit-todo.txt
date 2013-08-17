@@ -47,6 +47,7 @@
 
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)
+	- bracket matching highlighting
 
 
 CODEDITOR
@@ -61,10 +62,19 @@ CODEDITOR
 - f11 full screen
 - sessions:
 	- save and restore all open buffers along with view, caret and selection state
+	- autosave
 - customization:
 	- global, local (per-project), per-filetype, per-user config files (like scite).
 	- reload config on the fly when saving the config file.
 	- custom key bindings.
+- simultaneous edits
+	- ctrl+click creates multiple cursors and movement and typing is available to all
+	- ctrl+select creates multiple selections that can be copy/pasted
+- hi-level feats
+	- create tooltip list from the syntax hightlighter
+	- integrate a spell checking library
+	- integrate a Lua linter
+	- minimap like sublime text
 
 
 QUESTIONS

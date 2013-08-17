@@ -46,9 +46,11 @@ function editor:draw_scrollbox()
 		hscroll_h = self.hscroll_h,
 		page_size = self.scroll_page_size}
 
+	self.player.cr:save()
+
 	self.player.cr:translate(self.x, self.y)
-	--self.player.cr:rectangle(0, 0, clip_w, clip_h)
-	--self.player.cr:clip()
+	self.player.cr:rectangle(0, 0, clip_w, clip_h)
+	self.player.cr:clip()
 	self.player.cr:translate(scroll_x, scroll_y)
 
 	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
@@ -68,20 +70,21 @@ end
 
 --draw a reverse pilcrow at eol
 function editor:render_eol_marker(line)
-	local x, y = self:text_coords(line, self:visual_col(line, str.len(self.lines[line]) + 1))
+	local x, y = self:text_coords(line, self:visual_col(line, self:last_col(line) + 1))
 	local x = x + 2.5
 	local y = y - self.linesize + 3.5
 	local cr = self.player.cr
+	cr:new_path()
 	cr:move_to(x, y)
 	cr:rel_line_to(0, self.linesize - 0.5)
 	cr:move_to(x + 3, y)
 	cr:rel_line_to(0, self.linesize - 0.5)
-	cr:set_source_rgba(1, 1, 1, 0.4)
 	cr:move_to(x - 2.5, y)
 	cr:line_to(x + 3.5, y)
-	cr:stroke()
+	self.player:stroke('#ffffff66')
 	cr:arc(x + 2.5, y + 3.5, 4, - math.pi / 2 + 0.2, - 3 * math.pi / 2 - 0.2)
 	cr:close_path()
+	self.player:fill('#ffffff66')
 	cr:fill()
 end
 
@@ -93,6 +96,7 @@ function editor:render()
 			self:render_eol_marker(line)
 		end
 	end
+	self.player.cr:restore()
 end
 
 function editor:setactive(active)

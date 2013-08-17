@@ -2,12 +2,13 @@ local codedit = require'codedit'
 local player = require'cairo_player'
 
 local ed
+local loaded
 
 function player:on_render(cr)
 
 	ed = self:code_editor{id = 'code_editor', x = 200, y = 100, w = 300, h = 150, editor = ed}
 
-	if #ed.lines == 1 and ed.lines[1] == '' then
+	if not loaded then
 		ed:load[[
 A	BB	C
 AA	B	C
@@ -21,6 +22,7 @@ function lines.pos(s, lnum)
 	end
 end
 ]]
+		loaded = true
 	end
 
 	--[[

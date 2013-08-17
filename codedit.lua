@@ -10,7 +10,7 @@ end
 local editor = {
 	--normalizing
 	eol_spaces = 'remove', --leave, remove.
-	eof_lines = 'leave', --leave, remove, always.
+	eof_lines = 1, --leave, remove, ensure, or a number.
 	--saving
 	line_terminator = nil, --line terminator to use when saving. nil means autodetect.
 	--tab expansion
@@ -29,7 +29,7 @@ local editor = {
 function editor:new(options)
 	options = options or {}
 	self = glue.inherit(options, self)
-	self.lines = {''}
+	self.lines = {''} --can't have zero lines
 	self.changed = false
 	self.undo_stack = {}
 	self.redo_stack = {}
@@ -42,7 +42,39 @@ function editor:new(options)
 	return self
 end
 
---undo groups ------------------------------------------------------------------------------------------------------------
+function editor:last_col(line)
+	local s = self.lines[line]
+	return s and str.len(s) or 1
+end
+
+--changing lines ---------------------------------------------------------------------------------------------------------
+
+function editor:insert_line(line, s)
+	table.insert(self.lines, line, s)
+	if self.undo_group then
+		--table.insert(self.undo_group.commands, {'remove_line', line})
+	end
+	self.changed = true
+end
+
+function editor:remove_line(line)
+	local s = table.remove(self.lines, line)
+	if self.undo_group then
+		--table.insert(self.undo_group.commands, {'insert_line', line, s})
+	end
+	self.changed = true
+	return s
+end
+
+function editor:setline(line, s)
+	if self.undo_group then
+		--table.insert(self.undo_group.commands, {'setline', line, self.lines[line]})
+	end
+	self.lines[line] = s
+	self.changed = true
+end
+
+--undo/redo stack --------------------------------------------------------------------------------------------------------
 
 function editor:start_undo_group()
 	if self.undo_group then
@@ -56,27 +88,6 @@ function editor:end_undo_group()
 		table.insert(self.undo_stack, self.undo_group)
 	end
 	self.undo_group = nil
-end
-
---changing lines ---------------------------------------------------------------------------------------------------------
-
-function editor:insert_line(line, s)
-	table.insert(self.lines, line, s)
-	--table.insert(self.undo_group.commands, {'remove_line', line})
-	self.changed = true
-end
-
-function editor:remove_line(line)
-	local s = table.remove(self.lines, line)
-	--table.insert(self.undo_group.commands, {'insert_line', line, s})
-	self.changed = true
-	return s
-end
-
-function editor:setline(line, s)
-	--table.insert(self.undo_group.commands, {'setline', line, self.lines[line]})
-	self.lines[line] = s
-	self.changed = true
 end
 
 function editor:undo()
@@ -101,17 +112,15 @@ end
 
 --loading text -----------------------------------------------------------------------------------------------------------
 
+--insert a multi-line string at a specific line, returning the position after the last inserted char
 function editor:insert_lines(line, s)
-	local i = 1
-	while i <= #s do
-		local rni = s:find('\r\n', i, true) or #s + 1
-		local ni = s:find('\n', i, true) or #s + 1
-		local ri = s:find('\r', i, true) or #s + 1
-		local j = math.min(rni, ni, ri) - 1
-		self:insert_line(line, s:sub(i, j))
+	local col
+	for _,s in str.lines(s) do
+		self:insert_line(line, s)
 		line = line + 1
-		i = math.min(rni + 2, ni + 1, ri + 1 + (ri == rni and 1 or 0))
+		col = #s + 1
 	end
+	return line - 1, col
 end
 
 --class method that returns the most common line terminator in a string, or '\n' if there are no terminators
@@ -128,14 +137,39 @@ function editor:detect_line_terminator(s)
 	end
 end
 
+--load a multi-line string clearing the line buffer, the changed flag and the undo stack.
 function editor:load(s)
+	self.undo_stack = nil
+	self.redo_stack = nil
 	self.lines = {}
 	self:insert_lines(1, s)
 	self.changed = false
+	self.undo_stack = {}
+	self.redo_stack = {}
 	self.line_terminator = self.line_terminator or self:detect_line_terminator(s)
 end
 
---normalization ----------------------------------------------------------------------------------------------------------
+--insert a multiline string at a specific position in the text, returning the position after the last character.
+function editor:insert_string(line, col, s)
+	local s0 = self.lines[line]
+	local s1 = str.sub(s0, 1, col - 1)
+	local s2 = str.sub(s0, col)
+	self:remove_line(line)
+	local line2, col2 = self:insert_lines(line, s1 .. s .. s2)
+	return line2, col2 - #s2
+end
+
+--remove the string between two subsequent positions in the text
+function editor:remove_string(line1, col1, line2, col2)
+	local s1 = str.sub(self.lines[line1], 1, col1 - 1)
+	local s2 = str.sub(self.lines[line2], col2)
+	for line = line1, line2 - 1 do
+		self:remove_line(self.line1)
+	end
+	self:setline(line1, s1 .. s2)
+end
+
+--normalization and saving -----------------------------------------------------------------------------------------------
 
 function editor:remove_eol_spaces() --remove any spaces past eol
 	for i,line in ipairs(self.lines) do
@@ -143,14 +177,14 @@ function editor:remove_eol_spaces() --remove any spaces past eol
 	end
 end
 
-function editor:add_eof_line() --add an empty line at eof if there is none
+function editor:ensure_eof_line() --add an empty line at eof if there is none
 	if self.lines[#self.lines] ~= '' then
-		self:insert_line(self.lines, '')
+		self:insert_line(#self.lines + 1, '')
 	end
 end
 
-function editor:remove_eof_lines() --remove any empty lines at eof, except line 1
-	while #self.lines > 1 and self.lines[#self.lines] == '' do
+function editor:remove_eof_lines() --remove any empty lines at eof, except the first line
+	while #self.lines > 1 and str.first_nonspace(self.lines[#self.lines]) > #self.lines[#self.lines] do
 		self.lines[#self.lines] = nil
 	end
 end
@@ -159,14 +193,17 @@ function editor:normalize()
 	if self.eol_spaces == 'remove' then
 		self:remove_eol_spaces()
 	end
-	if self.eof_lines == 'always' then
-		self:add_eof_line()
+	if self.eof_lines == 'ensure' then
+		self:ensure_eof_line()
 	elseif self.eof_lines == 'remove' then
 		self:remove_eof_lines()
+	elseif type(self.eof_lines) == 'number' then
+		self:remove_eof_lines()
+		for i = 1, self.eof_lines do
+			self:insert_line(#self.lines + 1, '')
+		end
 	end
 end
-
---saving text ------------------------------------------------------------------------------------------------------------
 
 function editor:contents()
 	self:normalize()
@@ -216,8 +253,8 @@ local function real_col(s, vcol, tabsize)
 	return col
 end
 
-function editor:expand_tabs(s)
-	return str.replace(s, '\t', string.rep(' ', self.tabsize))
+function editor:expand_tab()
+	return string.rep(' ', self.tabsize)
 end
 
 function editor:tabstop_distance(vcol)
@@ -244,8 +281,8 @@ end
 
 function editor:max_visual_col()
 	local vcol = 0
-	for line,s in ipairs(self.lines) do
-		local vcol1 = self:visual_col(line, str.len(s))
+	for line in ipairs(self.lines) do
+		local vcol1 = self:visual_col(line, self:last_col(line))
 		if vcol1 > vcol then
 			vcol = vcol1
 		end
@@ -259,6 +296,7 @@ end
 --line1,col1 is the first selected char and line2,col2 is the char after the last selected char.
 
 local selection = {
+	block = false, --insert, block mode
 	color = nil, --custom color
 }
 
@@ -298,8 +336,8 @@ function selection:move(line, col, selecting)
 		--restrict selection to the available editor
 		self.line1 = clamp(line1, 1, #self.editor.lines)
 		self.line2 = clamp(line2, 1, #self.editor.lines)
-		self.col1 = clamp(col1, 1, str.len(self.editor.lines[self.line1]) + 1)
-		self.col2 = clamp(col2, 1, str.len(self.editor.lines[self.line2]) + 1)
+		self.col1 = clamp(col1, 1, self.editor:last_col(self.line1) + 1)
+		self.col2 = clamp(col2, 1, self.editor:last_col(self.line2) + 1)
 	else
 		--reset and re-anchor the selection
 		self.anchor_line = line
@@ -310,50 +348,56 @@ function selection:move(line, col, selecting)
 end
 
 function selection:cols(line)
-	assert(line >= self.line1 and line <= self.line2, 'out of range')
-	local col1, col2 = self.col1, self.col2
-	if not self.block then
-		col1 = line == self.line1 and col1 or 1
-		col2 = line == self.line2 and col2 or str.len(self.editor.lines[line]) + 1
+	local col1, col2
+	if self.block then
+		col1 = self.editor:real_col(line, self.editor:visual_col(self.line1, self.col1))
+		col2 = self.editor:real_col(line, self.editor:visual_col(self.line2, self.col2))
+		if col1 > col2 then
+			col1, col2 = col2, col1
+		end
+	else
+		col1 = line == self.line1 and self.col1 or 1
+		col2 = line == self.line2 and self.col2 or self.editor:last_col(line) + 1
 	end
-	--restrict selection to the available editor
-	local maxcol = str.len(self.editor.lines[line])
-	col1 = clamp(col1, 1, maxcol + 1)
-	col2 = clamp(col2, 1, maxcol + 1)
+	--restrict selection to the available text
+	local last_col = self.editor:last_col(line)
+	col1 = clamp(col1, 1, last_col + 1)
+	col2 = clamp(col2, 1, last_col + 1)
 	return col1, col2
+end
+
+function selection:next_line(line)
+	line = line and line + 1 or self.line1
+	if line > self.line2 then
+		return
+	end
+	return line, self:cols(line)
+end
+
+function selection:lines()
+	return self.next_line, self
 end
 
 function selection:contents()
 	local t = {}
-	for line = self.line1, self.line2 do
-		local col1, col2 = self:cols(line)
+	for line, col1, col2 in self:lines() do
 		t[#t+1] = str.sub(self.editor.lines[line], col1, col2 - 1)
 	end
 	return table.concat(t, self.editor.line_terminator)
 end
 
 function selection:remove()
+	if self:isempty() then return end
 	if self.block then
-		for line = self.line1, self.line2 do
-			local col1, col2 = self:cols(line)
+		for line, col1, col2 in self:lines() do
 			local s1 = str.sub(self.editor.lines[line], 1, col1 - 1)
 			local s2 = str.sub(self.editor.lines[line], col2)
 			self.editor:setline(line, s1 .. s2)
 		end
 	else
-		local s1 = str.sub(self.editor.lines[self.line1], 1, self.col1 - 1)
-		local s2 = str.sub(self.editor.lines[self.line2], self.col2)
-		for line = self.line1, self.line2 - 1 do
-			self.editor:remove_line(self.line1)
-		end
-		self.editor:setline(line, s1 .. s2)
+		self.editor:remove_string(self.line1, self.col1, self.line2, self.col2)
 	end
 	self:move(self.line1, self.col1)
-end
-
-function selection:replace(s)
-	self:remove()
-	--TODO: insert, see cursor:insert()
 end
 
 --cursor: caret-based navigation and editing -----------------------------------------------------------------------------
@@ -362,7 +406,7 @@ local cursor = {
 	insert_mode = true, --insert or overwrite when typing characters
 	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
 	restrict_eol = true, --don't allow caret past end-of-line
-	restrict_eof = true, --don't allow caret past end-of-file
+	restrict_eof = false, --don't allow caret past end-of-file
 	tabs = 'indent', --'never', 'indent', 'always'
 	tab_align_list = true, --align to the next word on the above line; incompatible with tabs = 'always'
 	tab_align_args = true, --align to the char after '(' on the above line; incompatible with tabs = 'always'
@@ -394,7 +438,15 @@ end
 --helpers
 
 function cursor:last_col()
-	return str.len(self.editor.lines[self.line])
+	return self.editor:last_col(self.line)
+end
+
+function cursor:outside_lines()
+	return self.line < 1 or self.line > #self.editor.lines
+end
+
+function cursor:outside_line()
+	return self:outside_lines() or self.col < 1 or self.col > self:last_col() + 1
 end
 
 function cursor:getline()
@@ -402,7 +454,6 @@ function cursor:getline()
 end
 
 function cursor:setline(s)
-	--self:undo_command('setline', self:getline())
 	self.editor:setline(self.line, s)
 end
 
@@ -424,9 +475,10 @@ end
 
 function cursor:real_col()
 	local col = self.editor:real_col(self.line, self.vcol)
-	if self:getline() and self.restrict_eol then
-		return clamp(col, 1, self:last_col() + 1)
+	if self.restrict_eol and self:getline() then
+		col = clamp(col, 1, self:last_col() + 1)
 	end
+	return col
 end
 
 function cursor:make_visible()
@@ -445,7 +497,20 @@ end
 
 --navigation
 
-function cursor:move_left(cols, selecting)
+function cursor:move(line, col)
+	self.line = line
+	self.col = col
+	if self.restrict_eof and self:outside_lines() then
+		self.line = clamp(self.line, 1, #self.editor.lines)
+	end
+	if self.restrict_eol and not self:outside_lines() then
+		self.col = clamp(self.col, 1, self:last_col() + 1)
+	end
+	self:store_vcol()
+	self:make_visible()
+end
+
+function cursor:move_left(cols)
 	cols = cols or 1
 	self.col = self.col - cols
 	if self.col < 1 then
@@ -458,14 +523,15 @@ function cursor:move_left(cols, selecting)
 		end
 	end
 	self:store_vcol()
+	self:make_visible()
 end
 
-function cursor:move_right(cols, selecting)
+function cursor:move_right(cols)
 	cols = cols or 1
 	self.col = self.col + cols
-	if self.restrict_eol and self.col > self:last_col() + 1 then
+	if self.restrict_eol and not self:outside_lines() and self:outside_line() then
 		self.line = self.line + 1
-		if self.line > #self.editor.lines then
+		if self:outside_lines() then
 			self.line = #self.editor.lines
 			self.col = self:last_col() + 1
 		else
@@ -473,9 +539,10 @@ function cursor:move_right(cols, selecting)
 		end
 	end
 	self:store_vcol()
+	self:make_visible()
 end
 
-function cursor:move_up(lines, selecting)
+function cursor:move_up(lines)
 	lines = lines or 1
 	self.line = self.line - lines
 	if self.line == 0 then
@@ -486,12 +553,13 @@ function cursor:move_up(lines, selecting)
 	else
 		self:restore_vcol()
 	end
+	self:make_visible()
 end
 
-function cursor:move_down(lines, selecting)
+function cursor:move_down(lines)
 	lines = lines or 1
 	self.line = self.line + lines
-	if self.line > #self.editor.lines then
+	if self:outside_lines() then
 		if self.restrict_eof then
 			self.line = #self.editor.lines
 			self.col = self:last_col() + 1
@@ -499,6 +567,7 @@ function cursor:move_down(lines, selecting)
 	else
 		self:restore_vcol()
 	end
+	self:make_visible()
 end
 
 function cursor:move_left_word()
@@ -513,11 +582,29 @@ end
 
 --editing
 
+--if cursor is over eof, add empty lines to reach it.
+--if cursor is over eol, extend the line to reach it.
+function cursor:extend_buffer()
+	if not self.restrict_eof then
+		while self.line > #self.editor.lines do
+			self.editor:insert_line(#self.editor.lines + 1, '')
+		end
+	end
+	if not self.restrict_eol then
+		local last_col = self:last_col()
+		if self.col > last_col + 1 then
+			self:setline(self:getline() .. string.rep(' ', self.col - last_col - 1))
+		end
+	end
+end
+
+--pressing enter adds a new line, optionally copies the indent of the current line, and carries the cursor over.
 function cursor:newline()
+	self:extend_buffer()
 	local s = self:getline()
 	local landing_col, indent = 1, ''
 	if self.auto_indent then
-		landing_col = self:indent_col()
+		landing_col = math.min(self.col, self:indent_col())
 		indent = str.sub(s, 1, landing_col - 1)
 	end
 	local s1 = str.sub(s, 1, self.col - 1)
@@ -527,14 +614,12 @@ function cursor:newline()
 	self:insert_line(s2)
 	self.col = landing_col
 	self:store_vcol()
+	self:make_visible()
 end
 
-function cursor:insert(c)
-	local s = self:getline()
-	local s1 = str.sub(s, 1, self.col - 1)
-	local s2 = str.sub(s, self.col + (self.insert_mode and 0 or 1))
-
-	if self.autoalign_list or self.autoalign_args then
+--expand a tab character according to current tab mode.
+function cursor:expand_tab(tab)
+	if false and (self.tab_align_list or self.tab_align_args) then
 		--look in the line above for the vcol of the first non-space char after at least one space or '(', starting at vcol
 		if str.first_nonspace(s1) < #s1 then
 			local vcol = self:visual_col()
@@ -560,18 +645,41 @@ function cursor:insert(c)
 			end
 		end
 	elseif self.tabs == 'never' then
-		c = self.editor:expand_tabs(c)
+		return self.editor:expand_tab()
 	elseif self.tabs == 'indent' then
-		if str.first_nonspace(s1) <= #s1 then
-			c = self.editor:expand_tabs(c)
+		local s = self:getline()
+		local s1 = str.sub(s, 1, self.col - 1)
+		if str.first_nonspace(s1) <= #s1 then --we're inside the line
+			return self.editor:expand_tab()
 		end
 	end
+	return tab
+end
 
+--insert a string at cursor
+function cursor:insert_string(s)
+	self:extend_buffer()
+	self.line, self.col = self.editor:insert_string(self.line, self.col, s)
+	self:store_vcol()
+	self:make_visible()
+end
+
+--insert (or overstrike) a non-line-breaking character.
+function cursor:insert_char(c)
+	assert(c ~= '\n' and c ~= '\r' and c ~= '\r\n')
+	self:extend_buffer()
+	local s = self:getline()
+	local s1 = str.sub(s, 1, self.col - 1)
+	local s2 = str.sub(s, self.col + (self.insert_mode and 0 or 1))
+	if str.istab(c, 1) then
+		c = self:expand_tab(c)
+	end
 	self:setline(s1 .. c .. s2)
 	self:move_right(str.len(c))
 end
 
 function cursor:delete_before()
+	self:extend_buffer()
 	if self.col == 1 then
 		if self.line > 1 then
 			local s = self:remove_line()
@@ -590,12 +698,11 @@ function cursor:delete_before()
 end
 
 function cursor:delete_after()
+	self:extend_buffer()
 	if self.col > self:last_col() then
 		if self.line < #self.editor.lines then
 			self:setline(self:getline() .. self:remove_line(self.line + 1))
 		end
-		--self.col = math.min(self.col, #self.editor.lines[self.line] + 1)
-		--self:store_vcol()
 	else
 		local s = self:getline()
 		self:setline(str.sub(s, 1, self.col - 1) .. str.sub(s, self.col + 1))
@@ -607,9 +714,21 @@ end
 --computing the size of the editor area in pixels
 
 function editor:size()
-	local maxlen = self:max_visual_col()
-	local w = self.charsize * maxlen
-	local h = self.linesize * #self.lines
+	local maxvcol = self:max_visual_col()
+	local maxline = #self.lines
+
+	--unrestricted cursors can enlarge the view area
+	for cur in pairs(self.cursors) do
+		if not cur.restrict_eol then
+			maxvcol = math.max(maxvcol, cur:visual_col())
+		end
+		if not cur.restrict_eof then
+			maxline = math.max(maxline, cur.line)
+		end
+	end
+
+	local w = self.charsize * maxvcol
+	local h = self.linesize * maxline
 	return w, h
 end
 
@@ -798,8 +917,7 @@ end
 
 function editor:draw_selection_text(sel)
 	if sel:isempty() then return end
-	for line = sel.line1, sel.line2 do
-		local col1, col2 = sel:cols(line)
+	for line, col1, col2 in sel:lines() do
 		local vcol1 = self:visual_col(line, col1)
 		local vcol2 = self:visual_col(line, col2-1)
 		self:draw_text(line, vcol1, line, vcol2, 'selection_text')
@@ -828,7 +946,20 @@ end
 
 --controller -------------------------------------------------------------------------------------------------------------
 
-function editor:save(s) end --stub
+--loading/saving API
+function editor:load_file() end --> s
+function editor:save_file(s) end
+
+--clipboard API
+local clipboard_contents = ''
+
+function editor:set_clipboard(s)
+	clipboard_contents = s
+end
+
+function editor:get_clipboard()
+	return clipboard_contents
+end
 
 --UI API
 function editor:setactive(active) end
@@ -845,19 +976,15 @@ function editor:key_pressed(focused, key, char, ctrl, shift, alt)
 	elseif key == 'left' then
 		self.cursor:move_left()
 		self.selection:move(self.cursor.line, self.cursor.col, shift)
-		self.cursor:make_visible()
 	elseif key == 'right' then
 		self.cursor:move_right()
 		self.selection:move(self.cursor.line, self.cursor.col, shift)
-		self.cursor:make_visible()
 	elseif key == 'up' then
 		self.cursor:move_up()
 		self.selection:move(self.cursor.line, self.cursor.col, shift)
-		self.cursor:make_visible()
 	elseif key == 'down' then
 		self.cursor:move_down()
 		self.selection:move(self.cursor.line, self.cursor.col, shift)
-		self.cursor:make_visible()
 	elseif ctrl and key == 'A' then
 		self.selection:move(1, 1)
 		self.selection:move(1/0, 1/0, true)
@@ -866,20 +993,41 @@ function editor:key_pressed(focused, key, char, ctrl, shift, alt)
 	elseif key == 'backspace' then
 		self.cursor:delete_before()
 	elseif key == 'delete' then
-		self.cursor:delete_after()
+		if self.selection:isempty() then
+			self.cursor:delete_after()
+		else
+			self.selection:remove()
+		end
 	elseif key == 'return' then
 		self.cursor:newline()
+	elseif ctrl and key == 'X' then
+		local s = self.selection:contents()
+		self:set_clipboard(s)
+		self.selection:remove()
+	elseif ctrl and key == 'C' then
+		self:set_clipboard(self.selection:contents())
+	elseif ctrl and key == 'V' then
+		local s = self:get_clipboard()
+		self.selection:remove()
+		self.cursor:insert_string(s)
 	elseif key == 'esc' then
 		--ignore
 	elseif ctrl and key == 'S' then
-		self:save(self:contents())
+		self:save_file(self:contents())
+	elseif ctrl and key == 'O' then
+		self:load(self:load_file())
 	elseif char and not ctrl then
-		self.cursor:insert(char)
+		self.cursor:insert_char(char)
 	end
 end
 
 function editor:mouse_input(active, mousex, mousey, lbutton, rbutton, wheel)
-	if not active and lbutton and mousex >= 0 and mousex <= self.clip_w and mousey >= 0 and mousey <= self.clip_h then
+	if not active and lbutton
+		and mousex >= -self.scroll_x
+		and mousex <= -self.scroll_x + self.clip_w
+		and mousey >= -self.scroll_y
+		and mousey <= -self.scroll_y + self.clip_h
+	then
 		self:setactive(true)
 		self.cursor.line, self.cursor.vcol = self:cursor_at(mousex, mousey)
 		self.cursor:restore_vcol()

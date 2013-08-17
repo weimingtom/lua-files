@@ -18,9 +18,6 @@ function player:magnifier(t)
 	local sw = self.surface:get_image_width()
 	local sh = self.surface:get_image_height()
 
-	--TODO: instead of this, make a compatible cairo surface, copy the strides with memcpy,
-	--scale it by zoom_level, and then paint it without a filter on the screen surface.
-
 	--store the pixels to be magnified in case they overlap with the magnifier itself
 	assert(self.surface:get_image_format() == cairo.C.CAIRO_FORMAT_RGB24)
 	self.surface:flush()

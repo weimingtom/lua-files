@@ -55,7 +55,7 @@ end
 
 --check if the char at byte index i is a space of any kind
 function str.isspace(s, i)
-	return str.ischar(s, i, ' ') or str.ischar(s, i, '\t')
+	return str.ischar(s, i, ' ') or str.istab(s, i)
 end
 
 --check if a string contains a substring at byte index i
@@ -152,6 +152,27 @@ function str.replace(s, what, with)
 	]]
 end
 
+--return the index where the next line starts (unimportant) and the contents of the line starting at a given index.
+--the last line is the substring after the last line terminator to the end of the string (see tests).
+function str.next_line(s, i)
+	i = i or 1
+	if i == #s + 1 then return #s + 2, '' end
+	if i > #s then return end
+	local rni = s:find('\r\n', i, true) or #s + 2
+	local ni = s:find('\n', i, true) or #s + 2
+	local ri = s:find('\r', i, true) or #s + 2
+	local j = math.min(rni, ni, ri) - 1
+	local ret = s:sub(i, j)
+	i = math.min(rni + 2, ni + 1, ri + 1 + (ri == rni and 1 or 0))
+	return i, ret
+end
+
+--iterate lines, returning the index where the next line starts (unimportant) and the contents of each line
+function str.lines(s)
+	return str.next_line, s
+end
+
+
 if not ... then
 
 assert(str.next('') == nil)
@@ -196,6 +217,26 @@ assert(str.last_nonspace(' x ') == 2)
 assert(str.rtrim('abc \t ') == 'abc')
 assert(str.rtrim(' \t abc  x \t ') == ' \t abc  x')
 assert(str.rtrim('abc') == 'abc')
+
+local function assert_lines(s, t)
+	local i = 0
+	for _,s in str.lines(s) do
+		i = i + 1
+		assert(t[i] == s, i .. ': "' .. s .. '" ~= "' .. tostring(t[i]) .. '"')
+	end
+	assert(i == #t)
+end
+assert_lines('', {''})
+assert_lines(' ', {' '})
+assert_lines('x\ny', {'x', 'y'})
+assert_lines('x\ny\n', {'x', 'y', ''})
+assert_lines('x\n\ny', {'x', '', 'y'})
+assert_lines('\n', {'', ''})
+assert_lines('\n\r\n', {'','',''})
+assert_lines('\r\n\n', {'','',''})
+assert_lines('\n\r', {'','',''})
+assert_lines('\n\r\n\r', {'','','',''})
+assert_lines('\n\n\r', {'','','',''})
 
 end
 
