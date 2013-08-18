@@ -23,21 +23,23 @@ local editor = glue.inherit({
 		selection_text = '#333333',
 		cursor = '#ffffff',
 		text = '#ffffff',
+		line_number = '#66ffff',
+		line_number_background = '#111111',
 	},
 	eol_markers = true,
 }, codedit)
 
 function editor:draw_scrollbox()
 	local x, y, w, h = self.player:getbox(self)
-	local cw, ch = self:size()
+	local cx, cy, cw, ch = self:view_rect()
 	local scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h = self.player:scrollbox{
 		id = self.id..'_scrollbox',
 		x = self.x,
 		y = self.y,
 		w = self.w,
 		h = self.h,
-		cx = self.scroll_x,
-		cy = self.scroll_y,
+		cx = cx,
+		cy = cy,
 		cw = cw,
 		ch = ch,
 		vscroll = self.vscroll,
@@ -52,8 +54,13 @@ function editor:draw_scrollbox()
 	self.player.cr:rectangle(0, 0, clip_w, clip_h)
 	self.player.cr:clip()
 	self.player.cr:translate(scroll_x, scroll_y)
+	self.player.cr:translate(self:line_numbers_width(), 0)
 
 	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
+end
+
+function editor:draw_line_numbers()
+	codedit.draw_line_numbers(self)
 end
 
 function editor:draw_rect(x, y, w, h, color)
@@ -105,9 +112,7 @@ end
 
 function player:code_editor(t)
 	local id = assert(t.id, 'id missing')
-	local ed = t.editor or editor:new()
-	glue.inherit(t, editor) --t is an editor class now
-	glue.inherit(ed, t) --ed inherits from t now
+	local ed = t.lines and t or editor:new(t)
 	ed.player = self
 	ed:key_pressed(
 		true, --self.focused == ed.id,

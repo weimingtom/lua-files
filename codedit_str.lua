@@ -152,19 +152,35 @@ function str.replace(s, what, with)
 	]]
 end
 
---return the index where the next line starts (unimportant) and the contents of the line starting at a given index.
+--return the index where the next line starts (unimportant) and the indices of the line starting at a given index.
 --the last line is the substring after the last line terminator to the end of the string (see tests).
-function str.next_line(s, i)
+function str.next_line_indices(s, i)
 	i = i or 1
-	if i == #s + 1 then return #s + 2, '' end
-	if i > #s then return end
+	if i == #s + 1 then
+		return #s + 2, #s + 1, #s
+	end
+	if i > #s then
+		return
+	end
 	local rni = s:find('\r\n', i, true) or #s + 2
 	local ni = s:find('\n', i, true) or #s + 2
 	local ri = s:find('\r', i, true) or #s + 2
 	local j = math.min(rni, ni, ri) - 1
-	local ret = s:sub(i, j)
-	i = math.min(rni + 2, ni + 1, ri + 1 + (ri == rni and 1 or 0))
-	return i, ret
+	local next_i = math.min(rni + 2, ni + 1, ri + 1 + (ri == rni and 1 or 0))
+	return next_i, i, j
+end
+
+--iterate lines, returning the index where the next line starts (unimportant) and the indices of each line
+function str.line_indices(s)
+	return str.next_line_indices, s
+end
+
+--return the index where the next line starts (unimportant) and the contents of the line starting at a given index.
+--the last line is the substring after the last line terminator to the end of the string (see tests).
+function str.next_line(s, i)
+	local _, i, j = str.next_line_indices(s, i)
+	if not _ then return end
+	return _, s:sub(i, j)
 end
 
 --iterate lines, returning the index where the next line starts (unimportant) and the contents of each line
@@ -172,6 +188,13 @@ function str.lines(s)
 	return str.next_line, s
 end
 
+function str.line_count(s)
+	local count = 0
+	for _ in str.line_indices(s) do
+		count = count + 1
+	end
+	return count
+end
 
 if not ... then
 
@@ -237,6 +260,9 @@ assert_lines('\r\n\n', {'','',''})
 assert_lines('\n\r', {'','',''})
 assert_lines('\n\r\n\r', {'','','',''})
 assert_lines('\n\n\r', {'','','',''})
+
+assert(str.line_count('') == 1)
+assert(str.line_count('\n\n\r') == 4)
 
 end
 

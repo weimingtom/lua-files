@@ -1,15 +1,10 @@
 local codedit = require'codedit'
 local player = require'cairo_player'
 
-local ed
+local editor
 local loaded
 
-function player:on_render(cr)
-
-	ed = self:code_editor{id = 'code_editor', x = 200, y = 100, w = 300, h = 150, editor = ed}
-
-	if not loaded then
-		ed:load[[
+text = [[
 A	BB	C
 AA	B	C
 AAA	BB	C
@@ -22,8 +17,10 @@ function lines.pos(s, lnum)
 	end
 end
 ]]
-		loaded = true
-	end
+
+function player:on_render(cr)
+
+	editor = self:code_editor(editor or {id = 'code_editor', x = 200, y = 100, w = 300, h = 150, text = text})
 
 	--[[
 	v.tabsize = self:slider{id = 'tabsize', x = 10, y = 10, w = 80, h = 24, i0 = 1, i1 = 8, i = v.tabsize}
