@@ -1,4 +1,4 @@
---code editor based on codedit.
+--code editor based on codedit engine.
 local codedit = require'codedit'
 local str = require'codedit_str'
 local glue = require'glue'

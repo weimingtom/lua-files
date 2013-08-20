@@ -1,5 +1,4 @@
---codedit: code editor engine by Cosmin Apreutesei.
-
+--codedit: code editor engine by Cosmin Apreutesei (unlicensed).
 local glue = require'glue'
 local str = require'codedit_str'
 
@@ -63,6 +62,8 @@ local editor = {
 		['ctrl+end']    = 'move_end',
 		['pageup']      = 'move_up_page',
 		['pagedown']    = 'move_down_page',
+		['alt+up']      = 'move_up_page',
+		['alt+down']    = 'move_down_page',
 		--navigation/selection
 		['shift+left']       = 'select_left',
 		['shift+right']      = 'select_right',
@@ -334,7 +335,7 @@ end
 local function visual_col(s, col, tabsize)
 	local col1 = 0
 	local vcol = 1
-	for i in str.indices(s) do
+	for i in str.byte_indices(s) do
 		col1 = col1 + 1
 		if col1 >= col then
 			return vcol
@@ -350,7 +351,7 @@ end
 local function real_col(s, vcol, tabsize)
 	local vcol1 = 1
 	local col = 0
-	for i in str.indices(s) do
+	for i in str.byte_indices(s) do
 		col = col + 1
 		local vcol2 = vcol1 + (str.istab(s, i) and tabstop_distance(vcol1 - 1, tabsize) or 1)
 		if vcol >= vcol1 and vcol <= vcol2 then --vcol is between the current and the next vcol
@@ -757,9 +758,9 @@ function cursor:expand_tab()
 			local col1 = self.editor:real_col(self.line-1, vcol)
 			local stage = 0
 			local s0 = self.editor:getline(self.line-1)
-			for i in str.indices(s0) do
+			for i in str.byte_indices(s0) do
 				if i >= col1 then
-					if stage == 0 and (str.isspace(s0, i) or str.ischar(s0, i, '(')) then
+					if stage == 0 and (str.isspace(s0, i) or str.isascii(s0, i, '(')) then
 						stage = 1
 					elseif stage == 1 and not str.isspace(s0, i) then
 						stage = 2
@@ -927,7 +928,9 @@ function editor:caret_rect_over_mode(cursor)
 	local vcol = self:visual_col(cursor.line, cursor.col)
 	local x, y = self:text_coords(cursor.line, vcol)
 	local w = 1
-	if cursor:getline() and str.istab(cursor:getline(), cursor.col) then --make cursor as wide as the tabspace
+	local s = cursor:getline()
+	local i = str.byte_index(cursor.col)
+	if cursor:getline() and str.istab(s, i) then --make cursor as wide as the tabspace
 		w = self:tabstop_distance(vcol - 1)
 	end
 	w = w * self.charsize
@@ -1083,7 +1086,7 @@ function editor:draw_buffer(line1, vcol1, line2, vcol2, color)
 	for line = line1, line2 do
 		local s = self:getline(line)
 		local vcol = 1
-		for i in str.indices(s) do
+		for i in str.byte_indices(s) do
 			if str.istab(s, i) then
 				vcol = vcol + self:tabstop_distance(vcol - 1)
 			else

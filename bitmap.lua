@@ -415,7 +415,7 @@ end
 
 local function data_interface(bmp)
 	local format = bitmap_format(bmp)
-	local data = bmp.data --ffi.cast(ffi.typeof('$ *', ffi.typeof(format.ctype)), bmp.data)
+	local data = ffi.cast(ffi.typeof('$ *', ffi.typeof(format.ctype)), bmp.data)
 	local stride = valid_stride(bmp.format, bmp.w, bmp.stride)
 	local stride = stride / ffi.sizeof(format.ctype) --stride is now in units of ctype, not bytes!
 	local pixelsize = format.bpp / 8 / ffi.sizeof(format.ctype) --pixelsize is fractional for < 8bpp formats, that's ok.
