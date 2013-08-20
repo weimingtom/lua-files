@@ -20,7 +20,6 @@ local editor = {
 	linesize = 1,
 	charsize = 1,
 	charvsize = 1,
-	caret_width = 2,
 	--scrolling
 	smooth_vscroll = false,
 	smooth_hscroll = true,
@@ -37,7 +36,7 @@ local editor = {
 		tab_align_list = true, --align to the next word on the above line; incompatible with tabs = 'always'
 		tab_align_args = true, --align to the char after '(' on the above line; incompatible with tabs = 'always'
 		color = nil, --custom color
-		caret_width = nil, --custom width
+		caret_width = 2,
 		keep_on_page_change = true, --preserve cursor position through page-up/page-down
 		word_chars = '^[a-zA-Z]'
 	},
@@ -444,11 +443,14 @@ function editor:indent_line(line, levels, use_tabs)
 			s = string.rep(' ', self.tabsize * levels) .. s
 		end
 	else
+		local start_col = -levels
 		if use_tabs then
-			s = str.sub(s, -levels)
+			start_col = start_col + 1
 		else
-			s = str.sub(s, self.tabsize * -levels)
+			start_col = self.tabsize * start_col + 1
 		end
+		start_col = math.min(self:indent_col(line), start_col)
+		s = str.sub(s, start_col)
 	end
 	self:setline(line, s)
 end
@@ -540,9 +542,12 @@ function selection:remove()
 	self:move(self.line1, self.col1)
 end
 
-function selection:indent(tabs)
-	for line = self.line1, self.line2 do
-		self:indent_line(tabs)
+function selection:indent(levels, tabs)
+	local line1, line2, col2 = self.line1, self.line2, self.col2
+	self:move(line1, 1)
+	self:move(line2 + (col2 == 1 and 0 or 1), 1, true)
+	for line = self.line1, self.line2-1 do
+		self.editor:indent_line(line, levels, tabs)
 	end
 end
 
@@ -590,9 +595,10 @@ function cursor:remove_line(line)    return self.editor:remove_line(line or self
 function cursor:visual_col() return self.editor:visual_col(self.line, self.col) end
 
 function cursor:real_col(line)
-	local col = self.editor:real_col(line or self.line, self.vcol)
-	if self.restrict_eol and self:getline() then
-		col = clamp(col, 1, self:last_col() + 1)
+	line = line or self.line
+	local col = self.editor:real_col(line, self.vcol)
+	if self.restrict_eol and self.editor:getline(line) then
+		col = clamp(col, 1, self.editor:last_col(line) + 1)
 	end
 	return col
 end
@@ -610,12 +616,14 @@ function cursor:move(line, col, selecting, store_vcol, keep_screen_location)
 	--scroll to preserve cursor screen location
 	if keep_screen_location then
 		local vcol0 = self:visual_col()
-		self:scroll_by(
-			(vcol - vcol0) * self.charsize,
-			(line - self.line) * self.linesize)
+		local cx = (vcol - vcol0) * self.editor.charsize
+		local cy = (line - self.line) * self.editor.linesize
+		self.editor:scroll_by(cx, -cy)
 	end
-	--make cursor visible if it isn't
-	self.editor:make_visible(line, vcol)
+	--make cursor visible if it's supposed to be
+	if self.visible then
+		self.editor:make_visible(line, vcol)
+	end
 	--re-anchor or extend selection
 	self.selection:move(line, col, selecting)
 	--finally, set the cursor position
@@ -641,7 +649,7 @@ function cursor:move_vert(lines, selecting, keep_screen_location)
 	if line < 1 and not self.restrict_eol then
 		--it seems more consistent to not move the cursor home in this case
 		return
-	elseif line > 1 and line < self.editor:last_line() then
+	elseif self.editor:getline(line) then
 		col = self:real_col(line)
 	end
 	self:move(line, col, selecting, false, keep_screen_location)
@@ -697,17 +705,11 @@ function cursor:move_eol(selecting) --eol = end of line
 end
 
 function cursor:move_up_page(selecting)
-	if self.keep_on_page_change then
-		self.editor:scroll_by(0, self.editor:pagesize() * self.editor.linesize)
-	end
-	self:move_up(self.editor:pagesize(), selecting)
+	self:move_up(self.editor:pagesize(), selecting, self.keep_on_page_change)
 end
 
 function cursor:move_down_page(selecting)
-	if self.keep_on_page_change then
-		self.editor:scroll_by(0, -self.editor:pagesize() * self.editor.linesize)
-	end
-	self:move_down(self.editor:pagesize(), selecting)
+	self:move_down(self.editor:pagesize(), selecting, self.keep_on_page_change)
 end
 
 --editing
@@ -723,9 +725,8 @@ end
 --insert a string at cursor
 function cursor:insert_string(s)
 	self:extend()
-	self.line, self.col = self.editor:insert_string(self.line, self.col, s)
-	self:store_vcol()
-	self:make_visible()
+	local line, col = self.editor:insert_string(self.line, self.col, s)
+	self:move(line, col)
 end
 
 --pressing enter adds a new line, optionally copies the indent of the current line, and carries the cursor over.
@@ -743,8 +744,8 @@ function cursor:newline()
 	self.line = self.line + 1
 	self:insert_line(s2)
 	self.col = landing_col
-	self.vcol = self:visual_vcol()
-	self:make_visible()
+	self.vcol = self:visual_col()
+	self.editor:make_visible(self.line, self.col)
 end
 
 --expand a tab character according to current tab mode.
@@ -793,8 +794,8 @@ end
 --insert tab at cursor or indent selection
 function cursor:indent()
 	if not self.selection:isempty() then
-		self.selection:indent(1)
-		self:move(self.selection.line2 + 1, 1)
+		self.selection:indent(1, self.tabs)
+		self:move(self.selection.line2, 1, true)
 	else
 		self:insert_string(self:expand_tab())
 	end
@@ -803,8 +804,8 @@ end
 --outdent selection or line
 function cursor:outdent()
 	if not self.selection:isempty() then
-		self.selection:indent(-1)
-		self:move(self.selection.line2 + 1, 1)
+		self.selection:indent(-1, self.tabs)
+		self:move(self.selection.line2, 1, true)
 	else
 		--TODO: outdent line
 	end
@@ -830,7 +831,7 @@ function cursor:delete_before()
 			local s0 = self:getline()
 			self:setline(s0 .. s)
 			self.col = str.len(s0) + 1
-			self.vcol = self:visual_vcol()
+			self.vcol = self:visual_col()
 		end
 	else
 		local s = self:getline()
@@ -915,7 +916,7 @@ end
 function editor:caret_rect_insert_mode(cursor)
 	local vcol = self:visual_col(cursor.line, cursor.col)
 	local x, y = self:cursor_coords(cursor.line, vcol)
-	local w = cursor.caret_width or self.caret_width
+	local w = cursor.caret_width
 	local h = self.linesize
 	x = x - math.floor(w / 2) --between columns
 	x = x + (vcol == 1 and 1 or 0) --on col1, shift it a bit to the right to make it visible
@@ -930,7 +931,7 @@ function editor:caret_rect_over_mode(cursor)
 		w = self:tabstop_distance(vcol - 1)
 	end
 	w = w * self.charsize
-	local h = self.caret_width
+	local h = cursor.caret_width
 	y = y + 1 --1 pixel under the baseline
 	return x, y, w, h
 end
@@ -1118,7 +1119,7 @@ function editor:draw_selection_text(sel)
 	if sel:isempty() then return end
 	for line, col1, col2 in sel:lines() do
 		local vcol1 = self:visual_col(line, col1)
-		local vcol2 = self:visual_col(line, col2-1)
+		local vcol2 = self:visual_col(line, col2) - 1
 		self:draw_buffer(line, vcol1, line, vcol2, 'selection_text')
 	end
 end
@@ -1202,7 +1203,7 @@ function commands:select_left()  self.cursor:move_left(1, true) end
 function commands:select_right() self.cursor:move_right(1, true) end
 function commands:select_up()    self.cursor:move_up(1, true) end
 function commands:select_down()  self.cursor:move_down(1, true) end
-function commands:select_left_wrod()  self.cursor:move_left_word(true) end
+function commands:select_left_word()  self.cursor:move_left_word(true) end
 function commands:select_right_word() self.cursor:move_right_word(true) end
 function commands:select_home()  self.cursor:move_home(true) end
 function commands:select_end()   self.cursor:move_end(true) end
