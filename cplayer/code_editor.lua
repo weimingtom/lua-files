@@ -70,6 +70,7 @@ end
 function editor:draw_char(x, y, s, i, color)
 	self.player:setcolor(self.colors[color])
 	self.player.cr:select_font_face(self.font_face, 0, 0)
+	self.player.cr:set_font_size(self.charsize)
 	self.player.cr:move_to(x, y)
 	--TODO: prevent string creation by using show_glyphs, and use harfbuzz for shaping anyway
 	self.player.cr:show_text(s:sub(i, (str.next(s, i) or #s + 1) - 1))
@@ -107,27 +108,26 @@ function editor:render()
 end
 
 function editor:setactive(active)
-	--
+	self.player.active = active and self.id or nil
 end
 
 function player:code_editor(t)
 	local id = assert(t.id, 'id missing')
 	local ed = t.lines and t or editor:new(t)
 	ed.player = self
-	ed:key_pressed(
+	ed:input(
 		true, --self.focused == ed.id,
+		self.active == ed.id,
 		self.key,
 		self.char,
 		self.ctrl,
 		self.shift,
-		self.alt)
-	ed:mouse_input(
-		self.active == ed.id,
+		self.alt,
 		self.mousex - ed.x - ed.scroll_x,
 		self.mousey - ed.y - ed.scroll_y,
 		self.lbutton,
 		self.rbutton,
-		self.wheel)
+		self.wheel_delta)
 	ed:render()
 	return ed
 end

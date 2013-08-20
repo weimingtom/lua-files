@@ -102,14 +102,16 @@ function str.count(s, sub)
 	return count
 end
 
---first occurence of a non-space char (#s + 1 if none); returns the byte index, same as char index
+--first occurence of a non-space char (#s + 1 if none); returns the byte index followed by the char index
 function str.first_nonspace(s)
+	local n = 1
 	for i in str.indices(s) do
 		if not str.isspace(s, i) then
-			return i
+			return i, n
 		end
+		n = n + 1
 	end
-	return #s + 1
+	return #s + 1, n
 end
 
 --last occurence of a non-space char (0 if none); returns byte index
@@ -128,28 +130,6 @@ end
 --right trim of space and tab characters
 function str.rtrim(s)
 	return s:sub(1, str.last_nonspace(s))
-end
-
-function str.replace(s, what, with)
-	return s:gsub(what, with)
-	--[[ --TODO:
-	assert(#s1 > 0)
-	local t = {}
-	local i = 1
-	local lasti = 1
-	while i do
-		if str.contains(s, i, what) then
-			t[#t+1] = s:sub(i0, i-1)
-			t[#t+1] = with
-			lasti = i
-			i = i + #what
-			if i > #s then i = nil end
-		else
-			i = str.next(s, i)
-		end
-	end
-	return table.concat(t)
-	]]
 end
 
 --return the index where the next line starts (unimportant) and the indices of the line starting at a given index.
@@ -195,6 +175,84 @@ function str.line_count(s)
 	end
 	return count
 end
+
+--byte index given char index
+function str.byte_index(s, n0)
+	if n0 < 1 then return 0 end
+	local n = 1
+	for i in str.indices(s) do
+		if n == n0 then
+			return i
+		end
+		n = n + 1
+	end
+	return #s + 1
+end
+
+--char index given byte index
+function str.char_index(s, i0)
+	if i0 < 1 then return 0 end
+	local n = 1
+	for i in str.indices(s) do
+		if i == i0 then
+			break
+		end
+		n = n + 1
+	end
+	return n
+end
+
+--byte index of the prev. char before the char at byte index i
+function str.prev(s, i)
+	if i == 1 then return end
+	local lasti = 1
+	for j in str.indices(s) do
+		if j >= i then
+			break
+		end
+		lasti = j
+	end
+	return lasti
+end
+
+function str.isword(s, i, word_chars)
+	return s:find(word_chars, i) ~= nil
+end
+
+function str.next_word_break(s, start, word_chars)
+	local isword = str.isword(s, start, word_chars)
+	for i in str.next, s, start do
+		if isword and str.isspace(s, i) then
+			isword = false
+		end
+		if isword ~= str.isword(s, i, word_chars) then
+			return i
+		end
+	end
+	return #s + 1
+end
+
+function str.prev_word_break(s, start, word_chars)
+	local prev = str.prev(s, start)
+	if not prev then return 0 end
+	local isword = str.isword(s, prev, word_chars)
+	local skipspace = str.isspace(s, prev)
+	if skipspace then
+		isword = true
+	end
+	while true do
+		local prev1 = str.prev(s, prev)
+		if not prev1 then break end
+		if skipspace and str.isspace(s, prev1) then
+			--nothing
+		elseif isword ~= str.isword(s, prev1, word_chars) then
+			return prev
+		end
+		prev = prev1
+	end
+	return 0
+end
+
 
 if not ... then
 

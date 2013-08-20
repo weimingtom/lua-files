@@ -1,9 +1,13 @@
+- move selection (or current line) up/down
+- select by dragging over the line numbers column
+
+- user-definable margins
+	- show blame info (eg. from git and hg)
+
 - carets:
 	- jump through words - ctrl+left/right jumps to the beginning of the next/prev. word.
-	- EOL free - allow caret past EOL - pad with spaces if inserting text at caret.
-	- EOF free - allow caret past EOF - pad with lines if inserting text at caret.
-	- scroll margins - moving the caret outside the view minus some margin scrolls the view in that direction.
-	- smart right scroll - scroll right as if the view is springed on the left (i.e. scroll back when moving left).
+	- caret jumps - when must scroll, scroll longer so the caret can move longer before scrolling again.
+	-
 
 - autodetect tabs mode and tabsize
 	- skip empty lines
@@ -48,7 +52,16 @@
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)
 	- bracket matching highlighting
-
+	- current line highlighting
+		- highlight just the line number
+	- view whitespace
+	- view special chars
+	- annotations (tooltips)
+	- user-definable markers
+	- text styles: strike-through, underline, dashed/dotted/squiggle underline, selection rectangle,
+	- long lines - display a limit bar or mark the excess with a text style
+	- animated scrolling like in sublime text (actually that's pretty annoying)
+	- text cursor over text, normal pointer surrounding the text, reverse pointer over the line numbers
 
 CODEDITOR
 ---------
@@ -75,6 +88,12 @@ CODEDITOR
 	- integrate a spell checking library
 	- integrate a Lua linter
 	- minimap like sublime text
+- autocompletion
+- calltips
+- zooming
+- file change detection
+- atomic save
+- auto-backup (with undo/redo stack?)
 
 
 QUESTIONS
@@ -84,3 +103,11 @@ QUESTIONS
 - bookmarks:
 	- how to manage writing code and browsing the same code (but different parts of it) at the same time? split view?
 		- idea: simple shortcut to go back to where the cursor was last time you were typign
+
+
+features I never use
+	- macros
+	- printing
+	- code folding
+	- line wrapping
+
