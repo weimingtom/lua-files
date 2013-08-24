@@ -34,8 +34,8 @@ end
 str.next = str.next_raw
 
 --iterate chars, returning the byte index where each char starts
-function str.byte_indices(s, lasti)
-	return str.next, s, lasti
+function str.byte_indices(s)
+	return str.next, s
 end
 
 --number of chars in string
@@ -200,8 +200,8 @@ function str.next_valid(s, i)
 end
 
 --iterate valid chars, returning the byte index where each char starts
-function str.valid_byte_indices(s, lasti)
-	return str.next_valid, s, lasti
+function str.valid_byte_indices(s)
+	return str.next_valid, s
 end
 
 --assert that a string only contains valid utf8 characters

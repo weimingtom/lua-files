@@ -4,9 +4,8 @@ local lua = lexer.load'lexers.lua'
 
 --pp(lua)
 
-local text = [[
-function f() end
-]]
+local text = 'function\nend'
 
+print(#text)
 pp(lexer.lex(text))
 

@@ -19,9 +19,6 @@ local editor = {
 	linesize = 1,
 	charsize = 1,
 	charvsize = 1,
-	--scrolling
-	smooth_vscroll = false,
-	smooth_hscroll = true,
 	margins = {left = 0, top = 0, right = 0, bottom = 0}, --invisible cursor margins, in pixels
 	--line numbers
 	line_numbers = true,
@@ -44,6 +41,9 @@ local editor = {
 		block = false, --insert, block mode
 		color = nil, --custom color
 	},
+	--highlighting
+	lexer = nil, --lexer to use for syntax highlighting. nil means disabled.
+	highlight = true,
 	--input bindings
 	commands = {}, --commands for key bindings; defined below
 	key_bindings = {
@@ -77,6 +77,19 @@ local editor = {
 		['ctrl+shift+end']   = 'select_end',
 		['shift+pageup']     = 'select_up_page',
 		['shift+pagedown']   = 'select_down_page',
+		--navigation/selection/block
+		['alt+shift+left']       = 'select_block_left',
+		['alt+shift+right']      = 'select_block_right',
+		['alt+shift+up']         = 'select_block_up',
+		['alt+shift+down']       = 'select_block_down',
+		['alt+ctrl+shift+left']  = 'select_block_left_word',
+		['alt+ctrl+shift+right'] = 'select_block_right_word',
+		['alt+shift+home']       = 'select_block_bol',
+		['alt+shift+end']        = 'select_block_eol',
+		['alt+ctrl+shift+home']  = 'select_block_home',
+		['alt+ctrl+shift+end']   = 'select_block_end',
+		['alt+shift+pageup']     = 'select_block_up_page',
+		['alt+shift+pagedown']   = 'select_block_down_page',
 		--selection
 		['ctrl+A']      = 'select_all',
 		--editing
@@ -187,12 +200,14 @@ end
 function editor:insert_line(line, s)
 	table.insert(self.lines, line, s)
 	self:undo_command('remove_line', line)
+	self.dirty = true
 	self.changed = true
 end
 
 function editor:remove_line(line)
 	local s = table.remove(self.lines, line)
 	self:undo_command('insert_line', line, s)
+	self.dirty = true
 	self.changed = true
 	return s
 end
@@ -200,6 +215,7 @@ end
 function editor:setline(line, s)
 	self:undo_command('setline', line, self:getline(line))
 	self.lines[line] = s
+	self.dirty = true
 	self.changed = true
 end
 
@@ -402,7 +418,7 @@ function editor:aligned_col(target_line, line, col)
 end
 
 --line segment on a line vertically aligned to another line segment on a different line
-function editor:aligned_cols(target_line, line1, col1, line2, col2)
+function editor:aligned_cols(line, line1, col1, line2, col2)
 	local col1 = self:aligned_col(line, line1, col1)
 	local col2 = self:aligned_col(line, line2, col2)
 	--the aligned columns could end up switched
@@ -430,7 +446,7 @@ end
 function editor:remove_block(line1, col1, line2, col2)
 	for line = line1, line2 do
 		local tcol1, tcol2 = self:aligned_cols(line, line1, col1, line2, col2)
-		self:remove_string(line, tcol1, line, tcol2)
+		self:setline(line, self:sub(line, tcol1, tcol2))
 	end
 end
 
@@ -479,7 +495,8 @@ function selection:isempty()
 	return self.line2 == self.line1 and self.col2 == self.col1
 end
 
-function selection:move(line, col, selecting)
+function selection:move(line, col, selecting, block_mode)
+	self.block = block_mode
 	if selecting then
 		local line1, col1 = self.anchor_line, self.anchor_col
 		local line2, col2 = line, col
@@ -490,9 +507,9 @@ function selection:move(line, col, selecting)
 		elseif line2 == line1 and col2 < col1 then
 			col2, col1 = col1, col2
 		end
-		--restrict selection to the available text
-		self.line1, self.col1 = self.editor:restrict(line1, col1, true, true)
-		self.line2, self.col2 = self.editor:restrict(line2, col2, true, true)
+		--restrict selection boundaries to the available text
+		self.line1, self.col1 = self.editor:restrict(line1, col1, not self.block, true)
+		self.line2, self.col2 = self.editor:restrict(line2, col2, not self.block, true)
 	else
 		--reset and re-anchor the selection
 		line, col = self.editor:restrict(line, col, true, true)
@@ -552,16 +569,6 @@ function selection:indent(levels, tabs)
 	end
 end
 
-function editor:selection_contents()
-	local lines = {}
-	for sel in pairs(selections) do
-		for line, col1, col2 in sel:lines() do
-			table.insert(lines, self:sub(line, col1, col2 - 1))
-		end
-	end
-	return self:contents(t)
-end
-
 --cursor: caret-based navigation and editing -----------------------------------------------------------------------------
 
 local cursor = editor.cursor
@@ -584,17 +591,6 @@ function cursor:free()
 	self.editor.cursors[self] = nil
 end
 
---cursor vocabulary
-
-function cursor:last_col(line)       return self.editor:last_col(line or self.line) end
-function cursor:indent_col(line)     return self.editor:indent_col(self.line) end --where indented text starts
-function cursor:getline(line)        return self.editor:getline(line or self.line) end
-function cursor:setline(s, line)     self.editor:setline(line or self.line, s) end
-function cursor:insert_line(s, line) self.editor:insert_line(line or self.line, s) end
-function cursor:remove_line(line)    return self.editor:remove_line(line or self.line) end
-
-function cursor:visual_col() return self.editor:visual_col(self.line, self.col) end
-
 function cursor:real_col(line)
 	line = line or self.line
 	local col = self.editor:real_col(line, self.vcol)
@@ -606,9 +602,11 @@ end
 
 --navigation
 
-function cursor:move(line, col, selecting, store_vcol, keep_screen_location)
+function cursor:move(line, col, selecting, store_vcol, block_mode, keep_screen_location)
 	--restrict the cursor according to current policy
-	line, col = self.editor:restrict(line, col, self.restrict_eol, self.restrict_eof)
+	line, col = self.editor:restrict(line, col,
+		self.restrict_eol and (not selecting or not block_mode),
+		self.restrict_eof)
 	--store wanted vcol
 	local vcol = self.editor:visual_col(line, col)
 	if store_vcol then
@@ -616,7 +614,7 @@ function cursor:move(line, col, selecting, store_vcol, keep_screen_location)
 	end
 	--scroll to preserve cursor screen location
 	if keep_screen_location then
-		local vcol0 = self:visual_col()
+		local vcol0 = self.editor:visual_col(self.line, self.col)
 		local cx = (vcol - vcol0) * self.editor.charsize
 		local cy = (line - self.line) * self.editor.linesize
 		self.editor:scroll_by(cx, -cy)
@@ -626,34 +624,41 @@ function cursor:move(line, col, selecting, store_vcol, keep_screen_location)
 		self.editor:make_visible(line, vcol)
 	end
 	--re-anchor or extend selection
-	self.selection:move(line, col, selecting)
+	self.selection:move(line, col, selecting, block_mode)
 	--finally, set the cursor position
 	self.line = line
 	self.col = col
 end
 
-function cursor:move_horiz(cols, selecting, keep_screen_location)
+function cursor:move_horiz(cols, selecting, block_mode, ...)
 	local line = self.line
 	local col = self.col + cols
-	if col < 1 then
-		line, col = self.editor:restrict(line - 1, 1/0, true, false)
-	elseif self.restrict_eol and line > self.editor:last_line() or col > self:last_col() + 1 then
-		line = line + 1
-		col = 1
+	if not selecting or not block_mode then --no jumping lines when selecting blocks
+		if col < 1 then
+			line, col = self.editor:restrict(line - 1, 1/0, true, false)
+		elseif self.restrict_eol and
+			(line > self.editor:last_line() or
+				col > self.editor:last_col(line) + 1)
+		then
+			line = line + 1
+			col = 1
+		end
 	end
-	self:move(line, col, selecting, true, keep_screen_location)
+	self:move(line, col, selecting, true, block_mode, ...)
 end
 
-function cursor:move_vert(lines, selecting, keep_screen_location)
+function cursor:move_vert(lines, selecting, block_mode, ...)
 	local line = self.line + lines
 	local col = self.col
-	if line < 1 and not self.restrict_eol then
-		--it seems more consistent to not move the cursor home in this case
-		return
-	elseif self.editor:getline(line) then
-		col = self:real_col(line)
+	if not selecting or not block_mode then --no jumping cols when selecting blocks
+		if line < 1 and not self.restrict_eol then
+			--it seems more consistent to not move the cursor home in this case
+			return
+		elseif self.editor:getline(line) then
+			col = self:real_col()
+		end
 	end
-	self:move(line, col, selecting, false, keep_screen_location)
+	self:move(line, col, selecting, false, block_mode, ...)
 end
 
 --navigation/hi-level
@@ -663,61 +668,60 @@ function cursor:move_right(cols, ...) self:move_horiz(cols or 1, ...) end
 function cursor:move_up(lines, ...)   self:move_vert(-(lines or 1), ...) end
 function cursor:move_down(lines, ...) self:move_vert(lines or 1, ...) end
 
-function cursor:move_left_word(selecting)
-	local s = self:getline()
+function cursor:move_left_word(selecting, ...)
+	local s = self.editor:getline(self.line)
 	if not s or self.col == 1 then
-		return self:move_left(1, selecting)
-	elseif self.col <= self:indent_col() then --skip indent
-		return self:move_left(1/0, selecting)
+		return self:move_left(1, selecting, ...)
+	elseif self.col <= self.editor:indent_col(self.line) then --skip indent
+		return self:move_left(1/0, selecting, ...)
 	end
 	local col = str.char_index(s, str.prev_word_break(s, str.byte_index(s, self.col), self.word_chars))
 	col = math.max(1, col) --if not found, consider it found at bol
-	self:move_left(self.col - col, selecting)
+	self:move_left(self.col - col, selecting, ...)
 end
 
-function cursor:move_right_word(selecting, keep_screen_location)
-	local s = self:getline()
+function cursor:move_right_word(selecting, ...)
+	local s = self.editor:getline(self.line)
 	if not s then
-		return self:move_right(1, selecting)
-	elseif self.col > self:last_col() then --skip indent
-		self:move(self.line + 1, self.editor:indent_col(self.line + 1), selecting, true, keep_screen_location)
-		return
+		return self:move_right(1, selecting, ...)
+	elseif self.col > self.editor:last_col(self.col) then --skip indent
+		return self:move(self.line + 1, self.editor:indent_col(self.line + 1), selecting, true, ...)
 	end
 	local col = str.char_index(s, str.next_word_break(s, str.byte_index(s, self.col), self.word_chars))
-	self:move_right(col - self.col, selecting)
+	self:move_right(col - self.col, selecting, ...)
 end
 
-function cursor:move_home(selecting)
-	self:move(1, 1, selecting)
+function cursor:move_home(...)
+	self:move(1, 1, ...)
 end
 
-function cursor:move_end(selecting)
+function cursor:move_end(...)
 	local line = self.editor:last_line()
-	self:move(line, self.editor:last_col(line) + 1, selecting)
+	self:move(line, self.editor:last_col(line) + 1, ...)
 end
 
-function cursor:move_bol(selecting) --bol = beginning of line
-	self:move(self.line, 1, selecting)
+function cursor:move_bol(...) --beginning of line
+	self:move(self.line, 1, ...)
 end
 
-function cursor:move_eol(selecting) --eol = end of line
-	if not self:getline() then return end
-	self:move(self.line, self.editor:last_col(self.line) + 1, selecting)
+function cursor:move_eol(...) --end of line
+	if not self.editor:getline(self.line) then return end
+	self:move(self.line, self.editor:last_col(self.line) + 1, ...)
 end
 
-function cursor:move_up_page(selecting)
-	self:move_up(self.editor:pagesize(), selecting, self.keep_on_page_change)
+function cursor:move_up_page(selecting, block_mode)
+	self:move_up(self.editor:pagesize(), selecting, block_mode, self.keep_on_page_change)
 end
 
-function cursor:move_down_page(selecting)
-	self:move_down(self.editor:pagesize(), selecting, self.keep_on_page_change)
+function cursor:move_down_page(selecting, block_mode)
+	self:move_down(self.editor:pagesize(), selecting, block_mode, self.keep_on_page_change)
 end
 
 --editing
 
 --if cursor is over eof, add empty lines to reach it, and if it's over eol, extend the line to reach it.
 function cursor:extend()
-	if self.restrict_eof and self.restrict_eol then --can't be out
+	if self.restrict_eof and self.restrict_eol then --cursor can't be out, do nothing
 		return
 	end
 	self.editor:extend(self.line, self.col)
@@ -733,20 +737,17 @@ end
 --pressing enter adds a new line, optionally copies the indent of the current line, and carries the cursor over.
 function cursor:newline()
 	self:extend()
-	local s = self:getline()
-	local landing_col, indent = 1, ''
+	local landing_col = 1
+	local indent = ''
 	if self.auto_indent then
-		landing_col = math.min(self.col, self:indent_col())
-		indent = str.sub(s, 1, landing_col - 1)
+		landing_col = math.min(self.col, self.editor:indent_col(self.line))
+		indent = self.editor:sub(self.line, 1, landing_col - 1)
 	end
-	local s1 = str.sub(s, 1, self.col - 1)
-	local s2 = indent .. str.sub(s, self.col)
-	self:setline(s1)
-	self.line = self.line + 1
-	self:insert_line(s2)
-	self.col = landing_col
-	self.vcol = self:visual_col()
-	self.editor:make_visible(self.line, self.col)
+	local s1 = self.editor:sub(self.line, 1, self.col - 1)
+	local s2 = indent .. self.editor:sub(self.line, self.col)
+	self.editor:setline(self.line, s1)
+	self.editor:insert_line(self.line + 1, s2)
+	self:move(self.line + 1, landing_col)
 end
 
 --expand a tab character according to current tab mode.
@@ -754,7 +755,7 @@ function cursor:expand_tab()
 	if false and (self.tab_align_list or self.tab_align_args) then
 		--look in the line above for the vcol of the first non-space char after at least one space or '(', starting at vcol
 		if str.first_nonspace(s1) < #s1 then
-			local vcol = self:visual_col()
+			local vcol = self.editor:visual_col(self.line, self.col)
 			local col1 = self.editor:real_col(self.line-1, vcol)
 			local stage = 0
 			local s0 = self.editor:getline(self.line-1)
@@ -779,7 +780,7 @@ function cursor:expand_tab()
 	elseif self.tabs == 'never' then
 		return self.editor:expand_tab()
 	elseif self.tabs == 'indent' then
-		local s = self:getline()
+		local s = self.editor:getline(self.line)
 		local s1 = str.sub(s, 1, self.col - 1)
 		if str.first_nonspace(s1) <= #s1 then --we're inside the line
 			return self.editor:expand_tab()
@@ -798,7 +799,7 @@ function cursor:indent()
 		self.selection:indent(1, self.tabs)
 		self:move(self.selection.line2, 1, true)
 	else
-		self:insert_string(self:expand_tab())
+		self.editor:insert_string(self.line, self.col, self:expand_tab())
 	end
 end
 
@@ -816,45 +817,54 @@ end
 function cursor:insert_char(c)
 	assert(#c > 1 or c:byte(1) > 31)
 	self:extend()
-	local s = self:getline()
+	local s = self.editor:getline(self.line)
 	local s1 = str.sub(s, 1, self.col - 1)
 	local s2 = str.sub(s, self.col + (self.insert_mode and 0 or 1))
-	self:setline(s1 .. c .. s2)
+	self.editor:setline(self.line, s1 .. c .. s2)
 	self:move_right(str.len(c))
+end
+
+function cursor:remove_selection()
+	self.selection:remove()
+	self:move(self.selection.line1, self.selection.col1)
 end
 
 function cursor:delete_before()
 	self:extend()
-	if self.col == 1 then
-		if self.line > 1 then
-			local s = self:remove_line()
-			self.line = self.line - 1
-			local s0 = self:getline()
-			self:setline(s0 .. s)
-			self.col = str.len(s0) + 1
-			self.vcol = self:visual_col()
+	if self.selection:isempty() then
+		if self.col == 1 then
+			if self.line > 1 then
+				local s = self.editor:remove_line(self.line)
+				self.line = self.line - 1
+				local s0 = self.editor:getline(self.line)
+				self.editor:setline(self.line, s0 .. s)
+				self.col = str.len(s0) + 1
+				self.vcol = self.editor:visual_col(self.line, self.col)
+			end
+		else
+			local s = self.editor:getline(self.line)
+			s = str.sub(s, 1, self.col - 2) .. str.sub(s, self.col)
+			self.editor:setline(self.line, s)
+			self:move_left()
 		end
 	else
-		local s = self:getline()
-		s = str.sub(s, 1, self.col - 2) .. str.sub(s, self.col)
-		self:setline(s)
-		self:move_left()
+		self:remove_selection()
 	end
 end
 
 function cursor:delete_after()
 	self:extend()
 	if self.selection:isempty() then
-		if self.col > self:last_col() then
+		if self.col > self.editor:last_col(self.line) then
 			if self.line < self.editor:last_line() then
-				self:setline(self:getline() .. self:remove_line(self.line + 1))
+				self.editor:setline(self.line, self.editor:getline(self.line) .. self.editor:remove_line(self.line + 1))
 			end
 		else
-			local s = self:getline()
-			self:setline(str.sub(s, 1, self.col - 1) .. str.sub(s, self.col + 1))
+			local s = self.editor:getline(self.line)
+			self.editor:setline(self.line, str.sub(s, 1, self.col - 1) .. str.sub(s, self.col + 1))
 		end
 	else
-		self.selection:remove()
+		self:remove_selection()
 	end
 end
 
@@ -979,24 +989,9 @@ function editor:clip_rect()
 	return -self.scroll_x, -self.scroll_y, self.clip_w, self.clip_h
 end
 
---scroll the editor to specific pixel coordinates
-function editor:scroll(x, y)
-	if not self.smooth_vscroll then
-		--snap vertical offset to linesize
-		local r = y % self.linesize
-		y = y - r + self.linesize * (r > self.linesize / 2 and 1 or 0)
-	end
-	if not self.smooth_hscroll then
-		--snap horiz. offset to charsize
-		local r = x % self.charsize
-		x = x - r + self.charsize * (r > self.charsize / 2 and 1 or 0)
-	end
-	self.scroll_x = x
-	self.scroll_y = y
-end
-
 function editor:scroll_by(x, y)
-	self:scroll(self.scroll_x + x, self.scroll_y + y)
+	self.scroll_x = self.scroll_x + x
+	self.scroll_y = self.scroll_y + y
 end
 
 --scroll the editor to make a specific character visible
@@ -1011,9 +1006,8 @@ function editor:make_visible(line, vcol)
 	w = w + self.margins.right
 	h = h + self.margins.bottom
 	--compute the scroll offset (client area coords)
-	local scroll_x = -clamp(-self.scroll_x, x + w - self.clip_w, x)
-	local scroll_y = -clamp(-self.scroll_y, y + h - self.clip_h, y)
-	self:scroll(scroll_x, scroll_y)
+	self.scroll_x = -clamp(-self.scroll_x, x + w - self.clip_w, x)
+	self.scroll_y = -clamp(-self.scroll_y, y + h - self.clip_h, y)
 end
 
 --which editor lines are (partially or entirely) visibile given the current vertical scroll
@@ -1022,6 +1016,7 @@ function editor:visible_lines()
 	local line2 = math.ceil((-self.scroll_y + self.clip_h) / self.linesize)
 	line1 = clamp(line1, 1, self:last_line())
 	line2 = clamp(line2, 1, self:last_line())
+	--return line1 + 1, line2 - 2
 	return line1, line2
 end
 
@@ -1063,6 +1058,7 @@ function editor:draw_line_numbers_background()
 end
 
 function editor:draw_line_numbers()
+	self:draw_line_numbers_background()
 	local minline, maxline = self:visible_lines()
 	for line = minline, maxline do
 		local s = tostring(line)
@@ -1102,9 +1098,69 @@ function editor:draw_buffer(line1, vcol1, line2, vcol2, color)
 	end
 end
 
+
+lexer = require'lexers.lexer'
+_LEXER = nil
+lexer.load'lexers.cpp'
+
+function editor:next_pos(line, line_i, next_i)
+	while true do
+		local next_line_i = line_i + #self:getline(line) + #self.line_terminator
+		if next_i < next_line_i then
+			break
+		end
+		line_i = next_line_i
+		line = line + 1
+	end
+	local col = next_i == line_i and 1 or str.char_index(self:getline(line), next_i - line_i + 1)
+	return line, col, line_i, next_i
+end
+
+function editor:draw_buffer_highlighted()
+
+	local minline, maxline = self:visible_lines()
+
+	if self.dirty then
+		self.text = self:contents()
+		self.lex_result = lexer.lex(self.text, 'cpp')
+		--self.dirty = false
+	end
+
+	local line_i, i, ci = 1, 1, 1
+	local line, col = 1, 1
+
+	local t = self.lex_result
+	for ti = 1, #t, 2 do
+		local color, next_i = t[ti], t[ti+1]
+
+		local _line, _col, _line_i, _i = self:next_pos(line, line_i, next_i)
+
+		if line >= minline and line <= maxline then
+			if not str.isascii(self.text, i, '\n') and not str.isspace(self.text, i) then
+				local vcol = self:visual_col(line, col)
+
+				self:draw_text(line, vcol, self:getline(line), color, i - line_i + 1, next_i - line_i)
+
+				--[[
+				for line = line + 1, _line do
+					self:draw_text(line, 1, self:getline(line), color, i - line_i + 1, next_i - line_i)
+				end
+				]]
+			end
+		end
+
+		line, col, line_i, i = _line, _col, _line_i, _i
+	end
+end
+
+
 function editor:draw_visible_text()
-	local color = self.text_color or 'text'
-	self:draw_buffer(1, 1, 1/0, 1/0, color)
+	if self.lexer then
+		self:draw_buffer_highlighted()
+	else
+		local color = self.text_color or 'text'
+		self:draw_buffer(1, 1, 1/0, 1/0, color)
+	end
 end
 
 function editor:draw_selection_background(sel)
@@ -1136,10 +1192,10 @@ end
 
 function editor:render()
 	self.scroll_x, self.scroll_y, self.clip_x, self.clip_y, self.clip_w, self.clip_h = self:draw_scrollbox()
-	--self:scroll_by(0, 0)
 	self:draw_background()
-	self:draw_line_numbers_background()
-	self:draw_line_numbers()
+	if self.line_numbers then
+		self:draw_line_numbers()
+	end
 	self:draw_visible_text()
 	for sel in pairs(self.selections) do
 		self:draw_selection_background(sel)
@@ -1214,6 +1270,19 @@ function commands:select_bol()   self.cursor:move_bol(true) end
 function commands:select_eol()   self.cursor:move_eol(true) end
 function commands:select_up_page()   self.cursor:move_up_page(true) end
 function commands:select_down_page() self.cursor:move_down_page(true) end
+
+function commands:select_block_left()  self.cursor:move_left(1, true, true) end
+function commands:select_block_right() self.cursor:move_right(1, true, true) end
+function commands:select_block_up()    self.cursor:move_up(1, true, true) end
+function commands:select_block_down()  self.cursor:move_down(1, true, true) end
+function commands:select_block_left_word()  self.cursor:move_left_word(true, true) end
+function commands:select_block_right_word() self.cursor:move_right_word(true, true) end
+function commands:select_block_home()  self.cursor:move_home(true, true) end
+function commands:select_block_end()   self.cursor:move_end(true, true) end
+function commands:select_block_bol()   self.cursor:move_bol(true, true) end
+function commands:select_block_eol()   self.cursor:move_eol(true, true) end
+function commands:select_block_up_page()   self.cursor:move_up_page(true, true) end
+function commands:select_block_down_page() self.cursor:move_down_page(true, true) end
 
 --editing
 
@@ -1298,11 +1367,11 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 		self.cursor.col = self.cursor:real_col()
 		self.cursor.selection:move(self.cursor.line, self.cursor.col)
 		self:setactive(true)
-	elseif active then
+	elseif active == self.id then
 		if lbutton then
 			local line, vcol = self:cursor_at(mousex, mousey)
-			local col = self:real_col(self.cursor:getline(), vcol)
-			self.cursor:move(line, col, true)
+			local col = self:real_col(self.cursor.line, vcol)
+			self.cursor:move(line, col, true, true, key and alt or (not key and self.cursor.selection.block))
 		else
 			self:setactive(false)
 		end

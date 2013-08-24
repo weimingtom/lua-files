@@ -58,18 +58,16 @@ end
 --the last line is the substring after the last line terminator to the end of the string (see tests).
 function str.next_line_indices(s, i)
 	i = i or 1
-	if i == #s + 1 then
-		return #s + 2, #s + 1, #s
-	end
-	if i > #s then
+	if i == #s + 1 then --string ended with newline, or string is empty: iterate one more empty line
+		return 1/0, i, i-1
+	elseif i > #s then
 		return
 	end
-	local rni = s:find('\r\n', i, true) or #s + 2
-	local ni = s:find('\n', i, true) or #s + 2
-	local ri = s:find('\r', i, true) or #s + 2
-	local j = math.min(rni, ni, ri) - 1
-	local next_i = math.min(rni + 2, ni + 1, ri + 1 + (ri == rni and 1 or 0))
-	return next_i, i, j
+	local j, next_i = s:match('^[^\r\n]*()\r?\n?()', i)
+	if next_i > #s and j == next_i then --string ends without a newline, mark that by setting next_i to inf
+		next_i = 1/0
+	end
+	return next_i, i, j-1
 end
 
 --iterate lines, returning the index where the next line starts (unimportant) and the indices of each line
@@ -159,11 +157,13 @@ assert(str.rtrim('abc') == 'abc')
 
 local function assert_lines(s, t)
 	local i = 0
+	local dt = {}
 	for _,s in str.lines(s) do
 		i = i + 1
 		assert(t[i] == s, i .. ': "' .. s .. '" ~= "' .. tostring(t[i]) .. '"')
+		dt[i] = s
 	end
-	assert(i == #t)
+	assert(i == #t, i .. ' ~= ' .. #t .. ': ' .. table.concat(dt, ', '))
 end
 assert_lines('', {''})
 assert_lines(' ', {' '})

@@ -1,13 +1,11 @@
 - move selection (or current line) up/down
-- select by dragging over the line numbers column
+- select by click-dragging over the line numbers column
 
 - user-definable margins
 	- show blame info (eg. from git and hg)
 
 - carets:
-	- jump through words - ctrl+left/right jumps to the beginning of the next/prev. word.
 	- caret jumps - when must scroll, scroll longer so the caret can move longer before scrolling again.
-	-
 
 - autodetect tabs mode and tabsize
 	- skip empty lines
@@ -45,6 +43,9 @@
 	- jump through autoalign_list virtual tabs
 	- jump through autoalign_args virtual tabs
 	- jump through tabstop cells
+
+- auto-reflowing of multiline comments and strings.
+	- i'm tired of manually reflowing them every time I change something in the middle of the text !!!
 
 - normalization:
 	* convert spaces to tabs everywhere on saving
@@ -102,12 +103,12 @@ QUESTIONS
 	- make a table based on separators (see automatic table formatting above)
 - bookmarks:
 	- how to manage writing code and browsing the same code (but different parts of it) at the same time? split view?
-		- idea: simple shortcut to go back to where the cursor was last time you were typign
+		- idea: simple shortcut to go back to where the cursor was last time you were typing (i always use ctrl+z/ctrl+y)
 
 
 features I never use
 	- macros
-	- printing
-	- code folding
+	- printing (so 50s)
+	- code folding (maybe something like autofolding/unfolding with a side window for fold contents?)
 	- line wrapping
 

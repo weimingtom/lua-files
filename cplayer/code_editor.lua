@@ -3,30 +3,55 @@ local codedit = require'codedit'
 local str = require'codedit_str'
 local glue = require'glue'
 local player = require'cairo_player'
+local cairo = require'cairo'
+local ft = require'freetype'
+local lib = ft:new()
 
 local editor = glue.inherit({
 	--font metrics
-	font_face = 'Fixedsys',
+	font_file = 'Fixedsys',
 	linesize = 16,
 	charsize = 8,
 	charvsize = 12,
 	--scrollbox options
 	vscroll = 'always',
 	hscroll = 'auto',
-	vscroll_w = nil, --use default
-	hscroll_h = nil, --use default
+	vscroll_w = 16, --use default
+	hscroll_h = 16, --use default
 	scroll_page_size = nil,
 	--colors
 	colors = {
-		background = '#333333',
+		background = '#000000',
 		selection_background = '#999999',
 		selection_text = '#333333',
 		cursor = '#ffffff',
 		text = '#ffffff',
 		line_number = '#66ffff',
 		line_number_background = '#111111',
+		--lexer styles
+		default = '#CCCCCC',
+		whitespace = '#000000',
+		comment = '#56CC66',
+		string = '#FF3333',
+		number = '#FF6666',
+		keyword = '#FFFF00',
+		identifier = '#FFFFFF',
+		operator = '#FFFFFF',
+		error = '#FF0000',
+		preprocessor = '#56CC66',
+		constant = '#FF3333',
+		variable = '#FFFFFF',
+		['function'] = '#FF6699',
+		class        = '#FFFF00',
+		type         = '#56CC66',
+		label        = '#FFFF66',
+		regex        = '#FF3333',
 	},
+	--extras
 	eol_markers = true,
+	minimap = true,
+	smooth_vscroll = false,
+	smooth_hscroll = false,
 }, codedit)
 
 function editor:draw_scrollbox()
@@ -46,34 +71,117 @@ function editor:draw_scrollbox()
 		hscroll = self.hscroll,
 		vscroll_w = self.vscroll_w,
 		hscroll_h = self.hscroll_h,
-		page_size = self.scroll_page_size}
+		page_size = self.scroll_page_size,
+		vscroll_step = self.smooth_vscroll and 1 or self.linesize,
+		hscroll_step = self.smooth_hscroll and 1 or self.charsize,
+	}
 
-	self.player.cr:save()
+	local cr = self.player.cr
 
-	self.player.cr:translate(self.x, self.y)
-	self.player.cr:rectangle(0, 0, clip_w, clip_h)
-	self.player.cr:clip()
-	self.player.cr:translate(scroll_x, scroll_y)
-	self.player.cr:translate(self:line_numbers_width(), 0)
+	cr:save()
+
+	cr:translate(self.x, self.y)
+	cr:rectangle(0, 0, clip_w, clip_h)
+	cr:clip()
+	cr:translate(scroll_x, scroll_y)
+	cr:translate(self:line_numbers_width(), 0)
 
 	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
-end
-
-function editor:draw_line_numbers()
-	codedit.draw_line_numbers(self)
 end
 
 function editor:draw_rect(x, y, w, h, color)
 	self.player:rect(x, y, w, h, self.colors[color])
 end
 
+local cache = {}
+
+function player:clear_glpyh_cache()
+	for _,t in pairs(cache) do
+		if t.image then
+			t.image:free()
+			t.bitmap:free(t.library)
+		end
+	end
+	cache = {}
+end
+
+function player:render_glyph(face, s, i, glyph_size, x, y)
+
+	--local j = (str.next(s, i) or #s + 1) - 1
+	local charcode = s:byte(i,i) --TODO: utf8 -> utf32
+
+	local image, bitmap_left, bitmap_top
+	local ci = cache[charcode]
+	if ci then
+		image, bitmap_left, bitmap_top = ci.image, ci.bitmap_left, ci.bitmap_top
+		if not image then return end
+	else
+		face:select_charmap(ft.FT_ENCODING_UNICODE)
+		local glyph_index = face:char_index(charcode)
+
+		local load_mode = bit.bor(ft.FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH, --ft.FT_LOAD_NO_BITMAP,
+											ft.FT_LOAD_NO_HINTING, ft.FT_LOAD_NO_AUTOHINT)
+		local render_mode = ft.FT_RENDER_MODE_LIGHT
+
+		face:set_char_size(glyph_size * 64)
+		face:load_glyph(glyph_index, load_mode)
+		local glyph = face.glyph
+
+		if glyph.format ~= ft.FT_GLYPH_FORMAT_BITMAP then
+			glyph:render(render_mode)
+		end
+		assert(glyph.format == ft.FT_GLYPH_FORMAT_BITMAP)
+
+		if glyph.bitmap.width == 0 or glyph.bitmap.rows == 0 then
+			cache[charcode] = {}
+			return
+		end
+
+		local bitmap = glyph.library:new_bitmap()
+		glyph.library:convert_bitmap(glyph.bitmap, bitmap, 4)
+
+		local cairo_format = cairo.CAIRO_FORMAT_A8
+		local cairo_stride = cairo.cairo_format_stride_for_width(cairo_format, bitmap.width)
+
+		assert(bitmap.pixel_mode == ft.FT_PIXEL_MODE_GRAY)
+		assert(bitmap.pitch == cairo_stride)
+
+		image = cairo.cairo_image_surface_create_for_data(
+			bitmap.buffer,
+			cairo_format,
+			bitmap.width,
+			bitmap.rows,
+			cairo_stride)
+		bitmap_left = glyph.bitmap_left
+		bitmap_top = glyph.bitmap_top
+
+		cache[charcode] = {
+			image = image,
+			bitmap = bitmap,
+			library = glyph.library,
+			bitmap_left = bitmap_left,
+			bitmap_top = bitmap_top,
+		}
+
+	end
+	--self.cr:set_source_surface(image, x + bitmap_left, y - bitmap_top); self.cr:paint()
+	self.cr:mask_surface(image, x + bitmap_left, y - bitmap_top)
+end
+
 function editor:draw_char(x, y, s, i, color)
-	self.player:setcolor(self.colors[color])
-	self.player.cr:select_font_face(self.font_face, 0, 0)
-	self.player.cr:set_font_size(self.charsize)
-	self.player.cr:move_to(x, y)
-	--TODO: prevent string creation by using show_glyphs, and use harfbuzz for shaping anyway
-	self.player.cr:show_text(s:sub(i, (str.next(s, i) or #s + 1) - 1))
+	local cr = self.player.cr
+
+	if self._color ~= color then
+		self.player:setcolor(self.colors[color] or self.colors.text)
+		self._color = color
+	end
+
+	self.player:render_glyph(self.ft_face, s, i, self.linesize, x, y)
+end
+
+function editor:draw_visible_text()
+	codedit.draw_visible_text(self)
+	self._color = nil
 end
 
 --draw a reverse pilcrow at eol
@@ -96,15 +204,54 @@ function editor:render_eol_marker(line)
 	cr:fill()
 end
 
-function editor:render()
-	codedit.render(self)
+function editor:render_eol_markers()
 	if self.eol_markers then
 		local line1, line2 = self:visible_lines()
 		for line = line1, line2 do
 			self:render_eol_marker(line)
 		end
 	end
-	self.player.cr:restore()
+end
+
+function editor:render_minimap()
+	local cr = self.player.cr
+	local mmap = glue.inherit({editor = self}, self)
+	local self = mmap
+	local scale = 1/6
+	self.vscroll = 'never'
+	self.hscroll = 'never'
+	self.x = 0
+	self.y = 0
+	self.w = (100 - self.vscroll_w - 4) / scale
+	self.h = self.h * 1/scale
+	cr:save()
+		cr:translate(self.editor.x + self.editor.w - 100, self.editor.y)
+		cr:scale(scale, scale)
+		codedit.render(self)
+		cr:restore()
+	cr:restore()
+end
+
+function editor:render()
+	if self.ft_face_file ~= self.font_file then
+		if self.ft_face then
+			self.ft_face:free()
+		end
+		self.ft_face = lib:new_face(self.font_file)
+		self.ft_face_file = self.font_file
+	end
+
+	--self.player:clear_glpyh_cache()
+
+	local cr = self.player.cr
+	for i = 1,1 do
+		codedit.render(self)
+		self:render_eol_markers()
+		cr:restore()
+		if self.minimap then
+			self:render_minimap()
+		end
+	end
 end
 
 function editor:setactive(active)
@@ -117,7 +264,7 @@ function player:code_editor(t)
 	ed.player = self
 	ed:input(
 		true, --self.focused == ed.id,
-		self.active == ed.id,
+		self.active,
 		self.key,
 		self.char,
 		self.ctrl,
@@ -132,5 +279,5 @@ function player:code_editor(t)
 	return ed
 end
 
-if not ... then assert(loadfile('../codedit_demo.lua'))() end
+if not ... then require'codedit_demo' end
 

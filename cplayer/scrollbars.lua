@@ -1,9 +1,10 @@
 local player = require'cairo_player'
 
 local scroll_width = 16
+local min_width = 20
 
-local function bar_size(w, size)
-	return math.min(w^2 / size, w)
+local function bar_size(w, size, minw)
+	return math.min(math.max(w^2 / size, minw), w)
 end
 
 local function bar_offset(x, w, size, i, bw)
@@ -14,28 +15,32 @@ local function bar_offset_clamp(bx, x, w, bw)
 	return math.min(math.max(bx, x), x + w - bw)
 end
 
-local function bar_segment(x, w, size, i)
-	local bw = bar_size(w, size)
+local function bar_segment(x, w, size, i, minw)
+	local bw = bar_size(w, size, minw)
 	local bx = bar_offset(x, w, size, i, bw)
 	bx = bar_offset_clamp(bx, x, w, bw)
 	return bx, bw
 end
 
-local function view_offset(bx, x, w, size)
-	return (bx - x) / w * size
+local function view_offset_round(i, step)
+	return i - i % step
 end
 
-local function view_offset_clamp(i, size, w)
-	return math.min(math.max(i, 0), math.max(size - w, 0))
+local function view_offset(bx, x, w, bw, size, step)
+	return view_offset_round((bx - x) / (w - bw) * (size - w), step)
 end
 
-local function bar_box(x, y, w, h, size, i, vertical)
+local function view_offset_clamp(i, size, w, step)
+	return view_offset_round(math.min(math.max(i, 0), math.max(size - w, 0)), step)
+end
+
+local function bar_box(x, y, w, h, size, i, vertical, min_width)
 	local bx, by, bw, bh
 	if vertical then
-		by, bh = bar_segment(y, h, size, i)
+		by, bh = bar_segment(y, h, size, i, min_width)
 		bx, bw = x, w
 	else
-		bx, bw = bar_segment(x, w, size, i)
+		bx, bw = bar_segment(x, w, size, i, min_width)
 		by, bh = y, h
 	end
 	return bx, by, bw, bh
@@ -45,13 +50,15 @@ local function scrollbar(self, t, vertical)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
 	local size = assert(t.size, 'size missing')
-	local i = view_offset_clamp(t.i or 0, size, vertical and h or w)
+	local step = t.step or 1
+	local i = view_offset_clamp(t.i or 0, size, vertical and h or w, step)
+	local min_width = t.min_width or min_width
 
 	if t.autohide and self.active ~= id and not self:hotbox(x, y, w, h) then
 		return i
 	end
 
-	local bx, by, bw, bh = bar_box(x, y, w, h, size, i, vertical)
+	local bx, by, bw, bh = bar_box(x, y, w, h, size, i, vertical, min_width)
 	local hot = self:hotbox(bx, by, bw, bh)
 
 	if not self.active and self.lbutton and hot then
@@ -61,10 +68,10 @@ local function scrollbar(self, t, vertical)
 		if self.lbutton then
 			if vertical then
 				by = bar_offset_clamp(self.mousey - self.ui.grab, y, h, bh)
-				i = view_offset(by, y, h, size)
+				i = view_offset(by, y, h, bh, size, step)
 			else
 				bx = bar_offset_clamp(self.mousex - self.ui.grab, x, w, bw)
-				i = view_offset(bx, x, w, size)
+				i = view_offset(bx, x, w, bw, size, step)
 			end
 		else
 			self.active = nil
@@ -99,6 +106,8 @@ function player:scrollbox(t)
 	local hscroll = t.hscroll or 'always'
 	local vscroll_w = t.vscroll_w or scroll_width
 	local hscroll_h = t.hscroll_h or scroll_width
+	local vscroll_step = t.vscroll_step
+	local hscroll_step = t.hscroll_step
 	local page_size = t.page_size or 120
 
 	local need_vscroll = vscroll == 'always' or (vscroll == 'auto' and ch > h -
@@ -114,10 +123,12 @@ function player:scrollbox(t)
 
 	--drawing
 	if need_vscroll then
-		cy = -self:vscrollbar{id = id .. '_vscrollbar', x = x + w, y = y, w = vscroll_w, h = h, size = ch, i = -cy}
+		cy = -self:vscrollbar{id = id .. '_vscrollbar', x = x + w, y = y, w = vscroll_w, h = h,
+										size = ch, i = -cy, step = vscroll_step}
 	end
 	if need_hscroll then
-		cx = -self:hscrollbar{id = id .. '_hscrollbar', x = x, y = y + h, w = w, h = hscroll_h, size = cw, i = -cx}
+		cx = -self:hscrollbar{id = id .. '_hscrollbar', x = x, y = y + h, w = w, h = hscroll_h,
+										size = cw, i = -cx, step = hscroll_step}
 	end
 
 	return

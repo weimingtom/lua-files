@@ -108,12 +108,12 @@ local function boxes_intersect(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2)
 end
 
 local function glyphs_per_line(cell_size, line_width)
-	return math.floor(line_width / cell_size)
+	return math.floor(line_width / cell_size - 0.75)
 end
 
 local function charmap_height(glyph_count, cell_size, line_width)
 	local n = glyphs_per_line(cell_size, line_width)
-	return math.ceil(glyph_count / n) * cell_size
+	return math.ceil(glyph_count / n) * cell_size + cell_size / 2
 end
 
 local i = 0
@@ -230,7 +230,7 @@ function player:on_render(cr)
 	--measure and scroll
 
 	local glyph_count = face:char_count()
-	local charmap_h = charmap_height(glyph_count, cell_size, charmap_x + self.w - scroll_w)
+	local charmap_h = charmap_height(glyph_count, cell_size, self.w - scroll_w)
 	local page_size = cell_size * 4
 	local line_size = cell_size / 2
 
@@ -260,14 +260,14 @@ function player:on_render(cr)
 	self.cr:clip()
 	self:charmap(face, glyph_size, cell_size,
 		charmap_x, -scroll + charmap_y,
-		charmap_x, charmap_y, self.w - scroll_w, self.h,
+		charmap_x, charmap_y, charmap_x + self.w - scroll_w, charmap_y + self.h,
 		{draw_bg = draw_bg})
 	self.cr:restore()
 
 	--draw a gradient over the top of the charmap for kicks
 	do
 		local gradient = cairo.cairo_pattern_create_linear(0, fade_y, 0, fade_y + fade_h)
-		local r,g,b = unpack(self.theme.window_bg)
+		local r,g,b = self:parse_color(self.theme.window_bg)
 		gradient:add_color_stop_rgba(0.5, r,g,b,1)
 		gradient:add_color_stop_rgba(1.0, r,g,b,0)
 		self.cr:set_source(gradient)

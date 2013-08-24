@@ -8,7 +8,10 @@ local cairo = require'cairo'
 local ffi = require'ffi'
 local glue = require'glue'
 
-local player = {}
+local player = {
+	continuous_rendering = true,
+	show_magnifier = true,
+}
 
 player.themes = {}
 
@@ -217,7 +220,11 @@ function player:window(t)
 
 	function panel.on_render(panel, surface)
 		--set the window title
-		window.title = string.format('Cairo %s - %d fps', cairo.cairo_version_string(), fps())
+		if self.continuous_rendering then
+			window.title = string.format('Cairo %s - %d fps', cairo.cairo_version_string(), fps())
+		else
+			window.title = string.format('Cairo %s', cairo.cairo_version_string())
+		end
 
 		--set the window state
 		self.w = panel.client_w
@@ -241,7 +248,7 @@ function player:window(t)
 		self:on_render(self.cr)
 
 		--magnifier glass: so useful it's enabled by default
-		if self:keypressed'ctrl' then
+		if self.show_magnifier and self:keypressed'ctrl' then
 			self.cr:identity_matrix()
 			self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
 		end
@@ -343,7 +350,9 @@ function player:window(t)
 	window.on_dead_syskey_down_char = window.on_key_down_char
 
 	--set panel to render continuously
-	panel:settimer(1, panel.invalidate)
+	if self.continuous_rendering then
+		panel:settimer(1, panel.invalidate)
+	end
 
 	window:show()
 
@@ -365,6 +374,10 @@ local function parse_color(c)
 	elseif type(c) == 'table' then
 		return unpack(c)
 	end
+end
+
+function player:parse_color(c)
+	return parse_color(c)
 end
 
 function player:setcolor(color)

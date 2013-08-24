@@ -1,26 +1,38 @@
 local codedit = require'codedit'
 local player = require'cairo_player'
+local glue = require'glue'
 
-local editor
+local editors = {}
 local loaded
 
-text = [[
-A	BB	C
-AA	B	C
-AAA	BB	C
-function lines.pos(s, lnum)
-	if lnum < 1 then return end
-	local n = 0
-	for _, i, j in lines.lines(s) do
-		n = n + 1
-		if n == lnum then return i, j end
-	end
-end
-]]
+text = glue.readfile'x:/work/lua-files/csrc/freetype/src/truetype/ttinterp.c'
+--text = glue.readfile'x:/work/lua-files/codedit.lua'
+
+--player.continuous_rendering = false
+player.show_magnifier = false
 
 function player:on_render(cr)
 
-	editor = self:code_editor(editor or {id = 'code_editor', x = 200, y = 100, w = 300, h = 150, text = text})
+	local editor_y = 40
+	for i = 1, 2 do
+		local w = math.floor(self.w / 2)
+		local h = self.h - editor_y - 20
+		local x = (i - 1) * w
+		local editor = editors[i] or {id = 'code_editor_' .. i, x = x, y = editor_y, w = w, h = h,
+												text = text, lexer = nil, eol_markers = false, minimap = true, line_numbers = true,
+												font_file = 'x:/work/lua-files/media/fonts/FSEX300.ttf'}
+		editor = self:code_editor(editor)
+		editor.x = x
+		editor.w = w
+		editor.h = h
+
+		editor.lexer = self:mbutton{
+			id = 'lexer_' .. i,
+			x = x, y = 10, w = 180, h = 26, values = {'none', 'cpp', 'lua'}, selected = editor.lexer or 'none'}
+		editor.lexer = editor.lexer ~= 'none' and editor.lexer or nil
+
+		editors[i] = editor
+	end
 
 	--[[
 	v.tabsize = self:slider{id = 'tabsize', x = 10, y = 10, w = 80, h = 24, i0 = 1, i1 = 8, i = v.tabsize}
@@ -30,8 +42,8 @@ function player:on_render(cr)
 		selected = b.line_terminator}
 	v.eol_markers = self:togglebutton{id = 'eol markers', x = 10, y = 100, w = 80, h = 24, selected = v.eol_markers}
 	]]
-
 end
 
 player:play()
+
 
