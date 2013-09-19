@@ -26,6 +26,7 @@ local editor = glue.inherit({
 		selection_text = '#333333',
 		cursor = '#ffffff',
 		text = '#ffffff',
+		margin_background = '#111111',
 		line_number = '#66ffff',
 		line_number_background = '#111111',
 		--lexer styles
@@ -56,7 +57,7 @@ local editor = glue.inherit({
 
 function editor:draw_scrollbox()
 	local x, y, w, h = self.player:getbox(self)
-	local cx, cy, cw, ch = self:view_rect()
+	local cx, cy, cw, ch = self:buffer_rect()
 	local scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h = self.player:scrollbox{
 		id = self.id..'_scrollbox',
 		x = self.x,
@@ -84,7 +85,7 @@ function editor:draw_scrollbox()
 	cr:rectangle(0, 0, clip_w, clip_h)
 	cr:clip()
 	cr:translate(scroll_x, scroll_y)
-	cr:translate(self:line_numbers_width(), 0)
+	cr:translate(self:margins_width(), 0)
 
 	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
 end
@@ -109,6 +110,8 @@ function player:render_glyph(face, s, i, glyph_size, x, y)
 
 	--local j = (str.next(s, i) or #s + 1) - 1
 	local charcode = s:byte(i,i) --TODO: utf8 -> utf32
+
+	if charcode == nil then return end
 
 	local image, bitmap_left, bitmap_top
 	local ci = cache[charcode]
@@ -164,7 +167,6 @@ function player:render_glyph(face, s, i, glyph_size, x, y)
 		}
 
 	end
-	--self.cr:set_source_surface(image, x + bitmap_left, y - bitmap_top); self.cr:paint()
 	self.cr:mask_surface(image, x + bitmap_left, y - bitmap_top)
 end
 

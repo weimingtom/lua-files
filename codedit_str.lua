@@ -52,6 +52,21 @@ function str.rtrim(s)
 	return s:sub(1, (str.last_nonspace(s)))
 end
 
+--number of tabs and of spaces in indentation
+function str.indent_counts(s)
+	local tabs, spaces = 0, 0
+	for i in str.byte_indices(s) do
+		if str.istab(s, i) then
+			tabs = tabs + 1
+		elseif str.isspace(s, i) then
+			spaces = spaces + 1
+		else
+			break
+		end
+	end
+	return tabs, spaces
+end
+
 --lines ------------------------------------------------------------------------------------------------------------------
 
 --return the index where the next line starts (unimportant) and the indices of the line starting at a given index.

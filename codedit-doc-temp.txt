@@ -1,0 +1,44 @@
+*measuring*
+
+function editor:view_dimensions() --view dimensions (the view is the unclipped area)
+function editor:cursor_coords(line, vcol) --cursor space -> view space
+function editor:cursor_at(x, y) --view space -> cursor space
+function editor:text_coords(line, vcol) --y is at the baseline --text space -> view space
+function editor:caret_rect(cursor)
+function editor:selection_rect(sel, line) --selection rectangle for one selection line
+function editor:pagesize() --how many lines are in the clipping rect
+function editor:view_rect() --view rect from the pov. of the clip rect
+function editor:clip_rect() --clip rect from the pov. of the view rect
+function editor:scroll(x, y) --scroll the editor to specific pixel coordinates
+function editor:scroll_by(x, y)
+function editor:make_visible(line, vcol) --scroll the editor to make a specific character visible
+function editor:visible_lines() --which editor lines are (partially or entirely) visibile given the current vertical scroll
+function editor:visible_cols() --which visual columns are (partially or entirely) visibile given the current horizontal scroll
+
+*rendering*
+
+function editor:draw_char(x, y, s, i, color) end --stub
+function editor:draw_rect(x, y, w, h, color) end --stub
+function editor:draw_scrollbox() end --stub; returns scroll_x, scroll_y, clip_w, clip_h
+function editor:draw_background()
+function editor:draw_text(line, vcol, s, color, i, j)
+function editor:draw_line_numbers_background()
+function editor:draw_line_numbers()
+function editor:draw_buffer(line1, vcol1, line2, vcol2, color)
+function editor:draw_visible_text()
+function editor:draw_selection_background(sel)
+function editor:draw_selection_text(sel)
+function editor:draw_cursor(cursor)
+function editor:render()
+
+*controller*
+
+function editor:save_file(s) end --saving API
+function editor:set_clipboard(s) --clipboard API
+function editor:get_clipboard()
+--UI API
+function editor:setactive(active) end --stub
+function editor:focused() end --stub
+function editor:focus() end --stub
+
+function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mousey, lbutton, rbutton, wheel_delta)
