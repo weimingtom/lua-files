@@ -1,4 +1,5 @@
-- move selection (or current line) up/down
+- move selection (or current line) up/down:
+	- with mouse (add selection:hot())
 - select by click-dragging over the line numbers column
 
 - user-definable margins
@@ -111,4 +112,5 @@ features I never use
 	- printing (so 50s)
 	- code folding (maybe something like autofolding/unfolding with a side window for fold contents?)
 	- line wrapping
+	- multiple selections
 

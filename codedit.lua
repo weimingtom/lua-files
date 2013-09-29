@@ -5,11 +5,10 @@ local editor = require'codedit_editor'
 
 --buffer access
 require'codedit_undo'    --undo/redo stack
-require'codedit_lines'   --line-based interface
-require'codedit_cols'    --pos-based interface
+require'codedit_buffer'  --buffer APIs
 require'codedit_tabs'    --tab expansion
-require'codedit_indent'  --indent/outdent
 require'codedit_blocks'  --block interface
+require'codedit_clipboard'
 
 --global text operations
 require'codedit_detect'
@@ -26,7 +25,7 @@ require'codedit_scroll'
 require'codedit_render'
 
 --controller
-require'codedit_keys'
+require'codedit_commands'
 require'codedit_ui'
 
 

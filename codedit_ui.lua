@@ -4,17 +4,6 @@ local editor = require'codedit_editor'
 --saving API
 function editor:save_file(s) end --stub
 
---clipboard API
-local clipboard_contents = '' --global clipboard over all editor instances on the same Lua state
-
-function editor:set_clipboard(s)
-	clipboard_contents = s
-end
-
-function editor:get_clipboard()
-	return clipboard_contents
-end
-
 --UI API
 function editor:setactive(active) end --stub
 function editor:focused() end --stub
@@ -39,16 +28,10 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 
 		local is_input_char = char and not ctrl and not alt and (#char > 1 or char:byte(1) > 31)
 		if is_input_char then
-			self.cursor:insert_char(char)
+			self:perform_char(char)
 		elseif key then
 			local shortcut = (ctrl and 'ctrl+' or '') .. (alt and 'alt+' or '') .. (shift and 'shift+' or '') .. key
-			local binding = self.key_bindings[shortcut]
-			if type(binding) == 'table' then
-				local command = self.commands[binding[1]]
-				command(self, unpack(binding, 2))
-			elseif binding then
-				self.commands[binding](self)
-			end
+			self:perform_shortcut(shortcut)
 		end
 
 	end
@@ -56,7 +39,7 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 	if not active and lbutton and hot then
 		self:setactive(true)
 		self.cursor.line, self.cursor.vcol = self:cell_at(mousex, mousey)
-		self.cursor.col = self.cursor:real_col()
+		self.cursor.col = self:real_col(self.cursor.line, self.cursor.vcol)
 		self.cursor.selection:reset(self.cursor.line, self.cursor.col)
 		self:setactive(true)
 	elseif active == self.id then
@@ -71,3 +54,5 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 
 end
 
+
+if not ... then require'codedit_demo' end

@@ -1,8 +1,8 @@
 local player = require'cairo_player'
 local path_cairo = require'path_cairo'
-local tangent_vector = require'path_arc'.tangent_vector
+local arc = require'path_arc'
 
-local angle = 0
+local angle = 270
 local clockwise = true
 
 function player:on_render(cr)
@@ -17,11 +17,21 @@ function player:on_render(cr)
 
 	local cx, cy, rx, ry, start_angle, sweep_angle, rotation = 500, 200, 200, 100, 0, (angle % 360)*(clockwise and 1 or -1), 30
 
-	draw{'elliptic_arc', cx, cy, rx, ry, start_angle, sweep_angle, rotation}
+	local cpx, cpy = arc.endpoints(cx, cy, rx, ry, start_angle, sweep_angle, rotation)
+	cr:move_to(cpx, cpy)
+	local function write(_, x2, y2, x3, y3, x4, y4)
+		cpx, cpy = cr:get_current_point()
+		cr:circle(cpx, cpy, 2)
+		cr:circle(x4, y4, 2)
+		cr:move_to(cpx, cpy)
+		cr:curve_to(x2, y2, x3, y3, x4, y4)
+	end
+	arc.to_bezier3(write, cx, cy, rx, ry, start_angle, sweep_angle, rotation)
+
 	cr:set_source_rgb(1,1,1)
 	cr:stroke()
 
-	local px, py, tx, ty = tangent_vector(1, cx, cy, rx, ry, start_angle, sweep_angle, rotation)
+	local px, py, tx, ty = arc.tangent_vector(1, cx, cy, rx, ry, start_angle, sweep_angle, rotation)
 
 	cr:circle(cx, cy, 5)
 	cr:circle(px, py, 5)

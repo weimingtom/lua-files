@@ -5,7 +5,7 @@ local glue = require'glue'
 
 local str = glue.update({}, utf8)
 
---tabs and spaces --------------------------------------------------------------------------------------------------------
+--tabs and whitespace ----------------------------------------------------------------------------------------------------
 
 --check for an ascii char at a byte index without string creation
 function str.isascii(s, i, c)
@@ -151,6 +151,8 @@ function str.prev_word_break(s, start, word_chars)
 	return 0
 end
 
+
+--tests ------------------------------------------------------------------------------------------------------------------
 
 if not ... then
 

@@ -27,10 +27,20 @@ function editor:scroll_by(x, y)
 	self.scroll_y = self.scroll_y + y
 end
 
+function editor:scroll_up()
+	self:scroll_by(0, self.linesize)
+	--TODO: move cursor into view
+end
+
+function editor:scroll_down()
+	self:scroll_by(0, -self.linesize)
+	--TODO: move cursor into view
+end
+
 --scroll the editor to make a specific character visible
 function editor:make_visible(line, vcol)
 	--find the cursor rectangle that needs to be completely in the editor rectangle
-	local x, y = self:cell_coords(line, vcol)
+	local x, y = self:char_coords(line, vcol)
 	local w = self.charsize
 	local h = self.linesize
 	--enlarge the cursor rectangle with margins
@@ -58,3 +68,6 @@ function editor:visible_cols()
 	local vcol2 = math.ceil((-self.scroll_x + self.clip_w) / self.charsize)
 	return vcol1, vcol2
 end
+
+
+if not ... then require'codedit_demo' end

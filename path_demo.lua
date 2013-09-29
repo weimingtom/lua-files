@@ -38,6 +38,8 @@ local function draw_function(cr)
 	return draw
 end
 
+local subpaths, abs_rel, inspect
+
 function player:on_render(cr)
 
 	local p = {

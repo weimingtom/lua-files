@@ -143,7 +143,7 @@ end
 function player:window(t)
 
 	local referer = self
-	local self = setmetatable({}, {__index = player})
+	local self = glue.inherit({}, player)
 
 	local panel, window
 
@@ -199,9 +199,12 @@ function player:window(t)
 	self.layout = null_layout
 
 	--widget state
-	self.active = nil
-	self.focused = nil
-	self.ui = {}
+	self.active = nil   --has mouse focus
+	self.focused = nil  --has keyboard focus
+	self.ui = {}        --state to be used by the active control
+
+	--animation state
+	self.animations = {} --{[animation] = animation_object}
 
 	--panel receives painting and mouse events
 
@@ -220,11 +223,11 @@ function player:window(t)
 
 	function panel.on_render(panel, surface)
 		--set the window title
+		local title = self.title or string.format('Cairo %s', cairo.cairo_version_string())
 		if self.continuous_rendering then
-			window.title = string.format('Cairo %s - %d fps', cairo.cairo_version_string(), fps())
-		else
-			window.title = string.format('Cairo %s', cairo.cairo_version_string())
+			title = string.format('%s - %d fps', title, fps())
 		end
+		window.title = title
 
 		--set the window state
 		self.w = panel.client_w
@@ -243,6 +246,13 @@ function player:window(t)
 
 		--clear the cursor state
 		self.cursor = nil
+
+		--remove completed animations
+		for t in pairs(self.animations) do
+			if t:finished() then
+				self.animations[t] = nil
+			end
+		end
 
 		--render the frame
 		self:on_render(self.cr)
@@ -357,6 +367,10 @@ function player:window(t)
 	window:show()
 
 	return self
+end
+
+function player:invalidate()
+	self.panel:invalidate()
 end
 
 --theme-aware api
@@ -484,6 +498,24 @@ end
 
 function player:keypressed(keyname)
 	return bit.band(ffi.C.GetAsyncKeyState(keycode(keyname)), 0x8000) ~= 0
+end
+
+--animation helpers
+
+local animation = {}
+
+function player:animation(duration)
+	local t = glue.inherit({player = self, start = self.clock, duration = duration}, animation)
+	self.animations[t] = true
+	return t
+end
+
+function animation:finished()
+	return self.player.clock - self.start > self.duration
+end
+
+function animation:progress()
+	return (self.player.clock - self.start) / self.duration
 end
 
 --submodule autoloader

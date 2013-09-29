@@ -8,6 +8,7 @@ local loaded
 --text = glue.readfile'x:/work/lua-files/csrc/freetype/src/truetype/ttinterp.c'
 --text = glue.readfile'x:/work/lua-files/codedit.lua'
 text = glue.readfile'c:/temp.c'
+text = glue.readfile'c:/temp2.c'
 
 --player.continuous_rendering = false
 player.show_magnifier = false
@@ -18,7 +19,7 @@ function player:on_render(cr)
 	for i = 1, 1 do
 		local w = math.floor(self.w / 2)
 		local h = self.h - editor_y - 20
-		local x = (i - 1) * w
+		local x = (i - 1) * w + 20
 		local editor = editors[i] or {id = 'code_editor_' .. i, x = x, y = editor_y, w = w, h = h,
 												text = text, lexer = nil, eol_markers = false, minimap = false, line_numbers = true,
 												font_file = 'x:/work/lua-files/media/fonts/FSEX300.ttf'}
@@ -26,6 +27,8 @@ function player:on_render(cr)
 		editor.x = x
 		editor.w = w
 		editor.h = h
+		editor.cursor.restrict_eof = true
+		editor.cursor.restrict_eol = false
 
 		editor.lexer = self:mbutton{
 			id = 'lexer_' .. i,
@@ -46,5 +49,4 @@ function player:on_render(cr)
 end
 
 player:play()
-
 

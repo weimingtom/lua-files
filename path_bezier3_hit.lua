@@ -237,5 +237,11 @@ function bezier5_xintercept(x1, y1, x6, y6)
 end
 
 
-if not ... then require'path_bezier3_hit_test' end
+if not ... then
+	local d,x,y,t = bezier3.hit(3.5, 2.0, 0, 0, 1, 2, 3, 3, 4, 2)
+	local function assertf(x,y) assert(math.abs(x-y) < 0.0000001, x..' ~= '..y) end
+	assertf(t, 0.886311733891)
+	assertf(x, 3.623099)
+	assertf(y, 2.264984)
+end
 

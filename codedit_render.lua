@@ -80,10 +80,10 @@ end
 function editor:highlight()
 	local minline, maxline = self:visible_lines()
 
-	if self.dirty then
+	if self.changed.highlighting ~= false then
 		self.text = self:contents()
 		self.lex_result = lexer.lex(self.text, 'cpp')
-		--self.dirty = false
+		self.changed.highlighting = false
 	end
 
 	local line_i, i, ci = 1, 1, 1
@@ -119,10 +119,10 @@ function editor:draw_buffer_highlighted()
 
 	local minline, maxline = self:visible_lines()
 
-	if self.dirty then
+	if self.changed.highlighting ~= false then
 		self.text = self:contents()
 		self.lex_result = lexer.lex(self.text, 'cpp')
-		--self.dirty = false
+		self.changed.highlighting = false
 	end
 
 	local line_i, i, ci = 1, 1, 1
@@ -166,7 +166,7 @@ function editor:draw_selection_background(sel)
 	if not sel.visible then return end
 	if sel:isempty() then return end
 	local color = sel.color or self.selection_color or 'selection_background'
-	for line = sel.line1, sel.line2 do
+	for line in sel:lines() do
 		local x, y, w, h = self:selection_rect(sel, line)
 		self:draw_rect(x, y, w, h, color)
 	end
@@ -209,3 +209,5 @@ function editor:render()
 	end
 end
 
+
+if not ... then require'codedit_demo' end

@@ -389,6 +389,12 @@ function M.cairo_matrix_rotate_around(mt, cx, cy, angle)
 	mt:translate(-cx, -cy)
 end
 
+function M.cairo_matrix_scale_around(mt, cx, cy, ...)
+	mt:translate(cx, cy)
+	mt:scale(...)
+	mt:translate(-cx, -cy)
+end
+
 function M.cairo_matrix_copy(mt)
 	local dmt = ffi.new'cairo_matrix_t'
 	ffi.copy(dmt, mt, ffi.sizeof(mt))
@@ -408,6 +414,12 @@ end
 function M.cairo_rotate_around(cr, cx, cy, angle)
 	M.cairo_translate(cr, cx, cy)
 	M.cairo_rotate(cr, angle)
+	M.cairo_translate(cr, -cx, -cy)
+end
+
+function M.cairo_scale_around(cr, cx, cy, ...)
+	M.cairo_translate(cr, cx, cy)
+	M.cairo_scale(cr, ...)
 	M.cairo_translate(cr, -cx, -cy)
 end
 
@@ -628,6 +640,7 @@ ffi.metatype('cairo_t', {__index = {
 	scale = M.cairo_scale,
 	rotate = M.cairo_rotate,
 	rotate_around = M.cairo_rotate_around,
+	scale_around = M.cairo_scale_around,
 	transform = M.cairo_transform,
 	safe_transform = M.cairo_safe_transform,
 	set_matrix = M.cairo_set_matrix,
@@ -930,6 +943,7 @@ ffi.metatype('cairo_matrix_t', {__index = {
 	scale = M.cairo_matrix_scale,
 	rotate = M.cairo_matrix_rotate,
 	rotate_around = M.cairo_matrix_rotate_around,
+	scale_around = M.cairo_matrix_scale_around,
 	invert = M.cairo_matrix_invert,
 	multiply = M.cairo_matrix_multiply,
 	transform_distance = M.cairo_matrix_transform_distance,

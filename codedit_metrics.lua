@@ -1,9 +1,38 @@
 --codedit measurements in the unclipped space, assuming a monospace font and fixed line height
 local editor = require'codedit_editor'
+local str = require'codedit_str'
 
 editor.linesize = 1
 editor.charsize = 1
 editor.charvsize = 1
+
+require'codedit_cursor'
+editor.cursor.color = nil --custom color
+editor.cursor.caret_thickness = 2
+
+--char space -> view space
+function editor:char_coords(line, vcol)
+	local x = self.charsize * (vcol - 1)
+	local y = self.linesize * (line - 1)
+	return x, y
+end
+
+function editor:char_baseline()
+	return self.linesize - math.floor((self.linesize - self.charvsize) / 2)
+end
+
+--text space -> view space
+function editor:text_coords(line, vcol) --y is at the baseline
+	local x, y = self:char_coords(line, vcol)
+	return x, y + self:char_baseline()
+end
+
+--view space -> char space
+function editor:char_at(x, y)
+	local line = math.floor(y / self.linesize) + 1
+	local vcol = math.floor((x + self.charsize / 2) / self.charsize) + 1
+	return line, vcol
+end
 
 --width in pixels of all margins, or all left or right margins
 function editor:margins_width(side)
@@ -47,65 +76,39 @@ function editor:buffer_coords()
 end
 
 --number of columns needed to fit the entire text (for computing the client area for horizontal scrolling)
-local function max_visual_col(self) --self = editor
-	local vcol = 0
-	for line = 1, self:last_line() do
-		local vcol1 = self:visual_col(line, self:last_col(line))
-		if vcol1 > vcol then
-			vcol = vcol1
+function editor:get_max_visual_col(self) --self = editor
+	if self.changed.max_visual_col ~= false then
+		local vcol = 0
+		for line = 1, self:last_line() do
+			local vcol1 = self:visual_col(line, self:last_col(line))
+			if vcol1 > vcol then
+				vcol = vcol1
+			end
 		end
+		self.max_visual_col = vcol
+		self.changed.max_visual_col = false
 	end
-	return vcol
+	return self.max_visual_col
 end
 
 function editor:buffer_dimensions()
-	local maxvcol = max_visual_col(self)
+	local maxvcol = self:get_max_visual_col(self)
 	local maxline = self:last_line()
-
 	--unrestricted cursors can enlarge the view area
 	for cur in pairs(self.cursors) do
 		if not cur.restrict_eol then
-			maxvcol = math.max(maxvcol, cur:visual_col())
+			maxvcol = math.max(maxvcol, self:visual_col(cur.line, cur.col))
 		end
 		if not cur.restrict_eof then
 			maxline = math.max(maxline, cur.line)
 		end
 	end
-
-	local w = self.charsize * maxvcol
-	local h = self.linesize * maxline
-
-	return w, h
-end
-
---cursor space -> view space
-function editor:cell_coords(line, vcol)
-	local cell_x = self.charsize * (vcol - 1)
-	local cell_y = self.linesize * (line - 1)
-	return cell_x, cell_y
-end
-
-function editor:cell_baseline(cell_y)
-	return cell_y + self.linesize - math.floor((self.linesize - self.charvsize) / 2)
-end
-
---view space -> cursor space
-function editor:cell_at(x, y)
-	local line = math.floor(y / self.linesize) + 1
-	local vcol = math.floor((x + self.charsize / 2) / self.charsize) + 1
-	return line, vcol
-end
-
---text space -> view space
-function editor:text_coords(line, vcol) --y is at the baseline
-	local cell_x, cell_y = self:cell_coords(line, vcol)
-	local baseline = self:cell_baseline(cell_y)
-	return cell_x, baseline
+	return self:char_coords(maxline + 1, maxvcol + 1)
 end
 
 function editor:caret_rect_insert_mode(cursor)
 	local vcol = self:visual_col(cursor.line, cursor.col)
-	local x, y = self:cell_coords(cursor.line, vcol)
+	local x, y = self:char_coords(cursor.line, vcol)
 	local w = cursor.caret_thickness
 	local h = self.linesize
 	x = x - math.floor(w / 2) --between columns
@@ -117,9 +120,9 @@ function editor:caret_rect_over_mode(cursor)
 	local vcol = self:visual_col(cursor.line, cursor.col)
 	local x, y = self:text_coords(cursor.line, vcol)
 	local w = 1
-	local s = cursor:getline()
-	local i = str.byte_index(cursor.col)
-	if cursor:getline() and str.istab(s, i) then --make cursor as wide as the tabspace
+	local s = self:getline(cursor.line, cursor.col)
+	local i = str.byte_index(s, cursor.col)
+	if s and str.istab(s, i) then --make cursor as wide as the tabspace
 		w = self:tabstop_distance(vcol - 1)
 	end
 	w = w * self.charsize
@@ -151,3 +154,5 @@ function editor:selection_rect(sel, line)
 	return x1, y1, x2 - x1, y2 - y1
 end
 
+
+if not ... then require'codedit_demo' end
