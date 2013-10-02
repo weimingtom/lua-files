@@ -117,6 +117,14 @@ function selection:select_all()
 	self:set(1, 1, 1/0, 1/0, true)
 end
 
+function selection:reset_to_cursor(cur)
+	self:reset(cur.line, cur.col)
+end
+
+function selection:extend_to_cursor(cur)
+	self:extend(cur.line, cur.col)
+end
+
 --selection-based editing ------------------------------------------------------------------------------------------------
 
 function selection:remove()

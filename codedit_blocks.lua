@@ -1,10 +1,6 @@
 --codedit text blocks
 local editor = require'codedit_editor'
 
-local function clamp(x, a, b)
-	return math.min(math.max(x, a), b)
-end
-
 --line segment on a line, that intersects with the rectangle formed by (line1, col1) and (line2, col2)
 function editor:block_cols(line, line1, col1, line2, col2)
 	local col1 = self:aligned_col(line, line1, col1)
@@ -15,8 +11,8 @@ function editor:block_cols(line, line1, col1, line2, col2)
 	end
 	--restrict columns to the available text
 	local last_col = self:last_col(line)
-	col1 = clamp(col1, 1, last_col + 1)
-	col2 = clamp(col2, 1, last_col + 1)
+	col1 = math.min(math.max(col1, 1), last_col + 1)
+	col2 = math.min(math.max(col2, 1), last_col + 1)
 	return col1, col2
 end
 

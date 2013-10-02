@@ -1,5 +1,6 @@
 --codedit normalization
 local editor = require'codedit_editor'
+local str = require'codedit_str'
 
 editor.eol_spaces = 'remove' --leave, remove.
 editor.eof_lines = 1 --leave, remove, ensure, or a number.

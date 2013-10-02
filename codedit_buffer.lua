@@ -1,4 +1,4 @@
---codedit interface to the internal line buffer
+--codedit line-based and position-based interfaces to the internal line buffer
 local editor = require'codedit_editor'
 local str = require'codedit_str'
 
@@ -110,6 +110,10 @@ function editor:clamp_pos(line, col)
 	end
 end
 
+function editor:hit_test(line, col)
+	return self:getline(line) and col > 1 and col <= self:last_col(line) + 1
+end
+
 --select the string between two subsequent positions in the text
 function editor:select_string(line1, col1, line2, col2)
 	local lines = {}
@@ -165,7 +169,7 @@ function editor:extend(line, col)
 	end
 end
 
---functions involving tabsize
+--editing based on tabsize: indent and outdent a line
 
 function editor:indent_line(line, with_tabs)
 	self:insert_string(line, 1, with_tabs and '\t' or string.rep(' ', self.tabsize))

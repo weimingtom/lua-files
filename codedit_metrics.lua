@@ -10,7 +10,10 @@ require'codedit_cursor'
 editor.cursor.color = nil --custom color
 editor.cursor.caret_thickness = 2
 
---char space -> view space
+function editor:line_y(line, vcol)
+	return self.linesize * (line - 1)
+end
+
 function editor:char_coords(line, vcol)
 	local x = self.charsize * (vcol - 1)
 	local y = self.linesize * (line - 1)
@@ -147,7 +150,7 @@ function editor:selection_rect(sel, line)
 	local x1 = (vcol1 - 1) * self.charsize
 	local x2 = (vcol2 - 1) * self.charsize
 	if line < sel.line2 then
-		x2 = x2 + 0.5 --show eol as half space
+		x2 = x2 + 0.5 * self.charsize --show eol as half space
 	end
 	local y1 = (line - 1) * self.linesize
 	local y2 = line * self.linesize

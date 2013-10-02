@@ -29,6 +29,8 @@ function player:on_render(cr)
 		editor.h = h
 		editor.cursor.restrict_eof = true
 		editor.cursor.restrict_eol = false
+		editor.cursor.land_bof = false
+		editor.cursor.land_eof = false
 
 		editor.lexer = self:mbutton{
 			id = 'lexer_' .. i,
@@ -36,6 +38,12 @@ function player:on_render(cr)
 		editor.lexer = editor.lexer ~= 'none' and editor.lexer or nil
 
 		editors[i] = editor
+
+		local s = editor.undo_group and (editor.undo_group.type .. '\n\n') or ''
+		for i,g in ipairs(editor.undo_stack) do
+			s = s .. g.type .. '\n'
+		end
+		self:label{x = self.w - 500, y = 40, font_face = 'Fixedsys', text = s}
 	end
 
 	--[[

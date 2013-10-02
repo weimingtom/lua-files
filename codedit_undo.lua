@@ -6,22 +6,22 @@ local editor = require'codedit_editor'
 local glue = require'glue'
 
 function editor:save_state(state)
-	state.line1 = self.cursor.selection.line1
-	state.col1  = self.cursor.selection.col1
-	state.line2 = self.cursor.selection.line2
-	state.col2  = self.cursor.selection.col2
-	state.line2 = self.cursor.line
-	state.col2  = self.cursor.col
+	state.line1 = self.selection.line1
+	state.line2 = self.selection.line2
+	state.col1  = self.selection.col1
+	state.col2  = self.selection.col2
+	state.line  = self.cursor.line
+	state.col   = self.cursor.col
 	state.vcol  = self.cursor.vcol
 end
 
 function editor:load_state(state)
-	self.cursor.selection.line1 = state.line1
-	self.cursor.selection.col1  = state.col1
-	self.cursor.selection.line2 = state.line2
-	self.cursor.selection.col2  = state.col2
-	self.cursor.line = state.line2
-	self.cursor.col  = state.col2
+	self.selection.line1 = state.line1
+	self.selection.line2 = state.line2
+	self.selection.col1  = state.col1
+	self.selection.col2  = state.col2
+	self.cursor.line = state.line
+	self.cursor.col  = state.col
 	self.cursor.vcol = state.vcol
 end
 
@@ -44,14 +44,6 @@ function editor:end_undo_group()
 	self.undo_group = nil
 end
 
-function editor:undo_break()
-	if not self.undo_group then return end
-	if #self.undo_group == 0 then return end --group empty, reuse it
-	local group_type = self.undo_group.type
-	self:end_undo_group()
-	self:start_undo_group(group_type)
-end
-
 --add an undo command to the current undo group, if any.
 function editor:undo_command(...)
 	if not self.undo_group then return end
@@ -69,7 +61,7 @@ local function undo_from(self, group_stack)
 	self:end_undo_group()
 	local group = table.remove(group_stack)
 	if not group then return end
-	self:start_undo_group()
+	self:start_undo_group(group.type)
 	for i = #group, 1, -1 do
 		local cmd = group[i]
 		self[cmd[1]](self, unpack(cmd, 2))

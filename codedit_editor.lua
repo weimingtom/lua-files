@@ -27,8 +27,9 @@ function editor:new(options)
 	self.selections = {} --{selections = true, ...}
 	self.cursors = {} --{cursor = true, ...}
 
-	--cursor
+	--cursor & selection
 	self.cursor = self:create_cursor(true)
+	self.selection = self:create_selection(true)
 
 	--scrolling
 	self.scroll_x = 0
