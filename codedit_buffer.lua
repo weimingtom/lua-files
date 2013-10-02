@@ -5,6 +5,7 @@ local tabs = require'codedit_tabs'
 
 local buffer = {
 	line_terminator = nil, --line terminator to use when saving. nil means autodetect.
+	tabs = 'indent', --never, indent, always
 }
 
 function buffer:new(editor, text)
@@ -186,17 +187,23 @@ function buffer:remove_string(line1, col1, line2, col2)
 	self:setline(line1, s1 .. s2)
 end
 
---editing based on tabsize
+--editing based on tabsize and tabs option
 
-function buffer:indent_line(line, with_tabs)
-	self:insert_string(line, 1, with_tabs and '\t' or string.rep(' ', self.editor.tabsize))
+function buffer:insert_tab(line, col)
+	if self.tabs == 'never' or
+		(self.tabs == 'indent' and self:getline(line) and col > self:indent_col(line))
+	then
+		return self:insert_string(line, col, string.rep(' ', self.editor.tabsize))
+	else
+		return self:insert_string(line, col, '\t')
+	end
 end
 
-function buffer:outdent_line(line)
-	local s = self:getline(line)
-	if not s then return end
+function buffer:remove_tab(line, col)
+	if not self:getline(line) then return end
+	local s = self:sub(line, col, 1/0)
 	if str.istab(s, 1) then
-		self:remove_string(line, 1, line, 2)
+		self:remove_string(line, col, line, col + 1)
 		return
 	end
 	--no tab to remove, hunt for enough spaces that make for a tab
@@ -204,19 +211,28 @@ function buffer:outdent_line(line)
 	for i in str.byte_indices(s) do
 		n = n + 1
 		if n > self.editor.tabsize or not str.isspace(s, i) then
-			--found enough spaces to make a full tab, or a non-space char encountered
+			--found enough spaces to make a full tab, or found a non-space char
 			break
 		elseif str.istab(s, i) then
 			--not enough spaces to make a tab, but a tab was found: replace the tab with spaces
 			--and remove a full tab worth of spaces from he beginning of the line
-			s = s:sub(1, i - 1) .. string.rep(' ', self.editor.tabsize) .. s:sub(i + 1)
-			s = s:sub(self.editor.tabsize + 1)
-			self:setline(line, s)
+			s = s:sub(col, col + i - 2) .. string.rep(' ', self.editor.tabsize) .. s:sub(col + i)
+			--s = s:sub(col + self.editor.tabsize)
+			--self:setline(line, s)
+			--self:remove_string(line, col + n
 			return
 		end
 	end
 	--line ended or the search was interrupted
-	self:remove_string(line, 1, line, n)
+	self:remove_string(line, col, line, col + n - 1)
+end
+
+function buffer:indent_line(line)
+	return self:insert_tab(line, 1)
+end
+
+function buffer:outdent_line(line)
+	return self:remove_tab(line, 1)
 end
 
 --[[

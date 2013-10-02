@@ -1,8 +1,9 @@
---codedit text blocks: vertically aligned text between two subsequent cursor positions.
+--codedit text blocks: vertically aligned text between two subsequent text positions.
 --line1 and line2 must be valid, subsequent lines. col1 and col2 can be anything.
 local buffer = require'codedit_buffer'
+local str = require'codedit_str'
 
---clamped line segment on a line that intersects the rectangle formed by (line1, col1) and (line2, col2)
+--clamped line segment on a line that intersects the rectangle formed by two arbitrary text positions.
 function buffer:block_cols(line, line1, col1, line2, col2)
 	local col1 = self:aligned_col(line, line1, col1)
 	local col2 = self:aligned_col(line, line2, col2)
@@ -17,7 +18,7 @@ function buffer:block_cols(line, line1, col1, line2, col2)
 	return col1, col2
 end
 
---select the rectangular block between two subsequent positions in the text as a multi-line string
+--select the block between two subsequent text positions as a multi-line string
 function buffer:select_block(line1, col1, line2, col2)
 	local lines = {}
 	for line = line1, line2 do
@@ -27,7 +28,7 @@ function buffer:select_block(line1, col1, line2, col2)
 	return lines
 end
 
---insert a multi-line string as a rectangular block at some position in the text. return the position after the string.
+--insert a multi-line string as a block at some position in the text. return the position after the string.
 function buffer:insert_block(line1, col1, s)
 	local line = line1
 	local line2, col2
@@ -40,11 +41,27 @@ function buffer:insert_block(line1, col1, s)
 	return line2, col2
 end
 
---remove the rectangular block between two subsequent positions in the text
+--remove the block between two subsequent positions in the text
 function buffer:remove_block(line1, col1, line2, col2)
 	for line = line1, line2 do
 		local tcol1, tcol2 = self:block_cols(line, line1, col1, line2, col2)
 		self:remove_string(line, tcol1, line, tcol2)
+	end
+end
+
+--indent the block between two subsequent positions in the text
+function buffer:indent_block(line1, line2, col1)
+	for line = line1, line2 do
+		self:insert_tab(line, col1)
+	end
+end
+
+--outdent the block between two subsequent positions in the text
+function buffer:outdent_block(line1, line2, col1)
+	local vcol = self:visual_col(line1, col1)
+	for line = line1, line2 do
+		local col = self:real_col(line, vcol)
+		self:remove_tab(line, col)
 	end
 end
 

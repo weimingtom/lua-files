@@ -318,6 +318,7 @@ function editor:paste(mode)
 	if not s then return end
 	self.buffer:start_undo_group'paste'
 	self.selection:remove()
+	self.cursor:move_to_selection(self.selection)
 	if mode == 'block' then
 		self.cursor:insert_block(s)
 	else

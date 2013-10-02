@@ -61,23 +61,20 @@ function block_selection:remove()
 	self:reset(self.line1, self.col1)
 end
 
+function block_selection:indent(use_tabs)
+	local line1, col1, line2, col2 = self:endpoints()
+	self.buffer:indent_block(line1, line2, col1, use_tabs)
+	self:set(line1, col1, line2, col2 + n)
+end
+
+function block_selection:outdent()
+	local line1, col1, line2, col2 = self:endpoints()
+	self.buffer:outdent_block(line1, line2, col1)
+	--TODO: compute min(visual-length(removed-text)) and shorten the selection with that amount.
+	self:set(line1, col1, line2, col2 - 1)
+end
+
 --[[
-function block_selection:indent(with_tabs)
-	local line1, line2 = self:line_range()
-	for line = line1, line2 do
-		self.buffer:indent_block(line1, col1, line2, with_tabs)
-	end
-	self:set(line1, 1, line2 + 1, 1)
-end
-
-function selection:outdent()
-	local line1, line2 = self:line_range()
-	for line = line1, line2 do
-		self.buffer:outdent_block(line)
-	end
-	self:set(line1, 1, line2 + 1, 1)
-end
-
 function selection:move_up()
 	local line1, line2 = self:line_range()
 	if line1 == 1 then

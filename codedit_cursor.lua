@@ -12,7 +12,6 @@ local cursor = {
 	--editing policies
 	insert_mode = true, --insert or overwrite when typing characters
 	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
-	tabs = 'indent', --never, indent, always
 	tab_align_list = true, --align to the next word on the above line; incompatible with tabs = 'always'
 	tab_align_args = true, --align to the char after '(' on the above line; incompatible with tabs = 'always'
 }
@@ -192,43 +191,41 @@ function cursor:insert_newline()
 	end
 end
 
---insert a tab character, expanding it according to tab expansion policies
-function cursor:insert_tab()
-	if false and (self.tab_align_list or self.tab_align_args) then
-		--look in the line above for the vcol of the first non-space char after at least one space or '(', starting at vcol
-		if str.first_nonspace(s1) < #s1 then
-			local vcol = self.buffer:visual_col(self.line, self.col)
-			local col1 = self.buffer:real_col(self.line-1, vcol)
-			local stage = 0
-			local s0 = self.buffer:getline(self.line-1)
-			for i in str.byte_indices(s0) do
-				if i >= col1 then
-					if stage == 0 and (str.isspace(s0, i) or str.isascii(s0, i, '(')) then
-						stage = 1
-					elseif stage == 1 and not str.isspace(s0, i) then
-						stage = 2
-						break
-					end
-					col1 = col1 + 1
+--look in the line above for the vcol of the first non-space char after at least one space or '(', starting at vcol
+function cursor:indent_aligned()
+	if str.first_nonspace(s1) < #s1 then
+		local vcol = self.buffer:visual_col(self.line, self.col)
+		local col1 = self.buffer:real_col(self.line-1, vcol)
+		local stage = 0
+		local s0 = self.buffer:getline(self.line-1)
+		for i in str.byte_indices(s0) do
+			if i >= col1 then
+				if stage == 0 and (str.isspace(s0, i) or str.isascii(s0, i, '(')) then
+					stage = 1
+				elseif stage == 1 and not str.isspace(s0, i) then
+					stage = 2
+					break
 				end
-			end
-			if stage == 2 then
-				local vcol1 = self.buffer:visual_col(self.line-1, col1)
-				c = string.rep(' ', vcol1 - vcol)
-			else
-				c = string.rep(' ', self.editor.tabsize)
+				col1 = col1 + 1
 			end
 		end
-	elseif self.tabs == 'never' then
-		self:insert_string(string.rep(' ', self.editor.tabsize))
-		return
-	elseif self.tabs == 'indent' then
-		if self.buffer:getline(self.line) and self.col > self.buffer:indent_col(self.line) then
-			self:insert_string(string.rep(' ', self.editor.tabsize))
-			return
+		if stage == 2 then
+			local vcol1 = self.buffer:visual_col(self.line-1, col1)
+			c = string.rep(' ', vcol1 - vcol)
+		else
+			c = string.rep(' ', self.editor.tabsize)
 		end
 	end
-	self:insert_string'\t'
+end
+
+--insert a tab character, expanding it according to tab expansion policies
+function cursor:insert_tab()
+	if self.tab_align_list or self.tab_align_args then
+		self:indent_aligned()
+	else
+		local line, col = self.buffer:insert_tab()
+		self:move(line, col)
+	end
 end
 
 function cursor:outdent_line()

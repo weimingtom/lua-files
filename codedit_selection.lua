@@ -131,10 +131,10 @@ function selection:remove()
 	self:reset(line1, col1)
 end
 
-function selection:indent(with_tabs)
+function selection:indent()
 	local line1, line2 = self:line_range()
 	for line = line1, line2 do
-		self.buffer:indent_line(line, with_tabs)
+		self.buffer:indent_line(line)
 	end
 	self:set(line1, 1, line2 + 1, 1)
 end
