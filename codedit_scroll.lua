@@ -38,7 +38,7 @@ function editor:scroll_down()
 end
 
 --scroll the editor to make a specific character visible
-function editor:make_visible(line, vcol)
+function editor:make_char_visible(line, vcol)
 	--find the cursor rectangle that needs to be completely in the editor rectangle
 	local x, y = self:char_coords(line, vcol)
 	local w = self.charsize
@@ -57,8 +57,8 @@ end
 function editor:visible_lines()
 	local line1 = math.floor(-self.scroll_y / self.linesize) + 1
 	local line2 = math.ceil((-self.scroll_y + self.clip_h) / self.linesize)
-	line1 = clamp(line1, 1, self:last_line())
-	line2 = clamp(line2, 1, self:last_line())
+	line1 = clamp(line1, 1, self.buffer:last_line())
+	line2 = clamp(line2, 1, self.buffer:last_line())
 	return line1, line2
 end
 

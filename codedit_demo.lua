@@ -27,8 +27,8 @@ function player:on_render(cr)
 		editor.x = x
 		editor.w = w
 		editor.h = h
-		editor.cursor.restrict_eof = true
-		editor.cursor.restrict_eol = false
+		--editor.cursor.restrict_eof = true
+		--editor.cursor.restrict_eol = true
 		editor.cursor.land_bof = false
 		editor.cursor.land_eof = false
 
@@ -39,8 +39,8 @@ function player:on_render(cr)
 
 		editors[i] = editor
 
-		local s = editor.undo_group and (editor.undo_group.type .. '\n\n') or ''
-		for i,g in ipairs(editor.undo_stack) do
+		local s = editor.buffer.undo_group and (editor.buffer.undo_group.type .. '\n\n') or ''
+		for i,g in ipairs(editor.buffer.undo_stack) do
 			s = s .. g.type .. '\n'
 		end
 		self:label{x = self.w - 500, y = 40, font_face = 'Fixedsys', text = s}

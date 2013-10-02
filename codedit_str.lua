@@ -1,4 +1,4 @@
---string API for codedit by Cosmin Apreutesei (unlicensed).
+--string module for codedit by Cosmin Apreutesei (unlicensed).
 --based on utf8 library, deals specifically with tabs, spaces, lines and words.
 local utf8 = require'utf8'
 local glue = require'glue'

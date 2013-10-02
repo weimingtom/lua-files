@@ -1,9 +1,7 @@
---codedit tab expansion: translating between visual columns and real columns based on a fixed tabsize.
+--tab expansion module for codedit by Cosmin Apreutesei (unlicensed).
+--translates between visual columns and real columns based on a fixed tabsize.
 --real columns map 1:1 to char indices, while visual columns represent screen columns after tab expansion.
-local editor = require'codedit_editor'
 local str = require'codedit_str'
-
-editor.tabsize = 3 --nil means autodetect.
 
 --how many spaces from a visual column to the next tabstop, for a specific tabsize.
 local function tabstop_distance(vcol, tabsize)
@@ -43,30 +41,13 @@ local function real_col(s, vcol, tabsize)
 	return col
 end
 
-function editor:tabstop_distance(vcol)
-	return tabstop_distance(vcol, self.tabsize)
+if not ... then
+	--TODO: unit tests
 end
 
-function editor:visual_col(line, col)
-	local s = self:getline(line)
-	if s then
-		return visual_col(s, col, self.tabsize)
-	else
-		return col --outside eof visual columns and real columns are the same
-	end
-end
-
-function editor:real_col(line, vcol)
-	local s = self:getline(line)
-	if s then
-		return real_col(s, vcol, self.tabsize)
-	else
-		return vcol --outside eof visual columns and real columns are the same
-	end
-end
-
---real col on a line, that is vertically aligned to the same real col on a different line
-function editor:aligned_col(target_line, line, col)
-	return self:real_col(target_line, self:visual_col(line, col))
-end
+return {
+	tabstop_distance = tabstop_distance,
+	visual_col = visual_col,
+	real_col = real_col,
+}
 

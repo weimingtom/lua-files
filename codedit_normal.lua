@@ -1,29 +1,29 @@
 --codedit normalization
-local editor = require'codedit_editor'
+local buffer = require'codedit_buffer'
 local str = require'codedit_str'
 
-editor.eol_spaces = 'remove' --leave, remove.
-editor.eof_lines = 1 --leave, remove, ensure, or a number.
+buffer.eol_spaces = 'remove' --leave, remove.
+buffer.eof_lines = 1 --leave, remove, ensure, or a number.
 
-function editor:remove_eol_spaces() --remove any spaces past eol
+function buffer:remove_eol_spaces() --remove any spaces past eol
 	for line = 1, self:last_line() do
 		self:setline(line, str.rtrim(self:getline(line)))
 	end
 end
 
-function editor:ensure_eof_line() --add an empty line at eof if there is none
+function buffer:ensure_eof_line() --add an empty line at eof if there is none
 	if not self:isempty(self:last_line()) then
 		self:insert_line(self:last_line() + 1, '')
 	end
 end
 
-function editor:remove_eof_lines() --remove any empty lines at eof, except the first line
+function buffer:remove_eof_lines() --remove any empty lines at eof, except the first line
 	while self:last_line() > 1 and self:isempty(self:last_line()) do
 		self:remove_line(self:last_line())
 	end
 end
 
-function editor:normalize()
+function buffer:normalize()
 	if self.eol_spaces == 'remove' then
 		self:remove_eol_spaces()
 	end
@@ -38,3 +38,6 @@ function editor:normalize()
 		end
 	end
 end
+
+
+if not ... then require'codedit_demo' end

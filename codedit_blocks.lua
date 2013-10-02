@@ -1,8 +1,9 @@
---codedit text blocks
-local editor = require'codedit_editor'
+--codedit text blocks: vertically aligned text between two subsequent cursor positions.
+--line1 and line2 must be valid, subsequent lines. col1 and col2 can be anything.
+local buffer = require'codedit_buffer'
 
---line segment on a line, that intersects with the rectangle formed by (line1, col1) and (line2, col2)
-function editor:block_cols(line, line1, col1, line2, col2)
+--clamped line segment on a line that intersects the rectangle formed by (line1, col1) and (line2, col2)
+function buffer:block_cols(line, line1, col1, line2, col2)
 	local col1 = self:aligned_col(line, line1, col1)
 	local col2 = self:aligned_col(line, line2, col2)
 	--the aligned columns could end up switched because the visual columns of col1 and col2 could be switched.
@@ -17,7 +18,7 @@ function editor:block_cols(line, line1, col1, line2, col2)
 end
 
 --select the rectangular block between two subsequent positions in the text as a multi-line string
-function editor:select_block(line1, col1, line2, col2)
+function buffer:select_block(line1, col1, line2, col2)
 	local lines = {}
 	for line = line1, line2 do
 		local tcol1, tcol2 = self:block_cols(line, line1, col1, line2, col2)
@@ -27,7 +28,7 @@ function editor:select_block(line1, col1, line2, col2)
 end
 
 --insert a multi-line string as a rectangular block at some position in the text. return the position after the string.
-function editor:insert_block(line1, col1, s)
+function buffer:insert_block(line1, col1, s)
 	local line = line1
 	local line2, col2
 	local vcol = self:visual_col(line1, col1)
@@ -40,10 +41,12 @@ function editor:insert_block(line1, col1, s)
 end
 
 --remove the rectangular block between two subsequent positions in the text
-function editor:remove_block(line1, col1, line2, col2)
+function buffer:remove_block(line1, col1, line2, col2)
 	for line = line1, line2 do
 		local tcol1, tcol2 = self:block_cols(line, line1, col1, line2, col2)
 		self:remove_string(line, tcol1, line, tcol2)
 	end
 end
 
+
+if not ... then require'codedit_demo' end

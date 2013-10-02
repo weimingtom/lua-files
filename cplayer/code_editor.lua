@@ -262,7 +262,7 @@ end
 
 function player:code_editor(t)
 	local id = assert(t.id, 'id missing')
-	local ed = t.lines and t or editor:new(t)
+	local ed = t.buffer and t.buffer.lines and t or editor:new(t)
 	ed.player = self
 	ed:input(
 		true, --self.focused == ed.id,

@@ -41,11 +41,11 @@ function editor:draw_buffer(line1, vcol1, line2, vcol2, color)
 	end
 
 	for line = line1, line2 do
-		local s = self:getline(line)
+		local s = self.buffer:getline(line)
 		local vcol = 1
 		for i in str.byte_indices(s) do
 			if str.istab(s, i) then
-				vcol = vcol + self:tabstop_distance(vcol - 1)
+				vcol = vcol + self.buffer:tabstop_distance(vcol - 1)
 			else
 				if vcol > vcol2 then
 					break
@@ -176,8 +176,8 @@ function editor:draw_selection_text(sel)
 	if not sel.visible then return end
 	if sel:isempty() then return end
 	for line, col1, col2 in sel:lines() do
-		local vcol1 = self:visual_col(line, col1)
-		local vcol2 = self:visual_col(line, col2) - 1
+		local vcol1 = self.buffer:visual_col(line, col1)
+		local vcol2 = self.buffer:visual_col(line, col2) - 1
 		self:draw_buffer(line, vcol1, line, vcol2, 'selection_text')
 	end
 end

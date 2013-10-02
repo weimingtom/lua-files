@@ -1,19 +1,12 @@
 --codedit margins
-local editor = require'codedit_editor'
 local glue = require'glue'
 
-editor.margin = {
+local margin = {
 	side = 'left', --left, right
 	w = 50,
 	background_color = nil, --custom color
 	text_color = nil, --custom color
 }
-
-function editor:create_margin()
-	return self.margin:new(self)
-end
-
-local margin = editor.margin
 
 function margin:new(editor, t, pos)
 	self = glue.inherit(t or {}, self)
@@ -63,27 +56,5 @@ function margin:draw()
 	self:draw_contents()
 end
 
---line numbers margin ----------------------------------------------------------------------------------------------------
-
-editor.line_numbers_margin = glue.update({}, margin)
-
-function editor:create_line_numbers_margin()
-	self.line_numbers_margin:new(self)
-end
-
-local ln_margin = editor.line_numbers_margin
-
-local function digits(n) --number of base-10 digits of a number
-	return math.floor(math.log10(n) + 1)
-end
-
-function ln_margin:draw_line(line, x, y)
-	local s = tostring(line)
-	x = x - #s * self.editor.charsize
-	self.editor:draw_text(x, y, s, self.text_color or 'line_number')
-end
-
-function ln_margin:get_width()
-	return digits(self.editor:last_line()) * self.editor.charsize or 0
-end
+return margin
 

@@ -1,20 +1,13 @@
---codedit selection: selecting contiguous text between two line,col pairs.
+--codedit selection object: selecting contiguous text between two line,col pairs.
 --line1,col1 is the first selected char and line2,col2 is the char immediately after the last selected char.
-local editor = require'codedit_editor'
 local glue = require'glue'
 
-editor.selection = {
+local selection = {
 	color = nil, --color override
 }
 
-function editor:create_selection(visible)
-	return self.selection:new(self, visible)
-end
-
-local selection = editor.selection
-
 function selection:new(editor, visible)
-	self = glue.inherit({editor = editor, visible = visible}, self)
+	self = glue.inherit({editor = editor, buffer = editor.buffer, visible = visible}, self)
 	self:reset(1, 1)
 	self.editor.selections[self] = true
 	return self
@@ -24,13 +17,13 @@ function selection:free()
 	self.editor.selections[self] = nil
 end
 
---selection querying -----------------------------------------------------------------------------------------------------
+--selection querying
 
 function selection:isempty()
 	return self.line2 == self.line1 and self.col2 == self.col1
 end
 
---goes top-down / left-to-rigth
+--goes top-down and left-to-rigth
 function selection:isforward()
 	return self.line1 < self.line2 or (self.line1 == self.line2 and self.col1 <= self.col2)
 end
@@ -48,7 +41,7 @@ end
 function selection:cols(line)
 	local line1, col1, line2, col2 = self:endpoints()
 	local col1 = line == line1 and col1 or 1
-	local col2 = line == line2 and col2 or self.editor:last_col(line) + 1
+	local col2 = line == line2 and col2 or self.buffer:last_col(line) + 1
 	return col1, col2
 end
 
@@ -75,24 +68,24 @@ function selection:line_range()
 end
 
 function selection:select()
-	return self.editor:select_string(self:endpoints())
+	return self.buffer:select_string(self:endpoints())
 end
 
 function selection:contents()
-	return self.editor:contents(self:select())
+	return self.buffer:contents(self:select())
 end
 
---changing the selection -------------------------------------------------------------------------------------------------
+--changing the selection
 
 --empty and re-anchor the selection
 function selection:reset(line, col)
-	self.line1, self.col1 = self.editor:clamp_pos(line, col)
+	self.line1, self.col1 = self.buffer:clamp_pos(line, col)
 	self.line2, self.col2 = self.line1, self.col1
 end
 
 --move selection's free endpoint
 function selection:extend(line, col)
-	self.line2, self.col2 = self.editor:clamp_pos(line, col)
+	self.line2, self.col2 = self.buffer:clamp_pos(line, col)
 end
 
 --reverse selection's direction
@@ -125,19 +118,23 @@ function selection:extend_to_cursor(cur)
 	self:extend(cur.line, cur.col)
 end
 
---selection-based editing ------------------------------------------------------------------------------------------------
+function selection:set_to_selection(sel)
+	self:set(sel.line1, sel.col1, sel.line2, sel.col2, sel:isforward())
+end
+
+--selection-based editing
 
 function selection:remove()
 	if self:isempty() then return end
 	local line1, col1, line2, col2 = self:endpoints()
-	self.editor:remove_string(line1, col1, line2, col2)
+	self.buffer:remove_string(line1, col1, line2, col2)
 	self:reset(line1, col1)
 end
 
 function selection:indent(with_tabs)
 	local line1, line2 = self:line_range()
 	for line = line1, line2 do
-		self.editor:indent_line(line, with_tabs)
+		self.buffer:indent_line(line, with_tabs)
 	end
 	self:set(line1, 1, line2 + 1, 1)
 end
@@ -145,7 +142,7 @@ end
 function selection:outdent()
 	local line1, line2 = self:line_range()
 	for line = line1, line2 do
-		self.editor:outdent_line(line)
+		self.buffer:outdent_line(line)
 	end
 	self:set(line1, 1, line2 + 1, 1)
 end
@@ -156,18 +153,18 @@ function selection:move_up()
 		return
 	end
 	for line = line1, line2 do
-		self.editor:move_line(line, line - 1)
+		self.buffer:move_line(line, line - 1)
 	end
 	self:set(line1 - 1, 1, line2 - 1 + 1, 1)
 end
 
 function selection:move_down()
 	local line1, line2 = self:line_range()
-	if line2 == self.editor:last_line() then
+	if line2 == self.buffer:last_line() then
 		return
 	end
 	for line = line2, line1, -1 do
-		self.editor:move_line(line, line + 1)
+		self.buffer:move_line(line, line + 1)
 	end
 	self:set(line1 + 1, 1, line2 + 1 + 1, 1)
 end
@@ -175,3 +172,4 @@ end
 
 if not ... then require'codedit_demo' end
 
+return selection

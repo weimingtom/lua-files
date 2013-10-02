@@ -80,27 +80,27 @@ end
 
 --number of columns needed to fit the entire text (for computing the client area for horizontal scrolling)
 function editor:get_max_visual_col(self) --self = editor
-	if self.changed.max_visual_col ~= false then
+	if self.buffer.changed.max_visual_col ~= false then
 		local vcol = 0
-		for line = 1, self:last_line() do
-			local vcol1 = self:visual_col(line, self:last_col(line))
+		for line = 1, self.buffer:last_line() do
+			local vcol1 = self.buffer:visual_col(line, self.buffer:last_col(line))
 			if vcol1 > vcol then
 				vcol = vcol1
 			end
 		end
 		self.max_visual_col = vcol
-		self.changed.max_visual_col = false
+		self.buffer.changed.max_visual_col = false
 	end
 	return self.max_visual_col
 end
 
 function editor:buffer_dimensions()
 	local maxvcol = self:get_max_visual_col(self)
-	local maxline = self:last_line()
+	local maxline = self.buffer:last_line()
 	--unrestricted cursors can enlarge the view area
 	for cur in pairs(self.cursors) do
 		if not cur.restrict_eol then
-			maxvcol = math.max(maxvcol, self:visual_col(cur.line, cur.col))
+			maxvcol = math.max(maxvcol, self.buffer:visual_col(cur.line, cur.col))
 		end
 		if not cur.restrict_eof then
 			maxline = math.max(maxline, cur.line)
@@ -110,7 +110,7 @@ function editor:buffer_dimensions()
 end
 
 function editor:caret_rect_insert_mode(cursor)
-	local vcol = self:visual_col(cursor.line, cursor.col)
+	local vcol = self.buffer:visual_col(cursor.line, cursor.col)
 	local x, y = self:char_coords(cursor.line, vcol)
 	local w = cursor.caret_thickness
 	local h = self.linesize
@@ -126,7 +126,7 @@ function editor:caret_rect_over_mode(cursor)
 	local s = self:getline(cursor.line, cursor.col)
 	local i = str.byte_index(s, cursor.col)
 	if s and str.istab(s, i) then --make cursor as wide as the tabspace
-		w = self:tabstop_distance(vcol - 1)
+		w = self.buffer:tabstop_distance(vcol - 1)
 	end
 	w = w * self.charsize
 	local h = cursor.caret_thickness
@@ -145,11 +145,11 @@ end
 --selection rectangle for one selection line
 function editor:selection_rect(sel, line)
 	local col1, col2 = sel:cols(line)
-	local vcol1 = self:visual_col(line, col1)
-	local vcol2 = self:visual_col(line, col2)
+	local vcol1 = self.buffer:visual_col(line, col1)
+	local vcol2 = self.buffer:visual_col(line, col2)
 	local x1 = (vcol1 - 1) * self.charsize
 	local x2 = (vcol2 - 1) * self.charsize
-	if line < sel.line2 then
+	if not sel.block and line < sel.line2 then
 		x2 = x2 + 0.5 * self.charsize --show eol as half space
 	end
 	local y1 = (line - 1) * self.linesize

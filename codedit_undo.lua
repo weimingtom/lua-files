@@ -1,31 +1,10 @@
---codedit undo and redo command stacks.
+--codedit undo and redo command stacks for the line buffer.
 --the undo stack is a stack of undo groups. an undo group is a list of editor commands to be executed in reverse order
 --in order to perform a single undo operation. consecutive undo groups of the same type are merged together.
 --the undo commands in the group can be any editor method with any arguments.
-local editor = require'codedit_editor'
-local glue = require'glue'
+local buffer = require'codedit_buffer'
 
-function editor:save_state(state)
-	state.line1 = self.selection.line1
-	state.line2 = self.selection.line2
-	state.col1  = self.selection.col1
-	state.col2  = self.selection.col2
-	state.line  = self.cursor.line
-	state.col   = self.cursor.col
-	state.vcol  = self.cursor.vcol
-end
-
-function editor:load_state(state)
-	self.selection.line1 = state.line1
-	self.selection.line2 = state.line2
-	self.selection.col1  = state.col1
-	self.selection.col2  = state.col2
-	self.cursor.line = state.line
-	self.cursor.col  = state.col
-	self.cursor.vcol = state.vcol
-end
-
-function editor:start_undo_group(group_type)
+function buffer:start_undo_group(group_type)
 	if self.undo_group then
 		if self.undo_group.type == group_type then --same type of group, continue using the current group
 			return
@@ -33,10 +12,10 @@ function editor:start_undo_group(group_type)
 		self:end_undo_group() --auto-close current group to start a new one
 	end
 	self.undo_group = {type = group_type}
-	self:save_state(self.undo_group)
+	self.editor:save_state(self.undo_group)
 end
 
-function editor:end_undo_group()
+function buffer:end_undo_group()
 	if not self.undo_group then return end
 	if #self.undo_group > 0 then --push group if not empty
 		table.insert(self.undo_stack, self.undo_group)
@@ -45,7 +24,7 @@ function editor:end_undo_group()
 end
 
 --add an undo command to the current undo group, if any.
-function editor:undo_command(...)
+function buffer:undo_command(...)
 	if not self.undo_group then return end
 	if ... == 'setline' then
 		--optimization: ignore subsequent setline commands operating on the same line.
@@ -67,16 +46,16 @@ local function undo_from(self, group_stack)
 		self[cmd[1]](self, unpack(cmd, 2))
 	end
 	self:end_undo_group()
-	self:load_state(group)
+	self.editor:load_state(group)
 end
 
-function editor:undo()
+function buffer:undo()
 	undo_from(self, self.undo_stack)
 	if #self.undo_stack == 0 then return end
 	table.insert(self.redo_stack, table.remove(self.undo_stack))
 end
 
-function editor:redo()
+function buffer:redo()
 	undo_from(self, self.redo_stack)
 end
 
