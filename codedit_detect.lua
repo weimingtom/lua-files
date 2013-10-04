@@ -2,9 +2,7 @@
 local buffer = require'codedit_buffer'
 local str = require'codedit_str'
 
-buffer.default_line_terminator = '\n' --line terminator to use when autodetection fails.
-
---class method that returns the most common line terminator in a string, or default
+--class method that returns the most common line terminator in a string, or nil for failure
 function buffer:detect_line_terminator(s)
 	local rn = str.count(s, '\r\n') --win lines
 	local r  = str.count(s, '\r') --mac lines
@@ -13,8 +11,6 @@ function buffer:detect_line_terminator(s)
 		return '\r\n'
 	elseif r > n then
 		return '\r'
-	else
-		return self.default_line_terminator
 	end
 end
 

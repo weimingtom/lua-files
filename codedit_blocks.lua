@@ -34,8 +34,7 @@ function buffer:insert_block(line1, col1, s)
 	local line2, col2
 	local vcol = self:visual_col(line1, col1)
 	for _,s in str.lines(s) do
-		local col = self:real_col(line, vcol)
-		line2, col2 = self:insert_string(line, col, s)
+		line2, col2 = self:insert_string(line, self:real_col(line, vcol), s)
 		line = line + 1
 	end
 	return line2, col2
@@ -50,18 +49,19 @@ function buffer:remove_block(line1, col1, line2, col2)
 end
 
 --indent the block between two subsequent positions in the text
-function buffer:indent_block(line1, line2, col1)
+--returns max(visual-length(added-text)).
+function buffer:indent_block(line1, col1, line2, col2)
+	local vcol = self:visual_col(line1, col1)
 	for line = line1, line2 do
-		self:insert_tab(line, col1)
+		self:insert_tab(line, self:real_col(line, vcol))
 	end
 end
 
 --outdent the block between two subsequent positions in the text
-function buffer:outdent_block(line1, line2, col1)
+function buffer:outdent_block(line1, col1, line2, col2)
 	local vcol = self:visual_col(line1, col1)
 	for line = line1, line2 do
-		local col = self:real_col(line, vcol)
-		self:remove_tab(line, col)
+		self:remove_tab(line, self:real_col(line, vcol))
 	end
 end
 

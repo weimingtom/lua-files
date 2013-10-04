@@ -61,42 +61,26 @@ function block_selection:remove()
 	self:reset(self.line1, self.col1)
 end
 
-function block_selection:indent(use_tabs)
+function block_selection:extend_to_last_col()
 	local line1, col1, line2, col2 = self:endpoints()
-	self.buffer:indent_block(line1, line2, col1, use_tabs)
-	self:set(line1, col1, line2, col2 + n)
+	local max_col2 = 0
+	for line = line1, line2 do
+		max_col2 = math.max(max_col2, self.buffer:last_col(line) + 1)
+	end
+	self:set(line1, col1, line2, max_col2)
+end
+
+function block_selection:indent()
+	local line1, col1, line2, col2 = self:endpoints()
+	self.buffer:indent_block(line1, col1, line2, col2)
+	self:extend_to_last_col()
 end
 
 function block_selection:outdent()
 	local line1, col1, line2, col2 = self:endpoints()
-	self.buffer:outdent_block(line1, line2, col1)
-	--TODO: compute min(visual-length(removed-text)) and shorten the selection with that amount.
-	self:set(line1, col1, line2, col2 - 1)
+	self.buffer:outdent_block(line1, col1, line2, col2)
+	self:extend_to_last_col()
 end
-
---[[
-function selection:move_up()
-	local line1, line2 = self:line_range()
-	if line1 == 1 then
-		return
-	end
-	for line = line1, line2 do
-		self.buffer:move_line(line, line - 1)
-	end
-	self:set(line1 - 1, 1, line2 - 1 + 1, 1)
-end
-
-function selection:move_down()
-	local line1, line2 = self:line_range()
-	if line2 == self.buffer:last_line() then
-		return
-	end
-	for line = line2, line1, -1 do
-		self.buffer:move_line(line, line + 1)
-	end
-	self:set(line1 + 1, 1, line2 + 1 + 1, 1)
-end
-]]
 
 
 if not ... then require'codedit_demo' end

@@ -5,15 +5,22 @@ local tabs = require'codedit_tabs'
 
 local buffer = {
 	line_terminator = nil, --line terminator to use when saving. nil means autodetect.
+	default_line_terminator = '\n', --line terminator to use when autodetection fails.
 	tabs = 'indent', --never, indent, always
+	word_chars = '^[a-zA-Z]', --for jumping through words
 }
 
 function buffer:new(editor, text)
 	self = glue.inherit({editor = editor}, self)
-	self.line_terminator = self.line_terminator or self:detect_line_terminator(text)
+	self.line_terminator =
+		self.line_terminator or
+		self:detect_line_terminator(text) or
+		self.default_line_terminator
 	self.lines = {''} --can't have zero lines
 	self.changed = {} --{flag = nil/true/false}; all flags are set to true whenever the buffer changes.
-	self:insert_string(1, 1, text)
+	if text then
+		self:insert_string(1, 1, text) --insert text without undo stack
+	end
 	self.changed.file = false --"file" is the default changed flag to use for saving.
 	self.undo_stack = {}
 	self.redo_stack = {}
@@ -129,6 +136,11 @@ function buffer:clamp_pos(line, col)
 	end
 end
 
+--check if there's a char at a position, or the position is outside the text
+function buffer:ischar(line, col)
+	return line >= 1 and col >= 1 and line <= self:last_line() and col <= self:last_col(line)
+end
+
 --select the string between two valid, subsequent positions in the text
 function buffer:select_string(line1, col1, line2, col2)
 	local lines = {}
@@ -174,7 +186,7 @@ function buffer:insert_string(line, col, s)
 	return line, self:last_col(line) - #s2 + 1
 end
 
---remove the string between two valid, subsequent positions in the text.
+--remove the string between two subsequent positions in the text.
 --line2,col2 is the position right after (not of!) the last character to be removed.
 function buffer:remove_string(line1, col1, line2, col2)
 	line1, col1 = self:clamp_pos(line1, col1)
@@ -187,106 +199,14 @@ function buffer:remove_string(line1, col1, line2, col2)
 	self:setline(line1, s1 .. s2)
 end
 
---editing based on tabsize and tabs option
+--tab expansion (introducing the concept of visual columns)
 
-function buffer:insert_tab(line, col)
-	if self.tabs == 'never' or
-		(self.tabs == 'indent' and self:getline(line) and col > self:indent_col(line))
-	then
-		return self:insert_string(line, col, string.rep(' ', self.editor.tabsize))
-	else
-		return self:insert_string(line, col, '\t')
-	end
+function buffer:tab_width(vcol)
+	return tabs.tab_width(vcol, self.editor.tabsize)
 end
 
-function buffer:remove_tab(line, col)
-	if not self:getline(line) then return end
-	local s = self:sub(line, col, 1/0)
-	if str.istab(s, 1) then
-		self:remove_string(line, col, line, col + 1)
-		return
-	end
-	--no tab to remove, hunt for enough spaces that make for a tab
-	local n = 0
-	for i in str.byte_indices(s) do
-		n = n + 1
-		if n > self.editor.tabsize or not str.isspace(s, i) then
-			--found enough spaces to make a full tab, or found a non-space char
-			break
-		elseif str.istab(s, i) then
-			--not enough spaces to make a tab, but a tab was found: replace the tab with spaces
-			--and remove a full tab worth of spaces from he beginning of the line
-			s = s:sub(col, col + i - 2) .. string.rep(' ', self.editor.tabsize) .. s:sub(col + i)
-			--s = s:sub(col + self.editor.tabsize)
-			--self:setline(line, s)
-			--self:remove_string(line, col + n
-			return
-		end
-	end
-	--line ended or the search was interrupted
-	self:remove_string(line, col, line, col + n - 1)
-end
-
-function buffer:indent_line(line)
-	return self:insert_tab(line, 1)
-end
-
-function buffer:outdent_line(line)
-	return self:remove_tab(line, 1)
-end
-
---[[
-function buffer:delete_
-	if self.auto_indent then
-		local indent_col = self.buffer:indent_col(self.line)
-		if indent_col > 1 and self.col >= indent_col then --cursor is after the indent whitespace, we're auto-indenting
-			indent = self.buffer:sub(self.line, 1, indent_col - 1)
-		end
-	end
-
-
-function buffer:
-	if false and (self.tab_align_list or self.tab_align_args) then
-		--look in the line above for the vcol of the first non-space char after at least one space or '(', starting at vcol
-		if str.first_nonspace(s1) < #s1 then
-			local vcol = self.buffer:visual_col(self.line, self.col)
-			local col1 = self.buffer:real_col(self.line-1, vcol)
-			local stage = 0
-			local s0 = self.buffer:getline(self.line-1)
-			for i in str.byte_indices(s0) do
-				if i >= col1 then
-					if stage == 0 and (str.isspace(s0, i) or str.isascii(s0, i, '(')) then
-						stage = 1
-					elseif stage == 1 and not str.isspace(s0, i) then
-						stage = 2
-						break
-					end
-					col1 = col1 + 1
-				end
-			end
-			if stage == 2 then
-				local vcol1 = self.buffer:visual_col(self.line-1, col1)
-				c = string.rep(' ', vcol1 - vcol)
-			else
-				c = string.rep(' ', self.editor.tabsize)
-			end
-		end
-	elseif self.tabs == 'never' then
-		self:insert_string(string.rep(' ', self.editor.tabsize))
-		return
-	elseif self.tabs == 'indent' then
-		if self.buffer:getline(self.line) and self.col > self.buffer:indent_col(self.line) then
-			self:insert_string(string.rep(' ', self.editor.tabsize))
-			return
-		end
-	end
-	self:insert_string'\t'
-]]
-
---tab expansion
-
-function buffer:tabstop_distance(vcol)
-	return tabs.tabstop_distance(vcol, self.editor.tabsize)
+function buffer:next_tabstop(vcol)
+	return tabs.next_tabstop(vcol, self.editor.tabsize)
 end
 
 function buffer:visual_col(line, col)
@@ -310,6 +230,95 @@ end
 --real col on a line, that is vertically aligned to the same real col on a different line
 function buffer:aligned_col(target_line, line, col)
 	return self:real_col(target_line, self:visual_col(line, col))
+end
+
+--editing based on tab expansion
+
+function buffer:use_tabs(line, col, tabs)
+	tabs = tabs or self.tabs
+	return tabs == 'always' or (tabs == 'indent' and self:getline(line) and col > self:indent_col(line))
+end
+
+--insert a tab or spaces up to the next tabstop. returns the cursor at the tabstop, where the indented text is.
+function buffer:insert_tab(line, col, tabs)
+	if self:use_tabs(line, col, tabs) then
+		return self:insert_string(line, col, '\t')
+	else
+		local vcol = self:visual_col(line, col)
+		return self:insert_string(line, col, string.rep(' ', self:tab_width(vcol)))
+	end
+end
+
+function buffer:indent_line(line, tabs)
+	return self:insert_tab(line, 1, tabs)
+end
+
+--remove a tab or spaces up to the next tabstop. return the number of removed characters.
+function buffer:remove_tab(line, col)
+	local s = self:getline(line)
+	if not s then return 0 end
+	--to_remove is the total number of spaces + tabs to remove, and we can remove at most 1 tab.
+	local to_remove = self:tab_width(self:visual_col(line, col))
+	local total_removed = 0
+	local tab_removed = false
+	local i = str.byte_index(s, col)
+	while i and to_remove > 0 and not tab_removed and str.isspace(s, i) do
+		tab_removed = str.istab(s, i)
+		to_remove = to_remove - 1
+		total_removed = total_removed + 1
+		i = str.next(s, i)
+	end
+	self:remove_string(line, col, line, col + total_removed)
+	return total_removed
+end
+
+function buffer:outdent_line(line)
+	return self:remove_tab(line, 1)
+end
+
+--navigation at word boundaries
+
+function buffer:left_word_pos(line, col, word_chars)
+	--[[
+	word_chars = word_chars or self.word_chars
+	while true do
+		local line2, col2 = self:left_pos(line, col)
+		if line2 ~= line or not self:ischar(line2, col2) then
+			return line2, col2
+		else
+			local s = self:getline()
+			local i = byte_index(s, col2)
+
+		end
+
+	]]
+
+	local s = self:getline(line)
+	if not s or col <= 1 then
+		return self:left_pos(line, col)
+	elseif col <= self:indent_col(line) then --skip indent
+		return line, 1
+	end
+	local col = str.char_index(s, str.prev_word_break(s, str.byte_index(s, self.col), self.word_chars))
+	col = math.max(1, col) --if not found, consider it found at bol
+	self:move_horiz(-(self.col - col))
+end
+
+function buffer:right_word_pos(line, col, word_chars)
+	word_chars = word_chars or self.word_chars
+	local s = self:getline(line)
+	if not s then
+		return self:move_horiz(1)
+	elseif self.col > self.buffer:last_col(self.line) then --skip indent
+		if self.line + 1 > self.buffer:last_line() then
+			self:move(self.line + 1, 1)
+		else
+			self:move(self.line + 1, self.buffer:indent_col(self.line + 1))
+		end
+		return
+	end
+	local col = str.char_index(s, str.next_word_break(s, str.byte_index(s, self.col), self.word_chars))
+	self:move_horiz(col - self.col)
 end
 
 

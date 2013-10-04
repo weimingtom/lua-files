@@ -47,9 +47,9 @@ function str.len(s)
 	return len
 end
 
---byte index given char index. 0 if the index is < 0, #s + 1 if the index is outside the string.
+--byte index given char index. nil if the index is s outside the string.
 function str.byte_index(s, target_ci)
-	if target_ci < 1 then return 0 end
+	if target_ci < 1 then return end
 	local ci = 1
 	for i in str.byte_indices(s) do
 		if ci == target_ci then
@@ -57,36 +57,57 @@ function str.byte_index(s, target_ci)
 		end
 		ci = ci + 1
 	end
-	return #s + 1
 end
 
---char index given byte index. 0 if the index is < 0, char index at #s + 1 if the index is outside the string.
+--char index given byte index. nil if the index is outside the string.
 function str.char_index(s, target_i)
-	if target_i < 1 then return 0 end
+	if target_i < 1 then return end
 	local ci = 1
 	for i in str.byte_indices(s) do
 		if i == target_i then
-			break
+			return ci
 		end
 		ci = ci + 1
 	end
-	return ci
 end
 
---byte index of the prev. char before the char at byte index i
-function str.prev(s, i)
-	if i == 1 then return end
+--byte index of the prev. char before the char at byte index i. nil if indices go out of range.
+--NOTE: unlike next(), this is a O(N) operation!
+function str.prev(s, nexti)
+	if nexti <= 1 then return end
 	local lasti = 1
-	for j in str.byte_indices(s) do
-		if j >= i then
-			break
+	for i in str.byte_indices(s) do
+		if i == nexti then
+			return lasti
 		end
-		lasti = j
+		lasti = i
 	end
-	return lasti
+	if nexti == #s + 1 then
+		return lasti
+	end
 end
 
---sub based on char indices (which can't be negative)
+--iterate chars in reverse order, returning the byte index where each char starts.
+function str.byte_indices_reverse(s)
+	if #s < 200 then
+		--using prev() is a O(N^2/2) operation, ok for small strings (200 chars need 40,000 iterations)
+		return str.prev, s, #s + 1
+	else
+		--store byte indices in a table and iterate them in reverse.
+		--this is 40x slower than byte_indices() but still fast at 2mil chars/second (but eats RAM and makes garbage).
+		local t = {}
+		for i in str.byte_indices(s) do
+			table.insert(t, i)
+		end
+		local i = #t + 1
+		return function()
+			i = i - 1
+			return t[i]
+		end
+	end
+end
+
+--sub based on char indices, which, unlike with string.sub, can't be negative. end_ci can be nil meaning last char.
 function str.sub(s, start_ci, end_ci)
 	assert(start_ci >= 1)
 	assert(not end_ci or end_ci >= 0)

@@ -9,19 +9,34 @@ assert(utf8.len('') == 0)
 assert(utf8.len('a') == 1)
 assert(utf8.len('ab') == 2)
 
-assert(utf8.byte_index('', -1) == 0)
-assert(utf8.byte_index('', 0) == 0)
-assert(utf8.byte_index('', 1) == 1)
-assert(utf8.byte_index('', 2) == 1)
+assert(utf8.byte_index('', -1) == nil)
+assert(utf8.byte_index('', 0) == nil)
+assert(utf8.byte_index('', 1) == nil)
+assert(utf8.byte_index('', 2) == nil)
 assert(utf8.byte_index('abc', 3) == 3)
-assert(utf8.byte_index('abc', 5) == 4)
+assert(utf8.byte_index('abc', 5) == nil)
 
-assert(utf8.char_index('', -1) == 0)
-assert(utf8.char_index('', 0) == 0)
-assert(utf8.char_index('', 1) == 1)
-assert(utf8.char_index('', 2) == 1)
+assert(utf8.char_index('', -1) == nil)
+assert(utf8.char_index('', 0) == nil)
+assert(utf8.char_index('', 1) == nil)
+assert(utf8.char_index('', 2) == nil)
 assert(utf8.char_index('abc', 3) == 3)
-assert(utf8.char_index('abc', 5) == 4)
+assert(utf8.char_index('abc', 5) == nil)
+
+assert(utf8.prev('', -1) == nil)
+assert(utf8.prev('', 0) == nil)
+assert(utf8.prev('', 1) == nil)
+assert(utf8.prev('', 2) == nil)
+assert(utf8.prev('a', 1) == nil)
+assert(utf8.prev('a', 2) == 1)
+assert(utf8.prev('a', 3) == nil)
+assert(utf8.prev('abc', 4) == 3)
+assert(utf8.prev('abc', 3) == 2)
+assert(utf8.prev('abc', 2) == 1)
+assert(utf8.prev('abc', 1) == nil)
+
+local ii =   100; for i in utf8.byte_indices_reverse(string.rep('a',   100)) do assert(i == ii); ii = ii - 1 end
+local ii = 10000; for i in utf8.byte_indices_reverse(string.rep('a', 10000)) do assert(i == ii); ii = ii - 1 end
 
 --TODO: utf8.prev
 

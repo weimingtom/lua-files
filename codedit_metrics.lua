@@ -126,7 +126,7 @@ function editor:caret_rect_over_mode(cursor)
 	local s = self:getline(cursor.line, cursor.col)
 	local i = str.byte_index(s, cursor.col)
 	if s and str.istab(s, i) then --make cursor as wide as the tabspace
-		w = self.buffer:tabstop_distance(vcol - 1)
+		w = self.buffer:tab_width(vcol)
 	end
 	w = w * self.charsize
 	local h = cursor.caret_thickness

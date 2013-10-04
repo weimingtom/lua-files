@@ -45,7 +45,7 @@ function editor:draw_buffer(line1, vcol1, line2, vcol2, color)
 		local vcol = 1
 		for i in str.byte_indices(s) do
 			if str.istab(s, i) then
-				vcol = vcol + self.buffer:tabstop_distance(vcol - 1)
+				vcol = vcol + self.buffer:tab_width(vcol)
 			else
 				if vcol > vcol2 then
 					break

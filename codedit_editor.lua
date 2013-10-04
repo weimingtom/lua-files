@@ -98,11 +98,12 @@ function editor:redo() self.buffer:redo() end
 
 --navigation & selection commands
 
-function editor:select_to_cursor(mode)
+function editor:_before_move_cursor(mode)
+	self.buffer:start_undo_group'move'
 	if mode == 'select' or mode == 'select_block' then
 		if self.selection.block ~= (mode == 'select_block') then
+			self.selection.visible = false
 			local old_sel = self.selection
-			old_sel.visible = false
 			if mode == 'select' then
 				self.selection = self.line_selection
 			else
@@ -111,35 +112,45 @@ function editor:select_to_cursor(mode)
 			self.selection:set_to_selection(old_sel)
 			self.selection.visible = true
 		end
-		self.selection:extend_to_cursor(self.cursor)
+	else
+		self.cursor.restrict_eol = nil
+	end
+
+	if mode == 'select' or mode == 'select_block' or mode == 'unrestricted' then
 		local old_restrict_eol = self.cursor.restrict_eol
 		self.cursor.restrict_eol = nil
-		self.cursor.restrict_eol = self.cursor.restrict_eol and not self.selection.block
+		self.cursor.restrict_eol = self.cursor.restrict_eol and not self.selection.block and not mode == 'unrestricted'
 		if not old_restrict_eol and self.cursor.restrict_eol then
 			self.cursor:move(self.cursor.line, self.cursor.col)
 		end
-	else
-		self.selection:reset_to_cursor(self.cursor)
-		self.cursor.restrict_eol = nil
 	end
 end
 
-function editor:move_cursor_to_coords(x, y, mode)
-	self.buffer:start_undo_group'move'
-	self.cursor:move_to_coords(x, y)
-	self:select_to_cursor(mode)
+function editor:_after_move_cursor(mode)
+	if mode == 'select' or mode == 'select_block' then
+		self.selection:extend_to_cursor(self.cursor)
+	else
+		self.selection:reset_to_cursor(self.cursor)
+	end
 	self.cursor:make_visible()
 end
 
+function editor:move_cursor_to_coords(x, y, mode)
+	self:_before_move_cursor(mode)
+	self.cursor:move_to_coords(x, y)
+	self:_after_move_cursor(mode)
+end
+
 function editor:move_cursor(direction, mode)
-	self.buffer:start_undo_group'move'
+	self:_before_move_cursor(mode)
 	self.cursor['move_'..direction](self.cursor)
-	self:select_to_cursor(mode)
-	self.cursor:make_visible()
+	self:_after_move_cursor(mode)
 end
 
 function editor:move_left()  self:move_cursor('left') end
 function editor:move_right() self:move_cursor('right') end
+function editor:move_left_unrestricted()  self:move_cursor('left',  'unrestricted') end
+function editor:move_right_unrestricted() self:move_cursor('right', 'unrestricted') end
 function editor:move_up()    self:move_cursor('up') end
 function editor:move_down()  self:move_cursor('down') end
 function editor:move_left_word()  self:move_cursor('left_word') end
@@ -240,7 +251,7 @@ function editor:indent()
 		self.selection:reset_to_cursor(self.cursor)
 	else
 		self.buffer:start_undo_group'indent_selection'
-		self.selection:indent(self.tabs ~= 'always')
+		self.selection:indent()
 		self.cursor:move_to_selection(self.selection)
 	end
 	self.cursor:make_visible()
@@ -264,7 +275,7 @@ function editor:move_lines_up()
 		self.buffer:start_undo_group'move_line_up'
 		self.cursor:move_line_up()
 		self.selection:reset_to_cursor(self.cursor)
-	else
+	elseif self.selection.move_lines_up then --block selections don't have that
 		self.buffer:start_undo_group'move_selection_up'
 		self.selection:move_lines_up()
 		self.cursor:move_to_selection(self.selection)
@@ -277,7 +288,7 @@ function editor:move_lines_down()
 		self.buffer:start_undo_group'move_line_down'
 		self.cursor:move_line_down()
 		self.selection:reset_to_cursor(self.cursor)
-	else
+	elseif self.selection.move_lines_down then --block selections don't have that
 		self.buffer:start_undo_group'move_selection_down'
 		self.selection:move_lines_down()
 		self.cursor:move_to_selection(self.selection)

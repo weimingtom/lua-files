@@ -34,7 +34,7 @@ function str.first_nonspace(s)
 	return #s + 1, n
 end
 
---byte index of the last occurence of a non-space char (0 if none).
+--byte index of the last occurence of a non-space char.
 function str.last_nonspace(s)
 	local space_starts
 	for i in str.byte_indices(s) do
