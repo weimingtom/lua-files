@@ -27,10 +27,10 @@ function player:on_render(cr)
 		editor.x = x
 		editor.w = w
 		editor.h = h
-		--editor.cursor.restrict_eof = true
-		--editor.cursor.restrict_eol = true
-		editor.cursor.land_bof = false
-		editor.cursor.land_eof = false
+		codedit.cursor.restrict_eof = false
+		codedit.cursor.restrict_eol = false
+		codedit.cursor.land_bof = false
+		codedit.cursor.land_eof = false
 
 		editor.lexer = self:mbutton{
 			id = 'lexer_' .. i,

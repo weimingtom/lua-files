@@ -279,29 +279,17 @@ end
 --navigation at word boundaries
 
 function buffer:left_word_pos(line, col, word_chars)
-	--[[
 	word_chars = word_chars or self.word_chars
-	while true do
-		local line2, col2 = self:left_pos(line, col)
-		if line2 ~= line or not self:ischar(line2, col2) then
-			return line2, col2
-		else
-			local s = self:getline()
-			local i = byte_index(s, col2)
-
-		end
-
-	]]
-
 	local s = self:getline(line)
-	if not s or col <= 1 then
+	if not s then
 		return self:left_pos(line, col)
-	elseif col <= self:indent_col(line) then --skip indent
-		return line, 1
 	end
-	local col = str.char_index(s, str.prev_word_break(s, str.byte_index(s, self.col), self.word_chars))
-	col = math.max(1, col) --if not found, consider it found at bol
-	self:move_horiz(-(self.col - col))
+	local i = str.byte_index(s, col)
+	local previ = str.prev_word_break(s, i, word_chars)
+	if previ then
+		return line, str.char_index(s, previ)
+	end
+	return self:left_pos(line, col)
 end
 
 function buffer:right_word_pos(line, col, word_chars)

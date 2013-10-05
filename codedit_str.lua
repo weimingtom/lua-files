@@ -9,6 +9,7 @@ local str = glue.update({}, utf8)
 
 --check for an ascii char at a byte index without string creation
 function str.isascii(s, i, c)
+	assert(i >= 1 and i <= #s, 'out of range')
 	return s:byte(i) == c:byte(1)
 end
 
@@ -22,7 +23,7 @@ function str.isspace(s, i)
 	return str.isascii(s, i, ' ') or str.istab(s, i)
 end
 
---byte index followed by char index of the first occurence of a non-space char (#s + 1 if none).
+--byte index and char index of the first occurence of a non-space char (#s + 1 if none).
 function str.first_nonspace(s)
 	local n = 1
 	for i in str.byte_indices(s) do
@@ -34,17 +35,23 @@ function str.first_nonspace(s)
 	return #s + 1, n
 end
 
---byte index of the last occurence of a non-space char.
+--byte index and char index of the last occurence of a non-space char.
 function str.last_nonspace(s)
-	local space_starts
+	local n = 0
+	local space_starts_i, space_starts_n
 	for i in str.byte_indices(s) do
+		n = n + 1
 		if str.isspace(s, i) then
-			space_starts = space_starts or i
+			space_starts_i = space_starts_i or i
+			space_starts_n = space_starts_n or n
 		else
-			space_starts = nil
+			space_starts_i = nil
+			space_starts_n = nil
 		end
 	end
-	return space_starts and space_starts - 1 or #s
+	return
+		space_starts_i and space_starts_i - 1 or #s,
+		space_starts_n and space_starts_n - 1 or n
 end
 
 --right trim of space and tab characters
@@ -78,11 +85,11 @@ function str.next_line_indices(s, i)
 	elseif i > #s then
 		return
 	end
-	local j, next_i = s:match('^[^\r\n]*()\r?\n?()', i)
-	if next_i > #s and j == next_i then --string ends without a newline, mark that by setting next_i to inf
-		next_i = 1/0
+	local j, nexti = s:match('^[^\r\n]*()\r?\n?()', i)
+	if nexti > #s and j == nexti then --string ends without a newline, mark that by setting nexti to inf
+		nexti = 1/0
 	end
-	return next_i, i, j-1
+	return nexti, i, j-1
 end
 
 --iterate lines, returning the index where the next line starts (unimportant) and the indices of each line
@@ -103,51 +110,50 @@ function str.lines(s)
 	return str.next_line, s
 end
 
-function str.line_count(s)
-	local count = 0
-	for _ in str.line_indices(s) do
-		count = count + 1
-	end
-	return count
-end
-
 --words ------------------------------------------------------------------------------------------------------------------
 
 function str.isword(s, i, word_chars)
 	return s:find(word_chars, i) ~= nil
 end
 
---find either:
+--search forwards for:
 	--1) 1..n spaces followed by a non-space
-	--2) 1..n words or non-words follwed by 0..n spaces followed by a non-space
-function str.next_word_break(s, start, word_chars)
-	local expect = str.isspace(s, start) and 'space' or str.isword(s, start, word_chars) and 'word' or 'nonword'
-	for i in str.byte_indices(s, start) do
-		if expect == 'space' then
-			if not str.isspace(s, i) then
+	--2) 1..n words or non-words follwed by case 1
+	--3) 1..n words followed by a non-word
+	--4) 1..n non-words followed by a word
+--return nil if firsti is out of the 1..#s range.
+function str.next_word_break(s, firsti, word_chars)
+	if firsti < 1 then
+	if firsti < 1 or firsti > #s then return end
+	local expect = str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword'
+	for i in str.byte_indices(s, firsti) do
+		if expect == 'space' then --case 1
+			if not str.isspace(s, i) then --case 1 exit
 				return i
 			end
-		elseif str.isspace(s, i) then
+		elseif str.isspace(s, i) then --case 2 -> case 1
 			expect = 'space'
-		elseif expect ~= (str.isword(s, i, word_chars) and 'word' or 'nonword') then
+		elseif expect ~= (str.isword(s, i, word_chars) and 'word' or 'nonword') then --case 3 and 4 exit
 			return i
 		end
 	end
 end
 
---find backwards either:
+--search backwards for:
 	--1) 0..1 words or non-words followed by 1..n spaces followed by 0..n words or non-words
 	--3) 2..n words or non-words
-function str.prev_word_break(s, start, word_chars)
-	local expect = str.isspace(s, start) and 'space' or str.isword(s, start, word_chars) and 'word' or 'nonword'
-	local lasti = start
-	for i in str.byte_indices_reverse(s, start) do
+--return nil if firsti is out of the 2..#s+1 range.
+function str.prev_word_break(s, firsti, word_chars)
+	if firsti <= 1 or firsti > #s + 1 then return end
+	local expect = str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword'
+	local lasti = firsti
+	for i in str.byte_indices_reverse(s, firsti) do
 		if expect == 'space' then
 			if not str.isspace(s, i) then
 				expect = str.isword(s, i, word_chars) and 'word' or 'nonword'
 			end
 		elseif expect ~= (str.isspace(s, i) and 'space' or str.isword(s, i, word_chars) and 'word' or 'nonword') then
-			if lasti == start then
+			if lasti == firsti then
 				expect =
 					str.isspace(s, i) and 'space' or
 					str.isword(s, i, word_chars) and 'word' or 'nonword'
@@ -202,9 +208,6 @@ assert_lines('\r\n\n', {'','',''})
 assert_lines('\n\r', {'','',''})
 assert_lines('\n\r\n\r', {'','','',''})
 assert_lines('\n\n\r', {'','','',''})
-
-assert(str.line_count('') == 1)
-assert(str.line_count('\n\n\r') == 4)
 
 --TODO: next_word_break, prev_word_break
 
