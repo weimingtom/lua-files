@@ -117,38 +117,47 @@ function str.isword(s, i, word_chars)
 	return s:find(word_chars, i) ~= nil
 end
 
+--find either:
+	--1) 1..n spaces followed by a non-space
+	--2) 1..n words or non-words follwed by 0..n spaces followed by a non-space
 function str.next_word_break(s, start, word_chars)
-	local isword = str.isword(s, start, word_chars)
-	for i in str.next, s, start do
-		if isword and str.isspace(s, i) then
-			isword = false
-		end
-		if isword ~= str.isword(s, i, word_chars) then
+	local expect = str.isspace(s, start) and 'space' or str.isword(s, start, word_chars) and 'word' or 'nonword'
+	for i in str.byte_indices(s, start) do
+		if expect == 'space' then
+			if not str.isspace(s, i) then
+				return i
+			end
+		elseif str.isspace(s, i) then
+			expect = 'space'
+		elseif expect ~= (str.isword(s, i, word_chars) and 'word' or 'nonword') then
 			return i
 		end
 	end
-	return #s + 1
 end
 
+--find backwards either:
+	--1) 0..1 words or non-words followed by 1..n spaces followed by 0..n words or non-words
+	--3) 2..n words or non-words
 function str.prev_word_break(s, start, word_chars)
-	local prev = str.prev(s, start)
-	if not prev then return 0 end
-	local isword = str.isword(s, prev, word_chars)
-	local skipspace = str.isspace(s, prev)
-	if skipspace then
-		isword = true
-	end
-	while true do
-		local prev1 = str.prev(s, prev)
-		if not prev1 then break end
-		if skipspace and str.isspace(s, prev1) then
-			--nothing
-		elseif isword ~= str.isword(s, prev1, word_chars) then
-			return prev
+	local expect = str.isspace(s, start) and 'space' or str.isword(s, start, word_chars) and 'word' or 'nonword'
+	local lasti = start
+	for i in str.byte_indices_reverse(s, start) do
+		if expect == 'space' then
+			if not str.isspace(s, i) then
+				expect = str.isword(s, i, word_chars) and 'word' or 'nonword'
+			end
+		elseif expect ~= (str.isspace(s, i) and 'space' or str.isword(s, i, word_chars) and 'word' or 'nonword') then
+			if lasti == start then
+				expect =
+					str.isspace(s, i) and 'space' or
+					str.isword(s, i, word_chars) and 'word' or 'nonword'
+			else
+				return lasti
+			end
 		end
-		prev = prev1
+		lasti = i
 	end
-	return 0
+	return lasti
 end
 
 
@@ -201,6 +210,8 @@ assert(str.line_count('\n\n\r') == 4)
 
 end
 
+
+if not ... then require'codedit_demo' end
 
 return str
 

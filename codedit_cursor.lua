@@ -110,7 +110,9 @@ function cursor:move_left_word()
 		self:move(self.line, 1)
 		return
 	end
-	local col = str.char_index(s, str.prev_word_break(s, str.byte_index(s, self.col), self.word_chars))
+	local i = str.byte_index(s, self.col)
+	local prev_ci = str.prev_word_break(s, i, self.word_chars)
+	local col = str.char_index(s, prev_ci)
 	col = math.max(1, col) --if not found, consider it found at bol
 	self:move_horiz(-(self.col - col))
 end
@@ -127,7 +129,9 @@ function cursor:move_right_word()
 		end
 		return
 	end
-	local col = str.char_index(s, str.next_word_break(s, str.byte_index(s, self.col), self.word_chars))
+	local i = str.byte_index(s, self.col)
+	local next_ci = str.next_word_break(s, i, self.word_chars)
+	local col = next_ci and str.char_index(s, next_ci) or self.buffer:last_col(self.line) + 1
 	self:move_horiz(col - self.col)
 end
 

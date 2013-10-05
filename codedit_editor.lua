@@ -119,7 +119,7 @@ function editor:_before_move_cursor(mode)
 	if mode == 'select' or mode == 'select_block' or mode == 'unrestricted' then
 		local old_restrict_eol = self.cursor.restrict_eol
 		self.cursor.restrict_eol = nil
-		self.cursor.restrict_eol = self.cursor.restrict_eol and not self.selection.block and not mode == 'unrestricted'
+		self.cursor.restrict_eol = self.cursor.restrict_eol and not self.selection.block and mode ~= 'unrestricted'
 		if not old_restrict_eol and self.cursor.restrict_eol then
 			self.cursor:move(self.cursor.line, self.cursor.col)
 		end

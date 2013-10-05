@@ -6,9 +6,9 @@ editor.linesize = 1
 editor.charsize = 1
 editor.charvsize = 1
 
-require'codedit_cursor'
-editor.cursor.color = nil --custom color
-editor.cursor.caret_thickness = 2
+local cursor = require'codedit_cursor'
+cursor.color = nil --custom color
+cursor.caret_thickness = 2
 
 function editor:line_y(line, vcol)
 	return self.linesize * (line - 1)

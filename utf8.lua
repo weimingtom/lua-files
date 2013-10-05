@@ -34,8 +34,8 @@ end
 str.next = str.next_raw
 
 --iterate chars, returning the byte index where each char starts
-function str.byte_indices(s)
-	return str.next, s
+function str.byte_indices(s, previ)
+	return str.next, s, previ
 end
 
 --number of chars in string
@@ -74,6 +74,7 @@ end
 --byte index of the prev. char before the char at byte index i. nil if indices go out of range.
 --NOTE: unlike next(), this is a O(N) operation!
 function str.prev(s, nexti)
+	nexti = nexti or #s + 1
 	if nexti <= 1 then return end
 	local lasti = 1
 	for i in str.byte_indices(s) do
@@ -88,15 +89,16 @@ function str.prev(s, nexti)
 end
 
 --iterate chars in reverse order, returning the byte index where each char starts.
-function str.byte_indices_reverse(s)
+function str.byte_indices_reverse(s, nexti)
 	if #s < 200 then
 		--using prev() is a O(N^2/2) operation, ok for small strings (200 chars need 40,000 iterations)
-		return str.prev, s, #s + 1
+		return str.prev, s, nexti
 	else
 		--store byte indices in a table and iterate them in reverse.
 		--this is 40x slower than byte_indices() but still fast at 2mil chars/second (but eats RAM and makes garbage).
 		local t = {}
 		for i in str.byte_indices(s) do
+			if nexti and i >= nexti then break end
 			table.insert(t, i)
 		end
 		local i = #t + 1

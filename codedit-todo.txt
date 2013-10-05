@@ -64,6 +64,8 @@
 	- long lines - display a limit bar or mark the excess with a text style
 	- animated scrolling like in sublime text (actually that's pretty annoying)
 	- text cursor over text, normal pointer surrounding the text, reverse pointer over the line numbers
+	- spell checking (configurable to apply only to comments and strings)
+
 
 CODEDITOR
 ---------
