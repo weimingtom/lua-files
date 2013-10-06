@@ -82,6 +82,10 @@ function buffer:last_col(line)
 	return str.len(self:getline(line))
 end
 
+function buffer:end_pos()
+	return self:last_line(), self:last_col(self:last_line()) + 1
+end
+
 function buffer:indent_col(line)
 	return select(2, str.first_nonspace(self:getline(line)))
 end
@@ -130,15 +134,10 @@ function buffer:clamp_pos(line, col)
 	if line < 1 then
 		return 1, 1
 	elseif line > self:last_line() then
-		return self:last_line(), self:last_col(self:last_line()) + 1
+		return self:end_pos()
 	else
 		return line, math.min(math.max(col, 1), self:last_col(line) + 1)
 	end
-end
-
---check if there's a char at a position, or the position is outside the text
-function buffer:ischar(line, col)
-	return line >= 1 and col >= 1 and line <= self:last_line() and col <= self:last_col(line)
 end
 
 --select the string between two valid, subsequent positions in the text
@@ -280,33 +279,36 @@ end
 
 function buffer:left_word_pos(line, col, word_chars)
 	word_chars = word_chars or self.word_chars
-	local s = self:getline(line)
-	if not s then
+	if line < 1 or col <= 1 then
 		return self:left_pos(line, col)
+	elseif line > self:last_line() then
+		return self:end_pos()
+	elseif col > self:last_col(line) + 1 then
+		return line, self:last_col(line) + 1
+	else
+		local s = self:getline(line)
+		local prev_col = str.prev_word_break(s, col, word_chars)
+		if not prev_col then
+			return self:left_pos(line, col)
+		end
+		return line, prev_col
 	end
-	local i = str.byte_index(s, col)
-	local previ = str.prev_word_break(s, i, word_chars)
-	if previ then
-		return line, str.char_index(s, previ)
-	end
-	return self:left_pos(line, col)
 end
 
 function buffer:right_word_pos(line, col, word_chars)
 	word_chars = word_chars or self.word_chars
 	local s = self:getline(line)
 	if not s then
-		return self:move_horiz(1)
-	elseif self.col > self.buffer:last_col(self.line) then --skip indent
-		if self.line + 1 > self.buffer:last_line() then
-			self:move(self.line + 1, 1)
-		else
-			self:move(self.line + 1, self.buffer:indent_col(self.line + 1))
-		end
-		return
+		return self:right_pos(line, col, true)
 	end
-	local col = str.char_index(s, str.next_word_break(s, str.byte_index(s, self.col), self.word_chars))
-	self:move_horiz(col - self.col)
+	if col > self:last_col(line) then
+		return self:right_pos(line, col, true)
+	end
+	local next_col = str.next_word_break(s, col, word_chars)
+	if not next_col then
+		return self:right_pos(line, col)
+	end
+	return line, next_col
 end
 
 

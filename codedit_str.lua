@@ -116,15 +116,16 @@ function str.isword(s, i, word_chars)
 	return s:find(word_chars, i) ~= nil
 end
 
---search forwards for:
-	--1) 1..n spaces followed by a non-space
-	--2) 1..n words or non-words follwed by case 1
-	--3) 1..n words followed by a non-word
-	--4) 1..n non-words followed by a word
---return nil if firsti is out of the 1..#s range.
-function str.next_word_break(s, firsti, word_chars)
-	if firsti < 1 then
-	if firsti < 1 or firsti > #s then return end
+--from a char index, search forwards for:
+	--1) 1..n spaces followed by a non-space char
+	--2) 1..n word chars or non-word chars follwed by case 1
+	--3) 1..n word chars followed by a non-word char
+	--4) 1..n non-word chars followed by a word char
+--if the next break should be on a different line, return nil.
+function str.next_word_break(s, first_ci, word_chars)
+	if first_ci < 1 then return 1 end
+	local firsti = str.byte_index(s, first_ci)
+	if not firsti then return end
 	local expect = str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword'
 	for i in str.byte_indices(s, firsti) do
 		if expect == 'space' then --case 1
@@ -137,15 +138,19 @@ function str.next_word_break(s, firsti, word_chars)
 			return i
 		end
 	end
+	return str.len(s) + 1
 end
 
---search backwards for:
-	--1) 0..1 words or non-words followed by 1..n spaces followed by 0..n words or non-words
-	--3) 2..n words or non-words
---return nil if firsti is out of the 2..#s+1 range.
-function str.prev_word_break(s, firsti, word_chars)
-	if firsti <= 1 or firsti > #s + 1 then return end
-	local expect = str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword'
+--from a char index, search backwards for:
+	--1) 1..n spaces followed by 1..n words or non-words
+	--2) 1 words or non-words followed by case 1
+	--3) 2..n words or non-words follwed by a char of a differnt class
+	--in other words: look back until the char type changes from the type at firsti or of the prev. char, and skip spaces.
+--if the next break should be on a different line, return nil.
+function str.prev_word_break(s, first_ci, word_chars)
+	local firsti = str.byte_index(s, first_ci)
+	local expect = not firsti and 'prev' or
+			(str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword')
 	local lasti = firsti
 	for i in str.byte_indices_reverse(s, firsti) do
 		if expect == 'space' then
@@ -158,14 +163,13 @@ function str.prev_word_break(s, firsti, word_chars)
 					str.isspace(s, i) and 'space' or
 					str.isword(s, i, word_chars) and 'word' or 'nonword'
 			else
-				return lasti
+				return str.byte_index(s, lasti)
 			end
 		end
 		lasti = i
 	end
-	return lasti
+	return 1
 end
-
 
 --tests ------------------------------------------------------------------------------------------------------------------
 

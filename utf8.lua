@@ -178,19 +178,17 @@ end
 --utf8 validation and sanitization
 
 --check if there's a valid utf8 codepoint at byte index i
---[[
-byte  1          2           3          4
------------------------------------------
-00 - 7F
-C2 - DF    80 - BF
-E0         A0 - BF     80 - BF
-E1 - EC    80 - BF     80 - BF
-ED         80 - 9F     80 - BF
-EE - EF    80 - BF     80 - BF
-F0         90 - BF     80 - BF    80 - BF
-F1 - F3    80 - BF     80 - BF    80 - BF
-F4         80 - 8F     80 - BF    80 - BF
-]]
+-- byte  1          2           3          4
+--------------------------------------------
+-- 00 - 7F
+-- C2 - DF    80 - BF
+-- E0         A0 - BF     80 - BF
+-- E1 - EC    80 - BF     80 - BF
+-- ED         80 - 9F     80 - BF
+-- EE - EF    80 - BF     80 - BF
+-- F0         90 - BF     80 - BF    80 - BF
+-- F1 - F3    80 - BF     80 - BF    80 - BF
+-- F4         80 - 8F     80 - BF    80 - BF
 function utf8.isvalid(s, i)
 	local c = s:byte(i)
 	if not c then
@@ -200,60 +198,51 @@ function utf8.isvalid(s, i)
 	elseif c >= 0xC2 and c <= 0xDF then
 		local c2 = s:byte(i + 1)
 		return c2 and c2 >= 0x80 and c2 <= 0xBF
-	elseif c == 0xE0 then
+	elseif c >= 0xE0 and c <= 0xEF then
 		local c2 = s:byte(i + 1)
 		local c3 = s:byte(i + 2)
-		return c2 and c3 and
-			c2 >= 0xA0 and c2 <= 0xBF and
-			c3 >= 0x80 and c3 <= 0xBF
-	elseif c >= 0xE1 and c <= 0xEC then
-		local c2 = s:byte(i + 1)
-		local c3 = s:byte(i + 2)
-		return c2 and c3 and
-			c2 >= 0x80 and c2 <= 0xBF and
-			c3 >= 0x80 and c3 <= 0xBF
-	elseif c == 0xED then
-		local c2 = s:byte(i + 1)
-		local c3 = s:byte(i + 2)
-		return c2 and c3 and
-			c2 >= 0x80 and c2 <= 0x9F and
-			c3 >= 0x80 and c3 <= 0xBF
-	elseif c >= 0xEE and c <= 0xEF then
-		local c2 = s:byte(i + 1)
-		local c3 = s:byte(i + 2)
-		if c == 0xEF and c2 == 0xBF and (c3 == 0xBE or c3 == 0xBF) then
-			return false --uFFFE and uFFFF non-characters
+		if c == 0xE0 then
+			return c2 and c3 and
+				c2 >= 0xA0 and c2 <= 0xBF and
+				c3 >= 0x80 and c3 <= 0xBF
+		elseif c >= 0xE1 and c <= 0xEC then
+			return c2 and c3 and
+				c2 >= 0x80 and c2 <= 0xBF and
+				c3 >= 0x80 and c3 <= 0xBF
+		elseif c == 0xED then
+			return c2 and c3 and
+				c2 >= 0x80 and c2 <= 0x9F and
+				c3 >= 0x80 and c3 <= 0xBF
+		elseif c >= 0xEE and c <= 0xEF then
+			if c == 0xEF and c2 == 0xBF and (c3 == 0xBE or c3 == 0xBF) then
+				return false --uFFFE and uFFFF non-characters
+			end
+			return c2 and c3 and
+				c2 >= 0x80 and c2 <= 0xBF and
+				c3 >= 0x80 and c3 <= 0xBF
 		end
-		return c2 and c3 and
-			c2 >= 0x80 and c2 <= 0xBF and
-			c3 >= 0x80 and c3 <= 0xBF
-	elseif c == 0xF0 then
+	elseif c >= 0xF0 and c <= 0xF4 then
 		local c2 = s:byte(i + 1)
 		local c3 = s:byte(i + 2)
 		local c4 = s:byte(i + 3)
-		return c2 and c3 and c4 and
-			c2 >= 0x90 and c2 <= 0xBF and
-			c3 >= 0x80 and c3 <= 0xBF and
-			c4 >= 0x80 and c4 <= 0xBF
-	elseif c >= 0xF1 and c <= 0xF3 then
-		local c2 = s:byte(i + 1)
-		local c3 = s:byte(i + 2)
-		local c4 = s:byte(i + 3)
-		return c2 and c3 and c4 and
-			c2 >= 0x80 and c2 <= 0xBF and
-			c3 >= 0x80 and c3 <= 0xBF and
-			c4 >= 0x80 and c4 <= 0xBF
-	elseif c == 0xF4 then
-		local c2 = s:byte(i + 1)
-		local c3 = s:byte(i + 2)
-		local c4 = s:byte(i + 3)
-		return c2 and c3 and c4 and
-			c2 >= 0x80 and c2 <= 0x8F and
-			c3 >= 0x80 and c3 <= 0xBF and
-			c4 >= 0x80 and c4 <= 0xBF
-	else
-		return false
+		if c == 0xF0 then
+			return c2 and c3 and c4 and
+				c2 >= 0x90 and c2 <= 0xBF and
+				c3 >= 0x80 and c3 <= 0xBF and
+				c4 >= 0x80 and c4 <= 0xBF
+		elseif c >= 0xF1 and c <= 0xF3 then
+			return c2 and c3 and c4 and
+				c2 >= 0x80 and c2 <= 0xBF and
+				c3 >= 0x80 and c3 <= 0xBF and
+				c4 >= 0x80 and c4 <= 0xBF
+		elseif c == 0xF4 then
+			return c2 and c3 and c4 and
+				c2 >= 0x80 and c2 <= 0x8F and
+				c3 >= 0x80 and c3 <= 0xBF and
+				c4 >= 0x80 and c4 <= 0xBF
+		end
 	end
+	return false
 end
 
 --byte index of the next valid utf8 char after the char at byte index i.

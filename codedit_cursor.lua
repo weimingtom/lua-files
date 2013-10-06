@@ -103,26 +103,13 @@ function cursor:move_down_page()
 end
 
 function cursor:move_left_word()
-	local line, pos = self.buffer:left_word_pos(self.line, self.col)
-	self:move(line, pos)
+	local line, col = self.buffer:left_word_pos(self.line, self.col)
+	self:move(line, col)
 end
 
 function cursor:move_right_word()
-	local s = self.buffer:getline(self.line)
-	if not s then
-		return self:move_horiz(1)
-	elseif self.col > self.buffer:last_col(self.line) then --skip indent
-		if self.line + 1 > self.buffer:last_line() then
-			self:move(self.line + 1, 1)
-		else
-			self:move(self.line + 1, self.buffer:indent_col(self.line + 1))
-		end
-		return
-	end
-	local i = str.byte_index(s, self.col)
-	local next_ci = str.next_word_break(s, i, self.word_chars)
-	local col = next_ci and str.char_index(s, next_ci) or self.buffer:last_col(self.line) + 1
-	self:move_horiz(col - self.col)
+	local line, col = self.buffer:right_word_pos(self.line, self.col)
+	self:move(line, col)
 end
 
 function cursor:move_to_selection(sel)

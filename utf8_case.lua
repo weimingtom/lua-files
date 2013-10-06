@@ -1,4 +1,4 @@
-﻿--utf8 submodule: lowercase <-> uppercase conversions.
+﻿--utf8 submodule for lowercase <-> uppercase conversions.
 --(c) Kyle Smith - I have no idea what version of the unicode data it is based on.
 --there are 931 entries in to_upper and 922 entries in to_lower.
 local utf8 = require'utf8'
