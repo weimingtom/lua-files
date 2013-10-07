@@ -176,6 +176,71 @@ function str.prev_word_break(s, first_ci, word_chars)
 	return 1
 end
 
+--reflowing --------------------------------------------------------------------------------------------------------------
+
+--break a text at spaces, skipping multiple spaces and preserving empty lines,
+--and reassemble the lines back so that they don't exceed line_width.
+--text is given and returned as a list of lines.
+function str.reflow(lines, line_width, word_chars)
+	--break the text into words
+	local words = {}
+	for _,s in ipairs(lines) do
+		if str.first_nonspace(s) > #s then --line is empty, keep it
+			table.insert(words, '\n')
+		else
+			local i1, i2 --start and end byte indices in s for the current word
+			for i in str.byte_indices(s) do
+				if not str.isspace(s, i) then
+					if not i1 then --start a word
+						i1 = i
+						i2 = i
+					else --continue the word
+						i2 = i
+					end
+				elseif i1 then --end the word and skip other spaces
+					table.insert(words, s:sub(i1, i2))
+					i1, i2 = nil
+				end
+			end
+			if i1 then
+				table.insert(words, s:sub(i1, i2))
+			end
+		end
+	end
+	--reassemble the lines
+	local lines = {}
+	local col = 0
+	local i1 = 1 --start word index of the current line
+	local lasti
+	for i,s in ipairs(words) do
+		if s == '\n' then
+			if i1 < i then
+				table.insert(lines, table.concat(words, ' ', i1, i - 1))
+			end
+			table.insert(lines, '')
+			col = 0
+			i1 = i + 1
+			lasti = i + 1
+		else
+			col = col + str.len(s) + 1 -- +1 space
+			if col - 1 >= line_width then --col minus the last space
+				if i == i1 then
+					--TODO: case of single word exceeding line_width
+				else
+					table.insert(lines, table.concat(words, ' ', i1, i - 1))
+					i1 = i
+				end
+				col = 0
+			end
+			lasti = i
+		end
+	end
+	if i1 <= #words then
+		table.insert(lines, table.concat(words, ' ', i1, lasti))
+	end
+	return lines
+end
+
 --tests ------------------------------------------------------------------------------------------------------------------
 
 if not ... then

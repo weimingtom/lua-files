@@ -61,6 +61,7 @@ editor.key_bindings = { --flag order is ctrl+alt+shift
 	['ctrl+shift+down'] = 'move_lines_down',
 	['ctrl+Z']      = 'undo',
 	['ctrl+Y']      = 'redo',
+	['ctrl+R']      = 'reflow',
 	--copy/pasting
 	['ctrl+X']      = 'cut',
 	['ctrl+C']      = 'copy',

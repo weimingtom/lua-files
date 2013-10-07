@@ -169,6 +169,12 @@ function selection:move_down()
 	self:set(line1 + 1, 1, line2 + 1 + 1, 1)
 end
 
+function selection:reflow(line_width, word_chars)
+	local line1, col1, line2, col2 = self:endpoints()
+	local line2, col2 = self.buffer:reflow(line1, col1, line2, col2, line_width, word_chars)
+	self:set(line1, col1, line2, col2)
+end
+
 --hit testing
 
 function selection:hit_test(x, y)

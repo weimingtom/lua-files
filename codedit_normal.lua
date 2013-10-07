@@ -4,7 +4,7 @@ local str = require'codedit_str'
 
 buffer.eol_spaces = 'remove' --leave, remove.
 buffer.eof_lines = 1 --leave, remove, ensure, or a number.
-buffer.convert_to_tabs = true --convert indentation spaces to tabs based on current tabsize
+buffer.convert_indent = 'spaces' --tabs, spaces, leave: convert indentation to tabs or spaces based on current tabsize
 
 function buffer:remove_eol_spaces() --remove any spaces past eol
 	for line = 1, self:last_line() do
@@ -33,12 +33,22 @@ function buffer:convert_indent_to_tabs()
 	end
 end
 
+function buffer:convert_indent_to_spaces()
+	for line = 1, self:last_line() do
+		local indent_col = self:indent_col(line)
+		local indent_vcol = self:visual_col(line, indent_col)
+		self:setline(line, string.rep(' ', indent_vcol - 1) .. self:sub(line, indent_col))
+	end
+end
+
 function buffer:normalize()
 	if self.eol_spaces == 'remove' then
 		self:remove_eol_spaces()
 	end
-	if self.convert_to_tabs then
+	if self.convert_indent == 'tabs' then
 		self:convert_indent_to_tabs()
+	elseif self.convert_indent == 'spaces' then
+		self:convert_indent_to_spaces()
 	end
 	if self.eof_lines == 'ensure' then
 		self:ensure_eof_line()

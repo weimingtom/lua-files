@@ -7,8 +7,8 @@ local buffer = {
 	line_terminator = nil, --line terminator to use when saving. nil means autodetect.
 	default_line_terminator = '\n', --line terminator to use when autodetection fails.
 	tabs = 'indent', --never, indent, always
-	word_chars = '^[a-zA-Z]', --for jumping through words
-	line_width = 72,
+	word_chars = '^[a-zA-Z]', --for jumping between words
+	line_width = 72, --for reflowing
 }
 
 function buffer:new(editor, text)
@@ -340,36 +340,14 @@ function buffer:right_word_pos(line, col, word_chars)
 	return line, next_col
 end
 
---text auto-reflowing
-
-function bufer:auto_reflow(line1, col1, line2, col2, line_width, word_chars)
-	word_chars = word_chars or self.word_chars
+--text reflowing. return the position after the last inserted character.
+function buffer:reflow(line1, col1, line2, col2, line_width, word_chars)
 	line_width = line_width or self.line_width
-	local s = self:contents(self:select_string(line1, col1, line2, col2))
-	local words = {}
-	for _,s in str.lines(s) do
-		if str.first_nonspace(s) > #s then --line is empty, break paragraph
-			table.insert(words, s..'\n')
-		else
-			for _,s in str.words(s, word_chars) do
-				table.insert(words, s)
-			end
-		end
-	end
-	local lines = {}
-	local col = 0
-	local lasti
-	for i,s in ipairs(words) do
-		col = col + #s + 1
-		if col > line_width then
-			table.insert(lines, table.concat(words, ' ', col - i, i))
-			col = 0
-		end
-		lasti = i
-	end
-	table.insert(lines, table.concat(words, ' ', lasti))
+	word_chars = word_chars or self.word_chars
+	local lines = self:select_string(line1, col1, line2, col2)
+	local lines = str.reflow(lines, line_width, word_chars)
 	self:remove_string(line1, col1, line2, col2)
-	self:insert_string(line1, col1, self:contents(lines))
+	return self:insert_string(line1, col1, self:contents(lines))
 end
 
 

@@ -295,6 +295,13 @@ function editor:move_lines_down()
 	self.cursor:make_visible()
 end
 
+function editor:reflow()
+	if self.selection:isempty() then return end
+	self.buffer:start_undo_group'reflow_selection'
+	self.selection:reflow()
+	self.cursor:move_to_selection(self.selection)
+end
+
 --clipboard commands
 
 --global clipboard over all editor instances on the same Lua state
