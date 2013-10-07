@@ -18,8 +18,11 @@ local function tab_width(vcol, tabsize)
 	return next_tabstop(vcol, tabsize) - vcol
 end
 
---how many tabs and left-over spaces fit between two visual columns
+--how many tabs and left-over spaces fit between two visual columns (vcol2 is the char right after the last tab/space)
 local function tabs_and_spaces(vcol1, vcol2, tabsize)
+	if vcol2 < vcol1 then
+		return 0, 0
+	end
 	--the distance is covered by a first (full or partial) tab, a number of full tabs, and finally a number of spaces
 	local distance_left = vcol2 - next_tabstop(vcol1, tabsize) --distance left after the first tab
 	if distance_left >= 0 then
@@ -96,7 +99,7 @@ if not ... then
 	assert_pair(1, 2, tabs_and_spaces(2, 6, 3))
 	assert_pair(2, 0, tabs_and_spaces(2, 7, 3))
 
-	--TODO: real_col & visual_col
+	--TODO: tabs_and_spaces, real_col, visual_col
 end
 
 return {

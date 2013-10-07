@@ -1,5 +1,5 @@
 - move selection (or current line) up/down:
-	- with mouse (add selection:hot())
+	- with mouse
 - select by click-dragging over the line numbers column
 
 - user-definable margins
@@ -48,16 +48,13 @@
 - auto-reflowing of multiline comments and strings.
 	- i'm tired of manually reflowing them every time I change something in the middle of the text !!!
 
-- normalization:
-	* convert spaces to tabs everywhere on saving
-
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)
 	- bracket matching highlighting
 	- current line highlighting
 		- highlight just the line number
 	- view whitespace
-	- view special chars
+	- mark special chars and invalid unicode chars
 	- annotations (tooltips)
 	- user-definable markers
 	- text styles: strike-through, underline, dashed/dotted/squiggle underline, selection rectangle,

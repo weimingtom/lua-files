@@ -18,9 +18,14 @@ function str.istab(s, i)
 	return str.isascii(s, i, '\t')
 end
 
---check if the char at byte index i is a space of any kind
+--check if the char at byte index i is a space char
+function str.isspacechar(s, i)
+	return str.isascii(s, i, ' ')
+end
+
+--check if the char at byte index i is a whitespace char
 function str.isspace(s, i)
-	return str.isascii(s, i, ' ') or str.istab(s, i)
+	return str.isspacechar(s, i) or str.istab(s, i)
 end
 
 --byte index and char index of the first occurence of a non-space char (#s + 1 if none).

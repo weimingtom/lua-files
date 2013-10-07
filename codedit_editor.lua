@@ -3,7 +3,6 @@ local glue = require'glue'
 local buffer = require'codedit_buffer'
 require'codedit_blocks'
 require'codedit_undo'
-require'codedit_detect'
 require'codedit_normal'
 local line_selection = require'codedit_selection'
 local block_selection = require'codedit_blocksel'
@@ -28,7 +27,7 @@ function editor:new(options)
 	--line buffer
 	self.buffer = self.buffer:new(self, self.text or '')
 
-	--list of sub-objects for rendering
+	--sub-objects are kept in these lists for rendering
 	self.selections = {} --{selections = true, ...}
 	self.cursors = {} --{cursor = true, ...}
 	self.margins = {} --{margin1, ...}
@@ -37,7 +36,7 @@ function editor:new(options)
 	self.cursor = self:create_cursor(true)
 	self.line_selection = self:create_line_selection(true)
 	self.block_selection = self:create_block_selection(false)
-	self.selection = self.line_selection
+	self.selection = self.line_selection --replaced by block_selection when selecting in block mode
 
 	--scrolling
 	self.scroll_x = 0

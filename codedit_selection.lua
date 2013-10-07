@@ -169,6 +169,17 @@ function selection:move_down()
 	self:set(line1 + 1, 1, line2 + 1 + 1, 1)
 end
 
+--hit testing
+
+function selection:hit_test(x, y)
+	for line1, col1, col2 in self:lines() do
+		if self.editor:hit_test_rect(x, y, line1, col1, line1, col2) then
+			return true
+		end
+	end
+	return false
+end
+
 
 if not ... then require'codedit_demo' end
 

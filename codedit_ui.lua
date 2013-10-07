@@ -17,7 +17,7 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 		and mousey >= -self.scroll_y
 		and mousey <= -self.scroll_y + self.clip_h
 
-	if hot then
+	if hot and not self.selection:hit_test(mousex, mousey) then
 		self.player.cursor = 'text'
 	end
 
@@ -38,7 +38,7 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 		self:setactive(true)
 	elseif active == self.id then
 		if lbutton then
-			local mode = key and alt or (not key and self.selection.block) and 'select_block' or 'select'
+			local mode = key and (alt and 'select_block' or 'select') or self.selection.block and 'select_block' or 'select'
 			self:move_cursor_to_coords(mousex, mousey, mode)
 		else
 			self:setactive(false)

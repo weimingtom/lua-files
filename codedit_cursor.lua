@@ -8,7 +8,8 @@ local cursor = {
 	restrict_eof = false, --don't allow caret past end-of-file
 	land_bof = true, --go at bof if cursor goes up past it
 	land_eof = true, --go at eof if cursor goes down past it
-	word_chars = '^[a-zA-Z]', --for jumping through words
+	word_chars = nil, --override buffer's default
+	jump_spaces = 'indent', --'indent', 'never'; where indentation is made of spaces, move like it were made with tabs.
 	--editing policies
 	insert_mode = true, --insert or overwrite when typing characters
 	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
@@ -31,6 +32,13 @@ function cursor:free()
 end
 
 --cursor navigation ------------------------------------------------------------------------------------------------------
+
+function cursor:snap_to_tabstop()
+	if self.jump_spaces == 'never' then return end
+	if not self.buffer:getline(self.line) then return end
+	if self.col > self.buffer:indent_col(self.line) then return end
+	self.line, self.col = self.buffer:tabstop_pos(self.line, self.col)
+end
 
 --move to a specific position, restricting the final position according to navigation policies
 function cursor:move(line, col, keep_vcol)
@@ -56,6 +64,7 @@ function cursor:move(line, col, keep_vcol)
 	end
 	self.line = line
 	self.col = col
+	--self:snap_to_tabstop()
 
 	if not keep_vcol then
 		--store the visual col of the cursor to be used as the wanted landing col by move_vert()
@@ -63,9 +72,13 @@ function cursor:move(line, col, keep_vcol)
 	end
 end
 
---navigate horizontally
-function cursor:move_horiz(cols)
-	local line, col = self.buffer:near_pos(self.line, self.col, cols, self.restrict_eol)
+function cursor:move_left()
+	local line, col = self.buffer:left_pos(self.line, self.col)
+	self:move(line, col)
+end
+
+function cursor:move_right()
+	local line, col = self.buffer:right_pos(self.line, self.col, self.restrict_eol)
 	self:move(line, col)
 end
 
@@ -76,8 +89,6 @@ function cursor:move_vert(lines)
 	self:move(line, col, true)
 end
 
-function cursor:move_left()  self:move_horiz(-1) end
-function cursor:move_right() self:move_horiz(1) end
 function cursor:move_up()    self:move_vert(-1) end
 function cursor:move_down()  self:move_vert(1) end
 

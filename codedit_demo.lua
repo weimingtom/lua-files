@@ -21,7 +21,7 @@ function player:on_render(cr)
 		local h = self.h - editor_y - 20
 		local x = (i - 1) * w + 20
 		local editor = editors[i] or {id = 'code_editor_' .. i, x = x, y = editor_y, w = w, h = h,
-												text = text, lexer = nil, eol_markers = false, minimap = false, line_numbers = true,
+												text = text, lexer = nil, eol_markers = false, minimap = false, line_numbers = false,
 												font_file = 'x:/work/lua-files/media/fonts/FSEX300.ttf'}
 		editor = self:code_editor(editor)
 		editor.x = x

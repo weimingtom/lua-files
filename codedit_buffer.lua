@@ -8,6 +8,7 @@ local buffer = {
 	default_line_terminator = '\n', --line terminator to use when autodetection fails.
 	tabs = 'indent', --never, indent, always
 	word_chars = '^[a-zA-Z]', --for jumping through words
+	line_width = 72,
 }
 
 function buffer:new(editor, text)
@@ -26,6 +27,31 @@ function buffer:new(editor, text)
 	self.redo_stack = {}
 	self.undo_group = nil
 	return self
+end
+
+--text analysis
+
+--class method that returns the most common line terminator in a string, or nil for failure
+function buffer:detect_line_terminator(s)
+	local rn = str.count(s, '\r\n') --win lines
+	local r  = str.count(s, '\r') --mac lines
+	local n  = str.count(s, '\n') --unix lines (default)
+	if rn > n and rn > r then
+		return '\r\n'
+	elseif r > n then
+		return '\r'
+	end
+end
+
+--detect indent type and tab size of current buffer
+function buffer:detect_indent()
+	local tabs, spaces = 0, 0
+	for line = 1, self:last_line() do
+		local tabs1, spaces1 = str.indent_counts(self:getline(line))
+		tabs = tabs + tabs1
+		spaces = spaces + spaces1
+	end
+	--TODO: finish this
 end
 
 --low-level line-based interface
@@ -76,7 +102,7 @@ function buffer:move_line(line1, line2)
 	self:setline(line2, s1)
 end
 
---hi-level position-based interface
+--position-based interface
 
 function buffer:last_col(line)
 	return str.len(self:getline(line))
@@ -198,15 +224,11 @@ function buffer:remove_string(line1, col1, line2, col2)
 	self:setline(line1, s1 .. s2)
 end
 
---tab expansion (introducing the concept of visual columns)
+--tab expansion (adding the concept of visual columns)
 
-function buffer:tab_width(vcol)
-	return tabs.tab_width(vcol, self.editor.tabsize)
-end
-
-function buffer:next_tabstop(vcol)
-	return tabs.next_tabstop(vcol, self.editor.tabsize)
-end
+function buffer:tab_width(vcol)               return tabs.tab_width(vcol, self.editor.tabsize) end
+function buffer:next_tabstop(vcol)            return tabs.next_tabstop(vcol, self.editor.tabsize) end
+function buffer:tabs_and_spaces(vcol1, vcol2) return tabs.tabs_and_spaces(vcol1, vcol2, self.editor.tabsize) end
 
 function buffer:visual_col(line, col)
 	local s = self:getline(line)
@@ -231,11 +253,21 @@ function buffer:aligned_col(target_line, line, col)
 	return self:real_col(target_line, self:visual_col(line, col))
 end
 
+--snap position to the nearest tabstop
+function buffer:tabstop_pos(line, col)
+	local vcol = self:visual_col(line, col)
+	local ts = self.editor.tabsize
+	local tvcol = tabs.next_tabstop(vcol - math.floor(ts/2), ts)
+	print(col, vcol, tvcol)
+	local col = self:real_col(line, tvcol)
+	return line, col
+end
+
 --editing based on tab expansion
 
 function buffer:use_tabs(line, col, tabs)
 	tabs = tabs or self.tabs
-	return tabs == 'always' or (tabs == 'indent' and self:getline(line) and col > self:indent_col(line))
+	return tabs == 'always' or (tabs == 'indent' and self:getline(line) and col <= self:indent_col(line))
 end
 
 --insert a tab or spaces up to the next tabstop. returns the cursor at the tabstop, where the indented text is.
@@ -298,10 +330,7 @@ end
 function buffer:right_word_pos(line, col, word_chars)
 	word_chars = word_chars or self.word_chars
 	local s = self:getline(line)
-	if not s then
-		return self:right_pos(line, col, true)
-	end
-	if col > self:last_col(line) then
+	if not s or col > self:last_col(line) then
 		return self:right_pos(line, col, true)
 	end
 	local next_col = str.next_word_break(s, col, word_chars)
@@ -309,6 +338,38 @@ function buffer:right_word_pos(line, col, word_chars)
 		return self:right_pos(line, col)
 	end
 	return line, next_col
+end
+
+--text auto-reflowing
+
+function bufer:auto_reflow(line1, col1, line2, col2, line_width, word_chars)
+	word_chars = word_chars or self.word_chars
+	line_width = line_width or self.line_width
+	local s = self:contents(self:select_string(line1, col1, line2, col2))
+	local words = {}
+	for _,s in str.lines(s) do
+		if str.first_nonspace(s) > #s then --line is empty, break paragraph
+			table.insert(words, s..'\n')
+		else
+			for _,s in str.words(s, word_chars) do
+				table.insert(words, s)
+			end
+		end
+	end
+	local lines = {}
+	local col = 0
+	local lasti
+	for i,s in ipairs(words) do
+		col = col + #s + 1
+		if col > line_width then
+			table.insert(lines, table.concat(words, ' ', col - i, i))
+			col = 0
+		end
+		lasti = i
+	end
+	table.insert(lines, table.concat(words, ' ', lasti))
+	self:remove_string(line1, col1, line2, col2)
+	self:insert_string(line1, col1, self:contents(lines))
 end
 
 

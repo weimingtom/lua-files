@@ -37,6 +37,12 @@ function editor:char_at(x, y)
 	return line, vcol
 end
 
+function editor:hit_test_rect(x, y, line1, vcol1, line2, vcol2)
+	local x1, y1 = self:char_coords(line1, vcol1)
+	local x2, y2 = self:char_coords(line2 + 1, vcol2)
+	return x >= x1 and x <= x2 and y >= y1 and y <= y2
+end
+
 --width in pixels of all margins, or all left or right margins
 function editor:margins_width(side)
 	local w = 0

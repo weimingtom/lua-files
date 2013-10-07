@@ -1,7 +1,6 @@
 --codedit block selection object: selecting vertically aligned text between two arbitrary cursor positions.
 --line1,line2 are the horizontal boundaries and col1,col2 are the vertical boundaries of the rectangle.
 local selection = require'codedit_selection'
-local glue = require'glue'
 
 local block_selection = {block = true}
 
@@ -81,6 +80,10 @@ function block_selection:outdent()
 	self.buffer:outdent_block(line1, col1, line2, col2)
 	self:extend_to_last_col()
 end
+
+--hit testing
+
+block_selection.hit_test = selection.hit_test
 
 
 if not ... then require'codedit_demo' end
