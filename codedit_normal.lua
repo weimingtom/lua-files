@@ -1,4 +1,4 @@
---codedit normalization
+--codedit normalization (extension module for buffer)
 local buffer = require'codedit_buffer'
 local str = require'codedit_str'
 

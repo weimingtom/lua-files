@@ -28,40 +28,55 @@ function str.isspace(s, i)
 	return str.isspacechar(s, i) or str.istab(s, i)
 end
 
---byte index and char index of the first occurence of a non-space char (#s + 1 if none).
-function str.first_nonspace(s)
-	local n = 1
+--byte index and char index of the next non-space char after some char (#s + 1 if none).
+function str.next_nonspace(s, after_ci)
+	local ci = 0
 	for i in str.byte_indices(s) do
-		if not str.isspace(s, i) then
-			return i, n
+		ci = ci + 1
+		if ci > after_ci and not str.isspace(s, i) then
+			return ci, i
 		end
-		n = n + 1
 	end
-	return #s + 1, n
+	return ci + 1, #s + 1
 end
 
---byte index and char index of the last occurence of a non-space char.
-function str.last_nonspace(s)
-	local n = 0
-	local space_starts_i, space_starts_n
-	for i in str.byte_indices(s) do
-		n = n + 1
+--char index and byte index of the first non-space char in a string (#s + 1 if none).
+function str.first_nonspace(s)
+	return str.next_nonspace(s, 0)
+end
+
+--char index and byte index of the last non-space char before a char (0 if none).
+function str.prev_nonspace(s, before_ci)
+	local i, ci = 0, 0
+	local ns_i, ns_ci
+	for _i in str.byte_indices(s) do
+		i = _i
+		ci = ci + 1
 		if str.isspace(s, i) then
-			space_starts_i = space_starts_i or i
-			space_starts_n = space_starts_n or n
+			if not ns_i then
+				ns_i = i - 1
+				ns_ci = ci - 1
+			end
 		else
-			space_starts_i = nil
-			space_starts_n = nil
+			ns_i, ns_ci = nil
 		end
+		if ci == before_ci - 1 then break end
 	end
-	return
-		space_starts_i and space_starts_i - 1 or #s,
-		space_starts_n and space_starts_n - 1 or n
+	if not ns_i then
+		ns_i, ns_ci = i, ci
+	end
+	return ns_ci, ns_i
+end
+
+--char index and byte index of the last non-space char in a string.
+function str.last_nonspace(s)
+	return str.prev_nonspace(s, 1/0)
 end
 
 --right trim of space and tab characters
 function str.rtrim(s)
-	return s:sub(1, (str.last_nonspace(s)))
+	local _, i = str.last_nonspace(s)
+	return s:sub(1, i)
 end
 
 --number of tabs and of spaces in indentation
@@ -132,18 +147,20 @@ function str.next_word_break(s, first_ci, word_chars)
 	local firsti = str.byte_index(s, first_ci)
 	if not firsti then return end
 	local expect = str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword'
+	local ci = first_ci
 	for i in str.byte_indices(s, firsti) do
+		ci = ci + 1
 		if expect == 'space' then --case 1
 			if not str.isspace(s, i) then --case 1 exit
-				return i
+				return ci
 			end
 		elseif str.isspace(s, i) then --case 2 -> case 1
 			expect = 'space'
 		elseif expect ~= (str.isword(s, i, word_chars) and 'word' or 'nonword') then --case 3 and 4 exit
-			return i
+			return ci
 		end
 	end
-	return str.len(s) + 1
+	return ci + 1
 end
 
 --from a char index, search backwards for:
@@ -157,7 +174,9 @@ function str.prev_word_break(s, first_ci, word_chars)
 	local expect = not firsti and 'prev' or
 			(str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword')
 	local lasti = firsti
+	local ci = first_ci
 	for i in str.byte_indices_reverse(s, firsti) do
+		ci = ci - 1
 		if expect == 'space' then
 			if not str.isspace(s, i) then
 				expect = str.isword(s, i, word_chars) and 'word' or 'nonword'
@@ -168,7 +187,7 @@ function str.prev_word_break(s, first_ci, word_chars)
 					str.isspace(s, i) and 'space' or
 					str.isword(s, i, word_chars) and 'word' or 'nonword'
 			else
-				return str.byte_index(s, lasti)
+				return ci + 1
 			end
 		end
 		lasti = i

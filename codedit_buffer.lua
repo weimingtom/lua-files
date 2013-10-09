@@ -4,15 +4,12 @@ local str = require'codedit_str'
 local tabs = require'codedit_tabs'
 
 local buffer = {
-	line_terminator = nil, --line terminator to use when saving. nil means autodetect.
+	line_terminator = nil, --line terminator to use when retrieving lines as a string. nil means autodetect.
 	default_line_terminator = '\n', --line terminator to use when autodetection fails.
-	tabs = 'indent', --never, indent, always
-	word_chars = '^[a-zA-Z]', --for jumping between words
-	line_width = 72, --for reflowing
 }
 
 function buffer:new(editor, text)
-	self = glue.inherit({editor = editor}, self)
+	self = glue.inherit({editor = editor, view = editor}, self)
 	self.line_terminator =
 		self.line_terminator or
 		self:detect_line_terminator(text) or
@@ -113,11 +110,13 @@ function buffer:end_pos()
 end
 
 function buffer:indent_col(line)
-	return select(2, str.first_nonspace(self:getline(line)))
+	return (str.first_nonspace(self:getline(line)))
 end
 
 function buffer:isempty(line)
-	return str.first_nonspace(self:getline(line)) > #self:getline(line)
+	local s = self:getline(line)
+	local _, i = str.first_nonspace(s)
+	return i > #s
 end
 
 function buffer:sub(line, col1, col2)
@@ -226,14 +225,16 @@ end
 
 --tab expansion (adding the concept of visual columns)
 
-function buffer:tab_width(vcol)               return tabs.tab_width(vcol, self.editor.tabsize) end
-function buffer:next_tabstop(vcol)            return tabs.next_tabstop(vcol, self.editor.tabsize) end
-function buffer:tabs_and_spaces(vcol1, vcol2) return tabs.tabs_and_spaces(vcol1, vcol2, self.editor.tabsize) end
+function buffer:tab_width(vcol)               return tabs.tab_width(vcol, self.view.tabsize) end
+function buffer:next_tabstop(vcol)            return tabs.next_tabstop(vcol, self.view.tabsize) end
+function buffer:tabs_and_spaces(vcol1, vcol2) return tabs.tabs_and_spaces(vcol1, vcol2, self.view.tabsize) end
+function buffer:prev_tabstop(vcol)            return tabs.prev_tabstop(vcol, self.view.tabsize) end
+function buffer:next_tabstop(vcol)            return tabs.next_tabstop(vcol, self.view.tabsize) end
 
 function buffer:visual_col(line, col)
 	local s = self:getline(line)
 	if s then
-		return tabs.visual_col(s, col, self.editor.tabsize)
+		return tabs.visual_col(s, col, self.view.tabsize)
 	else
 		return col --outside eof visual columns and real columns are the same
 	end
@@ -242,7 +243,7 @@ end
 function buffer:real_col(line, vcol)
 	local s = self:getline(line)
 	if s then
-		return tabs.real_col(s, vcol, self.editor.tabsize)
+		return tabs.real_col(s, vcol, self.view.tabsize)
 	else
 		return vcol --outside eof visual columns and real columns are the same
 	end
@@ -253,26 +254,30 @@ function buffer:aligned_col(target_line, line, col)
 	return self:real_col(target_line, self:visual_col(line, col))
 end
 
---snap position to the nearest tabstop
-function buffer:tabstop_pos(line, col)
+--tabstop position left of some char, unclamped
+function buffer:left_tabstop_pos(line, col)
 	local vcol = self:visual_col(line, col)
-	local ts = self.editor.tabsize
-	local tvcol = tabs.next_tabstop(vcol - math.floor(ts/2), ts)
-	print(col, vcol, tvcol)
-	local col = self:real_col(line, tvcol)
-	return line, col
+	local ts_vcol = self:prev_tabstop(vcol)
+	local ts_col = self:real_col(line, ts_vcol)
+	local ns_col = str.prev_nonspace(self:getline(line), col)
+	return line, math.max(ts_col, ns_col)
+end
+
+function buffer:right_tabstop_pos(line, col)
+	local vcol = self:visual_col(line, col)
+	local ts_vcol = self:next_tabstop(vcol)
+	local ts_col = self:real_col(line, ts_vcol)
+	local ns_col = str.next_nonspace(self:getline(line), col)
+	return line, math.min(ts_col, ns_col)
 end
 
 --editing based on tab expansion
 
-function buffer:use_tabs(line, col, tabs)
-	tabs = tabs or self.tabs
-	return tabs == 'always' or (tabs == 'indent' and self:getline(line) and col <= self:indent_col(line))
-end
-
 --insert a tab or spaces up to the next tabstop. returns the cursor at the tabstop, where the indented text is.
-function buffer:insert_tab(line, col, tabs)
-	if self:use_tabs(line, col, tabs) then
+function buffer:insert_tab(line, col, insert_tabs)
+	if insert_tabs == 'always' or
+	   (insert_tabs == 'indent' and self:getline(line) and col <= self:indent_col(line))
+	then
 		return self:insert_string(line, col, '\t')
 	else
 		local vcol = self:visual_col(line, col)
@@ -280,11 +285,11 @@ function buffer:insert_tab(line, col, tabs)
 	end
 end
 
-function buffer:indent_line(line, tabs)
-	return self:insert_tab(line, 1, tabs)
+function buffer:indent_line(line, insert_tabs)
+	return self:insert_tab(line, 1, insert_tabs)
 end
 
---remove a tab or spaces up to the next tabstop. return the number of removed characters.
+--remove a tab or all the spaces up to the next tabstop, if any. return the number of removed characters.
 function buffer:remove_tab(line, col)
 	local s = self:getline(line)
 	if not s then return 0 end
@@ -310,7 +315,6 @@ end
 --navigation at word boundaries
 
 function buffer:left_word_pos(line, col, word_chars)
-	word_chars = word_chars or self.word_chars
 	if line < 1 or col <= 1 then
 		return self:left_pos(line, col)
 	elseif line > self:last_line() then
@@ -328,7 +332,6 @@ function buffer:left_word_pos(line, col, word_chars)
 end
 
 function buffer:right_word_pos(line, col, word_chars)
-	word_chars = word_chars or self.word_chars
 	local s = self:getline(line)
 	if not s or col > self:last_col(line) then
 		return self:right_pos(line, col, true)
@@ -342,8 +345,6 @@ end
 
 --text reflowing. return the position after the last inserted character.
 function buffer:reflow(line1, col1, line2, col2, line_width, word_chars)
-	line_width = line_width or self.line_width
-	word_chars = word_chars or self.word_chars
 	local lines = self:select_string(line1, col1, line2, col2)
 	local lines = str.reflow(lines, line_width, word_chars)
 	self:remove_string(line1, col1, line2, col2)

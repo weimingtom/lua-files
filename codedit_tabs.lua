@@ -10,7 +10,7 @@ end
 
 --the first tabstop before a visual column
 local function prev_tabstop(vcol, tabsize)
-	return next_tabstop(vcol, tabsize) - tabsize
+	return next_tabstop(vcol - 1, tabsize) - tabsize
 end
 
 --how wide should a tab character be if found at a certain visual position
@@ -66,6 +66,7 @@ local function real_col(s, vcol, tabsize)
 	col = col + vcol - vcol1 + 1 --extend col past eol
 	return col
 end
+
 
 if not ... then
 	assert(tab_width(1, 3) == 3) --___X

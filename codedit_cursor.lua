@@ -8,11 +8,13 @@ local cursor = {
 	restrict_eof = false, --don't allow caret past end-of-file
 	land_bof = true, --go at bof if cursor goes up past it
 	land_eof = true, --go at eof if cursor goes down past it
-	word_chars = nil, --override buffer's default
-	jump_spaces = 'indent', --'indent', 'never'; where indentation is made of spaces, move like it were made with tabs.
+	word_chars = '^[a-zA-Z]', --for jumping between words
+	move_tabstops = 'indent', --'indent', 'never'; where to move the cursor between tabstops instead of individual spaces.
 	--editing policies
 	insert_mode = true, --insert or overwrite when typing characters
 	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
+	insert_tabs = 'indent', --never, indent, always: where to insert a tab instead of enough spaces that make up a tab.
+	delete_tabstops = 'indent', --never, indent, always: where to delete all the spaces that make up a tab at once.
 	tab_align_list = true, --align to the next word on the above line; incompatible with tabs = 'always'
 	tab_align_args = true, --align to the char after '(' on the above line; incompatible with tabs = 'always'
 }
@@ -32,13 +34,6 @@ function cursor:free()
 end
 
 --cursor navigation ------------------------------------------------------------------------------------------------------
-
-function cursor:snap_to_tabstop()
-	if self.jump_spaces == 'never' then return end
-	if not self.buffer:getline(self.line) then return end
-	if self.col > self.buffer:indent_col(self.line) then return end
-	self.line, self.col = self.buffer:tabstop_pos(self.line, self.col)
-end
 
 --move to a specific position, restricting the final position according to navigation policies
 function cursor:move(line, col, keep_vcol)
@@ -64,7 +59,6 @@ function cursor:move(line, col, keep_vcol)
 	end
 	self.line = line
 	self.col = col
-	--self:snap_to_tabstop()
 
 	if not keep_vcol then
 		--store the visual col of the cursor to be used as the wanted landing col by move_vert()
@@ -73,12 +67,30 @@ function cursor:move(line, col, keep_vcol)
 end
 
 function cursor:move_left()
-	local line, col = self.buffer:left_pos(self.line, self.col)
+	local line, col
+	if self.move_tabstops == 'always' or
+		(self.move_tabstops == 'indent' and
+		 self.buffer:getline(self.line) and
+		 self.col <= self.buffer:indent_col(self.line))
+	then
+		line, col = self.buffer:left_tabstop_pos(self.line, self.col)
+	else
+		line, col = self.buffer:left_pos(self.line, self.col)
+	end
 	self:move(line, col)
 end
 
 function cursor:move_right()
-	local line, col = self.buffer:right_pos(self.line, self.col, self.restrict_eol)
+	local line, col
+	if self.move_tabstops == 'always' or
+		(self.move_tabstops == 'indent' and
+		 self.buffer:getline(self.line) and
+		 self.col < self.buffer:indent_col(self.line))
+	then
+		line, col = self.buffer:right_tabstop_pos(self.line, self.col, self.restrict_eol)
+	else
+		line, col = self.buffer:right_pos(self.line, self.col, self.restrict_eol)
+	end
 	self:move(line, col)
 end
 
@@ -114,12 +126,12 @@ function cursor:move_down_page()
 end
 
 function cursor:move_left_word()
-	local line, col = self.buffer:left_word_pos(self.line, self.col)
+	local line, col = self.buffer:left_word_pos(self.line, self.col, self.word_chars)
 	self:move(line, col)
 end
 
 function cursor:move_right_word()
-	local line, col = self.buffer:right_word_pos(self.line, self.col)
+	local line, col = self.buffer:right_word_pos(self.line, self.col, self.word_chars)
 	self:move(line, col)
 end
 
@@ -157,15 +169,31 @@ end
 
 --delete the char at cursor
 function cursor:delete_char()
-	local line, col = self.buffer:right_pos(self.line, self.col, true)
-	self.buffer:remove_string(self.line, self.col, line, col)
+	local tabs_removed =
+		(self.delete_tabstops == 'always' or
+			(self.delete_tabstops == 'indent' and
+			 self.buffer:getline(self.line) and
+			 self.col < self.buffer:indent_col(self.line))) and
+				self.buffer:remove_tab(self.line, self.col) or 0
+	if tabs_removed == 0 then
+		local line, col = self.buffer:right_pos(self.line, self.col, true)
+		self.buffer:remove_string(self.line, self.col, line, col)
+	end
 end
 
 --delete the char before the cursor
 function cursor:delete_prev_char()
+	--[[
+	local tabs_removed =
+		(self.delete_tabstops == 'always' or
+			(self.delete_tabstops == 'indent' and
+			 self.buffer:getline(self.line) and
+			 self.col < self.buffer:indent_col(self.line))) and
+				self.buffer:remove_tab(self.line, self.col) or 0
+	]]
 	local line, col = self.buffer:left_pos(self.line, self.col)
-	self.buffer:remove_string(line, col, self.line, self.col)
 	self:move(line, col)
+	self:delete_char()
 end
 
 --add a new line, optionally copying the indent of the current line, and carry the cursor over
@@ -185,7 +213,7 @@ end
 
 --insert a tab character, expanding it according to tab expansion policies
 function cursor:insert_tab()
-	local line, col = self.buffer:insert_tab(self.line, self.col)
+	local line, col = self.buffer:insert_tab(self.line, self.col, self.insert_tabs)
 	self:move(line, col)
 end
 

@@ -542,6 +542,7 @@ glue.autoload(player, {
 	label        = 'cplayer.label',
 	dragpoint    = 'cplayer.dragpoint',
 	dragpoints   = 'cplayer.dragpoint',
+	tablist      = 'cplayer.tablist',
 	code_editor  = 'cplayer.code_editor',
 })
 

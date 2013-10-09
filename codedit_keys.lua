@@ -51,24 +51,25 @@ editor.key_bindings = { --flag order is ctrl+alt+shift
 	--additional selection
 	['ctrl+A']      = 'select_all',
 	--editing
-	['insert']      = 'toggle_insert_mode',
-	['backspace']   = 'delete_prev_char',
-	['delete']      = 'delete_char',
-	['return']      = 'newline',
-	['tab']         = 'indent',
-	['shift+tab']   = 'outdent',
+	['insert']          = 'toggle_insert_mode',
+	['backspace']       = 'delete_prev_char',
+	['shift+backspace'] = 'delete_prev_char',
+	['delete']          = 'delete_char',
+	['return']          = 'newline',
+	['tab']             = 'indent',
+	['shift+tab']       = 'outdent',
 	['ctrl+shift+up']   = 'move_lines_up',
 	['ctrl+shift+down'] = 'move_lines_down',
-	['ctrl+Z']      = 'undo',
-	['ctrl+Y']      = 'redo',
-	['ctrl+R']      = 'reflow',
+	['ctrl+Z']          = 'undo',
+	['ctrl+Y']          = 'redo',
+	['ctrl+R']          = 'reflow',
 	--copy/pasting
-	['ctrl+X']      = 'cut',
-	['ctrl+C']      = 'copy',
-	['ctrl+V']      = 'paste',
-	['ctrl+alt+V']  = 'paste_block',
+	['ctrl+X']          = 'cut',
+	['ctrl+C']          = 'copy',
+	['ctrl+V']          = 'paste',
+	['ctrl+alt+V']      = 'paste_block',
 	--saving
-	['ctrl+S']      = 'save',
+	['ctrl+S'] = 'save',
 }
 
 function editor:perform_shortcut(shortcut, ctrl, alt, shift)

@@ -10,15 +10,17 @@ local cursor = require'codedit_cursor'
 local line_numbers_margin = require'codedit_line_numbers'
 
 local editor = {
-	--defaults
-	tabsize = 3, --for tab expansion
-	line_numbers = true,
 	--subclasses
 	buffer = buffer,
 	line_selection = line_selection,
 	block_selection = block_selection,
 	cursor = cursor,
 	line_numbers_margin = line_numbers_margin,
+	--features
+	line_numbers = true,
+	--view
+	tabsize = 3, --for tab expansion
+	line_width = 52, --for reflowing
 }
 
 function editor:new(options)
@@ -250,7 +252,7 @@ function editor:indent()
 		self.selection:reset_to_cursor(self.cursor)
 	else
 		self.buffer:start_undo_group'indent_selection'
-		self.selection:indent()
+		self.selection:indent(self.cursor.insert_tabs)
 		self.cursor:move_to_selection(self.selection)
 	end
 	self.cursor:make_visible()
@@ -298,7 +300,7 @@ end
 function editor:reflow()
 	if self.selection:isempty() then return end
 	self.buffer:start_undo_group'reflow_selection'
-	self.selection:reflow()
+	self.selection:reflow(self.line_width)
 	self.cursor:move_to_selection(self.selection)
 end
 

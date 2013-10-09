@@ -45,9 +45,6 @@
 	- jump through autoalign_args virtual tabs
 	- jump through tabstop cells
 
-- auto-reflowing of multiline comments and strings.
-	- i'm tired of manually reflowing them every time I change something in the middle of the text !!!
-
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)
 	- bracket matching highlighting

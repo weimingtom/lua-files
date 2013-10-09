@@ -121,20 +121,5 @@ function player:mbutton(t)
 	return selected
 end
 
-function player:tabs(t)
-	local id, x, y, w, h, values, texts, selected = t.id, t.x, t.y, t.w, t.h, t.values, t.texts, t.selected
-
-	local bwidth = w/#values
-	for i,v in ipairs(values) do
-		if self:button{id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or v,
-							cut = 'both', selected = selected == v}
-		then
-			selected = v
-		end
-		x = x + bwidth
-	end
-	return selected
-end
-
 if not ... then require'cairo_player_demo' end
 

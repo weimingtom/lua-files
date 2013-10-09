@@ -65,5 +65,14 @@ function buffer:outdent_block(line1, col1, line2, col2)
 	end
 end
 
+--reflow a block to its width. return the position after the last inserted character.
+function buffer:reflow_block(line1, col1, line2, col2, word_chars)
+	word_chars = word_chars or self.word_chars
+	local lines = self:select_block(line1, col1, line2, col2)
+	local lines = str.reflow(lines, col2 - col1, word_chars)
+	self:remove_block(line1, col1, line2, col2)
+	return self:insert_block(line1, col1, self:contents(lines))
+end
+
 
 if not ... then require'codedit_demo' end
