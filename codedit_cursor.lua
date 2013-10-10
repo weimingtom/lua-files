@@ -207,7 +207,7 @@ function cursor:insert_tab()
 			(self.insert_tabs == 'indent' and
 			 self.buffer:getline(self.line) and
 			 self.col <= self.buffer:indent_col(self.line))
-	local line, col = self.buffer:insert_tabstop(self.line, self.col, use_tab)
+	local line, col = self.buffer:indent(self.line, self.col, use_tab)
 	self:move(line, col)
 end
 

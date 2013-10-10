@@ -50,10 +50,11 @@ end
 
 --indent the block between two subsequent positions in the text
 --returns max(visual-length(added-text)).
-function buffer:indent_block(line1, col1, line2, col2)
+function buffer:indent_block(line1, col1, line2, col2, use_tab)
 	local vcol = self:visual_col(line1, col1)
 	for line = line1, line2 do
-		self:insert_tab(line, self:real_col(line, vcol))
+		local col = self:real_col(line, vcol)
+		self:indent(line, col, use_tab)
 	end
 end
 
@@ -61,7 +62,8 @@ end
 function buffer:outdent_block(line1, col1, line2, col2)
 	local vcol = self:visual_col(line1, col1)
 	for line = line1, line2 do
-		self:remove_tab(line, self:real_col(line, vcol))
+		local col = self:real_col(line, vcol)
+		self:outdent(line, col)
 	end
 end
 

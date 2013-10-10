@@ -306,7 +306,7 @@ end
 --editing based on tab expansion
 
 --insert a tab or spaces up to the next tabstop. returns the cursor at the tabstop, where the indented text is.
-function buffer:insert_tabstop(line, col, use_tab)
+function buffer:indent(line, col, use_tab)
 	if use_tab then
 		return self:insert_string(line, col, '\t')
 	else
@@ -316,20 +316,22 @@ function buffer:insert_tabstop(line, col, use_tab)
 end
 
 function buffer:indent_line(line, use_tab)
-	return self:insert_tabstop(line, 1, use_tab)
+	return self:indent(line, 1, use_tab)
 end
 
-function buffer:remove_tabful(line, col)
-	local line2, col2 = self:next_tabful_pos(line, col)
-	self:remove_string(line, col, line2, col2)
+--remove the chars up to a following tabful.
+function buffer:outdent(line, col)
+	local s = self:getline(line)
+	if not s then return end
+	local i = str.byte_index(s, col)
+	if not i or not str.isspace(s, i) then return end
+
+	local line2, col2 = self:next_tabful_pos(line, col, false)
+	self:remove_string(line, col, line, col2)
 end
 
 function buffer:outdent_line(line)
-	local s = self:getline(line)
-	if not s then return end
-	if not str.isspace(s, 1) then return end
-	local line2, col2 = self:next_tabful_pos(line, 1, false)
-	self:remove_string(line, 1, line, col2)
+	self:outdent(line, 1)
 end
 
 --navigation at word boundaries

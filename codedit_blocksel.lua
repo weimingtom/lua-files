@@ -69,9 +69,9 @@ function block_selection:extend_to_last_col()
 	self:set(line1, col1, line2, max_col2)
 end
 
-function block_selection:indent()
+function block_selection:indent(use_tab)
 	local line1, col1, line2, col2 = self:endpoints()
-	self.buffer:indent_block(line1, col1, line2, col2)
+	self.buffer:indent_block(line1, col1, line2, col2, use_tab)
 	self:extend_to_last_col()
 end
 
