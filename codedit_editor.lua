@@ -252,7 +252,7 @@ function editor:indent()
 		self.selection:reset_to_cursor(self.cursor)
 	else
 		self.buffer:start_undo_group'indent_selection'
-		self.selection:indent(self.cursor.insert_tabs)
+		self.selection:indent(self.cursor.insert_tabs ~= 'never')
 		self.cursor:move_to_selection(self.selection)
 	end
 	self.cursor:make_visible()
