@@ -81,9 +81,9 @@ function block_selection:outdent()
 	self:extend_to_last_col()
 end
 
-function block_selection:reflow(line_width, word_chars)
+function block_selection:reflow(line_width, align, wrap)
 	local line1, col1, line2, col2 = self:endpoints()
-	local line2, col2 = self.buffer:reflow_block(line1, col1, line2, col2, word_chars)
+	local line2, col2 = self.buffer:reflow_block(line1, col1, line2, col2, line_width, align, wrap)
 	self:set(line1, col1, line2, col2)
 end
 

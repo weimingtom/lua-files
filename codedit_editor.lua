@@ -20,7 +20,7 @@ local editor = {
 	line_numbers = true,
 	--view
 	tabsize = 3, --for tab expansion
-	line_width = 52, --for reflowing
+	line_width = 72, --for reflowing
 }
 
 function editor:new(options)
@@ -77,12 +77,16 @@ function editor:save_state(state)
 	state.line2 = self.selection.line2
 	state.col1  = self.selection.col1
 	state.col2  = self.selection.col2
+	state.block = self.selection.block
 	state.line  = self.cursor.line
 	state.col   = self.cursor.col
 	state.vcol  = self.cursor.vcol
 end
 
 function editor:load_state(state)
+	self.selection.visible = false
+	self.selection = state.block and self.block_selection or self.line_selection
+	self.selection.visible = true
 	self.selection.line1 = state.line1
 	self.selection.line2 = state.line2
 	self.selection.col1  = state.col1
@@ -215,10 +219,13 @@ function editor:insert_char(char)
 	self.cursor:make_visible()
 end
 
-function editor:delete_prev_char()
+function editor:delete_char(prev)
 	if self.selection:isempty() then
 		self.buffer:start_undo_group'delete_char'
-		self.cursor:delete_prev_char()
+		if prev then
+			self.cursor:move_left()
+		end
+		self.cursor:delete_char()
 		self.selection:reset_to_cursor(self.cursor)
 	else
 		self:remove_selection()
@@ -226,15 +233,8 @@ function editor:delete_prev_char()
 	self.cursor:make_visible()
 end
 
-function editor:delete_char()
-	if self.selection:isempty() then
-		self.buffer:start_undo_group'delete_char'
-		self.cursor:delete_char()
-		self.selection:reset_to_cursor(self.cursor)
-	else
-		self:remove_selection()
-	end
-	self.cursor:make_visible()
+function editor:delete_prev_char()
+	self:delete_char(true)
 end
 
 function editor:newline()
@@ -297,11 +297,15 @@ function editor:move_lines_down()
 	self.cursor:make_visible()
 end
 
-function editor:reflow()
+function editor:reflow(align)
 	if self.selection:isempty() then return end
 	self.buffer:start_undo_group'reflow_selection'
-	self.selection:reflow(self.line_width)
+	self.selection:reflow(self.line_width, align or 'left', 'greedy')
 	self.cursor:move_to_selection(self.selection)
+end
+
+function editor:justify()
+	self:reflow'justify'
 end
 
 --clipboard commands

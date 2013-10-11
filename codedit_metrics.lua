@@ -126,12 +126,12 @@ function editor:caret_rect_insert_mode(cursor)
 end
 
 function editor:caret_rect_over_mode(cursor)
-	local vcol = self:visual_col(cursor.line, cursor.col)
+	local vcol = self.buffer:visual_col(cursor.line, cursor.col)
 	local x, y = self:text_coords(cursor.line, vcol)
 	local w = 1
-	local s = self:getline(cursor.line, cursor.col)
-	local i = str.byte_index(s, cursor.col)
-	if s and str.istab(s, i) then --make cursor as wide as the tabspace
+	local s = self.buffer:getline(cursor.line, cursor.col)
+	local i = s and str.byte_index(s, cursor.col)
+	if i and str.istab(s, i) then --make cursor as wide as the tabspace
 		w = self.buffer:tab_width(vcol)
 	end
 	w = w * self.charsize

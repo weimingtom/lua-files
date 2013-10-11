@@ -66,7 +66,7 @@ function cursor:move(line, col, keep_vcol)
 	end
 end
 
-function cursor:left_pos()
+function cursor:prev_pos()
 	if self.move_tabfuls == 'always' or
 		(self.move_tabfuls == 'indent' and
 		 self.buffer:getline(self.line) and
@@ -79,24 +79,27 @@ function cursor:left_pos()
 end
 
 function cursor:move_left()
-	local line, col = self:left_pos()
+	local line, col = self:prev_pos()
 	self:move(line, col)
 end
 
-function cursor:right_pos()
+function cursor:next_pos(restrict_eol)
+	if restrict_eol == nil then
+		restrict_eol = self.restrict_eol
+	end
 	if self.move_tabfuls == 'always' or
 		(self.move_tabfuls == 'indent' and
 		 self.buffer:getline(self.line) and
 		 self.col < self.buffer:indent_col(self.line))
 	then
-		return self.buffer:next_tabful_pos(self.line, self.col, self.restrict_eol)
+		return self.buffer:next_tabful_pos(self.line, self.col, restrict_eol)
 	else
-		return self.buffer:next_char_pos(self.line, self.col, self.restrict_eol)
+		return self.buffer:next_char_pos(self.line, self.col, restrict_eol)
 	end
 end
 
 function cursor:move_right()
-	local line, col = self:right_pos()
+	local line, col = self:next_pos()
 	self:move(line, col)
 end
 
@@ -168,21 +171,15 @@ end
 --insert or overwrite a char at cursor, depending on insert mode
 function cursor:insert_char(c)
 	if not self.insert_mode then
-		self.buffer:remove_string(self.line, self.col, self.line, self.col + str.len(c))
+		self:delete_char(false)
 	end
 	self:insert_string(c)
 end
 
 --delete the char at cursor
-function cursor:delete_char()
-	local line2, col2 = self:right_pos()
+function cursor:delete_char(restrict_eol)
+	local line2, col2 = self:next_pos(restrict_eol)
 	self.buffer:remove_string(self.line, self.col, line2, col2)
-end
-
---delete the char before the cursor
-function cursor:delete_prev_char()
-	self:move_left()
-	self:delete_char()
 end
 
 --add a new line, optionally copying the indent of the current line, and carry the cursor over
