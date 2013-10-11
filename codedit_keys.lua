@@ -52,9 +52,9 @@ editor.key_bindings = { --flag order is ctrl+alt+shift
 	['ctrl+A']      = 'select_all',
 	--editing
 	['insert']          = 'toggle_insert_mode',
-	['backspace']       = 'delete_prev_char',
-	['shift+backspace'] = 'delete_prev_char',
-	['delete']          = 'delete_char',
+	['backspace']       = 'delete_prev_pos',
+	['shift+backspace'] = 'delete_prev_pos',
+	['delete']          = 'delete_pos',
 	['return']          = 'newline',
 	['tab']             = 'indent',
 	['shift+tab']       = 'outdent',

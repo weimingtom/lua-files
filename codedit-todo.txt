@@ -40,10 +40,8 @@
 		- typing two spaces or a tab skips to the next "cell"
 
 - jump through virtual tabs
-	- jump through fixed (tabsize) virtual tabs
 	- jump through autoalign_list virtual tabs
 	- jump through autoalign_args virtual tabs
-	- jump through tabstop cells
 
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)

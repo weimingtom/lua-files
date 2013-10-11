@@ -219,13 +219,13 @@ function editor:insert_char(char)
 	self.cursor:make_visible()
 end
 
-function editor:delete_char(prev)
+function editor:delete_pos(prev)
 	if self.selection:isempty() then
-		self.buffer:start_undo_group'delete_char'
+		self.buffer:start_undo_group'delete_position'
 		if prev then
 			self.cursor:move_left()
 		end
-		self.cursor:delete_char()
+		self.cursor:delete_pos(true)
 		self.selection:reset_to_cursor(self.cursor)
 	else
 		self:remove_selection()
@@ -233,8 +233,8 @@ function editor:delete_char(prev)
 	self.cursor:make_visible()
 end
 
-function editor:delete_prev_char()
-	self:delete_char(true)
+function editor:delete_prev_pos()
+	self:delete_pos(true)
 end
 
 function editor:newline()

@@ -14,6 +14,7 @@ local cursor = {
 	insert_mode = true, --insert or overwrite when typing characters
 	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
 	insert_tabs = 'indent', --never, indent, always: where to insert a tab instead of enough spaces that make up a tab.
+	insert_list_tabs = true,
 	delete_tabfuls = 'indent', --never, indent, always: where to delete all the spaces that make up a tab at once.
 	tab_align_list = true, --align to the next word on the above line; incompatible with tabs = 'always'
 	tab_align_args = true, --align to the char after '(' on the above line; incompatible with tabs = 'always'
@@ -69,8 +70,7 @@ end
 function cursor:prev_pos()
 	if self.move_tabfuls == 'always' or
 		(self.move_tabfuls == 'indent' and
-		 self.buffer:getline(self.line) and
-		 self.col <= self.buffer:indent_col(self.line))
+		 self.buffer:indenting(self.line, self.col))
 	then
 		return self.buffer:prev_tabful_pos(self.line, self.col)
 	else
@@ -89,8 +89,7 @@ function cursor:next_pos(restrict_eol)
 	end
 	if self.move_tabfuls == 'always' or
 		(self.move_tabfuls == 'indent' and
-		 self.buffer:getline(self.line) and
-		 self.col < self.buffer:indent_col(self.line))
+		 self.buffer:indenting(self.line, self.col + 1))
 	then
 		return self.buffer:next_tabful_pos(self.line, self.col, restrict_eol)
 	else
@@ -176,8 +175,8 @@ function cursor:insert_char(c)
 	self:insert_string(c)
 end
 
---delete the char at cursor
-function cursor:delete_char(restrict_eol)
+--delete the text up to the next cursor position
+function cursor:delete_pos(restrict_eol)
 	local line2, col2 = self:next_pos(restrict_eol)
 	self.buffer:remove_string(self.line, self.col, line2, col2)
 end
@@ -185,11 +184,10 @@ end
 --add a new line, optionally copying the indent of the current line, and carry the cursor over
 function cursor:insert_newline()
 	local indent
-	if self.auto_indent and self.buffer:getline(self.line) then
-		local indent_col = self.buffer:indent_col(self.line)
-		if indent_col > 1 and self.col >= indent_col then --cursor is after indentation, we're auto-indenting
-			indent = self.buffer:sub(self.line, 1, indent_col - 1)
-		end
+	if self.auto_indent then --copy the indent up to the cursor col
+		local ns_col = self.buffer:first_nonspace_col(self.line)
+		local indent_col = math.min(self.col, ns_col or 1/0)
+		indent = self.buffer:sub(self.line, 1, indent_col - 1)
 	end
 	self:insert_string'\n'
 	if indent then
@@ -202,8 +200,17 @@ function cursor:insert_tab()
 	local use_tab =
 		self.insert_tabs == 'always' or
 			(self.insert_tabs == 'indent' and
-			 self.buffer:getline(self.line) and
-			 self.col <= self.buffer:indent_col(self.line))
+			 self.buffer:indenting(self.line, self.col))
+
+	if self.insert_list_tabs then
+		local ls_vcol = self.buffer:next_list_aligned_vcol(self.line, self.col, self.restrict_eol)
+		if ls_vcol then
+			local line, col = self.buffer:insert_whitespace(self.line, self.col, ls_vcol, use_tab)
+			self:move(line, col)
+			return
+		end
+	end
+
 	local line, col = self.buffer:indent(self.line, self.col, use_tab)
 	self:move(line, col)
 end
