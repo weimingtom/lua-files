@@ -1,9 +1,6 @@
 --utf8 module by Cosmin Apreutesei (unlicensed).
 --byte indices are i's, char (codepoint) indices are ci's.
---invalid characters are counted as 1-byte chars so they don't get lost. validate/sanitize beforehand as needed,
---or reassign utf8.next to utf8.next_valid to change the behavior of the entire module to skip on invalid indices:
---   local utf8 = require'utf8'
---   utf8 = glue.update({utf8.next = utf8.next_valid}, utf8)
+--invalid characters are counted as 1-byte chars so they don't get lost. validate/sanitize beforehand as needed.
 local glue = require'glue' --for autoload
 local utf8 = {}
 
@@ -177,7 +174,7 @@ end
 
 --utf8 validation and sanitization
 
---check if there's a valid utf8 codepoint at byte index i
+--check if there's a valid utf8 codepoint at byte index i. valid ranges for each utf8 byte are:
 -- byte  1          2           3          4
 --------------------------------------------
 -- 00 - 7F

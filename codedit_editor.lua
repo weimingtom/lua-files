@@ -276,9 +276,9 @@ function editor:move_lines_up()
 		self.buffer:start_undo_group'move_line_up'
 		self.cursor:move_line_up()
 		self.selection:reset_to_cursor(self.cursor)
-	elseif self.selection.move_lines_up then --block selections don't have that
+	elseif self.selection.move_up then --block selections don't have that
 		self.buffer:start_undo_group'move_selection_up'
-		self.selection:move_lines_up()
+		self.selection:move_up()
 		self.cursor:move_to_selection(self.selection)
 	end
 	self.cursor:make_visible()
@@ -289,9 +289,9 @@ function editor:move_lines_down()
 		self.buffer:start_undo_group'move_line_down'
 		self.cursor:move_line_down()
 		self.selection:reset_to_cursor(self.cursor)
-	elseif self.selection.move_lines_down then --block selections don't have that
+	elseif self.selection.move_down then --block selections don't have that
 		self.buffer:start_undo_group'move_selection_down'
-		self.selection:move_lines_down()
+		self.selection:move_down()
 		self.cursor:move_to_selection(self.selection)
 	end
 	self.cursor:make_visible()
@@ -300,13 +300,12 @@ end
 function editor:reflow(align)
 	if self.selection:isempty() then return end
 	self.buffer:start_undo_group'reflow_selection'
-	self.selection:reflow(self.line_width, align or 'left', 'greedy')
+	self.selection:reflow(self.line_width, self.tabsize, align or 'left', 'greedy')
 	self.cursor:move_to_selection(self.selection)
 end
 
-function editor:justify()
-	self:reflow'justify'
-end
+function editor:justify()      self:reflow'justify' end
+function editor:reflow_right() self:reflow'right' end
 
 --clipboard commands
 

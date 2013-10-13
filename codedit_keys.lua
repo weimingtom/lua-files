@@ -65,6 +65,7 @@ editor.key_bindings = { --flag order is ctrl+alt+shift
 	--reflowing
 	['ctrl+R']          = 'reflow',
 	['ctrl+J']          = 'justify',
+	['ctrl+E']          = 'reflow_right', --TODO: better shortcut
 	--copy/pasting
 	['ctrl+X']          = 'cut',
 	['ctrl+C']          = 'copy',

@@ -15,6 +15,7 @@ local cursor = {
 	auto_indent = true, --pressing enter copies the indentation of the current line over to the following line
 	insert_tabs = 'indent', --never, indent, always: where to insert a tab instead of enough spaces that make up a tab.
 	insert_list_tabs = true,
+	move_list_tabs = true,
 	delete_tabfuls = 'indent', --never, indent, always: where to delete all the spaces that make up a tab at once.
 	tab_align_list = true, --align to the next word on the above line; incompatible with tabs = 'always'
 	tab_align_args = true, --align to the char after '(' on the above line; incompatible with tabs = 'always'
@@ -87,6 +88,17 @@ function cursor:next_pos(restrict_eol)
 	if restrict_eol == nil then
 		restrict_eol = self.restrict_eol
 	end
+
+	if self.move_list_tabs then
+		local ls_vcol = self.buffer:next_list_aligned_vcol(self.line, self.col, self.restrict_eol)
+		if ls_vcol then
+			local col = self.buffer:real_col(self.line, ls_vcol)
+			local ns_col = self.buffer:next_nonspace_col(self.line, self.col)
+			col = math.min(ns_col or 1/0, col)
+			return self.line, col
+		end
+	end
+
 	if self.move_tabfuls == 'always' or
 		(self.move_tabfuls == 'indent' and
 		 self.buffer:indenting(self.line, self.col + 1))
@@ -183,15 +195,12 @@ end
 
 --add a new line, optionally copying the indent of the current line, and carry the cursor over
 function cursor:insert_newline()
-	local indent
-	if self.auto_indent then --copy the indent up to the cursor col
-		local ns_col = self.buffer:first_nonspace_col(self.line)
-		local indent_col = math.min(self.col, ns_col or 1/0)
-		indent = self.buffer:sub(self.line, 1, indent_col - 1)
-	end
-	self:insert_string'\n'
-	if indent then
-		self:insert_string(indent)
+	if self.auto_indent then
+		self.buffer:extend(self.line, self.col)
+		local indent = self.buffer:select_indent(self.line, self.col)
+		self:insert_string('\n' .. indent)
+	else
+		self:insert_string'\n'
 	end
 end
 

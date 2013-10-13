@@ -29,7 +29,9 @@ function str.isspace(s, i)
 end
 
 --char index of the next non-space char after some char (nil if none).
+--if after_ci is ommited, the first non-space char in the string is returned.
 function str.next_nonspace(s, after_ci)
+	after_ci = after_ci or 0
 	local ci = 0
 	for i in str.byte_indices(s) do
 		ci = ci + 1
@@ -39,13 +41,30 @@ function str.next_nonspace(s, after_ci)
 	end
 end
 
---char index of the first non-space char in a string (nil if none).
-function str.first_nonspace(s)
-	return str.next_nonspace(s, 0)
+--char index of the next double-space char after some char (nil if none).
+--if after_ci is ommited, the first double-space char in the string is returned.
+function str.next_double_space(s, after_ci)
+	after_ci = after_ci or 0
+	local ci = 0
+	local was_space
+	for i in str.byte_indices(s) do
+		ci = ci + 1
+		if ci > after_ci and str.isspace(s, i) then
+			if was_space then
+				return ci
+			else
+				was_space = true
+			end
+		else
+			was_space = false
+		end
+	end
 end
 
---char index of the last non-space char before a char (nil if none).
+--char index of the last non-space char before some char (nil if none).
+--if before_ci is ommited, the last non-space char in the string is returned.
 function str.prev_nonspace(s, before_ci)
+	before_ci = before_ci or 1/0
 	local ci = 0
 	local ns_ci
 	for i in str.byte_indices(s) do
@@ -60,14 +79,16 @@ function str.prev_nonspace(s, before_ci)
 	return ns_ci
 end
 
---char index of the last non-space char in a string (nil if none).
-function str.last_nonspace(s)
-	return str.prev_nonspace(s, 1/0)
+--left trim of space and tab characters
+function str.ltrim(s)
+	local ns_ci = str.next_nonspace(s)
+	return ns_ci and str.sub(s, ns_ci) or ''
 end
 
 --right trim of space and tab characters
 function str.rtrim(s)
-	return str.sub(s, 1, str.last_nonspace(s))
+	local ns_ci = str.prev_nonspace(s)
+	return ns_ci and str.sub(s, 1, ns_ci) or ''
 end
 
 --number of tabs and of spaces in indentation
@@ -192,21 +213,23 @@ end
 
 if not ... then
 
-assert(str.first_nonspace('') == nil)
-assert(str.first_nonspace(' ') == nil)
-assert(str.first_nonspace(' x') == 2)
-assert(str.first_nonspace(' x ') == 2)
-assert(str.first_nonspace('x ') == 1)
+assert(str.next_nonspace('') == nil)
+assert(str.next_nonspace(' ') == nil)
+assert(str.next_nonspace(' x') == 2)
+assert(str.next_nonspace(' x ') == 2)
+assert(str.next_nonspace('x ') == 1)
 
-assert(str.last_nonspace('') == nil)
-assert(str.last_nonspace(' ') == nil)
-assert(str.last_nonspace('x') == 1)
-assert(str.last_nonspace('x ') == 1)
-assert(str.last_nonspace(' x ') == 2)
+assert(str.prev_nonspace('') == nil)
+assert(str.prev_nonspace(' ') == nil)
+assert(str.prev_nonspace('x') == 1)
+assert(str.prev_nonspace('x ') == 1)
+assert(str.prev_nonspace(' x ') == 2)
 
 assert(str.rtrim('abc \t ') == 'abc')
 assert(str.rtrim(' \t abc  x \t ') == ' \t abc  x')
 assert(str.rtrim('abc') == 'abc')
+assert(str.rtrim('  ') == '')
+assert(str.rtrim('') == '')
 
 local function assert_lines(s, t)
 	local i = 0

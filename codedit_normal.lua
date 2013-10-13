@@ -26,7 +26,7 @@ end
 
 function buffer:convert_indent_to_tabs()
 	for line = 1, self:last_line() do
-		local indent_col = self:first_nonspace_col(line) or self:last_col(line)
+		local indent_col = self:next_nonspace_col(line) or self:last_col(line)
 		local indent_vcol = self:visual_col(line, indent_col)
 		local tabs, spaces = self:tabs_and_spaces(1, indent_vcol)
 		self:setline(line, string.rep('\t', tabs) .. string.rep(' ', spaces) .. self:sub(line, indent_col))
@@ -35,7 +35,7 @@ end
 
 function buffer:convert_indent_to_spaces()
 	for line = 1, self:last_line() do
-		local indent_col = self:first_nonspace_col(line) or self:last_col(line)
+		local indent_col = self:next_nonspace_col(line) or self:last_col(line)
 		local indent_vcol = self:visual_col(line, indent_col)
 		self:setline(line, string.rep(' ', indent_vcol - 1) .. self:sub(line, indent_col))
 	end

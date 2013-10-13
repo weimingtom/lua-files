@@ -1,4 +1,4 @@
---codedit line buffer object
+--codedit line buffer object (the meat of the project)
 local glue = require'glue'
 local str = require'codedit_str'
 require'codedit_reflow'
@@ -55,13 +55,13 @@ function buffer:detect_indent()
 	--TODO: finish this
 end
 
---finding line boundaries
+--finding buffer boundaries
 
 function buffer:last_line()
 	return #self.lines
 end
 
---selecting text at line boundaries
+--selecting text at the line level
 
 function buffer:getline(line)
 	return self.lines[line]
@@ -71,7 +71,7 @@ function buffer:contents(lines)
 	return table.concat(lines or self.lines, self.line_terminator)
 end
 
---editing text at line boundaries
+--editing text at the line level (low level interface; valid lines only)
 
 function buffer:invalidate()
 	for k in pairs(self.changed) do
@@ -107,19 +107,19 @@ function buffer:move_line(line1, line2)
 	self:setline(line2, s1)
 end
 
---finding (line,column) boundaries
+--finding line boundaries
 
 --last column on a valid line
 function buffer:last_col(line)
 	return str.len(self:getline(line))
 end
 
---the char position after the last char in the text
+--the position after the last char in the text
 function buffer:end_pos()
 	return self:last_line(), self:last_col(self:last_line()) + 1
 end
 
---navigation at char boundaries
+--char-by-char linear navigation based on line boundaries
 
 --position before some char, unclamped
 function buffer:prev_char_pos(line, col)
@@ -152,7 +152,7 @@ function buffer:near_char_pos(line, col, chars, restrict_eol)
 	return line, col
 end
 
---clamp a char position to the available text
+--clamp a position to the available text
 function buffer:clamp_pos(line, col)
 	if line < 1 then
 		return 1, 1
@@ -163,7 +163,7 @@ function buffer:clamp_pos(line, col)
 	end
 end
 
---selecting text at char boundaries
+--selecting text at linear char positions
 
 --line slice between two columns on a valid line
 function buffer:sub(line, col1, col2)
@@ -185,7 +185,7 @@ function buffer:select_string(line1, col1, line2, col2)
 	return lines
 end
 
---editing at char boundaries
+--editing at linear char positions
 
 --extend the buffer up to (line,col-1) with newlines and spaces so we can edit there.
 function buffer:extend(line, col)
@@ -223,6 +223,7 @@ end
 
 --insert a multiline string at a specific position in the text, returning the position after the last character.
 --if the position is outside the text, the buffer is extended.
+--TODO: reimplement this in terms of insert_lines
 function buffer:insert_string(line, col, s)
 	self:extend(line, col)
 	local s1 = self:sub(line, 1, col - 1)
@@ -254,12 +255,13 @@ function buffer:remove_string(line1, col1, line2, col2)
 	self:setline(line1, s1 .. s2)
 end
 
---tab expansion (adding the concept of visual columns and tabstops)
+--tab expansion: finding boundaries in visual space
 
-function buffer:tab_width(vcol)               return tabs.tab_width(vcol, self.view.tabsize) end
-function buffer:next_tabstop(vcol)            return tabs.next_tabstop(vcol, self.view.tabsize) end
-function buffer:prev_tabstop(vcol)            return tabs.prev_tabstop(vcol, self.view.tabsize) end
-function buffer:tabs_and_spaces(vcol1, vcol2) return tabs.tabs_and_spaces(vcol1, vcol2, self.view.tabsize) end
+function buffer:tab_width(vcol)    return tabs.tab_width(vcol, self.view.tabsize) end
+function buffer:next_tabstop(vcol) return tabs.next_tabstop(vcol, self.view.tabsize) end
+function buffer:prev_tabstop(vcol) return tabs.prev_tabstop(vcol, self.view.tabsize) end
+
+--translating between the real (text) space and the tabs-expanded visual space
 
 --real col -> visual col. outside eof visual columns and real columns coincide.
 function buffer:visual_col(line, col)
@@ -286,7 +288,7 @@ function buffer:aligned_col(target_line, line, col)
 	return self:real_col(target_line, self:visual_col(line, col))
 end
 
---navigation at tabstop boundaries
+--finding tabstop boundaries in real space
 
 function buffer:prev_tabstop_col(line, col)
 	local vcol = self:visual_col(line, col)
@@ -300,9 +302,18 @@ function buffer:next_tabstop_col(line, col)
 	return self:real_col(line, ts_vcol)
 end
 
+--selecting text based on tab expansion
+
+--the indent of the line up to some column
+function buffer:select_indent(line, col)
+	local ns_col = self:next_nonspace_col(line)
+	local col = math.min(col, ns_col or 1/0)
+	return self:getline(line) and self:sub(line, 1, col - 1)
+end
+
 --editing based on tab expansion
 
---insert a tab or spaces from a char position up to the next tabstop.
+--insert a tab or spaces from a position up to the next tabstop.
 --return the cursor at the tabstop, where the indented text is.
 function buffer:indent(line, col, use_tab)
 	if use_tab then
@@ -317,12 +328,17 @@ function buffer:indent_line(line, use_tab)
 	return self:indent(line, 1, use_tab)
 end
 
+--what's the optimal number of tabs and spaces that fit between two visual columns
+function buffer:tabs_and_spaces(vcol1, vcol2)
+	return tabs.tabs_and_spaces(vcol1, vcol2, self.view.tabsize)
+end
+
 --insert whitespace (tabs and spaces or just spaces, depending on the use_tabs flag)
---from a char position up to (but excluding) a visual col on the same line.
+--from a position up to (but excluding) a visual col on the same line.
 function buffer:insert_whitespace(line, col, vcol2, use_tabs)
 	local vcol1 = self:visual_col(line, col)
 	if vcol2 <= vcol1 then
-		return line, col
+		return line, col --target before cursor: ignore
 	end
 	local tabs, spaces
 	if use_tabs then
@@ -335,14 +351,14 @@ end
 
 --finding non-space boundaries
 
-function buffer:first_nonspace_col(line)
-	local s = self:getline(line)
-	return s and str.first_nonspace(s)
-end
-
 function buffer:next_nonspace_col(line, col)
 	local s = self:getline(line)
 	return s and str.next_nonspace(s, col)
+end
+
+function buffer:next_double_space_col(line, col)
+	local s = self:getline(line)
+	return s and str.next_double_space(s, col)
 end
 
 function buffer:prev_nonspace_col(line, col)
@@ -352,12 +368,12 @@ end
 
 --check if a line is either invalid, empty or made entirely of whitespace
 function buffer:isempty(line)
-	return not self:first_nonspace_col(line)
+	return not self:next_nonspace_col(line)
 end
 
 --check if a position is before the first non-space char, that is, in the indentation area.
 function buffer:indenting(line, col)
-	local ns_col = self:first_nonspace_col(line)
+	local ns_col = self:next_nonspace_col(line)
 	return not ns_col or col <= ns_col
 end
 
@@ -471,17 +487,25 @@ end
 function buffer:next_list_aligned_vcol(line, col, restrict_eol)
 	if line > 1 and not self:indenting(line, col) then
 		local above_col = self:aligned_col(line - 1, line, col)
-		local ns_col = self:next_nonspace_col(line - 1, above_col)
-		return ns_col and self:visual_col(line - 1, ns_col)
+		local sp_col = self:next_double_space_col(line - 1, above_col - 1)
+		if sp_col then
+			local ns_col = self:next_nonspace_col(line - 1, sp_col)
+			if ns_col then
+				local ns_vcol = self:visual_col(line - 1, ns_col)
+				if ns_vcol > col + 1 then
+					return ns_vcol
+				end
+			end
+		end
 	end
 end
 
 --paragraph-level editing
 
 --text reflowing. return the position after the last inserted character.
-function buffer:reflow(line1, col1, line2, col2, line_width, align, wrap)
+function buffer:reflow(line1, col1, line2, col2, line_width, tabsize, align, wrap)
 	local lines = self:select_string(line1, col1, line2, col2)
-	local lines = str.reflow(lines, line_width, align, wrap)
+	local lines = str.reflow(lines, line_width, tabsize, align, wrap)
 	self:remove_string(line1, col1, line2, col2)
 	return self:insert_string(line1, col1, self:contents(lines))
 end

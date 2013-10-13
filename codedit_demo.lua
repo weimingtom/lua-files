@@ -31,7 +31,7 @@ function player:on_render(cr)
 		codedit.cursor.restrict_eol = false
 		codedit.cursor.land_bof = false
 		codedit.cursor.land_eof = false
-		codedit.cursor.move_tabfuls = 'indent'
+		codedit.cursor.move_tabfuls = 'always'
 
 		editor.lexer = self:mbutton{
 			id = 'lexer_' .. i,

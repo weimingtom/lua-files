@@ -68,14 +68,14 @@ function buffer:outdent_block(line1, col1, line2, col2)
 end
 
 --reflow a block to its width. return the position after the last inserted character.
-function buffer:reflow_block(line1, col1, line2, col2, line_width, align, wrap)
+function buffer:reflow_block(line1, col1, line2, col2, line_width, tabsize, align, wrap)
 	local lines = self:select_block(line1, col1, line2, col2)
 	if true or not line_width then --TODO: test/finish this
 		local vcol1 = self:visual_col(line1, col1)
 		local vcol2 = self:visual_col(line2, col2)
 		line_width = vcol2 - vcol1
 	end
-	local lines = str.reflow(lines, line_width, align, wrap)
+	local lines = str.reflow(lines, line_width, tabsize, align, wrap)
 	self:remove_block(line1, col1, line2, col2)
 	return self:insert_block(line1, col1, self:contents(lines))
 end

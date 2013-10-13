@@ -1,6 +1,9 @@
-- move selection (or current line) up/down:
-	- with mouse
+- move selection (or current line) up/down with the mouse
 - select by click-dragging over the line numbers column
+- double click selects word
+- triple click selects line
+- double click on selected word selects line
+- how to select a paragraph? double click on selected line? triple click on selected word?
 
 - user-definable margins
 	- show blame info (eg. from git and hg)
@@ -24,13 +27,7 @@
 		- above line has '(' after current vcol
 	- add spaces up to and including the col of the found '('
 	- replace the indent tab surplus of the above indent if using tabs
-
-- tab_align_list
-	- enable if
-		- not indenting
-		- line > 1
-		- above line has a word after at least 2 spaces (or 1 tab) after vcol-1
-	- add spaces up to the col of the found word - 1
+	- jump through autoalign_args virtual tabs
 
 - fixed tab stops
 	- tab stops with left, right or center align
@@ -38,10 +35,6 @@
 	- automatic formatting
 		- keep everything aligned while typing inside the aligned "cells" of the table
 		- typing two spaces or a tab skips to the next "cell"
-
-- jump through virtual tabs
-	- jump through autoalign_list virtual tabs
-	- jump through autoalign_args virtual tabs
 
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)
