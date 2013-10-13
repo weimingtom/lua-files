@@ -192,8 +192,11 @@ end
 
 function conn.ping(mysql)
 	local ret = C.mysql_ping(mysql)
-	if ret == 0 then return true end
-	if ret == C.MYSQL_CR_SERVER_GONE_ERROR then return false end
+	if ret == 0 then
+		return true
+	elseif C.mysql_error(mysql) == C.MYSQL_CR_SERVER_GONE_ERROR then
+		return false
+	end
 	myerror(mysql)
 end
 
