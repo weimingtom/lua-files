@@ -13,11 +13,9 @@ function editor:input(focused, active, key, char, ctrl, shift, alt,
 								mousex, mousey, lbutton, rbutton, wheel_delta,
 								doubleclicked, tripleclicked, quadrupleclicked, waiting_for_triple_click)
 
-	local hot =
-	       mousex >= -self.view.scroll_x
-		and mousex <= -self.view.scroll_x + self.view.clip_w
-		and mousey >= -self.view.scroll_y
-		and mousey <= -self.view.scroll_y + self.view.clip_h
+	if not self.view.clip_x then return end --editor has not been rendered yet, input cannot work
+
+	local hot = self.view:client_hit_test(mousex, mousey)
 
 	if hot and not self.selection:hit_test(mousex, mousey) then
 		self.player.cursor = 'text'

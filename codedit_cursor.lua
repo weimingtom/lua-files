@@ -41,7 +41,7 @@ function cursor:new(buffer, view, visible)
 	return self
 end
 
---memento
+--state management
 
 function cursor:invalidate()
 	for k in pairs(self.changed) do
@@ -194,6 +194,7 @@ function cursor:move_to_selection(sel)
 end
 
 function cursor:move_to_coords(x, y)
+	x, y = self.view:screen_to_client(x, y)
 	local line, vcol = self.view:char_at(x, y)
 	local col = self.buffer:real_col(line, vcol)
 	self:move(line, col)
@@ -207,10 +208,10 @@ function cursor:insert_string(s)
 	self:move(line, col)
 end
 
---insert a string block at cursor and move the cursor to after the string
+--insert a string block at cursor.
+--does not move the cursor, but returns the position after the text.
 function cursor:insert_block(s)
-	local line, col = self.buffer:insert_block(self.line, self.col, s)
-	self:move(line, col)
+	return self.buffer:insert_block(self.line, self.col, s)
 end
 
 --insert or overwrite a char at cursor, depending on insert mode
@@ -302,7 +303,7 @@ end
 
 function cursor:make_visible()
 	if not self.visible then return end
-	self.view:make_cursor_visible(self)
+	self.view:cursor_make_visible(self)
 end
 
 

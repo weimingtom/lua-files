@@ -50,7 +50,6 @@ function editor:new(options)
 	--margins
 	if self.line_numbers then
 		self:create_line_numbers_margin()
-		self.view.margins[1].cursor = self.cursor
 	end
 
 	return self

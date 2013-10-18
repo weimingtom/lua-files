@@ -27,7 +27,8 @@ local view = glue.inherit({
 		margin_background = '#222222',
 		line_number_text = '#66ffff',
 		line_number_background = '#111111',
-		line_number_highlight_background = '#333333',
+		line_number_highlighted_text = '#66ffff',
+		line_number_highlighted_background = '#333333',
 		--lexer styles
 		default = '#CCCCCC',
 		whitespace = '#000000',
@@ -90,10 +91,6 @@ function view:clip(x, y, w, h)
 	self.player.cr:reset_clip()
 	self.player.cr:rectangle(x, y, w, h)
 	self.player.cr:clip()
-end
-
-function view:translate(x, y)
-	self.player.cr:translate(x, y)
 end
 
 function view:draw_rect(x, y, w, h, color)
@@ -178,18 +175,8 @@ end
 
 function view:draw_char(x, y, s, i, color)
 	local cr = self.player.cr
-
-	if self._color ~= color then
-		self.player:setcolor(self.colors[color] or self.colors.text)
-		self._color = color
-	end
-
+	self.player:setcolor(self.colors[color] or self.colors.text)
 	self.player:render_glyph(self.ft_face, s, i, self.line_h, x, y)
-end
-
-function view:draw_visible_text(...)
-	codedit.view.draw_visible_text(self, ...)
-	self._color = nil
 end
 
 --draw a reverse pilcrow at eol
@@ -293,8 +280,8 @@ function player:code_editor(t)
 		self.ctrl,
 		self.shift,
 		self.alt,
-		self.mousex - ed.view.x - ed.view.scroll_x,
-		self.mousey - ed.view.y - ed.view.scroll_y,
+		self.mousex,
+		self.mousey,
 		self.lbutton,
 		self.rbutton,
 		self.wheel_delta,
@@ -303,6 +290,7 @@ function player:code_editor(t)
 		self.quadrupleclicked,
 		self.waiting_for_tripleclick)
 	ed:render()
+
 	return ed
 end
 

@@ -21,7 +21,11 @@ function margin:get_width()
 	return self.w
 end
 
-function margin:draw_line(line, x, y) end --stub
+function margin:draw_line(line, x, y, w) end --stub
+
+function margin:hit_test(x, y)
+	return self.view:margin_hit_test(self, x, y)
+end
 
 return margin
 

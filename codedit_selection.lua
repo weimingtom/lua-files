@@ -26,7 +26,7 @@ function selection:new(buffer, view, visible)
 	return self
 end
 
---memento
+--state management
 
 function selection:invalidate()
 	for k in pairs(self.changed) do
@@ -214,15 +214,7 @@ end
 --hit testing
 
 function selection:hit_test(x, y)
-	if not self.visible then return false end
-	if self:isempty() then return false end
-	local line1, line2 = self:line_range()
-	for line = line1, line2 do
-		if self.view:point_in_rect(x, y, self.view:selection_line_rect(self, line)) then
-			return true
-		end
-	end
-	return false
+	return self.view:selection_hit_test(self, x, y)
 end
 
 
