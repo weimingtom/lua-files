@@ -180,9 +180,10 @@ end
 	--1) 1..n spaces followed by 1..n words or non-words
 	--2) 1 words or non-words followed by case 1
 	--3) 2..n words or non-words follwed by a char of a differnt class
-	--in other words: look back until the char type changes from the type at firsti or of the prev. char, and skip spaces.
---if the next break should be on a different line, return nil.
+--in other words: look back until the char type changes from the type at firsti or of the prev. char, and skip spaces.
+--if the prev. break should be on a different line, return nil.
 function str.prev_word_break(s, first_ci, word_chars)
+	if first_ci <= 1 then return end
 	local firsti = str.byte_index(s, first_ci)
 	local expect = not firsti and 'prev' or
 			(str.isspace(s, firsti) and 'space' or str.isword(s, firsti, word_chars) and 'word' or 'nonword')

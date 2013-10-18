@@ -9,6 +9,7 @@ Panel = subclass({
 	__class_style_bitmask = bitmask{ --only static, frame styles here
 		dropshadow = CS_DROPSHADOW,
 		own_dc = CS_OWNDC, --for opengl and cairo panels
+		receive_double_clicks = CS_DBLCLKS, --receive double click messages
 	},
 	__style_ex_bitmask = bitmask{
 		transparent = WS_EX_TRANSPARENT,
@@ -17,6 +18,7 @@ Panel = subclass({
 		--class style bits
 		noclose = false,
 		dropshadow = false,
+		receive_double_clicks = true, --receive double click messages
 		--other class properties
 		--background = COLOR_WINDOW,
 		cursor = LoadCursor(IDC_ARROW),

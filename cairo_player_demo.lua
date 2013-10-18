@@ -69,8 +69,8 @@ function player:on_render(cr)
 										selected = t.combo_item}
 	cpy = cpy + 24 + 10
 
-	t.tab = self:tabs{id = 'tabs', x = 10, y = cpy, w = 200, h = 24,
-							values = {'tab1', 'tab2', 'tab3'}, selected = t.tab}
+	t.tab = self:tablist{id = 'tabs', x = 10, y = cpy, w = 200, h = 24,
+								values = {'tab1', 'tab2', 'tab3'}, selected = t.tab}
 	cpy = cpy + 24 + 10
 
 	t.menu_item = self:menu{id = 'menu', x = 10, y = cpy, w = 100, h = 100,
@@ -145,5 +145,5 @@ function player:on_render(cr)
 	t.splitx = self:vsplitter{id = 'split', x = t.splitx or 950, y = 10, w = 6, h = 300}
 end
 
-return player:play(...)
+return player:play()
 

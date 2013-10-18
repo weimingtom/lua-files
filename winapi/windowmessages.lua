@@ -481,6 +481,7 @@ local buttons_bitmask = bitmask{
 	xbutton2 = MK_XBUTTON2,
 }
 
+--NOTE: double-click messages are only received on windows with CS_DBLCLKS style
 function WM.WM_LBUTTONDBLCLK(wParam, lParam)
 	local x, y = splitsigned(lParam)
 	return x, y, buttons_bitmask:get(wParam)

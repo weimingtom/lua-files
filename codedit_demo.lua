@@ -20,18 +20,24 @@ function player:on_render(cr)
 		local w = math.floor(self.w / 2)
 		local h = self.h - editor_y - 20
 		local x = (i - 1) * w + 20
-		local editor = editors[i] or {id = 'code_editor_' .. i, x = x, y = editor_y, w = w, h = h,
-												text = text, lexer = nil, eol_markers = false, minimap = false, line_numbers = false,
-												font_file = 'x:/work/lua-files/media/fonts/FSEX300.ttf'}
+
+		local editor = editors[i] or {
+								id = 'code_editor_' .. i, text = text,
+								view = {
+									x = x, y = editor_y, w = w, h = h,
+									lexer = nil, eol_markers = false, minimap = false, line_numbers = false,
+									font_file = 'x:/work/lua-files/media/fonts/FSEX300.ttf'
+								}}
+
 		editor = self:code_editor(editor)
-		editor.x = x
-		editor.w = w
-		editor.h = h
-		codedit.cursor.restrict_eof = false
-		codedit.cursor.restrict_eol = false
+		editor.view.x = x
+		editor.view.y = editor_y
+		editor.view.w = w
+		editor.view.h = h
+		codedit.cursor.restrict_eof = true
+		codedit.cursor.restrict_eol = true
 		codedit.cursor.land_bof = false
 		codedit.cursor.land_eof = false
-		codedit.cursor.move_tabfuls = 'always'
 
 		editor.lexer = self:mbutton{
 			id = 'lexer_' .. i,

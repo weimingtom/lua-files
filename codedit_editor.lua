@@ -8,6 +8,7 @@ local line_selection = require'codedit_selection'
 local block_selection = require'codedit_blocksel'
 local cursor = require'codedit_cursor'
 local line_numbers_margin = require'codedit_line_numbers'
+local view = require'codedit_view'
 
 local editor = {
 	--subclasses
@@ -16,29 +17,31 @@ local editor = {
 	block_selection = block_selection,
 	cursor = cursor,
 	line_numbers_margin = line_numbers_margin,
+	view = view,
 	--features
 	line_numbers = true,
-	--view
-	tabsize = 3, --for tab expansion
-	line_width = 72, --for reflowing
+	--keyboard state
+	next_reflow_mode = {left = 'justify', justify = 'left'},
+	default_reflow_mode = 'left',
 }
 
 function editor:new(options)
 	self = glue.inherit(options or {}, self)
 
-	--line buffer
-	self.buffer = self.buffer:new(self, self.text or '')
-
-	--sub-objects are kept in these lists for rendering
-	self.selections = {} --{selections = true, ...}
-	self.cursors = {} --{cursor = true, ...}
-	self.margins = {} --{margin1, ...}
+	--core objects
+	self.view = self.view:new()
+	self.buffer = self.buffer:new(self, self.view, self.text or '')
+	self.view.buffer = self.buffer
 
 	--main cursor & selection objects
 	self.cursor = self:create_cursor(true)
 	self.line_selection = self:create_line_selection(true)
 	self.block_selection = self:create_block_selection(false)
 	self.selection = self.line_selection --replaced by block_selection when selecting in block mode
+
+	--selection changed flags
+	self.block_selection.changed.reflow_mode = false
+	self.line_selection.changed.reflow_mode = false
 
 	--scrolling
 	self.scroll_x = 0
@@ -47,6 +50,7 @@ function editor:new(options)
 	--margins
 	if self.line_numbers then
 		self:create_line_numbers_margin()
+		self.view.margins[1].cursor = self.cursor
 	end
 
 	return self
@@ -55,45 +59,44 @@ end
 --object constructors
 
 function editor:create_cursor(visible)
-	return self.cursor:new(self, visible)
+	return self.cursor:new(self.buffer, self.view, visible)
 end
 
 function editor:create_line_selection(visible)
-	return self.line_selection:new(self, visible)
+	return self.line_selection:new(self.buffer, self.view, visible)
 end
 
 function editor:create_block_selection(visible)
-	return self.block_selection:new(self, visible)
+	return self.block_selection:new(self.buffer, self.view, visible)
 end
 
 function editor:create_line_numbers_margin()
-	self.line_numbers_margin:new(self)
+	self.line_numbers_margin:new(self.buffer, self.view)
 end
 
 --undo/redo integration
 
 function editor:save_state(state)
-	state.line1 = self.selection.line1
-	state.line2 = self.selection.line2
-	state.col1  = self.selection.col1
-	state.col2  = self.selection.col2
-	state.block = self.selection.block
-	state.line  = self.cursor.line
-	state.col   = self.cursor.col
-	state.vcol  = self.cursor.vcol
+	state.cursor = state.cursor or {}
+	state.selection = state.selection or {}
+	state.view = state.view or {}
+	self.cursor:save_state(state.cursor)
+	state.block_selection = self.selection.block
+	self.selection:save_state(state.selection)
+	self.view:save_state(state.view)
 end
 
 function editor:load_state(state)
-	self.selection.visible = false
-	self.selection = state.block and self.block_selection or self.line_selection
-	self.selection.visible = true
-	self.selection.line1 = state.line1
-	self.selection.line2 = state.line2
-	self.selection.col1  = state.col1
-	self.selection.col2  = state.col2
-	self.cursor.line = state.line
-	self.cursor.col  = state.col
-	self.cursor.vcol = state.vcol
+	if self.selection.block ~= state.block_selection then
+		self.selection.visible = false
+		self.selection:invalidate()
+		self.selection = state.block_selection and self.block_selection or self.line_selection
+		self.selection.visible = true
+		self.selection:invalidate()
+	end
+	self.selection:load_state(state.selection)
+	self.cursor:load_state(state.cursor)
+	self.view:load_state(state.view)
 end
 
 --undo/redo commands
@@ -148,18 +151,19 @@ end
 
 function editor:move_cursor(direction, mode)
 	self:_before_move_cursor(mode)
-	self.cursor['move_'..direction](self.cursor)
+	local method = assert(self.cursor['move_'..direction], direction)
+	method(self.cursor)
 	self:_after_move_cursor(mode)
 end
 
-function editor:move_left()  self:move_cursor('left') end
-function editor:move_right() self:move_cursor('right') end
-function editor:move_left_unrestricted()  self:move_cursor('left',  'unrestricted') end
-function editor:move_right_unrestricted() self:move_cursor('right', 'unrestricted') end
+function editor:move_prev_pos()  self:move_cursor('prev_pos') end
+function editor:move_next_pos() self:move_cursor('next_pos') end
+function editor:move_prev_pos_unrestricted()  self:move_cursor('prev_pos',  'unrestricted') end
+function editor:move_next_pos_unrestricted() self:move_cursor('next_pos', 'unrestricted') end
 function editor:move_up()    self:move_cursor('up') end
 function editor:move_down()  self:move_cursor('down') end
-function editor:move_left_word()  self:move_cursor('left_word') end
-function editor:move_right_word() self:move_cursor('right_word') end
+function editor:move_prev_word_break()  self:move_cursor('prev_word_break') end
+function editor:move_next_word_break() self:move_cursor('next_word_break') end
 function editor:move_home()  self:move_cursor('home') end
 function editor:move_end()   self:move_cursor('end') end
 function editor:move_bol()   self:move_cursor('bol') end
@@ -167,12 +171,12 @@ function editor:move_eol()   self:move_cursor('eol') end
 function editor:move_up_page()   self:move_cursor('up_page') end
 function editor:move_down_page() self:move_cursor('down_page') end
 
-function editor:select_left()  self:move_cursor('left', 'select') end
-function editor:select_right() self:move_cursor('right', 'select') end
+function editor:select_prev_pos()  self:move_cursor('prev_pos', 'select') end
+function editor:select_next_pos() self:move_cursor('next_pos', 'select') end
 function editor:select_up()    self:move_cursor('up', 'select') end
 function editor:select_down()  self:move_cursor('down', 'select') end
-function editor:select_left_word()  self:move_cursor('left_word', 'select') end
-function editor:select_right_word() self:move_cursor('right_word', 'select') end
+function editor:select_prev_word_break()  self:move_cursor('prev_word_break', 'select') end
+function editor:select_next_word_break() self:move_cursor('next_word_break', 'select') end
 function editor:select_home()  self:move_cursor('home', 'select') end
 function editor:select_end()   self:move_cursor('end', 'select') end
 function editor:select_bol()   self:move_cursor('bol', 'select') end
@@ -180,12 +184,12 @@ function editor:select_eol()   self:move_cursor('eol', 'select') end
 function editor:select_up_page()   self:move_cursor('up_page', 'select') end
 function editor:select_down_page() self:move_cursor('down_page', 'select') end
 
-function editor:select_block_left()  self:move_cursor('left', 'select_block') end
-function editor:select_block_right() self:move_cursor('right', 'select_block') end
+function editor:select_block_prev_pos()  self:move_cursor('prev_pos', 'select_block') end
+function editor:select_block_next_pos() self:move_cursor('next_pos', 'select_block') end
 function editor:select_block_up()    self:move_cursor('up', 'select_block') end
 function editor:select_block_down()  self:move_cursor('down', 'select_block') end
-function editor:select_block_left_word()  self:move_cursor('left_word', 'select_block') end
-function editor:select_block_right_word() self:move_cursor('right_word', 'select_block') end
+function editor:select_block_prev_word_break()  self:move_cursor('prev_word_break', 'select_block') end
+function editor:select_block_next_word_break() self:move_cursor('next_word_break', 'select_block') end
 function editor:select_block_home()  self:move_cursor('home', 'select_block') end
 function editor:select_block_end()   self:move_cursor('end', 'select_block') end
 function editor:select_block_bol()   self:move_cursor('bol', 'select_block') end
@@ -196,6 +200,18 @@ function editor:select_block_down_page() self:move_cursor('down_page', 'select_b
 function editor:select_all()
 	self:move_cursor('home')
 	self:move_cursor('end', 'select')
+end
+
+function editor:select_word_at_cursor()
+	local col1, col2 = self.buffer:word_cols(self.cursor.line, self.cursor.col, self.cursor.word_chars)
+	if not col1 then return end
+	self.selection:set(self.cursor.line, col1, self.cursor.line, col2)
+	self.cursor:move_to_selection(self.selection)
+end
+
+function editor:select_line_at_cursor()
+	self:move_cursor('bol')
+	self:move_cursor('eol', 'select')
 end
 
 --editing commands
@@ -223,9 +239,13 @@ function editor:delete_pos(prev)
 	if self.selection:isempty() then
 		self.buffer:start_undo_group'delete_position'
 		if prev then
-			self.cursor:move_left()
+			if not (self.cursor.line == 1 and self.cursor.col == 1) then
+				self.cursor:move_prev_pos()
+				self.cursor:delete_pos(true)
+			end
+		else
+			self.cursor:delete_pos(true)
 		end
-		self.cursor:delete_pos(true)
 		self.selection:reset_to_cursor(self.cursor)
 	else
 		self:remove_selection()
@@ -276,7 +296,7 @@ function editor:move_lines_up()
 		self.buffer:start_undo_group'move_line_up'
 		self.cursor:move_line_up()
 		self.selection:reset_to_cursor(self.cursor)
-	elseif self.selection.move_up then --block selections don't have that
+	elseif self.selection.move_up then
 		self.buffer:start_undo_group'move_selection_up'
 		self.selection:move_up()
 		self.cursor:move_to_selection(self.selection)
@@ -289,7 +309,7 @@ function editor:move_lines_down()
 		self.buffer:start_undo_group'move_line_down'
 		self.cursor:move_line_down()
 		self.selection:reset_to_cursor(self.cursor)
-	elseif self.selection.move_down then --block selections don't have that
+	elseif self.selection.move_up then
 		self.buffer:start_undo_group'move_selection_down'
 		self.selection:move_down()
 		self.cursor:move_to_selection(self.selection)
@@ -297,15 +317,19 @@ function editor:move_lines_down()
 	self.cursor:make_visible()
 end
 
-function editor:reflow(align)
+function editor:reflow()
 	if self.selection:isempty() then return end
+
+	local reflow_mode = self.last_reflow_mode and self.next_reflow_mode[self.last_reflow_mode] or self.default_reflow_mode
+	if self.selection.changed.reflow_mode then
+		reflow_mode = self.default_reflow_mode
+	end
+	self.last_reflow_mode = reflow_mode
+
 	self.buffer:start_undo_group'reflow_selection'
-	self.selection:reflow(self.line_width, self.tabsize, align or 'left', 'greedy')
+	self.selection:reflow(self.view.line_width, self.tabsize, reflow_mode, 'greedy')
 	self.cursor:move_to_selection(self.selection)
 end
-
-function editor:justify()      self:reflow'justify' end
-function editor:reflow_right() self:reflow'right' end
 
 --clipboard commands
 
@@ -351,6 +375,16 @@ end
 
 function editor:paste_block()
 	self:paste'block'
+end
+
+--scrolling
+
+function editor:scroll_down()
+	--TODO
+end
+
+function editor:scroll_up()
+	--TODO
 end
 
 --save command

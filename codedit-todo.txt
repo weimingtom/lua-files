@@ -1,9 +1,7 @@
 - move selection (or current line) up/down with the mouse
 - select by click-dragging over the line numbers column
-- double click selects word
-- triple click selects line
 - double click on selected word selects line
-- how to select a paragraph? double click on selected line? triple click on selected word?
+- how to select a paragraph? double click on selected line? triple click on selected word? ctrl+A ?
 
 - user-definable margins
 	- show blame info (eg. from git and hg)
@@ -18,23 +16,6 @@
 	- count the number of lines that use a mixture of tabs and spaces for indentation
 	- count the number of lines that use tabs inside the line
 	- count the number of lines that use multiple spaces inside the line
-
-- tab_align_args
-	- enable if
-		- indenting
-		- indenting to > 1 the above indent
-		- line > 1
-		- above line has '(' after current vcol
-	- add spaces up to and including the col of the found '('
-	- replace the indent tab surplus of the above indent if using tabs
-	- jump through autoalign_args virtual tabs
-
-- fixed tab stops
-	- tab stops with left, right or center align
-	- shortcut to align a line to tabstops, using double+ spaces or tabs as separators
-	- automatic formatting
-		- keep everything aligned while typing inside the aligned "cells" of the table
-		- typing two spaces or a tab skips to the next "cell"
 
 - rendering:
 	- syntax highlighting with embedded lexers (js and css in html etc.)

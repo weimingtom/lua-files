@@ -11,6 +11,7 @@ local glue = require'glue'
 local player = {
 	continuous_rendering = true,
 	show_magnifier = true,
+	triple_click_max_wait = 500,
 }
 
 player.themes = {}
@@ -181,6 +182,8 @@ function player:window(t)
 	self.clicked = false       --left mouse button clicked (one-shot)
 	self.rightclick = false    --right mouse button clicked (one-shot)
 	self.doubleclicked = false --left mouse button double-clicked (one-shot)
+	self.tripleclicked = false --left mouse button triple-clicked (one-shot)
+	self.waiting_for_tripleclick = false --double-clicked and inside the wait period for triple-click
 	self.lbutton = false       --left mouse button pressed state
 	self.rbutton = false       --right mouse button pressed state
 	self.wheel_delta = 0       --mouse wheel movement as number of scroll pages (one-shot)
@@ -267,12 +270,23 @@ function player:window(t)
 		self.clicked = false
 		self.rightclick = false
 		self.doubleclicked = false
+		self.tripleclicked = false
 		self.key = nil
 		self.char = nil
+		--[[
 		self.shift = nil
 		self.ctrl = nil
 		self.alt = nil
+		]]
 		self.wheel_delta = 0
+
+		--reset timed vars
+		if self.triple_click_start_time then
+			if self.clock - self.triple_click_start_time >= self.triple_click_max_wait then
+				self.waiting_for_tripleclick = false
+				self.triple_click_start_time = nil
+			end
+		end
 	end
 
 	function panel.on_mouse_move(panel, x, y, buttons)
@@ -296,6 +310,15 @@ function player:window(t)
 		winapi.ReleaseCapture()
 		self.lbutton = false
 		self.clicked = true
+		if self.triple_click_start_time then
+			if not self.waiting_for_tripleclick then
+				self.waiting_for_tripleclick = true
+			elseif self.clock - self.triple_click_start_time < self.triple_click_max_wait then
+				self.tripleclicked = true
+				self.waiting_for_tripleclick = false
+				self.triple_click_start_time = nil
+			end
+		end
 		panel:invalidate()
 	end
 
@@ -313,6 +336,7 @@ function player:window(t)
 
 	function panel.on_lbutton_double_click()
 		self.doubleclicked = true
+		self.triple_click_start_time = self.clock
 		panel:invalidate()
 	end
 
@@ -338,25 +362,40 @@ function player:window(t)
 		return winapi.DLGC_WANTALLKEYS
 	end
 
-	function window.on_key_down(window, vk, flags)
-		self.key = keyname(vk)
+	local function key_event(window, vk, flags, down)
+		self.key = down and keyname(vk) or nil
 		self.shift = bit.band(ffi.C.GetKeyState(winapi.VK_SHIFT), 0x8000) ~= 0
 		self.ctrl = bit.band(ffi.C.GetKeyState(winapi.VK_CONTROL), 0x8000) ~= 0
 		self.alt = bit.band(ffi.C.GetKeyState(winapi.VK_MENU), 0x8000) ~= 0
 		panel:invalidate()
 	end
-
+	function window.on_key_down(window, vk, flags)
+		key_event(window, vk, flags, true)
+	end
+	function window.on_key_up(window, vk, flags)
+		key_event(window, vk, flags, false)
+	end
 	window.on_syskey_down = window.on_key_down
+	window.on_syskey_up = window.on_key_up
 
-	function window.on_key_down_char(window, char, flags)
-		local buf = ffi.new'uint8_t[16]'
-		local sz = ffi.C.WideCharToMultiByte(winapi.CP_UTF8, 0, char, 1, buf, 16, nil, nil)
-		assert(sz > 0)
-		self.char = ffi.string(buf, sz)
+	local function key_char_event(window, char, flags, down)
+		if down then
+			local buf = ffi.new'uint8_t[16]'
+			local sz = ffi.C.WideCharToMultiByte(winapi.CP_UTF8, 0, char, 1, buf, 16, nil, nil)
+			assert(sz > 0)
+			self.char = ffi.string(buf, sz)
+		else
+			self.char = nil
+		end
 		panel:invalidate()
 	end
-
+	function window.on_key_down_char(window, char, flags)
+		key_char_event(window, char, flags, true)
+	end
 	window.on_syskey_down_char = window.on_key_down_char
+	function window.on_dead_key_up_char(window, char, flags)
+		key_char_event(window, char, flags, false)
+	end
 	window.on_dead_syskey_down_char = window.on_key_down_char
 
 	--set panel to render continuously
@@ -528,7 +567,6 @@ glue.autoload(player, {
 	button       = 'cplayer.buttons',
 	mbutton      = 'cplayer.buttons',
 	togglebutton = 'cplayer.buttons',
-	tabs         = 'cplayer.buttons',
 	slider       = 'cplayer.slider',
 	menu         = 'cplayer.menu',
 	combobox     = 'cplayer.combobox',

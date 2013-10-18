@@ -4,10 +4,12 @@ local selection = require'codedit_selection'
 
 local block_selection = {block = true}
 
---selection querying
+--inherited
 
 block_selection.new = selection.new
 block_selection.free = selection.free
+block_selection.save_state = selection.save_state
+block_selection.load_state = selection.load_state
 block_selection.isempty = selection.isempty
 block_selection.isforward = selection.isforward
 block_selection.endpoints = selection.endpoints
@@ -37,15 +39,19 @@ block_selection.contents = selection.contents
 
 --changing the selection
 
+block_selection.invalidate = selection.invalidate
+
 function block_selection:reset(line, col)
 	line = math.min(math.max(line, 1), self.buffer:last_line())
 	self.line1, self.col1 = line, col
 	self.line2, self.col2 = self.line1, self.col1
+	self:invalidate()
 end
 
 function block_selection:extend(line, col)
 	line = math.min(math.max(line, 1), self.buffer:last_line())
 	self.line2, self.col2 = line, col
+	self:invalidate()
 end
 
 block_selection.set = selection.set

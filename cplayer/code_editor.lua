@@ -1,5 +1,6 @@
 --code editor based on codedit engine.
 local codedit = require'codedit'
+local view = require'codedit_view'
 local str = require'codedit_str'
 local glue = require'glue'
 local player = require'cairo_player'
@@ -7,12 +8,9 @@ local cairo = require'cairo'
 local ft = require'freetype'
 local lib = ft:new()
 
-local editor = glue.inherit({
+local view = glue.inherit({
 	--font metrics
 	font_file = 'Fixedsys',
-	linesize = 16,
-	charsize = 8,
-	charvsize = 12,
 	--scrollbox options
 	vscroll = 'always',
 	hscroll = 'auto',
@@ -21,14 +19,15 @@ local editor = glue.inherit({
 	scroll_page_size = nil,
 	--colors
 	colors = {
-		background = '#000000',
+		background = '#080808',
 		selection_background = '#999999',
 		selection_text = '#333333',
 		cursor = '#ffffff',
 		text = '#ffffff',
-		margin_background = '#111111',
-		line_number = '#66ffff',
+		margin_background = '#222222',
+		line_number_text = '#66ffff',
 		line_number_background = '#111111',
+		line_number_highlight_background = '#333333',
 		--lexer styles
 		default = '#CCCCCC',
 		whitespace = '#000000',
@@ -53,17 +52,15 @@ local editor = glue.inherit({
 	minimap = true,
 	smooth_vscroll = false,
 	smooth_hscroll = false,
-}, codedit)
+}, view)
 
-function editor:draw_scrollbox()
-	local x, y, w, h = self.player:getbox(self)
-	local cx, cy, cw, ch = self:buffer_rect()
+function view:draw_scrollbox(x, y, w, h, cx, cy, cw, ch)
 	local scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h = self.player:scrollbox{
-		id = self.id..'_scrollbox',
-		x = self.x,
-		y = self.y,
-		w = self.w,
-		h = self.h,
+		id = self.buffer.editor.id..'_scrollbox',
+		x = x,
+		y = y,
+		w = w,
+		h = h,
 		cx = cx,
 		cy = cy,
 		cw = cw,
@@ -73,24 +70,33 @@ function editor:draw_scrollbox()
 		vscroll_w = self.vscroll_w,
 		hscroll_h = self.hscroll_h,
 		page_size = self.scroll_page_size,
-		vscroll_step = self.smooth_vscroll and 1 or self.linesize,
-		hscroll_step = self.smooth_hscroll and 1 or self.charsize,
+		--vscroll_step = self.smooth_vscroll and 1 or self.linesize,
+		--hscroll_step = self.smooth_hscroll and 1 or self.charsize,
 	}
 
-	local cr = self.player.cr
+	--local cr = self.player.cr
+	--cr:save()
 
-	cr:save()
-
-	cr:translate(self.x, self.y)
-	cr:rectangle(0, 0, clip_w, clip_h)
-	cr:clip()
-	cr:translate(scroll_x, scroll_y)
-	cr:translate(self:margins_width(), 0)
+	--cr:translate(clip_x, clip_y)
+	--cr:rectangle(0, 0, clip_w, clip_h)
+	--cr:clip()
+	--cr:translate(scroll_x, scroll_y)
+	--cr:translate(self:margins_width(), 0)
 
 	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
 end
 
-function editor:draw_rect(x, y, w, h, color)
+function view:clip(x, y, w, h)
+	self.player.cr:reset_clip()
+	self.player.cr:rectangle(x, y, w, h)
+	self.player.cr:clip()
+end
+
+function view:translate(x, y)
+	self.player.cr:translate(x, y)
+end
+
+function view:draw_rect(x, y, w, h, color)
 	self.player:rect(x, y, w, h, self.colors[color])
 end
 
@@ -170,7 +176,7 @@ function player:render_glyph(face, s, i, glyph_size, x, y)
 	self.cr:mask_surface(image, x + bitmap_left, y - bitmap_top)
 end
 
-function editor:draw_char(x, y, s, i, color)
+function view:draw_char(x, y, s, i, color)
 	local cr = self.player.cr
 
 	if self._color ~= color then
@@ -178,17 +184,17 @@ function editor:draw_char(x, y, s, i, color)
 		self._color = color
 	end
 
-	self.player:render_glyph(self.ft_face, s, i, self.linesize, x, y)
+	self.player:render_glyph(self.ft_face, s, i, self.line_h, x, y)
 end
 
-function editor:draw_visible_text()
-	codedit.draw_visible_text(self)
+function view:draw_visible_text(...)
+	codedit.view.draw_visible_text(self, ...)
 	self._color = nil
 end
 
 --draw a reverse pilcrow at eol
-function editor:render_eol_marker(line)
-	local x, y = self:text_coords(line, self:visual_col(line, self:last_col(line) + 1))
+function view:render_eol_marker(line)
+	local x, y = self:text_coords(line, self.buffer:visual_col(line, self.buffer:last_col(line) + 1))
 	local x = x + 2.5
 	local y = y - self.linesize + 3.5
 	local cr = self.player.cr
@@ -206,7 +212,7 @@ function editor:render_eol_marker(line)
 	cr:fill()
 end
 
-function editor:render_eol_markers()
+function view:render_eol_markers()
 	if self.eol_markers then
 		local line1, line2 = self:visible_lines()
 		for line = line1, line2 do
@@ -215,7 +221,7 @@ function editor:render_eol_markers()
 	end
 end
 
-function editor:render_minimap()
+function view:render_minimap()
 	local cr = self.player.cr
 	local mmap = glue.inherit({editor = self}, self)
 	local self = mmap
@@ -234,24 +240,34 @@ function editor:render_minimap()
 	cr:restore()
 end
 
+local view_render = view.render
+function view:render()
+	view_render(self)
+	self.player.cr:identity_matrix()
+	self.player.cr:reset_clip()
+end
+
+local editor = glue.inherit({view = view}, codedit)
+
 function editor:render()
-	if self.ft_face_file ~= self.font_file then
-		if self.ft_face then
-			self.ft_face:free()
-		end
-		self.ft_face = lib:new_face(self.font_file)
-		self.ft_face_file = self.font_file
-	end
-
-	--self.player:clear_glpyh_cache()
-
 	local cr = self.player.cr
 	for i = 1,1 do
-		codedit.render(self)
-		self:render_eol_markers()
-		cr:restore()
-		if self.minimap then
-			self:render_minimap()
+
+		if self.view.ft_face_file ~= self.view.font_file then
+			if self.view.ft_face then
+				self.view.ft_face:free()
+			end
+			self.view.ft_face = lib:new_face(self.view.font_file)
+			self.view.ft_face_file = self.view.font_file
+		end
+
+		--self.player:clear_glpyh_cache()
+
+		self.view:render()
+		self.view:render_eol_markers()
+		--cr:restore()
+		if false and self.view.minimap then
+			--self.view:render_minimap()
 		end
 	end
 end
@@ -262,8 +278,13 @@ end
 
 function player:code_editor(t)
 	local id = assert(t.id, 'id missing')
-	local ed = t.buffer and t.buffer.lines and t or editor:new(t)
+	local ed = t
+	if not t.buffer or not t.buffer.lines then
+		t.view = glue.inherit(t.view, view)
+		ed = editor:new(t)
+	end
 	ed.player = self
+	ed.view.player = self
 	ed:input(
 		true, --self.focused == ed.id,
 		self.active,
@@ -272,11 +293,15 @@ function player:code_editor(t)
 		self.ctrl,
 		self.shift,
 		self.alt,
-		self.mousex - ed.x - ed.scroll_x,
-		self.mousey - ed.y - ed.scroll_y,
+		self.mousex - ed.view.x - ed.view.scroll_x,
+		self.mousey - ed.view.y - ed.view.scroll_y,
 		self.lbutton,
 		self.rbutton,
-		self.wheel_delta)
+		self.wheel_delta,
+		self.doubleclicked,
+		self.tripleclicked,
+		self.quadrupleclicked,
+		self.waiting_for_tripleclick)
 	ed:render()
 	return ed
 end

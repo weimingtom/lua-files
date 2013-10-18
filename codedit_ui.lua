@@ -9,13 +9,15 @@ function editor:focus() end --stub
 
 --input ------------------------------------------------------------------------------------------------------------------
 
-function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mousey, lbutton, rbutton, wheel_delta)
+function editor:input(focused, active, key, char, ctrl, shift, alt,
+								mousex, mousey, lbutton, rbutton, wheel_delta,
+								doubleclicked, tripleclicked, quadrupleclicked, waiting_for_triple_click)
 
 	local hot =
-	       mousex >= -self.scroll_x
-		and mousex <= -self.scroll_x + self.clip_w
-		and mousey >= -self.scroll_y
-		and mousey <= -self.scroll_y + self.clip_h
+	       mousex >= -self.view.scroll_x
+		and mousex <= -self.view.scroll_x + self.view.clip_w
+		and mousey >= -self.view.scroll_y
+		and mousey <= -self.view.scroll_y + self.view.clip_h
 
 	if hot and not self.selection:hit_test(mousex, mousey) then
 		self.player.cursor = 'text'
@@ -33,16 +35,24 @@ function editor:input(focused, active, key, char, ctrl, shift, alt, mousex, mous
 
 	end
 
-	if not active and lbutton and hot then
-		self:move_cursor_to_coords(mousex, mousey)
-		self:setactive(true)
-	elseif active == self.id then
-		if lbutton then
-			local mode = key and (alt and 'select_block' or 'select') or self.selection.block and 'select_block' or 'select'
-			self:move_cursor_to_coords(mousex, mousey, mode)
-		else
-			self:setactive(false)
+	if doubleclicked and hot then
+		self:select_word_at_cursor()
+		self.word_selected = true
+	else
+		if tripleclicked and hot then
+			self:select_line_at_cursor()
+		elseif not active and lbutton and hot and not waiting_for_triple_click then
+			self:move_cursor_to_coords(mousex, mousey)
+			self:setactive(true)
+		elseif active == self.id then
+			if lbutton then
+				local mode = alt and 'select_block' or 'select'
+				self:move_cursor_to_coords(mousex, mousey, mode)
+			else
+				self:setactive(false)
+			end
 		end
+		self.word_selected = false
 	end
 
 end

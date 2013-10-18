@@ -3,25 +3,20 @@ local str = require'codedit_str'
 local tabs = require'codedit_tabs'
 local glue = require'glue'
 
---split a list of text lines into paragraphs. paragraphs break at empty lines and when indentation changes.
---a paragraph is a list of lines plus the fields indent and newline.
---TODO: can we detect paragraphs for which only the first line is indented?
+--split a list of text lines into paragraphs. paragraphs break at empty lines.
+--a paragraph is a list of lines plus the field indent.
 function str.paragraphs(lines, tabsize)
 	local paragraphs = {}
 	local paragraph
-	local last_indent_vcol
 	for _,line in ipairs(lines) do
 		local indent_col = str.next_nonspace(line)
-		local indent_vcol = indent_col and tabs.visual_col(line, indent_col, tabsize)
-		if indent_vcol ~= last_indent_vcol or not indent_vcol then
+		if not paragraph or not indent_col then --first paragraph, or empty line: start a new paragraph
 			paragraph = {
 				indent = str.sub(line, 1, indent_col and indent_col - 1), --paragraph indent whitespace, verbatim
-				newline = not indent_col, --paragraph starts with a newline
 			}
 			table.insert(paragraphs, paragraph)
 		end
 		table.insert(paragraph, line)
-		last_indent_vcol = indent_vcol
 	end
 	return paragraphs
 end
@@ -207,10 +202,10 @@ function align.justify(lines, line_width)
 	return out_lines
 end
 
-function str.indent(lines, s)
+function str.indent(lines, indent)
 	local out_lines = {}
 	for i,line in ipairs(lines) do
-		out_lines[i] = s .. line
+		out_lines[i] = indent .. line
 	end
 	return out_lines
 end
@@ -220,10 +215,12 @@ function str.reflow(lines, line_width, tabsize, align, wrap)
 	local out_lines = {}
 	for i,paragraph in ipairs(paragraphs) do
 		local words = str.words(paragraph)
+		if #words > 0 then
+			words[1] = paragraph.indent .. words[1]
+		end
 		local lines = str.wrap(words, line_width, wrap)
-		local lines = str.indent(lines, paragraph.indent)
 		local lines = str.align(lines, line_width, align)
-		if paragraph.newline then
+		if i > 1 then
 			table.insert(out_lines, '')
 		end
 		glue.extend(out_lines, lines)

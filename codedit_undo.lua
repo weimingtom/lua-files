@@ -1,4 +1,4 @@
---codedit undo and redo command stacks for the line buffer.
+--codedit: undo and redo command stacks for the buffer object.
 --the undo stack is a stack of undo groups. an undo group is a list of editor commands to be executed in reverse order
 --in order to perform a single undo operation. consecutive undo groups of the same type are merged together.
 --the undo commands in the group can be any editor method with any arguments.

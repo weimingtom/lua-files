@@ -12,6 +12,7 @@ Window = subclass({
 		noclose = CS_NOCLOSE, --disable close button and ALT+F4
 		dropshadow = CS_DROPSHADOW, --only for non-movable windows
 		own_dc = CS_OWNDC, --for opengl or other purposes
+		receive_double_clicks = CS_DBLCLKS, --receive double click messages
 	},
 	__style_bitmask = bitmask{ --only static, frame styles here
 		border = WS_BORDER,
@@ -33,6 +34,7 @@ Window = subclass({
 		--class style bits
 		noclose = false,
 		dropshadow = false,
+		receive_double_clicks = true,
 		--window style bits
 		border = true,
 		titlebar = true,
@@ -311,6 +313,10 @@ end
 
 function c:on_key_down(vk, flags)
 	print('WM_KEYDOWN', vk, flags)
+end
+
+function c:on_lbutton_double_click()
+	print'double clicked'
 end
 
 MessageLoop()

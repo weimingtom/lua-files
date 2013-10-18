@@ -3,21 +3,54 @@
 local glue = require'glue'
 
 local selection = {
-	color = nil, --color override
+	--view overrides
+	background_color = nil,
+	text_color = nil,
+	line_rect = nil, --line_rect(line) -> x, y, w, h
 }
 
-function selection:new(editor, visible)
-	self = glue.inherit({editor = editor, buffer = editor.buffer, visible = visible}, self)
-	self:reset(1, 1)
-	self.editor.selections[self] = true
+--lifetime
+
+function selection:new(buffer, view, visible)
+	self = glue.inherit({
+		buffer = buffer,
+		view = view,
+	}, self)
+	self.visible = visible
+	self.line1, self.col1 = 1, 1
+	self.line2, self.col2 = 1, 1
+	self.changed = {}
+	if self.view then
+		self.view:add_selection(self)
+	end
 	return self
 end
 
-function selection:free()
-	self.editor.selections[self] = nil
+--memento
+
+function selection:invalidate()
+	for k in pairs(self.changed) do
+		self.changed[k] = true
+	end
 end
 
---selection querying
+local function update_state(dst, src)
+	dst.line1 = src.line1
+	dst.line2 = src.line2
+	dst.col1 = src.col1
+	dst.col2 = src.col2
+end
+
+function selection:save_state(state)
+	update_state(state, self)
+end
+
+function selection:load_state(state)
+	update_state(self, state)
+	self:invalidate()
+end
+
+--boundaries
 
 function selection:isempty()
 	return self.line2 == self.line1 and self.col2 == self.col1
@@ -81,17 +114,20 @@ end
 function selection:reset(line, col)
 	self.line1, self.col1 = self.buffer:clamp_pos(line, col)
 	self.line2, self.col2 = self.line1, self.col1
+	self:invalidate()
 end
 
 --move selection's free endpoint
 function selection:extend(line, col)
 	self.line2, self.col2 = self.buffer:clamp_pos(line, col)
+	self:invalidate()
 end
 
 --reverse selection's direction
 function selection:reverse()
 	self.line1, self.col1, self.line2, self.col2 =
 		self.line2, self.col2, self.line1, self.col1
+	self:invalidate()
 end
 
 --set selection endpoints, preserving or setting its direction
@@ -170,16 +206,19 @@ function selection:move_down()
 end
 
 function selection:reflow(line_width, tabsize, align, wrap)
-	local line1, col1, line2, col2 = self:endpoints()
-	local line2, col2 = self.buffer:reflow(line1, col1, line2, col2, line_width, tabsize, align, wrap)
-	self:set(line1, col1, line2, col2)
+	local line1, line2 = self:line_range()
+	local line2, col2 = self.buffer:reflow_lines(line1, line2, line_width, tabsize, align, wrap)
+	self:set(line1, 1, line2, col2)
 end
 
 --hit testing
 
 function selection:hit_test(x, y)
-	for line1, col1, col2 in self:lines() do
-		if self.editor:hit_test_rect(x, y, line1, col1, line1, col2) then
+	if not self.visible then return false end
+	if self:isempty() then return false end
+	local line1, line2 = self:line_range()
+	for line = line1, line2 do
+		if self.view:point_in_rect(x, y, self.view:selection_line_rect(self, line)) then
 			return true
 		end
 	end

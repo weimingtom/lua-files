@@ -22,16 +22,16 @@ local function bar_segment(x, w, size, i, minw)
 	return bx, bw
 end
 
-local function view_offset_round(i, step)
+local function client_offset_round(i, step)
 	return i - i % step
 end
 
-local function view_offset(bx, x, w, bw, size, step)
-	return view_offset_round((bx - x) / (w - bw) * (size - w), step)
+local function client_offset(bx, x, w, bw, size, step)
+	return client_offset_round((bx - x) / (w - bw) * (size - w), step)
 end
 
-local function view_offset_clamp(i, size, w, step)
-	return view_offset_round(math.min(math.max(i, 0), math.max(size - w, 0)), step)
+local function client_offset_clamp(i, size, w, step)
+	return client_offset_round(math.min(math.max(i, 0), math.max(size - w, 0)), step)
 end
 
 local function bar_box(x, y, w, h, size, i, vertical, min_width)
@@ -51,7 +51,7 @@ local function scrollbar(self, t, vertical)
 	local x, y, w, h = self:getbox(t)
 	local size = assert(t.size, 'size missing')
 	local step = t.step or 1
-	local i = view_offset_clamp(t.i or 0, size, vertical and h or w, step)
+	local i = client_offset_clamp(t.i or 0, size, vertical and h or w, step)
 	local min_width = t.min_width or min_width
 
 	if t.autohide and self.active ~= id and not self:hotbox(x, y, w, h) then
@@ -68,10 +68,10 @@ local function scrollbar(self, t, vertical)
 		if self.lbutton then
 			if vertical then
 				by = bar_offset_clamp(self.mousey - self.ui.grab, y, h, bh)
-				i = view_offset(by, y, h, bh, size, step)
+				i = client_offset(by, y, h, bh, size, step)
 			else
 				bx = bar_offset_clamp(self.mousex - self.ui.grab, x, w, bw)
-				i = view_offset(bx, x, w, bw, size, step)
+				i = client_offset(bx, x, w, bw, size, step)
 			end
 		else
 			self.active = nil
@@ -132,8 +132,8 @@ function player:scrollbox(t)
 	end
 
 	return
-		cx, cy,     --view offset coordinates
-		x, y, w, h  --view clipping rectangle
+		cx, cy,     --client area coordinates, relative to the clipping rectangle
+		x, y, w, h  --clipping rectangle, in absolute coordinates
 end
 
 if not ... then require'cairo_player_demo' end
