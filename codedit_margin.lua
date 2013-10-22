@@ -1,11 +1,13 @@
---codedit margins
+--codedit margin base object (by itself can be used as a spacer margin).
 local glue = require'glue'
 
 local margin = {
-	side = 'left', --left, right
 	w = 50,
-	background_color = nil, --custom color
-	text_color = nil, --custom color
+	--view overrides
+	text_color = nil,
+	background_color = nil,
+	highlighted_text_color = nil,
+	highlighted_background_color = nil,
 }
 
 function margin:new(buffer, view, t, pos)

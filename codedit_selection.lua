@@ -158,6 +158,11 @@ function selection:set_to_selection(sel)
 	self:set(sel.line1, sel.col1, sel.line2, sel.col2, sel:isforward())
 end
 
+function selection:set_to_line_range()
+	local line1, line2 = self:line_range()
+	self:set(line1, 1, line2 + 1, 1)
+end
+
 --selection-based editing
 
 function selection:remove()
@@ -172,7 +177,7 @@ function selection:indent(use_tab)
 	for line = line1, line2 do
 		self.buffer:indent_line(line, use_tab)
 	end
-	self:set(line1, 1, line2 + 1, 1)
+	self:set_to_line_range()
 end
 
 function selection:outdent()
@@ -180,7 +185,7 @@ function selection:outdent()
 	for line = line1, line2 do
 		self.buffer:outdent_line(line)
 	end
-	self:set(line1, 1, line2 + 1, 1)
+	self:set_to_line_range()
 end
 
 function selection:move_up()

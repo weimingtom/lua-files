@@ -21,6 +21,7 @@ local cursor = {
 	--view overrides
 	thickness = nil,
 	color = nil,
+	line_highlight_color = nil,
 }
 
 --lifetime

@@ -6,9 +6,8 @@ local editors = {}
 local loaded
 
 --text = glue.readfile'x:/work/lua-files/csrc/freetype/src/truetype/ttinterp.c'
---text = glue.readfile'x:/work/lua-files/codedit.lua'
-text = glue.readfile'c:/temp.c'
-text = glue.readfile'c:/temp2.c'
+--text = glue.readfile'c:/temp.c'
+--text = glue.readfile'c:/temp2.c'
 
 --player.continuous_rendering = false
 player.show_magnifier = false
@@ -22,7 +21,9 @@ function player:on_render(cr)
 		local x = (i - 1) * w + 20
 
 		local editor = editors[i] or {
-								id = 'code_editor_' .. i, text = text,
+								id = 'code_editor_' .. i,
+								--text = text,
+								filename = 'x:/work/lua-files/codedit_view.lua',
 								view = {
 									x = x, y = editor_y, w = w, h = h,
 									lexer = nil, eol_markers = false, minimap = false, line_numbers = false,

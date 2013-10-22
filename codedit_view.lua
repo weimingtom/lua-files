@@ -14,7 +14,7 @@
 :       |   |   |           |N    :
 :       |   |   |           ||    :
 :       |___|___|___________||    :
-:       :   :   :------ZZZ--+*    :
+:       :   :   +------ZZZ--+     :
 :       :   :   :                 :
 :       :   :   :                 :
 ...................................
@@ -37,7 +37,7 @@ local view = {
 	cursor_margins = {top = 16, left = 0, right = 0, bottom = 16},
 	--rendering
 	highlight_cursor_lines = true,
-	lexer = nil, --lexer to use for syntax highlighting. nil means no highlighting.
+	lexer = 'lua', --lexer to use for syntax highlighting. nil means no highlighting.
 	--reflowing
 	line_width = 72,
 }
@@ -108,12 +108,6 @@ function view:char_coords(line, vcol)
 	return x, y
 end
 
---visual char baseline position in text space
-function view:text_coords(line, vcol) --y is at the baseline
-	local x, y = self:char_coords(line, vcol)
-	return x, y + self.char_baseline
-end
-
 --visual char at text space coordinates
 function view:char_at(x, y)
 	local line = math.floor(y / self.line_h) + 1
@@ -135,7 +129,7 @@ function view:selection_line_rect(sel, line)
 	local vcol1 = self.buffer:visual_col(line, col1)
 	local vcol2 = self.buffer:visual_col(line, col2)
 	local x, y, w, h = self:char_rect(line, vcol1, line, vcol2)
-	if not sel.block and line < sel.line2 then
+	if not sel.block and line < (sel:isforward() and sel.line2 or sel.line1) then
 		w = w + 0.5 * self.char_w --show eol as half space
 	end
 	return x, y, w, h, vcol1, vcol2
@@ -154,11 +148,11 @@ end
 
 function view:cursor_rect_over_mode(cursor)
 	local vcol = self.buffer:visual_col(cursor.line, cursor.col)
-	local x, y = self:text_coords(cursor.line, vcol)
+	local x, y = self:char_coords(cursor.line, vcol)
 	local w = self.buffer:istab(cursor.line, cursor.col) and self.buffer:tab_width(vcol) or 1
 	w = w * self.char_w
 	local h = cursor.thickness or self.cursor_thickness
-	y = y + 1 --1 pixel under the baseline
+	y = y + self.char_baseline + 1 --1 pixel under the baseline
 	return x, y, w, h
 end
 
@@ -218,9 +212,14 @@ end
 function view:margin_clip_rect(margin)
 	local clip_x = self:margin_x(margin)
 	local clip_w = margin:get_width()
-	local clip_y = self.clip_y
-	local clip_h = self.clip_h
-	return clip_x, clip_y, clip_w, clip_h
+	return clip_x, self.clip_y, clip_w, self.clip_h
+end
+
+--clip rect of a line in screen space
+function view:line_clip_rect(line)
+	local _, y = self:char_coords(line, 1)
+	local _, y = self:client_to_screen(0, y)
+	return self.clip_x, y, self.clip_w, self.line_h
 end
 
 --clipping in visual char space
@@ -241,6 +240,11 @@ function view:visible_cols()
 	return vcol1, vcol2
 end
 
+function view:line_is_visible(line)
+	local line1, line2 = self:visible_lines()
+	return line >= line1 and line <= line2
+end
+
 --point translation from screen space to client (text) space and back
 
 function view:screen_to_client(x, y)
@@ -256,7 +260,7 @@ function view:client_to_screen(x, y)
 end
 
 function view:screen_to_margin_client(margin, x, y)
-	x = x - self:margin_x()
+	x = x - self:margin_x(margin)
 	y = y - self.clip_y - self.scroll_y
 	return x, y
 end
@@ -333,17 +337,18 @@ function view:cursor_make_visible(cur)
 	self:make_rect_visible(x, y, w, h)
 end
 
---rendering stubs: all rendering boils down to these
+--rendering stubs: all rendering is based on these functions
 
-function view:draw_char(x, y, s, i, color) end
-function view:draw_rect(x, y, w, h, color) end
-function view:clip(x, y, w, h) end
+function view:draw_char(x, y, s, i, color) error'stub' end
+function view:draw_rect(x, y, w, h, color) error'stub' end
+function view:clip(x, y, w, h) error'stub' end
 
 --rendering
 
 function view:draw_text(x, y, s, color, i, j)
 	i = i or 1
 	j = j or str.len(s)
+	y = y + self.char_baseline
 	for i = i, j do
 		self:draw_char(x, y, s, i, color)
 		x = x + self.char_w
@@ -373,8 +378,8 @@ function view:draw_buffer(cx, cy, line1, vcol1, line2, vcol2, color)
 				if vcol > vcol2 then
 					break
 				elseif vcol >= vcol1 then
-					local x, y = self:text_coords(line, vcol)
-					self:draw_char(cx + x, cy + y, s, i, color)
+					local x, y = self:char_coords(line, vcol)
+					self:draw_char(cx + x, cy + y + self.char_baseline, s, i, color)
 				end
 				vcol = vcol + 1
 			end
@@ -385,7 +390,7 @@ end
 
 lexer = require'lexers.lexer'
 _LEXER = nil
-lexer.load'lexers.cpp'
+lexer.load'lexers.lua'
 
 function view:next_pos(line, line_i, next_i)
 	while true do
@@ -423,12 +428,12 @@ function view:draw_buffer_highlighted(cx, cy)
 			if not str.isascii(self.text, i, '\n') and not str.isspace(self.text, i) then
 				local vcol = self.buffer:visual_col(line, col)
 
-				local x, y = self:text_coords(line, vcol)
-				self:draw_text(x, y, self.buffer:getline(line), color, i - line_i + 1, next_i - line_i)
+				local x, y = self:char_coords(line, vcol)
+				self:draw_text(cx + x, cy + y, self.buffer:getline(line), color, i - line_i + 1, next_i - line_i)
 
 				--[[
 				for line = line + 1, _line do
-					self:draw_text(line, 1, self:getline(line), color, i - line_i + 1, next_i - line_i)
+					self:draw_text(line, 1, self.buffer:getline(line), color, i - line_i + 1, next_i - line_i)
 				end
 				]]
 			end
@@ -481,16 +486,24 @@ function view:draw_margin(margin)
 	--contents
 	local cx, cy = self:margin_client_to_screen(margin, 0, 0)
 	local cw = margin:get_width()
+	local ch = self.line_h
 	local minline, maxline = self:visible_lines()
 	for line = minline, maxline do
-		self:draw_margin_line(margin, line, cx, cy, cw)
+		self:draw_margin_line(margin, line, cx, cy, cw, ch)
 	end
 	--highlighted lines
 	if self.highlight_cursor_lines then
 		for cursor in pairs(self.cursors) do
-			self:draw_margin_line(margin, cursor.line, cx, cy, cw, true)
+			self:draw_margin_line(margin, cursor.line, cx, cy, cw, ch, true)
 		end
 	end
+end
+
+function view:draw_line_highlight(line, color)
+	if not self:line_is_visible(line) then return end
+	local x, y, w, h = self:line_clip_rect(line)
+	color = color or self.buffer.line_highlight_color or 'line_highlight'
+	self:draw_rect(x, y, w, h, color)
 end
 
 function view:draw_client()
@@ -498,6 +511,10 @@ function view:draw_client()
 	--background
 	local color = self.buffer.background_color or 'background'
 	self:draw_rect(self.clip_x, self.clip_y, self.clip_w, self.clip_h, color)
+	--highlighting the line under cursor
+	for cur in pairs(self.cursors) do
+		self:draw_line_highlight(cur.line, cur.line_highlight_color)
+	end
 	--text, selections, cursors
 	local cx, cy = self:client_to_screen(0, 0)
 	self:draw_visible_text(cx, cy)

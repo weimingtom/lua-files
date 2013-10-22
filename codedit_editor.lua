@@ -7,7 +7,8 @@ require'codedit_normal'
 local line_selection = require'codedit_selection'
 local block_selection = require'codedit_blocksel'
 local cursor = require'codedit_cursor'
-local line_numbers_margin = require'codedit_line_numbers'
+local line_numbers_margin = require'codedit_margin_ln'
+local blame_margin = require'codedit_margin_blame'
 local view = require'codedit_view'
 
 local editor = {
@@ -17,9 +18,11 @@ local editor = {
 	block_selection = block_selection,
 	cursor = cursor,
 	line_numbers_margin = line_numbers_margin,
+	blame_margin = blame_margin,
 	view = view,
-	--features
+	--margins
 	line_numbers = true,
+	blame = false,
 	--keyboard state
 	next_reflow_mode = {left = 'justify', justify = 'left'},
 	default_reflow_mode = 'left',
@@ -30,7 +33,7 @@ function editor:new(options)
 
 	--core objects
 	self.view = self.view:new()
-	self.buffer = self.buffer:new(self, self.view, self.text or '')
+	self.buffer = self.buffer:new(self, self.view, self.text, self.filename)
 	self.view.buffer = self.buffer
 
 	--main cursor & selection objects
@@ -48,8 +51,11 @@ function editor:new(options)
 	self.scroll_y = 0
 
 	--margins
+	if self.blame then
+		self.blame_margin = self:create_blame_margin()
+	end
 	if self.line_numbers then
-		self:create_line_numbers_margin()
+		self.line_numbers_margin = self:create_line_numbers_margin()
 	end
 
 	return self
@@ -70,7 +76,11 @@ function editor:create_block_selection(visible)
 end
 
 function editor:create_line_numbers_margin()
-	self.line_numbers_margin:new(self.buffer, self.view)
+	return self.line_numbers_margin:new(self.buffer, self.view)
+end
+
+function editor:create_blame_margin()
+	return self.blame_margin:new(self.buffer, self.view)
 end
 
 --undo/redo integration
@@ -379,22 +389,21 @@ end
 --scrolling
 
 function editor:scroll_down()
-	--TODO
+	self.view:scroll_down()
 end
 
 function editor:scroll_up()
-	--TODO
+	self.view:scroll_up()
 end
 
 --save command
 
-function editor:save_file(s) end --stub
-
-function editor:save()
+function editor:save(filename)
 	if not self.buffer.changed.file then return end
 	self.buffer:start_undo_group'normalize'
 	self.buffer:normalize()
-	self:save_file(self.buffer:contents())
+	self.cursor:move(self.cursor.line, self.cursor.col)
+	self.buffer:save_to_file(filename)
 end
 
 

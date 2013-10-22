@@ -1,10 +1,9 @@
 - move selection (or current line) up/down with the mouse
 - select by click-dragging over the line numbers column
+	- select entire line by clicking?
+	- change mouse pointer to margin.cur?
 - double click on selected word selects line
 - how to select a paragraph? double click on selected line? triple click on selected word? ctrl+A ?
-
-- user-definable margins
-	- show blame info (eg. from git and hg)
 
 - carets:
 	- caret jumps - when must scroll, scroll longer so the caret can move longer before scrolling again.
@@ -18,18 +17,15 @@
 	- count the number of lines that use multiple spaces inside the line
 
 - rendering:
+	- long lines - display a limit bar or mark the excess with a text style
 	- syntax highlighting with embedded lexers (js and css in html etc.)
-	- bracket matching highlighting
-	- current line highlighting
-		- highlight just the line number
+	- bracket matching highlighting (needs help from the lexer: either to get the tokens or at least to ignore comments)
+		- make an engine independent of lexers
 	- view whitespace
 	- mark special chars and invalid unicode chars
 	- annotations (tooltips)
-	- user-definable markers
 	- text styles: strike-through, underline, dashed/dotted/squiggle underline, selection rectangle,
-	- long lines - display a limit bar or mark the excess with a text style
 	- animated scrolling like in sublime text (actually that's pretty annoying)
-	- text cursor over text, normal pointer surrounding the text, reverse pointer over the line numbers
 	- spell checking (configurable to apply only to comments and strings)
 
 

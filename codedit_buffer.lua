@@ -10,27 +10,43 @@ local buffer = {
 	--view overrides
 	background_color = nil,
 	text_color = nil,
+	line_highlight_color = nil,
 }
 
-function buffer:new(editor, view, text)
+function buffer:new(editor, view, text, filename)
 	self = glue.inherit({
 		editor = editor,  --for getstate & setstate
 		view = view,      --for tabsize
 	}, self)
+
+	if filename then
+		text = glue.readfile(filename)
+		self.filename = filename
+	end
+
 	self.line_terminator =
 		self.line_terminator or
 		self:detect_line_terminator(text) or
 		self.default_line_terminator
+
 	self.lines = {''} --can't have zero lines
 	self.changed = {} --{<flag> = true/false}; you can add any flags, they will all be set when the buffer changes.
-	if text then
-		self:insert_string(1, 1, text) --insert text without undo stack
-	end
+	self:insert_string(1, 1, text) --insert text without undo stack
 	self.changed.file = false --"file" is the default changed flag to decide when to save.
+
 	self.undo_stack = {}
 	self.redo_stack = {}
 	self.undo_group = nil
+
 	return self
+end
+
+--message passing
+
+function buffer:invalidate()
+	for k in pairs(self.changed) do
+		self.changed[k] = true
+	end
 end
 
 --text analysis
@@ -75,12 +91,6 @@ function buffer:contents(lines)
 end
 
 --editing text at the line level (low level interface; valid lines only)
-
-function buffer:invalidate()
-	for k in pairs(self.changed) do
-		self.changed[k] = true
-	end
-end
 
 function buffer:insert_line(line, s)
 	table.insert(self.lines, line, s)
@@ -530,6 +540,40 @@ function buffer:reflow_lines(line1, line2, line_width, tabsize, align, wrap)
 	local lines = str.reflow(lines, line_width, tabsize, align, wrap)
 	self:remove_string(line1, col1, line2, col2)
 	return self:insert_string(line1, col1, self:contents(lines))
+end
+
+--saving to disk safely
+
+function buffer:save_to_file(filename)
+	filename = assert(filename or self.filename)
+	--write the file contents to a temp file and replace the original with it.
+	--the way to prevent data loss 24-century style.
+	glue.fcall(function(finally)
+
+		local filename1 = assert(os.tmpname())
+		finally(function() os.remove(filename1) end)
+
+		local file1 = assert(io.open(filename1, 'wb'))
+		finally(function()
+			if io.type(file1) ~= 'file' then return end
+			file1:close()
+		end)
+
+		for line = 1, self:last_line() - 1 do
+			file1:write(self:getline(line))
+			file1:write(self.line_terminator)
+		end
+		file1:write(self:getline(self:last_line()))
+		file1:close()
+
+		local filename2 = assert(os.tmpname())
+		finally(function() os.remove(filename2) end)
+
+		os.rename(filename, filename2)
+		if not os.rename(filename1, filename) then
+			os.rename(filename2, filename)
+		end
+	end)
 end
 
 
