@@ -54,7 +54,9 @@ function CairoPanel:on_paint(window_hdc)
 		self.__window_cr:set_source_surface(self.__pixman_surface, 0, 0)
 	end
 	self:on_render(self.__pixman_surface)
-	self.__window_cr:paint()
+	if self.__pixman_surface then
+		self.__window_cr:paint()
+	end
 end
 
 return CairoPanel

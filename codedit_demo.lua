@@ -5,7 +5,8 @@ local glue = require'glue'
 local editors = {}
 local loaded
 
---text = glue.readfile'x:/work/lua-files/csrc/freetype/src/truetype/ttinterp.c'
+filename = 'x:/test.txt'
+--filename = 'x:/work/lua-files/csrc/freetype/src/truetype/ttinterp.c'
 --text = glue.readfile'c:/temp.c'
 --text = glue.readfile'c:/temp2.c'
 
@@ -14,19 +15,24 @@ player.show_magnifier = false
 
 function player:on_render(cr)
 
+	if self.window.w ~= 800 then
+		self.window.w = 800
+		return
+	end
+
 	local editor_y = 40
 	for i = 1, 1 do
-		local w = math.floor(self.w / 2)
+		local w = math.floor(self.w / 1)
 		local h = self.h - editor_y - 20
 		local x = (i - 1) * w + 20
 
 		local editor = editors[i] or {
 								id = 'code_editor_' .. i,
 								--text = text,
-								filename = 'x:/work/lua-files/codedit_view.lua',
+								filename = filename,
 								view = {
 									x = x, y = editor_y, w = w, h = h,
-									lexer = nil, eol_markers = false, minimap = false, line_numbers = false,
+									eol_markers = false, minimap = false, line_numbers = false,
 									font_file = 'x:/work/lua-files/media/fonts/FSEX300.ttf'
 								}}
 
@@ -40,10 +46,10 @@ function player:on_render(cr)
 		codedit.cursor.land_bof = false
 		codedit.cursor.land_eof = false
 
-		editor.lexer = self:mbutton{
+		editor.view.lang = self:mbutton{
 			id = 'lexer_' .. i,
-			x = x, y = 10, w = 180, h = 26, values = {'none', 'cpp', 'lua'}, selected = editor.lexer or 'none'}
-		editor.lexer = editor.lexer ~= 'none' and editor.lexer or nil
+			x = x, y = 10, w = 180, h = 26, values = {'none', 'cpp', 'lua'}, selected = editor.view.lang or 'lua'}
+		editor.view.lang = editor.view.lang ~= 'none' and editor.view.lang or nil
 
 		editors[i] = editor
 

@@ -414,11 +414,18 @@ end
 
 --theme-aware api
 
+local hexcolors = setmetatable({}, {__mode = 'kv'})
+
 local function hexcolor(s)
-	if s:sub(1,1) ~= '#' then return end
-	local r,g,b,a = tonumber(s:sub(2,3), 16), tonumber(s:sub(4,5), 16),
-						 tonumber(s:sub(6,7), 16), tonumber(s:sub(8,9), 16) or 255
-	return r/255, g/255, b/255, a/255
+	if hexcolors[s] then
+		return unpack(hexcolors[s])
+	end
+	local r = tonumber(s:sub(2, 3), 16) / 255
+	local g = tonumber(s:sub(4, 5), 16) / 255
+	local b = tonumber(s:sub(6, 7), 16) / 255
+	local a = (tonumber(s:sub(8, 9), 16) or 255) / 255
+	hexcolors[s] = {r, g, b, a} --memoize for speed
+	return r, g, b, a
 end
 
 local function parse_color(c)

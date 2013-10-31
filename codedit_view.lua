@@ -21,6 +21,8 @@
 ]]
 local glue = require'glue'
 local str = require'codedit_str'
+local tabs = require'codedit_tabs'
+local hl = require'codedit_hl'
 
 local view = {
 	--tab expansion
@@ -37,7 +39,7 @@ local view = {
 	cursor_margins = {top = 16, left = 0, right = 0, bottom = 16},
 	--rendering
 	highlight_cursor_lines = true,
-	lexer = 'lua', --lexer to use for syntax highlighting. nil means no highlighting.
+	lang = nil, --lexer to use for syntax highlighting. nil means no highlighting.
 	--reflowing
 	line_width = 72,
 }
@@ -55,7 +57,7 @@ function view:new(buffer)
 	--state
 	self.scroll_x = 0 --client rect position relative to the clip rect
 	self.scroll_y = 0
-	self.changed = {}
+	self.last_valid_line = 0 --for incremental lexing
 	return self
 end
 
@@ -69,9 +71,9 @@ end
 
 --state management
 
-function view:invalidate()
-	for k in pairs(self.changed) do
-		self.changed[k] = true
+function view:invalidate(line)
+	if line then
+		self.last_valid_line = math.min(self.last_valid_line, line - 1)
 	end
 end
 
@@ -345,13 +347,13 @@ function view:clip(x, y, w, h) error'stub' end
 
 --rendering
 
-function view:draw_text(x, y, s, color, i, j)
+function view:draw_text(cx, cy, s, color, i, j)
 	i = i or 1
 	j = j or str.len(s)
-	y = y + self.char_baseline
+	cy = cy + self.char_baseline
 	for i = i, j do
-		self:draw_char(x, y, s, i, color)
-		x = x + self.char_w
+		self:draw_char(cx, cy, s, i, color)
+		cx = cx + self.char_w
 	end
 end
 
@@ -387,64 +389,73 @@ function view:draw_buffer(cx, cy, line1, vcol1, line2, vcol2, color)
 	end
 end
 
-
-lexer = require'lexers.lexer'
-_LEXER = nil
-lexer.load'lexers.lua'
-
-function view:next_pos(line, line_i, next_i)
-	while true do
-		local next_line_i = line_i + #self.buffer:getline(line) + #self.buffer.line_terminator
-		if next_i < next_line_i then
-			break
+function view:draw_buffer_text(x, y, color, line1, i1, line2, i2)
+	for line = line1, line2 do
+		local s = self.buffer:getline(line)
+		local vcol = 1
+		for i in str.byte_indices(s) do
+			if str.istab(s, i) then
+				vcol = vcol + self.buffer:tab_width(vcol)
+			else
+				if vcol > vcol2 then
+					break
+				elseif vcol >= vcol1 then
+					local x, y = self:char_coords(line, vcol)
+					self:draw_char(cx + x, cy + y + self.char_baseline, s, i, color)
+				end
+				vcol = vcol + 1
+			end
 		end
-		line_i = next_line_i
-		line = line + 1
 	end
-	local col = next_i == line_i and 1 or str.char_index(self.buffer:getline(line), next_i - line_i + 1)
-	return line, col, line_i, next_i
+end
+
+--byte index -> visual column: same as tabs.visual_col but based on byte index instead of char index.
+local function visual_col_bi(s, targeti, tabsize, previ, prevvcol)
+	local vcol = prevvcol and prevvcol + 1 or 1
+	for i in str.byte_indices(s, previ) do
+		if i >= targeti then
+			return vcol
+		end
+		vcol = vcol + (str.istab(s, i) and tabs.tab_width(vcol, tabsize) or 1)
+	end
+	return vcol --TODO: fix this differently (this is for when targeti is outside the string)
 end
 
 function view:draw_buffer_highlighted(cx, cy)
 
 	local minline, maxline = self:visible_lines()
 
-	if self.buffer.changed.highlighting ~= false then
-		self.text = self.buffer:contents()
-		self.lex_result = lexer.lex(self.text, 'cpp')
-		self.buffer.changed.highlighting = false
-	end
+	self.tokens, self.last_valid_line, self.start_tokens =
+		hl.relex(maxline, self.tokens, self.last_valid_line, self.buffer, self.lang, self.start_tokens)
 
-	local line_i, i, ci = 1, 1, 1
-	local line, col = 1, 1
+	local last_line, last_p1, last_vcol
 
-	local t = self.lex_result
-	for ti = 1, #t, 2 do
-		local color, next_i = t[ti], t[ti+1]
+	for i, line, p1, p2, style in hl.tokens(self.tokens, 1, 1, self.buffer) do
 
-		local _line, _col, _line_i, _i = self:next_pos(line, line_i, next_i)
-
-		if line >= minline and line <= maxline then
-			if not str.isascii(self.text, i, '\n') and not str.isspace(self.text, i) then
-				local vcol = self.buffer:visual_col(line, col)
-
-				local x, y = self:char_coords(line, vcol)
-				self:draw_text(cx + x, cy + y, self.buffer:getline(line), color, i - line_i + 1, next_i - line_i)
-
-				--[[
-				for line = line + 1, _line do
-					self:draw_text(line, 1, self.buffer:getline(line), color, i - line_i + 1, next_i - line_i)
-				end
-				]]
-			end
+		if line > maxline then
+			break
 		end
 
-		line, col, line_i, i = _line, _col, _line_i, _i
+		if line >= minline then
+			if not style:match'whitespace$' then
+
+				if line ~= last_line then
+					last_p1, last_vcol = nil
+				end
+
+				local s = self.buffer:getline(line)
+				local vcol = visual_col_bi(s, p1, self.tabsize, last_p1, last_vcol)
+				local x, y = self:char_coords(line, vcol)
+				self:draw_text(cx + x, cy + y, s, style, p1, p2)
+
+				last_line, last_p1, last_vcol = line, p1, vcol
+			end
+		end
 	end
 end
 
 function view:draw_visible_text(cx, cy)
-	if self.lexer then
+	if self.lang then
 		self:draw_buffer_highlighted(cx, cy)
 	else
 		local color = self.buffer.text_color or 'text'

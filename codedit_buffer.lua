@@ -43,10 +43,11 @@ end
 
 --message passing
 
-function buffer:invalidate()
+function buffer:invalidate(line)
 	for k in pairs(self.changed) do
 		self.changed[k] = true
 	end
+	self.view:invalidate(line)
 end
 
 --text analysis
@@ -95,20 +96,20 @@ end
 function buffer:insert_line(line, s)
 	table.insert(self.lines, line, s)
 	self:undo_command('remove_line', line)
-	self:invalidate()
+	self:invalidate(line)
 end
 
 function buffer:remove_line(line)
 	local s = table.remove(self.lines, line)
 	self:undo_command('insert_line', line, s)
-	self:invalidate()
+	self:invalidate(line)
 	return s
 end
 
 function buffer:setline(line, s)
 	self:undo_command('setline', line, self:getline(line))
 	self.lines[line] = s
-	self:invalidate()
+	self:invalidate(line)
 end
 
 --switch two lines with one another
@@ -279,7 +280,7 @@ end
 
 --number of columns needed to fit the entire text (for computing the client area for horizontal scrolling)
 function buffer:max_visual_col()
-	if self.changed.cached_max_visual_col ~= false then
+	if self.changed.max_visual_col ~= false then
 		local vcol = 0
 		for line = 1, self:last_line() do
 			local vcol1 = self:visual_col(line, self:last_col(line))

@@ -171,7 +171,6 @@ function player:render_glyph(face, s, i, glyph_size, x, y)
 			bitmap_left = bitmap_left,
 			bitmap_top = bitmap_top,
 		}
-
 	end
 	self.cr:mask_surface(image, x + bitmap_left, y - bitmap_top)
 end

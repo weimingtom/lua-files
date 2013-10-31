@@ -138,7 +138,7 @@ function utf8.sub(s, start_ci, end_ci)
 		if end_ci < start_ci then
 			return ''
 		end
-		assert(end_ci > ci + 1, 'invalid index')
+		assert(end_ci > ci, 'invalid index')
 	end
 	return s:sub(start_i, end_i)
 end
