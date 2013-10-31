@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- XML LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S, V = lpeg.P, lpeg.R, lpeg.S, lpeg.V
 
 local M = {_NAME = 'xml'}
@@ -15,57 +14,79 @@ local comment = token(l.COMMENT, '<!--' * (l.any - '-->')^0 * P('-->')^-1)
 local cdata = token('cdata', '<![CDATA[' * (l.any - ']]>')^0 * P(']]>')^-1)
 
 -- Strings.
-local sq_str = l.delimited_range("'", nil, true)
-local dq_str = l.delimited_range('"', nil, true)
-local string = token(l.STRING, sq_str + dq_str)
+local sq_str = l.delimited_range("'", false, true)
+local dq_str = l.delimited_range('"', false, true)
+local string = l.last_char_includes('=') * token(l.STRING, sq_str + dq_str)
 
-local equals = token(l.OPERATOR, '=')
-local number = token(l.NUMBER, l.digit^1 * P('%')^-1)
+local in_tag = P(function(input, index)
+  local before = input:sub(1, index - 1)
+  local s, e = before:find('<[^>]-$'), before:find('>[^<]-$')
+  if s and e then return s > e and index or nil end
+  if s then return index end
+  return input:find('^[^<]->', index) and index or nil
+end)
+
+-- Numbers.
+local number = l.last_char_includes('=') *
+               token(l.NUMBER, l.digit^1 * P('%')^-1) * in_tag
+
 local alpha = R('az', 'AZ', '\127\255')
 local word_char = l.alnum + S('_-:.??')
 local identifier = (l.alpha + S('_-:.??')) * word_char^0
+local namespace = token(l.OPERATOR, ':') * token('namespace', identifier)
+
+-- Elements.
+local element = l.last_char_includes('</') * token('element', identifier) *
+                namespace^-1
+
+-- Attributes.
+local attribute = token('attribute', identifier) * namespace^-1 *
+                  #(l.space^0 * '=')
 
 -- Tags.
-local namespace = token('namespace', identifier)
-local element = token('element', identifier) *
-                (token(l.OPERATOR, ':') * namespace)^-1
-local normal_attr = token('attribute', identifier)
-local xmlns_attr = token('attribute', identifier) * token(l.OPERATOR, ':') *
-                   namespace
-local attribute = xmlns_attr + normal_attr
-local attributes = {attribute * ws^0 * equals * ws^0 * (string + number) *
-                    (ws * V(1))^0}
-local tag_start = token('tag', '<' * P('/')^-1) * element
-local tag_end = token('tag', P('/')^-1 * '>')
-local tag = tag_start * (ws * attributes)^0 * ws^0 * tag_end
+local tag = token('tag', '<' * P('/')^-1 + P('/')^-1 * '>')
 
--- Doctypes.
-local doctype = token('doctype', '<?xml') * (ws * attributes)^0 * ws^0 *
-                token('doctype', '?>')
+-- Equals.
+local equals = token(l.OPERATOR, '=') * in_tag
 
 -- Entities.
 local entity = token('entity', '&' * word_match{
   'lt', 'gt', 'amp', 'apos', 'quot'
 } * ';')
 
+-- Doctypes and other markup tags.
+local doctype = token('doctype', P('<!DOCTYPE')) * ws *
+                token('doctype', identifier) * (ws * identifier)^-1 *
+                (1 - P('>'))^0 * token('doctype', '>')
+
+-- Processing instructions.
+local proc_insn = token('proc_insn', P('<?') * (1 - P('?>'))^0 * P('?>')^-1)
+
 M._rules = {
   {'whitespace', ws},
   {'comment', comment},
   {'cdata', cdata},
   {'doctype', doctype},
+  {'proc_insn', proc_insn},
   {'tag', tag},
+  {'element', element},
+  {'attribute', attribute},
+  {'equals', equals},
+  {'string', string},
+  {'number', number},
   {'entity', entity},
-  {'any_char', l.any_char},
 }
 
 M._tokenstyles = {
-  {'tag', l.style_tag},
-  {'element', l.style_tag},
-  {'namespace', l.style_class},
-  {'attribute', l.style_type},
-  {'cdata', l.style_comment},
-  {'entity', l.style_operator},
-  {'doctype', l.style_comment},
+  tag = l.STYLE_KEYWORD,
+  element = l.STYLE_KEYWORD,
+  namespace = l.STYLE_CLASS,
+  attribute = l.STYLE_TYPE,
+  cdata = l.STYLE_COMMENT,
+  entity = l.STYLE_OPERATOR,
+  doctype = l.STYLE_COMMENT,
+  proc_insn = l.STYLE_COMMENT,
+  --markup = l.STYLE_COMMENT
 }
 
 M._foldsymbols = {

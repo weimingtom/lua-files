@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Gettext LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'gettext'}
@@ -14,7 +13,7 @@ local ws = token(l.WHITESPACE, l.space^1)
 local comment = token(l.COMMENT, '#' * S(': .~') * l.nonnewline^0)
 
 -- Strings.
-local string = token(l.STRING, l.delimited_range('"', '\\', true, false, '\n'))
+local string = token(l.STRING, l.delimited_range('"', true))
 
 -- Keywords.
 local keyword = token(l.KEYWORD, word_match({
@@ -34,7 +33,6 @@ M._rules = {
   {'keyword', keyword},
   {'identifier', identifier},
   {'variable', variable},
-  {'any_char', l.any_char},
 }
 
 return M

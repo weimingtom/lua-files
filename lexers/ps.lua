@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Postscript LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'ps'}
@@ -14,8 +13,8 @@ local ws = token(l.WHITESPACE, l.space^1)
 local comment = token(l.COMMENT, '%' * l.nonnewline^0)
 
 -- Strings.
-local arrow_string = l.delimited_range('<>', '\\', true)
-local nested_string = l.delimited_range('()', '\\', true, true)
+local arrow_string = l.delimited_range('<>')
+local nested_string = l.delimited_range('()', false, false, true)
 local string = token(l.STRING, arrow_string + nested_string)
 
 -- Numbers.
@@ -56,7 +55,6 @@ M._rules = {
   {'number', number},
   {'label', label},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 return M

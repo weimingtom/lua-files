@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- PHP LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S, V = lpeg.P, lpeg.R, lpeg.S, lpeg.V
 
 local M = {_NAME = 'php'}
@@ -16,9 +15,9 @@ local block_comment = '/*' * (l.any - '*/')^0 * P('*/')^-1
 local comment = token(l.COMMENT, block_comment + line_comment)
 
 -- Strings.
-local sq_str = l.delimited_range("'", '\\', true)
-local dq_str = l.delimited_range('"', '\\', true)
-local bt_str = l.delimited_range('`', '\\', true)
+local sq_str = l.delimited_range("'")
+local dq_str = l.delimited_range('"')
+local bt_str = l.delimited_range('`')
 local heredoc = '<<<' * P(function(input, index)
   local _, e, delimiter = input:find('([%a_][%w_]*)[\n\r\f]+', index)
   if delimiter then
@@ -67,12 +66,10 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 -- Embedded in HTML.
 local html = l.load('hypertext')
-M._lexer = html
 
 -- Embedded PHP.
 local php_start_rule = token('php_tag', '<?' * ('php' * l.space)^-1)
@@ -80,7 +77,7 @@ local php_end_rule = token('php_tag', '?>')
 l.embed_lexer(html, M, php_start_rule, php_end_rule)
 
 M._tokenstyles = {
-  {'php_tag', l.style_embedded},
+  php_tag = l.STYLE_EMBEDDED
 }
 
 local _foldsymbols = html._foldsymbols

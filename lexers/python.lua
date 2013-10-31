@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Python LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'python'}
@@ -14,13 +13,13 @@ local ws = token(l.WHITESPACE, l.space^1)
 local comment = token(l.COMMENT, '#' * l.nonnewline_esc^0)
 
 -- Strings.
-local sq_str = P('u')^-1 * l.delimited_range("'", '\\', true, false, '\n')
-local dq_str = P('U')^-1 * l.delimited_range('"', '\\', true, false, '\n')
+local sq_str = P('u')^-1 * l.delimited_range("'", true)
+local dq_str = P('U')^-1 * l.delimited_range('"', true)
 local triple_sq_str = "'''" * (l.any - "'''")^0 * P("'''")^-1
 local triple_dq_str = '"""' * (l.any - '"""')^0 * P('"""')^-1
 -- TODO: raw_strs cannot end in single \.
-local raw_sq_str = P('u')^-1 * 'r' * l.delimited_range("'", nil, true)
-local raw_dq_str = P('U')^-1 * 'R' * l.delimited_range('"', nil, true)
+local raw_sq_str = P('u')^-1 * 'r' * l.delimited_range("'", false, true)
+local raw_dq_str = P('U')^-1 * 'R' * l.delimited_range('"', false, true)
 local string = token(l.STRING, triple_sq_str + triple_dq_str + sq_str + dq_str +
                                raw_sq_str + raw_dq_str)
 
@@ -118,12 +117,13 @@ M._rules = {
   {'number', number},
   {'decorator', decorator},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 
 M._tokenstyles = {
-  {'decorator', l.style_preproc},
+  decorator = l.STYLE_PREPROCESSOR
 }
+
+l.property['fold.by.indentation'] = '1'
 
 return M

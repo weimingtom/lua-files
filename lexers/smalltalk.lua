@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Smalltalk LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'smalltalk'}
@@ -11,10 +10,10 @@ local M = {_NAME = 'smalltalk'}
 local ws = token(l.WHITESPACE, l.space^1)
 
 -- Comments.
-local comment = token(l.COMMENT, l.delimited_range('"', nil, true))
+local comment = token(l.COMMENT, l.delimited_range('"', false, true))
 
 -- Strings.
-local sq_str = l.delimited_range("'", '\\', true)
+local sq_str = l.delimited_range("'")
 local literal = '$' * l.word
 local string = token(l.STRING, sq_str + literal)
 
@@ -52,7 +51,6 @@ M._rules = {
   {'number', number},
   {'label', label},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._foldsymbols = {

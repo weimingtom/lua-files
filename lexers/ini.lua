@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Ini LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'ini'}
@@ -15,9 +14,9 @@ local comment = token(l.COMMENT, #S(';#') * l.starts_line(S(';#') *
                                  l.nonnewline^0))
 
 -- Strings.
-local sq_str = l.delimited_range("'", '\\', true)
-local dq_str = l.delimited_range('"', '\\', true)
-local label = l.delimited_range('[]', nil, true, false, '\n')
+local sq_str = l.delimited_range("'")
+local dq_str = l.delimited_range('"')
+local label = l.delimited_range('[]', true, true)
 local string = token(l.STRING, sq_str + dq_str + label)
 
 -- Numbers.
@@ -46,7 +45,6 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._LEXBYLINE = true

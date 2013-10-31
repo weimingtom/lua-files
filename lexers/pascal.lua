@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Pascal LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'pascal'}
@@ -18,7 +17,7 @@ local comment = token(l.COMMENT, line_comment + bblock_comment + pblock_comment)
 
 -- Strings.
 local string = token(l.STRING, S('uUrR')^-1 *
-                               l.delimited_range("'", nil, true, false, '\n'))
+                               l.delimited_range("'", true, true))
 
 -- Numbers.
 local number = token(l.NUMBER, (l.float + l.integer) * S('LlDdFf')^-1)
@@ -73,7 +72,6 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 return M

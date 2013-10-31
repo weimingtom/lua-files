@@ -2,8 +2,7 @@
 -- Haskell LPeg lexer.
 -- Modified by Alex Suraci.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'haskell'}
@@ -17,10 +16,10 @@ local block_comment = '{-' * (l.any - '-}')^0 * P('-}')^-1
 local comment = token(l.COMMENT, line_comment + block_comment)
 
 -- Strings.
-local string = token(l.STRING, l.delimited_range('"', '\\'))
+local string = token(l.STRING, l.delimited_range('"'))
 
 -- Chars.
-local char = token(l.STRING, l.delimited_range("'", "\\", false, false, '\n'))
+local char = token(l.STRING, l.delimited_range("'", true))
 
 -- Numbers.
 local number = token(l.NUMBER, l.float + l.integer)
@@ -53,7 +52,8 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
+
+l.property['fold.by.indentation'] = '1'
 
 return M

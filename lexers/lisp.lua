@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Lisp LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'lisp'}
@@ -19,7 +18,7 @@ local word = l.alpha * (l.alnum + '_' + '-')^0
 
 -- Strings.
 local literal = "'" * word
-local dq_str = l.delimited_range('"', '\\', true)
+local dq_str = l.delimited_range('"')
 local string = token(l.STRING, literal + dq_str)
 
 -- Numbers.
@@ -67,11 +66,10 @@ M._rules = {
   {'number', number},
   {'operator', operator},
   {'entity', entity},
-  {'any_char', l.any_char},
 }
 
 M._tokenstyles = {
-  {'entity', l.style_variable},
+  entity = l.STYLE_VARIABLE
 }
 
 M._foldsymbols = {

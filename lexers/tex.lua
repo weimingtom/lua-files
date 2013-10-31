@@ -2,8 +2,7 @@
 -- Plain TeX LPeg lexer.
 -- Modified by Robert Gieseke.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'tex'}
@@ -29,11 +28,10 @@ M._rules = {
   {'environment', environment},
   {'keyword', command},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._tokenstyles = {
-  {'environment', l.style_tag},
+  environment = l.STYLE_KEYWORD
 }
 
 M._foldsymbols = {

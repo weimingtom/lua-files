@@ -1,8 +1,7 @@
 -- Inform LPeg lexer for Scintillua.
 -- JMS 2010-04-25.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'inform'}
@@ -87,11 +86,10 @@ M._rules = {
   {'action', action},
   {'identifier', identifier},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 _styles = {
-  {'action', l.style_variable}
+  {'action', l.STYLE_VARIABLE}
 }
 
 return M

@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Ruby LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'ruby'}
@@ -24,9 +23,9 @@ local literal_delimitted = P(function(input, index)
     if delimiter_matches[delimiter] then
       -- Handle nested delimiter/matches in strings.
       local s, e = delimiter, delimiter_matches[delimiter]
-      patt = l.delimited_range(s..e, '\\', true, true)
+      patt = l.delimited_range(s..e, false, false, true)
     else
-      patt = l.delimited_range(delimiter, '\\', true)
+      patt = l.delimited_range(delimiter)
     end
     match_pos = lpeg.match(patt, input, index)
     return match_pos or #input + 1
@@ -34,11 +33,11 @@ local literal_delimitted = P(function(input, index)
 end)
 
 -- Strings.
-local cmd_str = l.delimited_range('`', '\\', true)
+local cmd_str = l.delimited_range('`')
 local lit_cmd = '%x' * literal_delimitted
 local lit_array = '%w' * literal_delimitted
-local sq_str = l.delimited_range("'", '\\', true)
-local dq_str = l.delimited_range('"', '\\', true)
+local sq_str = l.delimited_range("'")
+local dq_str = l.delimited_range('"')
 local lit_str = '%' * S('qQ')^-1 * literal_delimitted
 local heredoc = '<<' * P(function(input, index)
   local s, e, indented, _, delimiter =
@@ -51,7 +50,7 @@ local heredoc = '<<' * P(function(input, index)
 end)
 -- TODO: regex_str fails with `obj.method /patt/` syntax.
 local regex_str = l.last_char_includes('!%^&*([{-=+|:;,?<>~') *
-                  l.delimited_range('/', '\\', nil, nil, '\n') * S('iomx')^0
+                  l.delimited_range('/', true, false) * S('iomx')^0
 local lit_regex = '%r' * literal_delimitted * S('iomx')^0
 local string = token(l.STRING, sq_str + dq_str + lit_str + heredoc + cmd_str +
                                lit_cmd + lit_array) +
@@ -117,11 +116,10 @@ M._rules = {
   {'variable', variable},
   {'symbol', symbol},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._tokenstyles = {
-  {'symbol', l.style_constant},
+  symbol = l.STYLE_CONSTANT
 }
 
 local function disambiguate(text, pos, line, s)

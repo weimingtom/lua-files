@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- VHDL LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'vhdl'}
@@ -14,8 +13,8 @@ local ws = token(l.WHITESPACE, l.space^1)
 local comment = token(l.COMMENT, '--' * l.nonnewline^0)
 
 -- Strings.
-local sq_str = l.delimited_range("'", nil, true, false, '\n')
-local dq_str = l.delimited_range('"', '\\', true, false, '\n')
+local sq_str = l.delimited_range("'", true, true)
+local dq_str = l.delimited_range('"', true)
 local string = token(l.STRING, sq_str + dq_str)
 
 -- Numbers.
@@ -84,7 +83,6 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 return M

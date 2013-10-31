@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 JMS. See LICENSE.
 -- Scala LPeg Lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'scala'}
@@ -17,7 +16,7 @@ local comment = token(l.COMMENT, line_comment + block_comment)
 
 -- Strings.
 local symbol = "'" * l.word
-local dq_str = l.delimited_range('"', '\\', true, false, '\n')
+local dq_str = l.delimited_range('"', true)
 local tq_str = '"""' * (l.any - '"""')^0 * P('"""')^-1
 local string = token(l.STRING, tq_str + symbol + dq_str)
 
@@ -64,7 +63,6 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._foldsymbols = {

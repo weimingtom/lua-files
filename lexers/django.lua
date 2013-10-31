@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Django LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S, V = lpeg.P, lpeg.R, lpeg.S, lpeg.V
 
 local M = {_NAME = 'django'}
@@ -15,7 +14,7 @@ local comment = token(l.COMMENT, '{#' * (l.any - l.newline - '#}')^0 *
                                  P('#}')^-1)
 
 -- Strings.
-local string = token(l.STRING, l.delimited_range('"', nil, true))
+local string = token(l.STRING, l.delimited_range('"', false, true))
 
 -- Keywords.
 local keyword = token(l.KEYWORD, word_match{
@@ -50,13 +49,12 @@ M._rules = {
   {'function', func},
   {'identifier', identifier},
   {'string', string},
+  {'comment', comment},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 -- Embedded in HTML.
 local html = l.load('hypertext')
-M._lexer = html
 
 -- Embedded Django.
 local django_start_rule = token('django_tag', '{' * S('{%'))
@@ -66,7 +64,7 @@ l.embed_lexer(html, M, django_start_rule, django_end_rule)
 html._RULES['comment'] = html._RULES['comment'] + comment
 
 M._tokenstyles = {
-  {'django_tag', l.style_embedded},
+  django_tag = l.STYLE_EMBEDDED
 }
 
 local _foldsymbols = html._foldsymbols

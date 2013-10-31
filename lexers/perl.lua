@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Perl LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S, V = lpeg.P, lpeg.R, lpeg.S, lpeg.V
 
 local M = {_NAME = 'perl'}
@@ -24,9 +23,9 @@ local literal_delimitted = P(function(input, index) -- for single delimiter sets
     if delimiter_matches[delimiter] then
       -- Handle nested delimiter/matches in strings.
       local s, e = delimiter, delimiter_matches[delimiter]
-      patt = l.delimited_range(s..e, '\\', true, true)
+      patt = l.delimited_range(s..e, false, false, true)
     else
-      patt = l.delimited_range(delimiter, '\\', true)
+      patt = l.delimited_range(delimiter)
     end
     match_pos = lpeg.match(patt, input, index)
     return match_pos or #input + 1
@@ -39,9 +38,9 @@ local literal_delimitted2 = P(function(input, index) -- for 2 delimiter sets
     if delimiter_matches[delimiter] then
       -- Handle nested delimiter/matches in strings.
       local s, e = delimiter, delimiter_matches[delimiter]
-      patt = l.delimited_range(s..e, '\\', true, true)
+      patt = l.delimited_range(s..e, false, false, true)
     else
-      patt = l.delimited_range(delimiter, '\\', true)
+      patt = l.delimited_range(delimiter)
     end
     first_match_pos = lpeg.match(patt, input, index)
     final_match_pos = lpeg.match(patt, input, first_match_pos - 1)
@@ -53,9 +52,9 @@ local literal_delimitted2 = P(function(input, index) -- for 2 delimiter sets
 end)
 
 -- Strings.
-local sq_str = l.delimited_range("'", '\\', true)
-local dq_str = l.delimited_range('"', '\\', true)
-local cmd_str = l.delimited_range('`', '\\', true)
+local sq_str = l.delimited_range("'")
+local dq_str = l.delimited_range('"')
+local cmd_str = l.delimited_range('`')
 local heredoc = '<<' * P(function(input, index)
   local s, e, delimiter = input:find('([%a_][%w_]*)[\n\r\f;]+', index)
   if s == index and delimiter then
@@ -71,7 +70,7 @@ local lit_match = 'm' * literal_delimitted * S('cgimosx')^0
 local lit_sub = 's' * literal_delimitted2 * S('ecgimosx')^0
 local lit_tr = (P('tr') + 'y') * literal_delimitted2 * S('cds')^0
 local regex_str = l.last_char_includes('-<>+*!~\\=%&|^?:;([{') *
-                  l.delimited_range('/', '\\', false, true, '\n') * S('imosx')^0
+                  l.delimited_range('/', true) * S('imosx')^0
 local lit_regex = 'qr' * literal_delimitted * S('imosx')^0
 local string = token(l.STRING, sq_str + dq_str + cmd_str + heredoc + lit_str +
                                lit_array + lit_cmd + lit_match + lit_sub +
@@ -149,7 +148,6 @@ M._rules = {
   {'number', number},
   {'variable', variable},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._foldsymbols = {

@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Shell LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'bash'}
@@ -14,9 +13,9 @@ local ws = token(l.WHITESPACE, l.space^1)
 local comment = token(l.COMMENT, '#' * l.nonnewline^0)
 
 -- Strings.
-local sq_str = l.delimited_range("'", nil, true)
-local dq_str = l.delimited_range('"', '\\', true)
-local ex_str = l.delimited_range('`', '\\', true)
+local sq_str = l.delimited_range("'", false, true)
+local dq_str = l.delimited_range('"')
+local ex_str = l.delimited_range('`')
 local heredoc = '<<' * P(function(input, index)
   local s, e, _, delimiter =
     input:find('(["\']?)([%a_][%w_]*)%1[\n\r\f;]+', index)
@@ -46,7 +45,7 @@ local identifier = token(l.IDENTIFIER, l.word)
 -- Variables.
 local variable = token(l.VARIABLE,
                        '$' * (S('!#?*@$') + l.digit^1 + l.word +
-                              l.delimited_range('{}', nil, true, false, '\n')))
+                              l.delimited_range('{}', true, true)))
 
 -- Operators.
 local operator = token(l.OPERATOR, S('=!<>+-/*^&|~.,:;?()[]{}'))
@@ -60,7 +59,6 @@ M._rules = {
   {'number', number},
   {'variable', variable},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._foldsymbols = {

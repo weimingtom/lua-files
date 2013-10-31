@@ -24,8 +24,7 @@
 
 -- Based on lexer code from Mitchell mitchell.att.foicica.com.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'chuck'}
@@ -39,8 +38,8 @@ local block_comment = '/*' * (l.any - '*/')^0 * P('*/')^-1
 local comment = token(l.COMMENT, line_comment + block_comment)
 
 -- Strings.
-local sq_str = P('L')^-1 * l.delimited_range("'", '\\', true, false, '\n')
-local dq_str = P('L')^-1 * l.delimited_range('"', '\\', true, false, '\n')
+local sq_str = P('L')^-1 * l.delimited_range("'", true)
+local dq_str = P('L')^-1 * l.delimited_range('"', true)
 local string = token(l.STRING, sq_str + dq_str)
 
 -- Numbers.
@@ -104,13 +103,12 @@ M._rules = {
   {'comment', comment},
   {'number', number},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._tokenstyles = {
-  {'ugen', l.style_constant},
-  {'time', l.style_number},
-  {'now', l.style_definition},
+  ugen = l.STYLE_CONSTANT,
+  time = l.STYLE_NUMBER,
+  now = l.STYLE_CONSTANT..',bold'
 }
 
 return M

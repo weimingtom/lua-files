@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- Rebol LPeg lexer.
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'rebol'}
@@ -12,12 +11,13 @@ local ws = token(l.WHITESPACE, l.space^1)
 
 -- Comments.
 local line_comment = ';' * l.nonnewline^0;
-local block_comment = 'comment' * P(' ')^-1 * l.delimited_range('{}', nil, true)
+local block_comment = 'comment' * P(' ')^-1 *
+                      l.delimited_range('{}', false, true)
 local comment = token(l.COMMENT, line_comment + block_comment)
 
 -- Strings.
-local sl_string = l.delimited_range('"', '\\', true, false, '\n')
-local ml_string = l.delimited_range('{}', '\\', true)
+local sl_string = l.delimited_range('"', true)
+local ml_string = l.delimited_range('{}')
 local lit_string = "'" * l.word
 local string = token(l.STRING, sl_string + ml_string + lit_string)
 
@@ -117,7 +117,6 @@ M._rules = {
   {'identifier', identifier},
   {'string', string},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._foldsymbols = {

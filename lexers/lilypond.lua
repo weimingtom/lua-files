@@ -2,8 +2,7 @@
 -- Lilypond LPeg lexer.
 -- TODO Embed Scheme; Notes?, Numbers?
 
-local l = lexer
-local token, style, color, word_match = l.token, l.style, l.color, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'lilypond'}
@@ -17,7 +16,7 @@ local line_comment = '%' * l.nonnewline^0
 local comment = token(l.COMMENT, line_comment)
 
 -- Strings.
-local string = token(l.STRING, l.delimited_range('"'))
+local string = token(l.STRING, l.delimited_range('"', false, true))
 
 -- Keywords, commands.
 local keyword = token(l.KEYWORD, '\\' * l.word)
@@ -35,7 +34,6 @@ M._rules = {
   {'keyword', keyword},
   {'operator', operator},
   {'identifier', identifier},
-  {'any_char', l.any_char},
 }
 
 return M

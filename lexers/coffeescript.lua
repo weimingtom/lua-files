@@ -1,8 +1,7 @@
 -- Copyright 2006-2013 Mitchell mitchell.att.foicica.com. See LICENSE.
 -- CoffeeScript LPeg lexer.
 
-local l = lexer
-local token, word_match = l.token, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, S = lpeg.P, lpeg.S
 
 local M = {_NAME = 'coffeescript'}
@@ -16,10 +15,10 @@ local line_comment = '#' * l.nonnewline_esc^0
 local comment = token(l.COMMENT, block_comment + line_comment)
 
 -- Strings.
-local sq_str = l.delimited_range("'", '\\', true)
-local dq_str = l.delimited_range('"', '\\', true)
+local sq_str = l.delimited_range("'")
+local dq_str = l.delimited_range('"')
 local regex_str = l.last_char_includes('+-*%<>!=^&|?~:;,([{') *
-                  l.delimited_range('/', '\\', nil, nil, '\n') * S('igm')^0
+                  l.delimited_range('/', true) * S('igm')^0
 local string = token(l.STRING, sq_str + dq_str) + token(l.REGEX, regex_str)
 
 -- Numbers.
@@ -55,7 +54,8 @@ M._rules = {
   {'number', number},
   {'string', string},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
+
+l.property['fold.by.indentation'] = '1'
 
 return M

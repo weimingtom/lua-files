@@ -2,8 +2,7 @@
 -- Lua LPeg lexer.
 -- Original written by Peter Odding, 2007/04/04.
 
-local l = lexer
-local token, word_match = l.token, l.word_match
+local l, token, word_match = lexer, lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local M = {_NAME = 'lua'}
@@ -25,8 +24,8 @@ local block_comment = '--' * longstring
 local comment = token(l.COMMENT, block_comment + line_comment)
 
 -- Strings.
-local sq_str = l.delimited_range("'", '\\', true)
-local dq_str = l.delimited_range('"', '\\', true)
+local sq_str = l.delimited_range("'")
+local dq_str = l.delimited_range('"')
 local string = token(l.STRING, sq_str + dq_str) +
                token('longstring', longstring)
 
@@ -118,12 +117,11 @@ M._rules = {
   {'number', number},
   {'label', label},
   {'operator', operator},
-  {'any_char', l.any_char},
 }
 
 M._tokenstyles = {
-  {'longstring', l.style_string},
-  {'library', l.style_type}
+  longstring = l.STYLE_STRING,
+  library = l.STYLE_TYPE
 }
 
 local function fold_longcomment(text, pos, line, s, match)
