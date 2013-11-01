@@ -25,6 +25,10 @@ int Hunspell_add(Hunhandle *pHunspell, const char * word);
 int Hunspell_add_with_affix(Hunhandle *pHunspell, const char * word, const char * example);
 int Hunspell_remove(Hunhandle *pHunspell, const char * word);
 void Hunspell_free_list(Hunhandle *pHunspell, char *** slst, int n);
+
+//extras
+int Hunspell_add_dic(Hunhandle *pHunspell, const char * dpath, const char * key);
+
 ]]
 
 function M.new(affpath, dpath, key) --key is for hzip-encrypted dictionary files
@@ -102,7 +106,7 @@ function M.generate(h, word, word2)
 	return free_list(h, list, n)
 end
 
-function M.add(h, word, example)
+function M.add_word(h, word, example)
 	if example then
 		assert(C.Hunspell_add_with_affix(h, word, example) == 0)
 	else
@@ -110,8 +114,12 @@ function M.add(h, word, example)
 	end
 end
 
-function M.remove(h, word)
+function M.remove_word(h, word)
 	assert(C.Hunspell_remove(h, word) == 0)
+end
+
+function M.add_dic(h, dpath, key)
+	assert(C.Hunspell_add_dic(h, dpath, key) == 0)
 end
 
 ffi.metatype('Hunhandle', {__index = {
@@ -123,10 +131,13 @@ ffi.metatype('Hunhandle', {__index = {
 	stem = M.stem,
 	generate = M.generate,
 
-	add = M.add,
-	remove = M.remove,
+	add_word = M.add_word,
+	remove_word = M.remove_word,
 
 	get_dic_encoding = M.get_dic_encoding,
+
+	--extras
+	add_dic = M.add_dic,
 }})
 
 
@@ -148,12 +159,15 @@ if not ... then
 	pp('generate plural of "word"', h:generate('word', 'ts:Ns'))
 	pp('generate plural of "word"', h:generate('word', {'ts:Ns'}))
 
-	h:add('asdf')
+	h:add_word('asdf')
 	assert(h:spell('asdf') == 'known')
-	h:remove('asdf')
+	h:remove_word('asdf')
 	assert(h:spell('asdf') == 'unknown')
 
 	assert(h:get_dic_encoding() == 'UTF-8')
+
+	--extras
+	h:add_dic('media/hunspell/en_US/en_US.dic')
 
 	h:free()
 end
