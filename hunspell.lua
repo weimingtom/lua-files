@@ -26,7 +26,7 @@ int Hunspell_add_with_affix(Hunhandle *pHunspell, const char * word, const char 
 int Hunspell_remove(Hunhandle *pHunspell, const char * word);
 void Hunspell_free_list(Hunhandle *pHunspell, char *** slst, int n);
 
-//extras
+//extras from extras.cxx
 int Hunspell_add_dic(Hunhandle *pHunspell, const char * dpath, const char * key);
 
 ]]
