@@ -43,10 +43,9 @@ function M.free(h)
 	ffi.gc(h, nil)
 end
 
-local spell_codes = {[0] = 'unknown', [1] = 'known', [2] = 'warn'}
-
 function M.spell(h, s)
-	return assert(spell_codes[C.Hunspell_spell(h, s)])
+	local ret = C.Hunspell_spell(h, s)
+	return ret ~= 0, ret == 2 and 'warn' or nil
 end
 
 function M.get_dic_encoding(h)
@@ -148,8 +147,8 @@ if not ... then
 		'media/hunspell/en_US/en_US.aff',
 		'media/hunspell/en_US/en_US.dic')
 
-	assert(h:spell('dog') == 'known')
-	assert(h:spell('dawg') == 'unknown')
+	assert(h:spell('dog'))
+	assert(not h:spell('dawg'))
 
 	pp('suggest for "dawg"', h:suggest('dawg'))
 	pp('analyze "words"', h:analyze('words'))
@@ -160,9 +159,9 @@ if not ... then
 	pp('generate plural of "word"', h:generate('word', {'ts:Ns'}))
 
 	h:add_word('asdf')
-	assert(h:spell('asdf') == 'known')
+	assert(h:spell('asdf'))
 	h:remove_word('asdf')
-	assert(h:spell('asdf') == 'unknown')
+	assert(not h:spell('asdf'))
 
 	assert(h:get_dic_encoding() == 'UTF-8')
 
