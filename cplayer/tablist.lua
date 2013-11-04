@@ -10,7 +10,7 @@ function player:tablist(t)
 
 	for i,item in ipairs(values) do
 		if self:button{id = id..'_'..item, x = x, y = y, w = item_w, h = item_h,
-								text = item, cut = 'both', selected = selected == item}
+								text = item, cut = 'both', selected = selected == i}
 		then
 			selected = item
 		end

@@ -183,15 +183,15 @@ end
 
 --draw a reverse pilcrow at eol
 function view:render_eol_marker(line)
-	local x, y = self:text_coords(line, self.buffer:visual_col(line, self.buffer:last_col(line) + 1))
+	local x, y = self:char_coords(line, self.buffer:visual_col(line, self.buffer:last_col(line) + 1))
 	local x = x + 2.5
-	local y = y - self.linesize + 3.5
+	local y = y + self.char_baseline - self.line_h + 3.5
 	local cr = self.player.cr
 	cr:new_path()
 	cr:move_to(x, y)
-	cr:rel_line_to(0, self.linesize - 0.5)
+	cr:rel_line_to(0, self.line_h - 0.5)
 	cr:move_to(x + 3, y)
-	cr:rel_line_to(0, self.linesize - 0.5)
+	cr:rel_line_to(0, self.line_h - 0.5)
 	cr:move_to(x - 2.5, y)
 	cr:line_to(x + 3.5, y)
 	self.player:stroke('#ffffff66')

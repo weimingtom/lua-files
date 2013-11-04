@@ -22,6 +22,8 @@ function buffer:new(editor, view, text, filename)
 	if filename then
 		text = glue.readfile(filename)
 		self.filename = filename
+	else
+		text = text or ''
 	end
 
 	self.line_terminator =

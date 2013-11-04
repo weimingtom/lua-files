@@ -61,54 +61,6 @@ local function linesize(line, buffer)
 	return #buffer:getline(line) + #buffer.line_terminator
 end
 
---[[
-local function next_token_rel_pos(t, i, p1)
-	local i, p = next_token_pos(t, i)
-	--p is relative to (line1, p1). make it relative to (line1, 1) given p1.
-	return i, p and p + p1 - 1
-end
-
---project tokens originated from text at (line1, p1) back into the text,
---returning (i, line, p1, p2) for each line covered.
-local function project_lines(t, line1, _p1, buffer)
-	local line = line1
-	local minp, maxp = 1, linesize(line1, buffer)
-
-	local i1, p1 --current token
-	local i2, p2 --next token
-	local rp1, rp2 --relative positions
-	local first_line
-
-	local i1, p1 = next_token_rel_pos(t, nil, _p1)
-	local i2, p2 = next_token_rel_pos(t, i1, _p1)
-
-	local rp1 = p1 - minp + 1
-	local rp2
-	local first_line = true
-
-		if first_line then
-			first_line = false
-			rp1 = minp
-		end
-
-	return function()
-		if not p2 then return end
-		if p2 > maxp then --not the last line
-			local rline = line
-			local rp1 = rp1
-			local rp2 = maxp
-		else
-
-
-			line = line + 1
-			minp, maxp = maxp + 1, maxp + linesize(line, buffer)
-
-			return i1, rline, rp1, rp2
-
-	end
-end
-]]
-
 --project token positions originated from text at (line1, p1) back into the text,
 --returning (i, line, p) for each position.
 local function project_pos(t, line1, p1, buffer)
@@ -209,7 +161,8 @@ local function start_token_for(line, t, line1, p1, buffer, lang0)
 	return i0, line0, p0, lang0
 end
 
---replace the tokens from i onwards with new tokens. the new tokens must represent the lexed text at that position.
+--replace the tokens in t from i onwards with new tokens.
+--the new tokens must represent the lexed text at that position.
 local function replace_tokens(t, i, newt)
 	local p0 = t[i] - 1
 	for i1, p1, p2, style in tokens(newt) do
@@ -261,10 +214,10 @@ local function relex(maxline, t, last_line, buffer, lang0, start_tokens)
 
 	replace_tokens(t, i, newt)
 
-	start_tokens = start_tokens or {}
-	replace_start_tokens(start_tokens, newt, line1, p1, buffer)
+	--start_tokens = start_tokens or {}
+	--replace_start_tokens(start_tokens, newt, line1, p1, buffer)
 
-	return t, line2, start_tokens
+	return t, line2--, start_tokens
 end
 
 --highlighter object
@@ -290,7 +243,7 @@ end
 
 if not ... then
 
-	if true then
+	if false then
 
 		local text = [==[
 --[[

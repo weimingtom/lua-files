@@ -8,18 +8,16 @@ cairo_player		better keyboard/mouse state
 
 IMAGE LOADING
 -----------------------------------------------------------------------
-bmpconv				needs demo + review multithreading
-libjpeg				review bmpconv integration; finish multiscan reading; needs demo
-libpng				review bmpconv integration; cdata source and string source are NYI; needs demo for conv. options
-giflib				review bmpconv integration
-nanojpeg				unused; crashes bmpconv with rgb and force_copy = false
+bitmap            color effects: contrast, gamma, brightness, saturation, hue
+bitmap            convolutions: blur, sharpen, antialias, solorize, posterize, emboss
+libjpeg				finish multiscan reading; finish native conversions
+libpng				finish native conversions
 imagefile			review integration with whoever uses it
-cairo					support loading images through the imagefile API
 
 
 HARD/HIGH-LEVEL
 -----------------------------------------------------------------------
-path					oh yeah... can we merge any files? can we rename it? can we split geometry lib from path lib?
+path					split geometry modules and path modules; path API; path editor
 svg_parser			check if it still complies with path semantics
 text_editor			needs lots of work
 obj_parser/loader	review with sg_gl_mesh; there are still meshes that don't load correctly
@@ -82,15 +80,13 @@ bzip2					see https://github.com/malkia/ufo/blob/master/ffi/bz2.lua
 lzma
 md5, sha1, sha256 in Lua
 vlc					plain C, no wrapper
-freetype				stub (only minimal binding to load a ft_face)
 an image library:
 	- IM: http://www.tecgraf.puc-rio.br/im/
 	- OpenCV, DevIL etc.
-event polling libraries?
+event polling libraries? turbo-lua?
 lrexlib http://math2.org/luasearch/rex.html ?
 luaInterface (.NET): http://code.google.com/p/luainterface/
 luaCOM
-wxlua again? http://wxlua.sourceforge.net/screenshots.php
 CLucene
 
 

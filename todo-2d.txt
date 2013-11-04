@@ -1,14 +1,7 @@
-- important: blur, shadow, 2d projection, perspective projection, contrast, gamma, brightness, saturation, grayscale
-
-- bitmaps: vflip, hflip, crop, tile
-- downsampling: dithering, quantization
-- projection:
-	- scale up/down (linear, bilinear, bicubic, spline, lanczos), rotate (wrap, smooth), stretch, skew
-	- perspective
-- distortions: mesh-based warp (envelope tool, lens), wave, twist, shake, ripple
-- effects: blur (split, gaussian), sharpen, antialias, solorize, posterize, emboss
-- blending: porter-duff modes
-- color: brightness, contrast, gamma, hue, stauration, invert
+- downsampling: quantization
+- bitmap geometric transforms:
+	- linear: scale up/down (linear, bilinear, bicubic, spline, lanczos), rotate (wrap, smooth), stretch, skew
+	- mesh-based warp: envelope tool, lens, projection, wave, twist, shake, ripple
 
 - antialiasing gamma adjustment at primitive level
 - rendering modes: full, solid, outline, wireframe
@@ -40,7 +33,6 @@ The vertex pipeline:
 	- other transformations from cartography? cylinder projection etc.
 
 - hit testing: inside polygon test with different fill modes.
-- polygon clipping
 
 - shape-preserving intersections (needs split API):
 	- line to arc
@@ -52,5 +44,3 @@ The vertex pipeline:
 	- bezier to bezier
 	- bezier to arc (or arc to bezier)
 	-
-
-

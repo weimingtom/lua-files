@@ -116,5 +116,5 @@ function player:grid(t)
 	return state
 end
 
-if not ... then assert(loadfile('../cairo_player_demo.lua'))() end
+if not ... then require'cairo_player_demo' end
 
