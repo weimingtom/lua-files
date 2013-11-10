@@ -13,18 +13,13 @@ local buffer = {
 	line_highlight_color = nil,
 }
 
-function buffer:new(editor, view, text, filename)
+function buffer:new(editor, view, text)
 	self = glue.inherit({
 		editor = editor,  --for getstate & setstate
 		view = view,      --for tabsize
 	}, self)
 
-	if filename then
-		text = glue.readfile(filename)
-		self.filename = filename
-	else
-		text = text or ''
-	end
+	text = text or ''
 
 	self.line_terminator =
 		self.line_terminator or
@@ -548,7 +543,6 @@ end
 --saving to disk safely
 
 function buffer:save_to_file(filename)
-	filename = assert(filename or self.filename)
 	--write the file contents to a temp file and replace the original with it.
 	--the way to prevent data loss 24-century style.
 	glue.fcall(function(finally)
@@ -573,9 +567,11 @@ function buffer:save_to_file(filename)
 		finally(function() os.remove(filename2) end)
 
 		os.rename(filename, filename2)
-		if not os.rename(filename1, filename) then
+		local ok,err = os.rename(filename1, filename)
+		if not ok then
 			os.rename(filename2, filename)
 		end
+		assert(ok, err)
 	end)
 end
 

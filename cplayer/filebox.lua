@@ -1,8 +1,19 @@
+--TODO: this crashes
 local player = require'cairo_player'
 local winapi = require'winapi'
 require'winapi.filedialogs'
 
+local ffi = require'ffi'
+ffi.cdef[[
+HRESULT CoInitialize(LPVOID pvReserved);
+HRESULT CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit);
+]]
+
+local ole = ffi.load'Ole32.dll'
+ole.CoInitializeEx(nil, 2)
+
 function player:filebox(t)
+
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
 	local filename = t.filename or 'browse...'
@@ -26,5 +37,6 @@ function player:filebox(t)
 
 	return filename
 end
+
 
 if not ... then require'cairo_player_demo' end

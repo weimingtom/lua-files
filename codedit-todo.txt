@@ -1,3 +1,6 @@
+- simultaneous edits
+	- ctrl+click creates multiple cursors and movement and typing is available to all
+	- ctrl+select creates multiple selections that can be copy/pasted
 - move selection (or current line) up/down with the mouse
 - select by click-dragging over the line numbers column
 	- select entire line by clicking?
@@ -27,38 +30,29 @@
 	- text styles: strike-through, underline, dashed/dotted/squiggle underline, selection rectangle,
 	- animated scrolling like in sublime text (actually that's pretty annoying)
 	- spell checking (configurable to apply only to comments and strings)
+	- minimap like sublime text
+	- zooming
 
 
 CODEDITOR
 ---------
+issues:
+	- merged key bindings for editor and app. editor gets key bindings that it has no commands for.
+
+
 - file tabs
-	- nav with ctrl+tab, ctrl+shift+tab
-	- ctrl+n new
-	- ctrl+o open
-	- ctrl+w close
 	- drag to reorder
 	- top or bottom display
-- f11 full screen
-- sessions:
-	- save and restore all open buffers along with view, caret and selection state
-	- autosave
 - customization:
-	- global, local (per-project), per-filetype, per-user config files (like scite).
+	- global, local (per-project), per-filetype config file.
 	- reload config on the fly when saving the config file.
-	- custom key bindings.
-- simultaneous edits
-	- ctrl+click creates multiple cursors and movement and typing is available to all
-	- ctrl+select creates multiple selections that can be copy/pasted
 - hi-level feats
 	- create tooltip list from the syntax hightlighter
-	- integrate a spell checking library
+	- integrate hunspell
 	- integrate a Lua linter
-	- minimap like sublime text
 - autocompletion
 - calltips
-- zooming
 - file change detection
-- atomic save
 - auto-backup (with undo/redo stack?)
 
 

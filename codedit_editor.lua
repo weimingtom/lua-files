@@ -33,7 +33,7 @@ function editor:new(options)
 
 	--core objects
 	self.view = self.view:new()
-	self.buffer = self.buffer:new(self, self.view, self.text, self.filename)
+	self.buffer = self.buffer:new(self, self.view, self.text)
 	self.view.buffer = self.buffer
 
 	--main cursor & selection objects
@@ -45,10 +45,6 @@ function editor:new(options)
 	--selection changed flags
 	self.block_selection.changed.reflow_mode = false
 	self.line_selection.changed.reflow_mode = false
-
-	--scrolling
-	self.scroll_x = 0
-	self.scroll_y = 0
 
 	--margins
 	if self.blame then
@@ -399,10 +395,9 @@ end
 --save command
 
 function editor:save(filename)
-	if not self.buffer.changed.file then return end
 	self.buffer:start_undo_group'normalize'
 	self.buffer:normalize()
-	self.cursor:move(self.cursor.line, self.cursor.col)
+	self.cursor:move(self.cursor.line, self.cursor.col) --cursor could get invalid after normalization
 	self.buffer:save_to_file(filename)
 end
 

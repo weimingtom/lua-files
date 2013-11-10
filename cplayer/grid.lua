@@ -1,5 +1,53 @@
 --immediate mode grid widget
 local player = require'cairo_player'
+local glue = require'glue'
+local grid = require'grid_widget'
+
+cgrid = glue.inherit({}, grid)
+cgrid.view = glue.inherit({}, grid.view)
+
+function cgrid:new(t, player)
+	self = grid.new(self, t)
+	self.player = player
+	return self
+end
+
+function cgrid.view:draw_scrollbox(x, y, w, h, cx, cy, cw, ch)
+	local scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h = self.grid.player:scrollbox{
+		id = self.grid.id..'_scrollbox',
+		x = x,
+		y = y,
+		w = w,
+		h = h,
+		cx = cx,
+		cy = cy,
+		cw = cw,
+		ch = ch,
+		vscroll = self.vscroll,
+		hscroll = self.hscroll,
+		vscroll_w = self.vscroll_w,
+		hscroll_h = self.hscroll_h,
+		page_size = self.scroll_page_size,
+		--vscroll_step = self.smooth_vscroll and 1 or self.linesize,
+		--hscroll_step = self.smooth_hscroll and 1 or self.charsize,
+	}
+	return scroll_x, scroll_y, clip_x, clip_y, clip_w, clip_h
+end
+
+function player:grid(t)
+	local g
+	if t.player then
+		g = t
+	else
+		g = cgrid:new(t)
+		g.player = self
+	end
+	g:render()
+	return grid
+end
+
+--[[
+
 
 function player:grid(t)
 	local id = assert(t.id, 'id missing')
@@ -115,6 +163,7 @@ function player:grid(t)
 	cr:restore()
 	return state
 end
+]]
 
 if not ... then require'cairo_player_demo' end
 

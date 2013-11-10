@@ -255,8 +255,8 @@ function editor:render()
 		self.view:render()
 		self.view:render_eol_markers()
 		--cr:restore()
-		if false and self.view.minimap then
-			--self.view:render_minimap()
+		if self.view.minimap then
+			self.view:render_minimap()
 		end
 	end
 end
@@ -269,7 +269,8 @@ function player:code_editor(t)
 	local id = assert(t.id, 'id missing')
 	local ed = t
 	if not t.buffer or not t.buffer.lines then
-		t.view = glue.inherit(t.view, view)
+		t.view = t.view and glue.inherit(t.view, view) or view
+		t.cursor = t.cursor and glue.inherit(t.cursor, editor.cursor) or editor.cursor
 		ed = editor:new(t)
 	end
 	ed.player = self

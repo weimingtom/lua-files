@@ -141,6 +141,8 @@ function null_layout:getbox(t)
 		assert(t.h, 'h missing')
 end
 
+function player:on_close() end --stub
+
 function player:window(t)
 
 	local referer = self
@@ -351,6 +353,10 @@ function player:window(t)
 
 	--window receives keyboard and mouse wheel events
 
+	function window.on_close(window)
+		self:on_close()
+	end
+
 	function window.on_mouse_wheel(window, x, y, buttons, wheel_delta)
 		self.wheel_delta = self.wheel_delta + (wheel_delta and wheel_delta / 120 or 0)
 		panel:invalidate()
@@ -505,6 +511,7 @@ end
 
 
 local function aligntext(cr, text, font_size, halign, valign, x, y, w, h)
+	text = tostring(text)
 	cr:set_font_size(font_size)
 	local extents = cr:text_extents(text)
 	cr:move_to(
@@ -517,11 +524,13 @@ local function aligntext(cr, text, font_size, halign, valign, x, y, w, h)
 end
 
 function player:text_path(text, font_size, halign, valign, x, y, w, h)
+	text = tostring(text)
 	aligntext(self.cr, text, font_size, halign, valign, x, y, w, h)
 	self.cr:text_path(text)
 end
 
 function player:text(text, font_size, color, halign, valign, x, y, w, h)
+	text = tostring(text)
 	aligntext(self.cr, text, font_size, halign, valign, x, y, w, h)
 	self:setcolor(color)
 	self.cr:show_text(text)

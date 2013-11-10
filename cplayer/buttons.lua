@@ -84,7 +84,7 @@ function player:button(t)
 	self:text(text, font_size, fg_color, 'center', 'middle', x, y, w, h)
 	self.theme = old_theme
 
-	return clicked
+	return (t.immediate and self.active == id and hot and down) or clicked
 end
 
 function player:togglebutton(t)

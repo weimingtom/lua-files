@@ -29,6 +29,7 @@ Window = subclass({
 		help_button = WS_EX_CONTEXTHELP, --only shown if both minimize and maximize buttons are hidden
 		tool_window = WS_EX_TOOLWINDOW,
 		transparent = WS_EX_TRANSPARENT,
+		double_border = WS_EX_DLGMODALFRAME,
 	},
 	__defaults = {
 		--class style bits

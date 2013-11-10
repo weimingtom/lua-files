@@ -2,14 +2,13 @@ local player = require'cairo_player'
 local glue = require'glue'
 
 local t = {
-	tab = 'tab1',
+	tab = 1,
 	text1 = 'edit me',
 	text2 = 'edit me too as I am a very long string that wants to be edited',
 	text3 = '"this is me quoting myself" - me',
 	percent = 50,
 	fruit = 'cherries',
 	theme = 'dark',
-	grid_state = nil,
 }
 
 function player:on_render(cr)
@@ -95,33 +94,6 @@ function player:on_render(cr)
 	self:rect(300, 10, 500, 500, 'normal_bg', 'normal_border', 10)
 	cr:translate(-t.sb_cx, -t.sb_cy)
 	cr:restore()
-
-	t.grid_state =
-	self:grid{id = 'grid', x = 530, y = 10, w = 400, h = 200,
-		fields = {'id', 'name', 'description'},
-		field_meta = {
-			id = {align = 'right'},
-		},
-		rows = {
-			{1, 'goon', 'woody quality'},
-			{2, 'tit', 'tinny quality'},
-			{3, 'tit', 'tinny quality'},
-			{4, 'tit', 'tinny quality'},
-			{5, 'tit', 'tinny quality'},
-			{6, 'tit', 'tinny quality'},
-			{7, 'tit', 'tinny quality'},
-			{8, 'tit', 'tinny quality'},
-			{9, 'tit', 'tinny quality'},
-			{10,'end', 'endy quality'},
-		},
-		state = t.grid_state or {
-			selected_row = 5,
-			col_widths = {
-				id = 50,
-				description = 300,
-			},
-		},
-	}
 
 	t.node13 = t.node13 or
 			{name = 'level1.3',

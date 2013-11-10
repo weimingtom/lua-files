@@ -145,7 +145,7 @@ function BaseWindow:__set_style_bit(k,v)
 end
 
 function BaseWindow:__set_style_ex_bit(k,v)
-	SetWindowExStyle(self.hwnd, self.__style_ex_bitmask:set(GetWindowExStyle(self.hwnd), style))
+	SetWindowExStyle(self.hwnd, self.__style_ex_bitmask:set(GetWindowExStyle(self.hwnd), k, v))
 	SetWindowPos(self.hwnd, nil, 0, 0, 0, 0, SWP_FRAMECHANGED_ONLY)
 end
 

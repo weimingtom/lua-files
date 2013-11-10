@@ -6,7 +6,7 @@ local tabs = require'codedit_tabs'
 local cursor = {
 	--navigation options
 	restrict_eol = true, --don't allow caret past end-of-line
-	restrict_eof = false, --don't allow caret past end-of-file
+	restrict_eof = true, --don't allow caret past end-of-file
 	land_bof = true, --go at bof if cursor goes up past it
 	land_eof = true, --go at eof if cursor goes down past it
 	word_chars = '^[a-zA-Z]', --for jumping between words
