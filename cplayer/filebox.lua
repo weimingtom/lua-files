@@ -39,4 +39,4 @@ function player:filebox(t)
 end
 
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end

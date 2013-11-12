@@ -20,5 +20,5 @@ function player:menu(t)
 	return selected, clicked
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 

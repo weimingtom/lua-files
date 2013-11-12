@@ -21,6 +21,7 @@ function player:editbox(t)
 	local text = t.text
 	local caret_w = t.caret_w or 2
 	local font_size = t.font_size or h / 2
+	local font_face = t.font_face
 	local down = self.lbutton
 	local cr = self.cr
 	local readonly = t.readonly
@@ -98,7 +99,7 @@ function player:editbox(t)
 	self.cr:rectangle(x, y, w, h)
 	self.cr:save()
 	self.cr:clip()
-	self:text(text, font_size, 'normal_fg', 'left', 'middle', x + text_x, y, w, h)
+	self:text(text, font_face, font_size, 'normal_fg', 'left', 'middle', x + text_x, y, w, h)
 	if caret_x and (self.clock - self.ui.activation_clock) % 1000 < 500 then
 		self:rect(x + text_x + caret_x, y, caret_w, h, 'normal_fg')
 	end
@@ -107,5 +108,5 @@ function player:editbox(t)
 	return text
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 

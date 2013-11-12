@@ -136,5 +136,5 @@ function player:scrollbox(t)
 		x, y, w, h  --clipping rectangle, in absolute coordinates
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 

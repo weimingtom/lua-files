@@ -38,5 +38,5 @@ function player:hsplitter(t)
 	splitter(self, t, false)
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 

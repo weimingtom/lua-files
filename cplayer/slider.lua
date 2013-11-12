@@ -16,6 +16,7 @@ function player:slider(t)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
 	local font_size = t.font_size or math.ceil(h / 2 + 1)
+	local font_face = t.font_face
 	local text = t.text or id
 
 	local i0, i1, step = t.i0 or 0, t.i1 or 100, t.step or 1
@@ -47,7 +48,7 @@ function player:slider(t)
 	self:rect(x, y, w, h, 'faint_bg', 'normal_border')
 	self:rect(x, y, w1, h, 'selected_bg')
 
-	self:text_path(text, font_size, 'center', 'middle', x, y, w, h)
+	self:text_path(text, font_face, font_size, 'center', 'middle', x, y, w, h)
 	self.cr:save()
 	self.cr:clip()
 		self:rect(x + w1, y, w, h, 'selected_bg')
@@ -57,4 +58,4 @@ function player:slider(t)
 	return i
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end

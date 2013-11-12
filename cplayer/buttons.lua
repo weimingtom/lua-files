@@ -49,6 +49,7 @@ function player:button(t)
 	local selected = t.selected
 	local enabled = t.enabled == nil and true or t.enabled
 	local font_size = t.font_size or h / 2
+	local font_face = t.font_face
 
 	local down = self.lbutton
 	local hot = enabled and self:hotbox(x, y, w, h)
@@ -81,7 +82,7 @@ function player:button(t)
 	local old_theme = self:save_theme(t.theme)
 	button_path(self.cr, x, y, w, h, cut)
 	self:fillstroke(bg_color, 'normal_border', 1)
-	self:text(text, font_size, fg_color, 'center', 'middle', x, y, w, h)
+	self:text(text, font_face, font_size, fg_color, 'center', 'middle', x, y, w, h)
 	self.theme = old_theme
 
 	return (t.immediate and self.active == id and hot and down) or clicked
@@ -121,5 +122,5 @@ function player:mbutton(t)
 	return selected
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 

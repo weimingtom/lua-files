@@ -59,5 +59,5 @@ function player:magnifier(t)
 	self:rect(x, y, w, h, nil, 'selected_bg', 1)
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 

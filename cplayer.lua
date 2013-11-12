@@ -499,7 +499,7 @@ function player:curve(x1, y1, x2, y2, x3, y3, x4, y4, ...)
 	self:stroke(...)
 end
 
-local function aligntext(cr, text, font_size, halign, valign, x, y, w, h)
+local function aligntext(cr, text, font_face, font_size, halign, valign, x, y, w, h)
 	text = tostring(text)
 	cr:set_font_size(font_size)
 	local extents = cr:text_extents(text)
@@ -514,13 +514,13 @@ end
 
 function player:text_path(text, font_face, font_size, halign, valign, x, y, w, h)
 	text = tostring(text)
-	aligntext(self.cr, text, font_size, halign, valign, x, y, w, h)
+	aligntext(self.cr, text, font_face, font_size, halign, valign, x, y, w, h)
 	self.cr:text_path(text)
 end
 
 function player:text(text, font_face, font_size, color, halign, valign, x, y, w, h)
 	text = tostring(text)
-	aligntext(self.cr, text, font_size, halign, valign, x, y, w, h)
+	aligntext(self.cr, text, font_face, font_size, halign, valign, x, y, w, h)
 	self:setcolor(color)
 	self.cr:show_text(text)
 end
@@ -533,7 +533,7 @@ end
 
 --null layout
 
-local player.null_layout = {} --a null layout is a stateless layout that requires all box coordinates to be specified
+player.null_layout = {} --a null layout is a stateless layout that requires all box coordinates to be specified
 
 function player.null_layout:getbox(t)
 	return
