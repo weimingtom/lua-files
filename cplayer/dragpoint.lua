@@ -1,5 +1,5 @@
 --a dragpoint is a square point that you can drag around, use as a handle.
-local player = require'cairo_player'
+local player = require'cplayer'
 
 function player:dragpoint(t)
 	local id = assert(t.id, 'id missing')

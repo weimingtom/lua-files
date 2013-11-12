@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local libpng = require'libpng'
 local glue = require'glue'
 local ffi = require'ffi'

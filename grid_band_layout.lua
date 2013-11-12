@@ -159,7 +159,7 @@ local function set_w(band, parent_w) --set width for all bands
 	set_children_w(band)
 end
 
-local function compute(band, parent_w)
+local function set_layout(band, parent_w)
 	set_minmax(band)
 	set_pw(band)
 	set_w(band, parent_w or 0)
@@ -167,7 +167,5 @@ end
 
 if not ... then require'grid_band_layout_demo' end
 
-return {
-	compute = compute
-}
+return set_layout
 

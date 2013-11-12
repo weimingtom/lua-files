@@ -621,7 +621,7 @@ inst.create_thread = lanes.gen('*', function(linda, id)
 				if hwnd == nil or hwnd ~= last_hwnd then
 					close_player()
 					if hwnd then
-						player = require'cairo_player_demo'
+						player = require'cplayer_demo'
 						player.main = player:window{on_render = player.on_render, parent = hwnd}
 					end
 				else

@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local function splitter(self, t, vertical)
 	local id = assert(t.id, 'id missing')
@@ -38,5 +38,5 @@ function player:hsplitter(t)
 	splitter(self, t, false)
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

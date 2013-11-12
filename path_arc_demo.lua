@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local arc = require'path_arc'
 local affine = require'affine2d'
 local glue = require'glue'

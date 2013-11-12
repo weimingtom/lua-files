@@ -1,5 +1,5 @@
 --layouting API: box stack and box-based alignment and hit testing
-local player = require'cairo_player'
+local player = require'cplayer'
 
 --UI controls state
 player.active = nil  --active control id
@@ -107,4 +107,4 @@ function player:text(text, color, halign, valign)
 	self.cr:show_text(text)
 end
 
-if not ... then require'cairo_player_ui_demo' end
+if not ... then require'cplayer_ui_demo' end

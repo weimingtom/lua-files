@@ -1,44 +1,135 @@
-local player = require'cairo_player'
-local layout = require'grid_band_layout'
+local set_layout = require'grid_band_layout'
 
-local function walk_band_cells(f, band, x, y, w, row_h, i, pband)
+--set hierarchy info
 
-	x = x or 0
-	y = y or 0
-	w = w or math.floor(band._w + 0.5)
-	row_h = row_h or band.row_h
-
-	local rows = math.max(band.rows or 1, 1)
-	local h = rows * row_h
-
-	if band.name then
-		if f(band, x, y, w, h, i, pband) == false then
-			return false
-		end
-		y = y + rows * row_h
+local function set_children(parent, root)
+	for i, child in ipairs(parent) do
+		child.index = i
+		child.parent = parent
+		child.root = root
+		set_children(child, root)
 	end
+end
 
+local function set_hierarchy(band)
+	band.root = band
+	set_children(band, band)
+end
+
+local function isparent(band, child)
+	return child.parent == band or (child.parent and isparent(band, child.parent))
+end
+
+--stateless iteration
+
+local function right_band(band)
+	if not band.parent then return end
+	if band.index < #band.parent then
+		return band.parent[band.index + 1]
+	else
+		return right_band(band.parent)
+	end
+end
+
+local function next_band(band0, band)
+	if not band then
+		return band0
+	end
+	if #band > 0 then
+		return band[1]
+	else
+		return right_band(band)
+	end
+end
+
+local function bands(band) --depth-first top-down iterator
+	return next_band, band
+end
+
+--inherit row height
+
+local function set_row_h(band)
+	band._row_h = band.row_h or (band.parent and band.parent._row_h) or 26
+	for i, child in ipairs(band) do
+		set_row_h(child)
+	end
+end
+
+-- set number of rows
+
+local function set_rows(band)
+	local child_rows = 0
+	for i, child in ipairs(band) do
+		set_rows(child)
+		child_rows = math.max(child_rows, child._total_rows)
+	end
+	band._rows = band.rows or 1
+	band._total_rows = band._rows + child_rows
+end
+
+--set coordinates on computed layout
+
+local function band_size(band)
+	local w = math.floor(band._w + 0.5)
+	local h = band._rows * band._row_h
+	local total_h = band._total_rows * band._row_h
+	return w, h, total_h
+end
+
+local function set_coords_recursive(band, x, y, w, h, total_h)
+	band._x = x
+	band._y = y
+	band._w = w
+	band._h = h
+	band._total_h = total_h
 	local left_w = w
-	for i, cband in ipairs(band) do
-		local w = math.floor(cband._w + 0.5)
+	y = y + h
+	for i, child in ipairs(band) do
+		w, h, total_h = band_size(child)
 		if i == #band then
-			w = left_w
+			w = left_w --drop all rounding chippings on the last child
 		end
-		if walk_band_cells(f, cband, x, y, w, row_h, i, band) == false then
-			break
-		end
+		set_coords_recursive(child, x, y, w, h, total_h)
 		x = x + w
 		left_w = left_w - w
 	end
 end
 
-local function band_cells(band, x, y)
-	return coroutine.wrap(function()
-		walk_band_cells(coroutine.yield, band, x, y)
-	end)
+local function set_coords(band)
+	set_coords_recursive(band, 0, 0, band_size(band))
 end
 
---box math
+--set everything in the right order
+
+local function set_all(band)
+	set_hierarchy(band)
+	set_row_h(band)
+	set_rows(band)
+	set_layout(band)
+	set_coords(band)
+end
+
+--editing
+
+local function move(band, parent, index)
+	assert(not parent or band.root == parent.root)
+	if parent and band.parent == parent and band.index < index then
+		index = index - 1
+	end
+	assert(not parent or (index >= 1 and index <= #parent + 1))
+	if band.parent then
+		table.remove(band.parent, band.index)
+	end
+	if parent then
+		table.insert(parent, index, band)
+	end
+end
+
+--hit testing
+
+local function unpack_band(band)
+	return band._x, band._y, band._w, band._h
+end
 
 local function hitbox(x0, y0, x, y, w, h)
 	return x0 >= x and x0 <= x + w and y0 >= y and y0 <= y + h
@@ -48,208 +139,128 @@ local function offsetbox(d, x, y, w, h)
 	return x - d, y - d, w + 2*d, h + 2*d
 end
 
-local function hitbox_margins(x0, y0, x, y, w, h, d) --top, left, bottom, right
+local function hit_test_body(band, x0, y0) --true, side | nil
+	local x, y, w, h = unpack_band(band)
+	local half_w = w / 2
+	if hitbox(x0, y0, x, y, half_w, h) then
+		return true, 'left'
+	elseif hitbox(x0, y0, x + half_w, y, half_w, h) then
+		return true, 'right'
+	end
+end
+
+local function hit_test_margins(band, x0, y0, d) --true, top, left, bottom, right | nil
+	local x, y, w, h = unpack_band(band)
 	if hitbox(x0, y0, offsetbox(d, x, y, 0, 0)) then
-		return true, true, false, false
+		return true, true, true, false, false
 	elseif hitbox(x0, y0, offsetbox(d, x + w, y, 0, 0)) then
-		return true, false, false, true
+		return true, true, false, false, true
 	elseif hitbox(x0, y0, offsetbox(d, x, y + h, 0, 0)) then
-		return true, false, true, false
+		return true, true, false, true, false
 	elseif hitbox(x0, y0, offsetbox(d, x + w, y + h, 0, 0)) then
-		return false, false, true, true
+		return true, false, false, true, true
 	elseif hitbox(x0, y0, offsetbox(d, x, y, w, 0)) then
-		return true, false, false, false
+		return true, true, false, false, false
 	elseif hitbox(x0, y0, offsetbox(d, x, y + h, w, 0)) then
-		return false, false, true, false
+		return true, false, false, true, false
 	elseif hitbox(x0, y0, offsetbox(d, x, y, 0, h)) then
-		return false, true, false, false
+		return true, false, true, false, false
 	elseif hitbox(x0, y0, offsetbox(d, x + w, y, 0, h)) then
-		return false, false, false, true
+		return true, false, false, false, true
 	end
 end
 
---hit testing
+--class
 
-local function hit_test_band(x0, y0, band, x, y)
-	for band, x, y, w, h in band_cells(band, x, y) do
-		local top, left, bottom, right = hitbox_margins(x0, y0, x, y, w, h, 5)
-		if top ~= nil then
-			return band, top, left, bottom, right
-		elseif hitbox(x0, y0, x, y, w, h) then
-			return band
+local glue = require'glue'
+
+local band = {
+	--layout computation
+	set_hierarchy = set_hierarchy,
+	set_row_h = set_row_h,
+	set_rows = set_rows,
+	set_layout = set_layout,
+	set_coords = set_coords,
+	set_all = set_all,
+	--navigation
+	next = next_band,
+	bands = bands,
+	isparent = isparent,
+	--editing
+	move = move,
+	--hit testing
+	hit_test_body = hit_test_body,
+	hit_test_margins = hit_test_margins,
+}
+
+function band:new(t)
+	self = glue.inherit(t, self)
+	return self
+end
+
+--rendering stubs
+function band:draw_arrow(x, y, angle) end --draw an arrow pointing at x, y rotated at an angle (in degrees)
+function band:draw_rect(x, y, w, h, fill, stroke, line_width) --draw a rectangle
+function band:draw_text(text, font_face, font_size, valign, halign, x, y, w, h) --draw text in a box
+
+local function render(band)
+	for band in bands(band) do
+
+		local x, y, w, h, i, pband = band._x, band._y, band._w, band._h, band.index, band.parent
+
+		if not (self.active and self.ui.action == 'move' and grid_band.isparent(self.active, band)) then
+			self:rect(x + 0.5, y + 0.5, w, self.active == band and band._total_h or h,
+				(self.active == band and self.ui.action == 'move' and '#ff9999')
+				or 'normal_bg', 'normal_border', 1)
 		end
-	end
-end
 
-local function eq(a, b, e) return math.abs(a-b) < e end
+		self.cr:select_font_face('MS Sans Serif', 0, 0)
+		local t = {
+			band.name,
+			(band.w or (band.wp and band.wp * 100 .. '%') or '') .. ''
+		}
 
-local function render_band(api, band)
-	walk_band_cells(function(band, x, y, w, h, i, pband)
-		local constrained = eq(band._w, band._max_w, 0.1) or eq(band._w, band._min_w, 0.1)
-		api:rect(x + 0.5, y + 0.5, w, h, constrained and 'hot_bg' or 'normal_bg', 'normal_border', 1)
-		api.cr:select_font_face('MS Sans Serif', 0, 0)
-		local t = {band.name,
-			string.format('%4.2f', band._pw),
-			band._min_w .. ' - ' .. band._max_w,
-			string.format('%4.2f', band._w)}
 		for i,s in ipairs(t) do
-			api:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
+			self:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
 		end
-	end, band, 10, 10)
-end
-
-player.continuous_rendering = false
-
-local band = {
-	row_h = 100,
-	name = 'A', w = 480,
-	{name = 'A1', w = 100, pw = .15},
-	{name = 'A2', w = 20},
-	{name = 'A3'},
-	{name = 'A22', w = 20},
-	{name = 'A4'},
-	{name = 'A5', w = 120},
-}
-
-local band = {
-	row_h = 100,
-	w = 1000,
-	name = 'main',
-	{name = 'Product Information', rows = 2,
-		{min_w = 100, name = 'Product ID'},
-		{min_w = 100, name = 'Product Name'},
-	},
-	{name = 'Price Information',
-		{name = 'Price',
-			{min_w = 100, name = 'Qty / Unit', min_w = 40},
-			{min_w = 100, name = 'Unit Price'},
-			{min_w = 100, name = 'Discontinued'},
-		},
-		{name = 'Units',
-			{min_w = 100, name = 'Units In Stock'},
-			{min_w = 100, name = 'Units On Order'},
-		},
-	},
-	{name = 'Other', rows = 2,
-		{min_w = 100, name = 'Reorder Level'},
-		{min_w = 100, name = 'EAN13'},
-	},
-}
-
-
---set parent and index for each band for stateless navigation
-
-local function set_hierarchy(band)
-	for i, cband in ipairs(band) do
-		cband.index = i
-		cband.parent = band
-		set_hierarchy(cband)
 	end
 end
 
-set_hierarchy(band)
-layout.compute(band)
-
-function player:draw_arrow(x, y, angle)
-	local cr = self.cr
+local function draw_arrow(cr, x, y, angle)
 	local l = 12
 	cr:new_path()
 	cr:move_to(x, y)
 	cr:rotate(math.rad(angle))
-	cr:rel_line_to(l/2, 1.2 * l)
-	cr:rel_line_to(-l, 0)
+	cr:rel_line_to(l/2, math.sqrt(3) / 2 * l)
+	cr:rel_line_to(-l * .3, 0)
+	cr:rel_line_to(0, l / 2)
+	cr:rel_line_to(-l * .4, 0)
+	cr:rel_line_to(0, -l / 2)
+	cr:rel_line_to(-l * .3, 0)
 	cr:close_path()
 	cr:rotate(math.rad(-angle))
-	self:fillstroke('#ff0000ff', '#ff0000ff')
-end
-
-function player:on_render()
-
-	render_band(self, band, 10, 10)
-
-	local mx, my = self.cr:device_to_user(self.mousex, self.mousey)
-
-	if self.active then
-		if self.lbutton then
-			if self.ui.move then
-
-				walk_band_cells(function(band, x, y, w, h, i, pband)
-
-					local top, left, bottom, right = hitbox_margins(mx, my, x, y, w, h, 10)
-					if top ~= nil then
-
-						if right then
-							self:draw_arrow(x + w, y, 180)
-							self:draw_arrow(x + w, y + h, 0)
-							return false
-						elseif bottom then
-							self:draw_arrow(x, y + h, 90)
-							self:draw_arrow(x + w, y + h, -90)
-							return false
-						end
-
-					elseif hitbox(mx, my, x, y, w, h) then
-
-					end
-				end, band, 10, 10)
-
-			elseif self.ui.vert then
-				local row_h = (self.active.h / (self.active.rows or 1))
-				self.active.rows = math.max( math.floor( (my - self.active.y) / row_h + 0.5), 1)
-			elseif self.active.w then
-				self.active.w = mx - self.active.x
-				if self.ui.pband then
-					--self.ui.pband.w = mx - self.ui.pband.x
-				end
-				layout.compute(band, 0)
-				self:text(self.active.name or '', 8, 'normal_fg', 'right', 'middle', 100, 100, 1000, 100)
-			end
-		else
-			self.active = nil
-		end
-	end
-
-	walk_band_cells(function(band, x, y, w, h, i, pband)
-		band.x = x
-		band.y = y
-		band.h = h
-		local top, left, bottom, right = hitbox_margins(mx, my, x, y, w, h, 5)
-		if top ~= nil then
-			if (top and left) or (bottom and right) then
-				self.cursor = 'resize_nwse'
-			elseif (top and right) or (bottom and left) then
-				self.cursor = 'resize_nesw'
-			elseif bottom then
-				self.cursor = 'resize_vertical'
-				if not self.active and self.lbutton then
-					self.active = band
-					self.ui.vert = true
-					self.ui.pband = pband
-				end
-			elseif right then
-				local last_band = pband and i == #pband
-				self.cursor = 'resize_horizontal'
-				if not self.active and self.lbutton then
-					self.active = band
-					self.ui.vert = false
-					self.ui.last_band = last_band
-					self.ui.pband = pband
-				end
-			end
-		elseif hitbox(mx, my, x, y, w, h) then
-			self.cursor = 'move'
-			if not self.active and self.lbutton then
-				self.active = band
-				self.ui.move = true
-			end
-		end
-	end, band, 10, 10)
-
+	self:fillstroke('#ffffff', '#000000', 1)
 end
 
 
-if not ... then
+if not ... then require'grid_band_demo' end
 
-player:play()
+return {
+	--layout computation
+	set_hierarchy = set_hierarchy,
+	set_row_h = set_row_h,
+	set_rows = set_rows,
+	set_layout = set_layout,
+	set_coords = set_coords,
+	set_all = set_all,
+	--navigation
+	next_band = next_band,
+	bands = bands,
+	isparent = isparent,
+	--editing
+	move = move,
+	--hit testing
+	hit_test_body = hit_test_body,
+	hit_test_margins = hit_test_margins,
+}
 
-end

@@ -1,5 +1,5 @@
 --immediate mode grid widget
-local player = require'cairo_player'
+local player = require'cplayer'
 local glue = require'glue'
 local grid = require'grid_widget'
 
@@ -165,5 +165,5 @@ function player:grid(t)
 end
 ]]
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

@@ -1,5 +1,5 @@
 local codedit = require'codedit'
-local player = require'cairo_player'
+local player = require'cplayer'
 local glue = require'glue'
 local pp = require'pp'
 local winapi = require'winapi'

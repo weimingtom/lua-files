@@ -1,15 +1,19 @@
+issues
+-----------------------------------------------------
+- resize horizontally with complex layouts
+-
+
+todo
+-----------------------------------------------------
+- hide band by dragging outside of the band area (show X at cursor)
+
+
 - viewing:
-	- column bands
-		- resize columns
-			- per column min and max width
-		- reposition columns
 		- hide/show columns (popup menu with checkboxes)
-		- make new bands / merge bands automatically by drag and drop
 		- hide/show column header
 	- vertical grid (with bands)
 	- tree-list
 		- expand all/collapse all option
-	- auto-width option: distribute grid width proportionally among columns (% specifier?)
 	- per-column auto-expand to widest row option
 	- double click on column splitter to expand column to widest row
 - cell formatting

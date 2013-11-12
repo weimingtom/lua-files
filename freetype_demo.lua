@@ -1,7 +1,7 @@
 local glue = require'glue'
 local ffi = require'ffi'
 local ft = require'freetype'
-local player = require'cairo_player'
+local player = require'cplayer'
 local cairo = require'cairo'
 
 local load_mode = bit.bor(ft.FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH, ft.FT_LOAD_NO_BITMAP,

@@ -1,5 +1,5 @@
 --demo for hit testing, length, split and bbox for lines, arcs, beizer2, bezier3.
-local player = require'cairo_player'
+local player = require'cplayer'
 local glue = require'glue'
 local distance2 = require'path_point'.distance2
 local line = require'path_line'

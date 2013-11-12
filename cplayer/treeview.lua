@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local function count_open_nodes(nodes, open_nodes)
 	local count = 0
@@ -63,6 +63,6 @@ function player:treeview(t)
 	return state
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 
 

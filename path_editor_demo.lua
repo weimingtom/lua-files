@@ -1,5 +1,5 @@
 local affine2d = require'affine2d'
-local player = require'cairo_player'
+local player = require'cplayer'
 local path_cairo = require'path_cairo'
 local path_editor = require'path_editor'
 

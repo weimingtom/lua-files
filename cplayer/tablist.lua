@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local glue = require'glue'
 
 function player:tablist(t)
@@ -42,5 +42,5 @@ function player:tablist(t)
 end
 
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

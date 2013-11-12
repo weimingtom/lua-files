@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 function player:menu(t)
 	local id = assert(t.id, 'id missing')
@@ -20,5 +20,5 @@ function player:menu(t)
 	return selected, clicked
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

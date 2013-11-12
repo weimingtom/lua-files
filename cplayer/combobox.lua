@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 function player:combobox(t)
 	local id = assert(t.id, 'id missing')
@@ -36,5 +36,5 @@ function player:combobox(t)
 	return self.cmenu
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

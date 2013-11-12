@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local clipper = require'clipper'
 local ffi = require'ffi'
 local cairo = require'cairo'

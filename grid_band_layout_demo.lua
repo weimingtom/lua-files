@@ -1,5 +1,5 @@
-local player = require'cairo_player'
-local layout = require'grid_band_layout'
+local player = require'cplayer'
+local set_layout = require'grid_band_layout'
 
 local bands = {
 
@@ -51,43 +51,36 @@ local bands = {
 
 }
 
-local function walk_band_cells(f, band, x, y, w, row_h)
-
-	x = x or 0
-	y = y or 0
-	w = w or band._w
-	row_h = row_h or 100
-
-	local rows = (band.rows or 1)
-	local h = rows * row_h
-
+local function walk_band_cells(f, band, x, y)
+	x = x or 0.5 --0.5 because 0 is between the pixels in cairo
+	y = y or 0.5
+	local w = band._w
+	local h = (band.rows or 1) * 100
 	if band.name then
 		f(band, x, y, w, h)
-		y = y + rows * row_h
+		y = y + h
 	end
-
-	local left_w = w
 	for i, cband in ipairs(band) do
-		local w = cband._w
-		walk_band_cells(f, cband, x, y, w, row_h)
-		x = x + w
-		left_w = left_w - w
+		walk_band_cells(f, cband, x, y)
+		x = x + cband._w
 	end
 end
 
-local function render_band(api, band)
+function player:render_band(band)
 	walk_band_cells(function(band, x, y, w, h)
-		api:rect(x + 0.5, y + 0.5, w, h,
+
+		self:rect(x, y, w, h,
 			(w == band._min_w or w == band._max_w) and 'hot_bg' or 'normal_bg', 'normal_border', 1)
-		api.cr:select_font_face('MS Sans Serif', 0, 0)
+		self.cr:select_font_face('MS Sans Serif', 0, 0)
 		local t = {
 			band.name,
 			string.format('%4.2f', band._pw),
 			band._min_w .. ' - ' .. band._max_w,
 			string.format('%4.2f', band._w)}
 		for i,s in ipairs(t) do
-			api:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
+			self:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
 		end
+
 	end, band)
 end
 
@@ -104,9 +97,9 @@ function player:on_render()
 
 	band.w = mx
 
-	layout.compute(band)
+	set_layout(band)
 
-	render_band(self, band)
+	self:render_band(band)
 
 end
 

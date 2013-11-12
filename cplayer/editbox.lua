@@ -1,5 +1,5 @@
 --TODO: assumes char size = 1 byte; make it work with arbitrary utf-8 strings
-local player = require'cairo_player'
+local player = require'cplayer'
 local ffi = require'ffi'
 
 local function find_caret_pos(cr, text, target_x)
@@ -107,5 +107,5 @@ function player:editbox(t)
 	return text
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

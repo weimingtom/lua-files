@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local path_cairo = require'path_cairo'
 local arc = require'path_arc'
 

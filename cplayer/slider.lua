@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local function clamp(i, i0, i1)
 	return math.min(math.max(i, i0), i1)
@@ -57,4 +57,4 @@ function player:slider(t)
 	return i
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end

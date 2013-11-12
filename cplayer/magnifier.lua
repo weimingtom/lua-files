@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local cairo = require'cairo'
 local ffi = require'ffi'
 
@@ -59,5 +59,5 @@ function player:magnifier(t)
 	self:rect(x, y, w, h, nil, 'selected_bg', 1)
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

@@ -1,5 +1,5 @@
 --draw scaled RGBA8888 and G8 images
-local player = require'cairo_player'
+local player = require'cplayer'
 local cairo = require'cairo'
 local bitmap = require'bitmap'
 
@@ -33,5 +33,5 @@ function player:image(t)
 	surface:free()
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

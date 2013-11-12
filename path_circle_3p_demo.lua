@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local circle_3p = require'path_circle_3p'
 
 local x1, y1, xp, yp, x2, y2 = 200, 200, 400, 200, 400, 400

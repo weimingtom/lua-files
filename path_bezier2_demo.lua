@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local bezier2 = require'path_bezier2'
 
 local b1 = {1200, 300, 100, 100, 1200, 100}

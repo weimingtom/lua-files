@@ -1,5 +1,5 @@
 --TODO: this crashes
-local player = require'cairo_player'
+local player = require'cplayer'
 local winapi = require'winapi'
 require'winapi.filedialogs'
 
@@ -39,4 +39,4 @@ function player:filebox(t)
 end
 
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end

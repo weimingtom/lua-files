@@ -1,4 +1,4 @@
-local player = require'sg_cairo_player'
+local player = require'sg_cplayer'
 local ffi = require'ffi'
 local cairo = require'cairo'
 

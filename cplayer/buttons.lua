@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local kappa = 4 / 3 * (math.sqrt(2) - 1)
 
@@ -121,5 +121,5 @@ function player:mbutton(t)
 	return selected
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

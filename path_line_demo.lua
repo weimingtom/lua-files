@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 local line = require'path_line'
 
 local l1 = {100, 100, 400, 600}

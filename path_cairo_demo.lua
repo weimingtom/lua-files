@@ -1,7 +1,7 @@
 local glue = require'glue'
 local path = require'path'
 local draw_function = require'path_cairo'
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local i=0
 local drag_i

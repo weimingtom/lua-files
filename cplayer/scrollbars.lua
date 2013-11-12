@@ -1,4 +1,4 @@
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local scroll_width = 16
 local min_width = 20
@@ -136,5 +136,5 @@ function player:scrollbox(t)
 		x, y, w, h  --clipping rectangle, in absolute coordinates
 end
 
-if not ... then require'cairo_player_demo' end
+if not ... then require'cplayer_demo' end
 

@@ -5,7 +5,7 @@ local cairo = require'cairo'
 local stdio = require'stdio'
 require'cairo_ft'
 
-local player = require'cairo_player'
+local player = require'cplayer'
 
 local function shape_text(s, ft_face, hb_font, size, direction, script, language, features)
 	local buf = hb.hb_buffer_create()
