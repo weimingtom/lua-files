@@ -47,17 +47,16 @@ function player:render_band(band)
 	for band in grid_band.bands(band) do
 		local x, y, w, h, i, pband = band._x, band._y, band._w, band._h, band.index, band.parent
 		if not (self.active and self.ui.action == 'move' and grid_band.isparent(self.active, band)) then
-			self:rect(x + 0.5, y + 0.5, w, self.active == band and band._total_h or h,
-				(self.active == band and self.ui.action == 'move' and '#ff9999')
-				or 'normal_bg', 'normal_border', 1)
+			local h = self.active == band and band._total_h or h
+			local color = self.active == band and self.ui.action == 'move' and '#ff9999' or 'normal_bg'
+			self:rect(x + 1, y + 1, w - 1, h - 1, color)
 		end
-		self.cr:select_font_face('MS Sans Serif', 0, 0)
 		local t = {
 			band.name,
 			(band.w or (band.wp and band.wp * 100 .. '%') or '') .. ''
 		}
 		for i,s in ipairs(t) do
-			self:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
+			self:textbox(x, y + 13 * (i-1), w, h, s, nil, nil, 'center', 'center')
 		end
 	end
 end
@@ -81,7 +80,7 @@ end
 
 function player:on_render()
 
-	self.cr:translate(100, 100)
+	self.cr:translate(50, 50)
 
 	local mx, my = self.cr:device_to_user(self.mousex, self.mousey)
 
@@ -143,7 +142,9 @@ function player:on_render()
 								self:draw_arrow(band._x + w, band._y + band._total_h, 0)
 								self.ui.dest = band.parent
 								self.ui.index = band.index + (right and 1 or 0)
-								self:text((self.ui.dest.name or '') .. ' ' .. self.ui.index, 8, 'normal_fg', 'right', 'middle', 100, 100, 1000, 100)
+								self:textbox(
+									100, 100, 1000, 100,
+									(self.ui.dest.name or '') .. ' ' .. self.ui.index, nil, 'normal_fg', 'right', 'center')
 								break
 							end
 
@@ -162,7 +163,7 @@ function player:on_render()
 
 				self.active.w = mx - self.active._x
 				grid_band.set_all(band, 0)
-				self:text(self.active.name or '', 8, 'normal_fg', 'right', 'middle', 100, 100, 1000, 100)
+				self:text(1000, 100, self.active.name or '', nil, 'normal_fg', 'right')
 
 			end
 

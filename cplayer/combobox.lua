@@ -5,8 +5,6 @@ function player:combobox(t)
 	local x, y, w, h = self:getbox(t)
 	local items, selected = t.items, t.selected
 	local text = selected or 'pick...'
-	local font_size = t.font_size or h / 2
-	local font_face = t.font_face
 
 	local menu_h = 100
 
@@ -32,7 +30,7 @@ function player:combobox(t)
 
 	--drawing
 	self:rect(x, y, w, h, 'faint_bg')
-	self:text(text, font_face, font_size, 'normal_fg', 'left', 'middle', x, y, w, h)
+	self:textbox(x, y, w, h, text, t.font, 'normal_fg', 'left', 'center')
 
 	return self.cmenu
 end

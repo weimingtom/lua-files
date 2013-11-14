@@ -1,4 +1,5 @@
 local player = require'cplayer'
+local cairo = require'cairo'
 
 local function clamp(i, i0, i1)
 	return math.min(math.max(i, i0), i1)
@@ -15,8 +16,6 @@ end
 function player:slider(t)
 	local id = assert(t.id, 'id missing')
 	local x, y, w, h = self:getbox(t)
-	local font_size = t.font_size or math.ceil(h / 2 + 1)
-	local font_face = t.font_face
 	local text = t.text or id
 
 	local i0, i1, step = t.i0 or 0, t.i1 or 100, t.step or 1
@@ -45,14 +44,12 @@ function player:slider(t)
 	text = (text and (text .. ': ') or '') .. tostring(i)
 
 	--drawing
-	self:rect(x, y, w, h, 'faint_bg', 'normal_border')
+	self:rect(x + 0.5, y + 0.5, w - 1, h - 1, 'faint_bg', 'normal_border')
 	self:rect(x, y, w1, h, 'selected_bg')
 
-	self:text_path(text, font_face, font_size, 'center', 'middle', x, y, w, h)
 	self.cr:save()
-	self.cr:clip()
-		self:rect(x + w1, y, w, h, 'selected_bg')
-		self:rect(x, y, w1, h, 'selected_fg')
+	self.cr:set_operator(cairo.CAIRO_OPERATOR_DIFFERENCE)
+	self:textbox(x, y, w, h, text, t.font, '#ffffff', 'center', 'center')
 	self.cr:restore()
 
 	return i

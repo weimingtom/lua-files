@@ -53,6 +53,20 @@ function box:pad(o)
 	return self:offset(-o, -o, o, o)
 end
 
+local function align(align, x1, w1, x, w)
+	return
+		align == 'center' and (2 * x + w - w1) / 2 or
+		align == 'left'   and x or
+		align == 'right'  and x + w - w1 or
+		error'invalid align'
+end
+
+local function align_box(halign, valign, x1, y1, w1, h1, x, y, w, h)
+	return
+		align(halign, x1, w1, x, w),
+		align(valign, y1, h1, y, h)
+end
+
 function box:align(w, h, halign, valign)
 	halign = halign or 'center'
 	valign = valign or 'middle'

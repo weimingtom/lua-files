@@ -78,7 +78,7 @@ function player:render_band(band)
 			band._min_w .. ' - ' .. band._max_w,
 			string.format('%4.2f', band._w)}
 		for i,s in ipairs(t) do
-			self:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
+			self:text(s, 8, 'normal_fg', 'center', 'center', x, y + 13 * (i-1), w, h)
 		end
 
 	end, band)

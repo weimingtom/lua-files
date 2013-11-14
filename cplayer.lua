@@ -14,52 +14,6 @@ local player = {
 	triple_click_max_wait = 500,
 }
 
-player.themes = {}
-
-player.themes.dark = {
-	window_bg     = '#000000',
-	faint_bg      = '#ffffff33',
-	normal_bg     = '#ffffff4c',
-	normal_fg     = '#ffffff',
-	normal_border = '#ffffff66',
-	hot_bg        = '#ffffff99',
- 	hot_fg        = '#000000',
-	selected_bg   = '#ffffff',
-	selected_fg   = '#000000',
-	disabled_bg   = '#ffffff4c',
-	disabled_fg   = '#999999',
-	error_bg      = '#ff0000b2',
-	error_fg      = '#ffffff',
-}
-
-player.themes.light = {
-	window_bg     = '#ffffff',
-	faint_bg      = '#00000033',
-	normal_bg     = '#0000004c',
-	normal_fg     = '#000000',
-	normal_border = '#00000066',
-	hot_bg        = '#00000099',
-	hot_fg        = '#ffffff',
-	selected_bg   = '#000000e5',
-	selected_fg   = '#ffffff',
-	disabled_bg   = '#0000004c',
-	disabled_fg   = '#666666',
-	error_bg      = '#ff0000b2',
-	error_fg      = '#ffffff',
-}
-
-player.themes.red = glue.merge({
-	normal_bg      = '#ff0000b2',
-	normal_fg      = '#ffffff',
-	normal_border  = '#ffffff66',
-	hot_bg         = '#ff0000e5',
-	hot_fg         = '#ffffff',
-	selected_bg    = '#ffffff',
-	selected_fg    = '#000000',
-	disabled_bg    = '#ff0000b2',
-	disabled_fg    = '#999999',
-}, player.themes.dark)
-
 --winapi keycodes. key codes for 0-9 and A-Z keys are ascii codes.
 local keynames = {
 	[0x08] = 'backspace',[0x09] = 'tab',      [0x0d] = 'return',   [0x10] = 'shift',    [0x11] = 'ctrl',
@@ -408,123 +362,6 @@ function player:invalidate()
 	self.panel:invalidate()
 end
 
---theme-aware api
-
-local hexcolors = setmetatable({}, {__mode = 'kv'})
-
-local function hexcolor(s)
-	if hexcolors[s] then
-		return unpack(hexcolors[s])
-	end
-	local r = tonumber(s:sub(2, 3), 16) / 255
-	local g = tonumber(s:sub(4, 5), 16) / 255
-	local b = tonumber(s:sub(6, 7), 16) / 255
-	local a = (tonumber(s:sub(8, 9), 16) or 255) / 255
-	hexcolors[s] = {r, g, b, a} --memoize for speed
-	return r, g, b, a
-end
-
-local function parse_color(c)
-	if type(c) == 'string' then
-		return hexcolor(c)
-	elseif type(c) == 'table' then
-		return unpack(c)
-	end
-end
-
-function player:parse_color(c)
-	return parse_color(c)
-end
-
-function player:setcolor(color)
-	self.cr:set_source_rgba(parse_color(self.theme[color] or color))
-end
-
-function player:fill(color)
-	self:setcolor(color or 'normal_bg')
-	self.cr:fill()
-end
-
-function player:stroke(color, line_width)
-	self:setcolor(color or 'normal_fg')
-	self.cr:set_line_width(line_width or 1)
-	self.cr:stroke()
-end
-
-function player:fillstroke(fill_color, stroke_color, line_width)
-	if fill_color and stroke_color then
-		self:setcolor(fill_color)
-		self.cr:fill_preserve()
-		self:stroke(stroke_color, line_width)
-	elseif fill_color then
-		self:fill(fill_color)
-	elseif stroke_color then
-		self:stroke(stroke_color, line_width)
-	else
-		self:fill('normal_bg')
-	end
-end
-
-function player:save_theme(theme)
-	local old_theme = self.theme
-	self.theme = theme or self.theme
-	return old_theme
-end
-
---graphics api
-
-function player:dot(x, y, r, ...)
-	self:rect(x-r, y-r, 2*r, 2*r, ...)
-end
-
-function player:rect(x, y, w, h, ...)
-	self.cr:rectangle(x, y, w, h)
-	self:fillstroke(...)
-end
-
-function player:circle(x, y, r, ...)
-	self.cr:circle(x, y, r)
-	self:fillstroke(...)
-end
-
-function player:line(x1, y1, x2, y2, ...)
-	self.cr:move_to(x1, y1)
-	self.cr:line_to(x2, y2)
-	self:stroke(...)
-end
-
-function player:curve(x1, y1, x2, y2, x3, y3, x4, y4, ...)
-	self.cr:move_to(x1, y1)
-	self.cr:curve_to(x2, y2, x3, y3, x4, y4)
-	self:stroke(...)
-end
-
-local function aligntext(cr, text, font_face, font_size, halign, valign, x, y, w, h)
-	text = tostring(text)
-	cr:set_font_size(font_size)
-	local extents = cr:text_extents(text)
-	cr:move_to(
-		halign == 'center' and (2 * x + w - extents.width) / 2 or
-		halign == 'left'   and x or
-		halign == 'right'  and x + w - extents.width,
-		valign == 'middle' and (2 * y + h - extents.y_bearing) / 2 or
-		valign == 'top'    and y + extents.height or
-		valign == 'bottom' and y + h)
-end
-
-function player:text_path(text, font_face, font_size, halign, valign, x, y, w, h)
-	text = tostring(text)
-	aligntext(self.cr, text, font_face, font_size, halign, valign, x, y, w, h)
-	self.cr:text_path(text)
-end
-
-function player:text(text, font_face, font_size, color, halign, valign, x, y, w, h)
-	text = tostring(text)
-	aligntext(self.cr, text, font_face, font_size, halign, valign, x, y, w, h)
-	self:setcolor(color)
-	self.cr:show_text(text)
-end
-
 --layout api
 
 function player:getbox(t)
@@ -577,28 +414,48 @@ end
 --submodule autoloader
 
 glue.autoload(player, {
-	editbox      = 'cplayer.editbox',
+	--themes
+	themes       = 'cplayer.theme',
+	parse_color  = 'cplayer.theme',
+	setcolor     = 'cplayer.theme',
+	parse_font   = 'cplayer.theme',
+	setfont      = 'cplayer.theme',
+	save_theme   = 'cplayer.theme',
+	fill         = 'cplayer.theme',
+	stroke       = 'cplayer.theme',
+	fillstroke	 = 'cplayer.theme',
+   --basic shapes & text
+	dot          = 'cplayer.theme',
+	rect         = 'cplayer.theme',
+	circle       = 'cplayer.theme',
+	line         = 'cplayer.theme',
+	curve        = 'cplayer.theme',
+   text         = 'cplayer.text',
+	textbox      = 'cplayer.text',
+	--basic widgets
 	vscrollbar   = 'cplayer.scrollbars',
 	hscrollbar   = 'cplayer.scrollbars',
 	scrollbox    = 'cplayer.scrollbars',
+	vsplitter    = 'cplayer.splitter',
+	hsplitter    = 'cplayer.splitter',
 	button       = 'cplayer.buttons',
 	mbutton      = 'cplayer.buttons',
 	togglebutton = 'cplayer.buttons',
 	slider       = 'cplayer.slider',
 	menu         = 'cplayer.menu',
+	editbox      = 'cplayer.editbox',
 	combobox     = 'cplayer.combobox',
 	filebox      = 'cplayer.filebox',
-	grid         = 'cplayer.grid',
-	treeview     = 'cplayer.treeview',
-	magnifier    = 'cplayer.magnifier',
-	vsplitter    = 'cplayer.splitter',
-	hsplitter    = 'cplayer.splitter',
 	image        = 'cplayer.image',
 	label        = 'cplayer.label',
 	dragpoint    = 'cplayer.dragpoint',
 	dragpoints   = 'cplayer.dragpoint',
 	tablist      = 'cplayer.tablist',
+	magnifier    = 'cplayer.magnifier',
+	--complex widgets
 	code_editor  = 'cplayer.code_editor',
+	grid         = 'cplayer.grid',
+	treeview     = 'cplayer.treeview',
 })
 
 --main loop
@@ -611,6 +468,6 @@ function player:play(...)
 	return winapi.MessageLoop()
 end
 
-if not ... then require'cplayer_demo' end
+if not ... then require'cplayer.widgets_demo' end
 
 return player

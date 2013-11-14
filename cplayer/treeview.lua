@@ -33,8 +33,6 @@ function player:treeview(t)
 	}
 	local row_h = 24
 	local indent_w = 24
-	local font_size = t.font_size or row_h/2
-	local font_face = t.font_face
 
 	local n = count_open_nodes(nodes, state.open_nodes)
 	local ch = n * row_h
@@ -57,7 +55,7 @@ function player:treeview(t)
 	local i = 1
 	do_open_nodes(nodes, state.open_nodes, 0, function(node, indent)
 		local name = type(node) == 'table' and (node.name or 'unnamed') or node
-		self:text(name, font_face, font_size, 'normal_fg', 'left', 'middle', x + indent * indent_w, y + i * row_h, w, row_h)
+		self:textbox(x + indent * indent_w, y + i * row_h, w, row_h, name, t.font, 'normal_fg', 'left', 'center')
 		i = i + 1
 	end)
 

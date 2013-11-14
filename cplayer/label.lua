@@ -27,7 +27,7 @@ function player:label(t)
 		error'invalid valign'
 
 	y =
-		valign == 'middle' and (2 * y + h - extents.y_bearing) / 2 or
+		valign == 'center' and (2 * y + h - extents.y_bearing) / 2 or
 		valign == 'top'    and y + extents.height or
 		valign == 'bottom' and y + h or
 		error'invalid valign'

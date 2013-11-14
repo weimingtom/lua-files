@@ -1,7 +1,7 @@
 --string module for codedit by Cosmin Apreutesei (unlicensed).
---based on utf8 library, deals specifically with tabs, spaces, lines and words.
-local utf8 = require'utf8'
+--deals specifically with tabs, spaces, lines and words.
 local glue = require'glue'
+local utf8 = require'utf8'
 
 local str = glue.update({}, utf8)
 
@@ -141,6 +141,14 @@ end
 --iterate lines, returning the index where the next line starts (unimportant) and the contents of each line
 function str.lines(s)
 	return str.next_line, s
+end
+
+function str.line_count(s)
+	local n = 0
+	for _ in str.line_indices(s) do
+		n = n + 1
+	end
+	return n
 end
 
 --words ------------------------------------------------------------------------------------------------------------------

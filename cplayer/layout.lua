@@ -46,7 +46,7 @@ function player:alignbox(w, h, halign, valign, bx, by, bw, bh)
 		halign == 'left' and bx or
 		halign == 'right' and bx + bw - w
 	local y =
-		valign == 'middle' and (2 * by + bh - h) / 2 or
+		valign == 'center' and (2 * by + bh - h) / 2 or
 		valign == 'top' and by or
 		valign == 'bottom' and by + bh - h
 	return x, y, w, h
@@ -102,7 +102,7 @@ function player:rect(x, y, w, h)
 end
 
 function player:text(text, color, halign, valign)
-	self:aligntext(text, 0, 0, self.w, self.h, halign or 'center', valign or 'middle')
+	self:aligntext(text, 0, 0, self.w, self.h, halign or 'center', valign or 'center')
 	self:setcolor(color or 'normal_fg')
 	self.cr:show_text(text)
 end

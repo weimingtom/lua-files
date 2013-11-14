@@ -124,7 +124,7 @@ function player:grid(t)
 			end
 		end
 
-		self:text(name, font_size, 'selected_fg', col_align, 'middle', field_x, 0, col_w, row_h)
+		self:text(name, font_size, 'selected_fg', col_align, 'center', field_x, 0, col_w, row_h)
 
 		field_x = field_x + col_w + col_spacing
 	end
@@ -152,7 +152,7 @@ function player:grid(t)
 			local v = tostring(row[i])
 
 			self:text(v, font_size, selrow and 'selected_fg' or hotrow and 'hot_fg' or 'normal_fg',
-							col_align, 'middle', field_x, field_y, col_w, row_h)
+							col_align, 'center', field_x, field_y, col_w, row_h)
 
 			field_x = field_x + col_w + col_spacing
 		end

@@ -48,8 +48,7 @@ function player:button(t)
 	local cut = t.cut
 	local selected = t.selected
 	local enabled = t.enabled == nil and true or t.enabled
-	local font_size = t.font_size or h / 2
-	local font_face = t.font_face
+	local font = t.font
 
 	local down = self.lbutton
 	local hot = enabled and self:hotbox(x, y, w, h)
@@ -80,9 +79,9 @@ function player:button(t)
 
 	--drawing
 	local old_theme = self:save_theme(t.theme)
-	button_path(self.cr, x, y, w, h, cut)
+	button_path(self.cr, x + 0.5, y + 0.5, w - 1, h - 1, cut)
 	self:fillstroke(bg_color, 'normal_border', 1)
-	self:text(text, font_face, font_size, fg_color, 'center', 'middle', x, y, w, h)
+	self:textbox(x, y, w, h, text, font, fg_color, 'center', 'center')
 	self.theme = old_theme
 
 	return (t.immediate and self.active == id and hot and down) or clicked
@@ -102,11 +101,12 @@ function player:mbutton(t)
 	local values, texts, selected, enabled = t.values, t.texts, t.selected, t.enabled
 	local multisel = type(selected) == 'table' and (t.multiselect == true or t.multiselect == nil)
 
-	local bwidth = w/#values
-
+	local bw = math.floor(w / #values)
+	local left_w = w
 	for i,v in ipairs(values) do
+		local bw = i < #values and bw or left_w
 		local cut = #values > 1 and (i==#values and 'left' or i==1 and 'right' or 'both')
-		local t = {id = id..'_'..i, x = x, y = y, w = bwidth, h = h, text = texts and texts[v] or tostring(v),
+		local t = {id = id..'_'..i, x = x, y = y, w = bw, h = h, text = texts and texts[v] or tostring(v),
 						cut = cut, enabled = enabled and enabled[v]}
 		if multisel then
 			t.selected = selected[v]
@@ -117,7 +117,8 @@ function player:mbutton(t)
 				selected = v
 			end
 		end
-		x = x + bwidth
+		x = x + bw - 1
+		left_w = left_w - (bw - 1)
 	end
 	return selected
 end

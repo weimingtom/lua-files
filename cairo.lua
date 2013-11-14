@@ -324,6 +324,12 @@ function M.cairo_glyph_extents(cr, glyphs, num_glyphs, extents)
 	return extents
 end
 
+function M.cairo_font_extents(cr, extents)
+	extents = extents or ffi.new'cairo_font_extents_t'
+	C.cairo_font_extents(cr, extents)
+	return extents
+end
+
 -- quad beziers addition
 
 function M.cairo_quad_curve_to(cr, x1, y1, x2, y2)

@@ -199,6 +199,7 @@ function band:new(t)
 end
 
 --rendering stubs
+--[[
 function band:draw_arrow(x, y, angle) end --draw an arrow pointing at x, y rotated at an angle (in degrees)
 function band:draw_rect(x, y, w, h, fill, stroke, line_width) --draw a rectangle
 function band:draw_text(text, font_face, font_size, valign, halign, x, y, w, h) --draw text in a box
@@ -221,7 +222,7 @@ local function render(band)
 		}
 
 		for i,s in ipairs(t) do
-			self:text(s, 8, 'normal_fg', 'center', 'middle', x, y + 13 * (i-1), w, h)
+			self:text(s, 8, 'normal_fg', 'center', 'center', x, y + 13 * (i-1), w, h)
 		end
 	end
 end
@@ -241,7 +242,7 @@ local function draw_arrow(cr, x, y, angle)
 	cr:rotate(math.rad(-angle))
 	self:fillstroke('#ffffff', '#000000', 1)
 end
-
+]]
 
 if not ... then require'grid_band_demo' end
 

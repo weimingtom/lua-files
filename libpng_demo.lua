@@ -123,7 +123,7 @@ function player:on_render(cr)
 
 				self:rect(cx, cy, w, h, 'error_bg')
 				self:text(string.format('%s', err:match('^(.-)\n'):match(': ([^:]-)$')), 14,
-													'normal_fg', 'center', 'middle',
+													'normal_fg', 'center', 'center',
 													cx, cy, w, h)
 			end
 

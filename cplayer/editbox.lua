@@ -20,8 +20,7 @@ function player:editbox(t)
 	local x, y, w, h = self:getbox(t)
 	local text = t.text
 	local caret_w = t.caret_w or 2
-	local font_size = t.font_size or h / 2
-	local font_face = t.font_face
+	local font = t.font
 	local down = self.lbutton
 	local cr = self.cr
 	local readonly = t.readonly
@@ -31,8 +30,6 @@ function player:editbox(t)
 	if hot and not self.active or self.active == id then
 		self.cursor = 'text'
 	end
-
-	cr:set_font_size(font_size)
 
 	local text_x = 0
 	local caret_pos
@@ -95,11 +92,11 @@ function player:editbox(t)
 	end
 
 	--drawing
-	self:rect(x, y, w, h, 'normal_bg', 'normal_border')
+	self:rect(x + 0.5, y + 0.5, w - 1, h - 1, 'normal_bg', 'normal_border')
 	self.cr:rectangle(x, y, w, h)
 	self.cr:save()
 	self.cr:clip()
-	self:text(text, font_face, font_size, 'normal_fg', 'left', 'middle', x + text_x, y, w, h)
+	self:textbox(x + text_x, y, w, h, text, font, 'normal_fg', 'left', 'center')
 	if caret_x and (self.clock - self.ui.activation_clock) % 1000 < 500 then
 		self:rect(x + text_x + caret_x, y, caret_w, h, 'normal_fg')
 	end
