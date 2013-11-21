@@ -452,6 +452,7 @@ glue.autoload(player, {
 	dragpoints   = 'cplayer.dragpoint',
 	tablist      = 'cplayer.tablist',
 	magnifier    = 'cplayer.magnifier',
+	analog_clock = 'cplayer.analog_clock',
 	--complex widgets
 	code_editor  = 'cplayer.code_editor',
 	grid         = 'cplayer.grid',

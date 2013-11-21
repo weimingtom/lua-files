@@ -29,6 +29,7 @@ local dataset = {}
 function dataset:new(fields)
 	self = glue.inherit(self)
 	self.fields = self:parse_fields(fields)
+	self.clones = {}
 	self:clear()
 	return self
 end
@@ -37,27 +38,28 @@ end
 function dataset:clear()
 	self.records = {}
 	self.deleted = {}
-	self.row_order_lost = nil --flag indicating that original_row lost its meaning
+	self.row_order_lost = false --flag indicating that original_row lost its meaning
 end
 
 function dataset:row_count()
 	return #self.records
 end
 
-function dataset:insert(row, record)
-	if self.sort_cmp then
-		row = self:sorted_row(record)
-	else
-		row = row or #self.records + 1
-	end
+--insert a record at a specified position.
+--if the dataset is sorted, the row argument is ignored and the position is that which preserves the sorting order.
+function dataset:insert(row, record, nosort)
+	row = row or #self.records + 1
 	assert(row >= 1 and row <= #self.records + 1)
 	record = record or {}
+	if self.sort_cmp and not nosort then
+		row = self:sorted_row(record)
+	end
 	record.status = 'new'
 	table.insert(self.records, row, record)
 end
 
 function dataset:append(record)
-	self:insert(#self.records + 1, record)
+	self:insert(nil, record)
 end
 
 function dataset:delete(row)
@@ -66,36 +68,57 @@ function dataset:delete(row)
 	table.remove(self.records, row)
 	if record.status == 'changed' then
 		table.insert(self.deleted, record.old)
-	elseif not record.status then
+	elseif not record.status then --won't log 'new' records
 		table.insert(self.deleted, record)
 	end
 end
 
-function dataset:update(row)
+function dataset:copy_record(row)
+	local new_record = {}
+	for i=1,#self.fields do
+		new_record[i] = cur_record[i]
+	end
+	return new_record
+end
+
+function dataset:update(row, new_record, nosort)
 	assert(row >= 1 and row <= #self.records)
-	local record = self.records[row]
-	if not record.status then
-		record.status = 'changed'
-		record.old = record
+	local new_row = self.sort_cmp and not nosort and self:sorted_row(new_record)
+	local cur_record = self.records[row]
+	if cur_record.status then
+		new_record.status = cur_record.status
+		new_record.old = cur_record.old
+	else
+		new_record.status = 'changed'
+		new_record.old = cur_record
+	end
+	self.records[row] = new_record
+	if new_row then
+		self:move(row, new_row)
 	end
 end
 
-function dataset:move(row1, row2)
-	assert(not self.sort_cmp)
-	assert(row1 >= 1 and row1 <= #self.records)
-	assert(row2 >= 1 and row2 <= #self.records + 1)
-	if row1 == row2 then return end
-	local record = table.remove(self.records, row1)
-	table.insert(self.records, row2, record)
-	self.row_order_lost = true
+--prepare the dataset for updating a row in-place.
+function dataset:edit(row)
+	local new_row = #self.records + 1
+	row = row or new_row
+	assert(row >= 1 and row <= new_row)
+	if row == new_row then
+		self:insert(new_row)
+	else
+		if self.records[row].status then return end --already updating
+		self:update(row, self:copy_record(row), true)
+	end
 end
 
-function dataset:updated(row) --TODO: change this API
+function dataset:move(row, dst_row)
 	assert(row >= 1 and row <= #self.records)
-	local record = self.records[row]
-	if not record.status then return end
-	if self.sort_cmp then
-		self:move(row, self:sorted_row(record))
+	assert(dst_row >= 1 and dst_row <= #self.records)
+	if row == dst_row then return end
+	local record = table.remove(self.records, row)
+	table.insert(self.records, dst_row, record)
+	if record.status ~= 'new' then
+		self.row_order_lost = true
 	end
 end
 
@@ -109,7 +132,7 @@ function dataset:merge()
 		record.fail_count = nil
 	end
 	self.deleted = {}
-	self.row_order_lost = nil
+	self.row_order_lost = false
 end
 
 --cancel changes: revert the dataset to the original state, before any changes were made
@@ -139,7 +162,7 @@ end
 
 function dataset:exec(cmd, record) end --stub
 
---apply changes to the backend, and log any failures
+--apply pending changes to the backend, and log failures
 function dataset:apply()
 	local fail_count = 0
 	local success_count = 0
@@ -160,6 +183,7 @@ function dataset:apply()
 				record.status = nil
 				record.old = nil
 				record.original_row = row
+				record.fail = nil
 				success_count = success_count + 1
 			else
 				record.fail = true
@@ -168,7 +192,8 @@ function dataset:apply()
 			end
 		end
 	end
-	self.row_order_lost = success_count > 0 and self.fail_count > 0
+	local partial_merge = success_count > 0 and self.fail_count > 0
+	self.row_order_lost = partial_merge or self.row_order_lost
 	return self.fail_count == 0, fail_count, success_count
 end
 
@@ -180,9 +205,14 @@ function dataset:parse_fields(fields)
 		local i = 1
 		for name in glue.gsplit(fields, ',') do
 			name = glue.trim(name)
-			local field = {name = name, index = i}
-			t[name] = field
-			t[i] = field
+			local field = {
+				name = name,
+				index = i,
+				lt_cmp = nil, --lt comparator: use default
+				eq_cmp = nil, --eq comparator: use default
+			}
+			t[name] = field --index field def by name
+			t[i] = field --index field def by index
 			i = i + 1
 		end
 		return t
@@ -205,88 +235,203 @@ function dataset:set(row, field_name, value)
 	self.records[row][self:col(field_name)] = value
 end
 
---given a list of fields and their direction, return a comparator function that compares two records.
-function dataset:comparator(arg)
-	local t = {} --{col1, 'asc' | 'desc', ...}
-	if type(arg) == 'string' then --'field1[:asc|:dsc],...'
-		for s in glue.gsplit(arg, ',') do
-			s = glue.trim(s)
-			local field, dir = s:match'^([^%:]+):?(.*)$'
-			assert(dir == '' or dir == 'asc' or dir == 'desc')
-			dir = dir == '' and 'asc' or dir
-			table.insert(t, self:col(field))
-			table.insert(t, dir)
-		end
+function dataset.lt_cmp(v1, v2) --default less-than value comparator
+	return v1 < v2
+end
+
+function dataset.gt_cmp(v1, v2) --default greater-than value comparator
+	return v2 < v1
+end
+
+function dataset.eq_cmp(v1, v2) --default equals-to value comparator
+	return v1 == v2
+end
+
+function dataset:field_eq_cmp(field) --eq value comparator for a field
+	local eq = self.fields[field].eq_cmp or self.eq_cmp
+	local col = self.fields[field].index
+	return function(rec1, rec2)
+		return eq(rec1[col], rec2[col])
+	end
+end
+
+function dataset:field_lt_cmp(field, dir) --lt value comparator for a field and direction
+	dir = dir or 'asc'
+	assert(dir == 'asc' or dir == 'desc')
+	local lt
+	if dir == 'asc' then
+		lt = self.fields[field].lt_cmp or self.lt_cmp
 	else
-		for i = 1, #arg, 2 do
-			local field, dir = arg[i], arg[i+1]
-			assert(dir == 'asc' or dir == 'desc')
-			t[i], t[i+1] = self:col(field), dir
-		end
+		lt = self.fields[field].gt_cmp or self.gt_cmp
 	end
-	if #t == 2 then --simple case: sort by one column
-		local col, dir = t[1], t[2]
-		if dir == 'asc' then
-			return function(rec1, rec2)
-				return rec1[col] < rec2[col]
-			end
-		else
-			return function(rec1, rec2)
-				return rec2[col] < rec1[col]
-			end
-		end
+	local col = self.fields[field].index
+	return function(rec1, rec2)
+		return lt(rec1[col], rec2[col])
 	end
+end
+
+function dataset:record_lt_cmp(arg) --lt record comparator from a sorting specification
+
+	local t = {} --{eq_cmp1, lt_cmp1, ...}
+	for i = 1, #arg, 2 do
+		local field, dir = arg[i], arg[i+1]
+		t[#t+1], t[#t+2] = self:field_eq_cmp(field), self:field_lt_cmp(field, dir)
+	end
+
+	--simple case: compare a single column directly
+	if #t == 2 then
+		return t[2] --lt cmp
+	end
+
+	--complex case: compare multiple columns recursively
 	local function cmp(rec1, rec2, i)
 		i = i or 1
 		if i > #t then
 			return false --all fields are equal
 		end
-		local col, dir = t[i], t[i+1]
-		if rec1[col] == rec2[col] then
-			return cmp(rec1, rec2, i + 2)
-		elseif dir == 'asc' then
-			return rec1[col] < rec2[col]
+		local eq, lt = t[i], t[i+1]
+		if eq(rec1, rec2) then
+			return cmp(rec1, rec2, i + 2) --tail call
 		else
-			return rec2[col] < rec1[col]
+			return lt(rec1, rec2)
 		end
 	end
+
 	return cmp
 end
 
---sort by one or more fields (expressed as a string or table) or by a custom function
-function dataset:sort(arg)
-	local cmp
-	if type(arg) == 'function' then
-		cmp = arg
-	else
-		cmp = self:comparator(arg)
+function dataset:parse_sort_spec(arg) --parse 'field1[:asc|:dsc], ...' -> {field_name, 'asc'|'dsc', ...}
+	local t = {}
+	for s in glue.gsplit(arg, ',') do
+		s = glue.trim(s)
+		local field, dir = s:match'^([^%:]+):?(.*)$'
+		if dir == '' then dir = 'asc' end
+		t[#t+1], t[#t+2] = field, dir
 	end
-	table.sort(self.records, cmp)
+	return t
+end
+
+--sort by one or more fields or with a custom function.
+--cmp is either a sorting specification expressed as a string or table, or a record comparator function.
+--if called without arguments and there's a sorting comparator current, the dataset is re-sorted with that.
+function dataset:sort(cmp)
+	if cmp then
+		if type(cmp) == 'string' then
+			cmp = self:parse_sort_spec(cmp)
+		end
+		--reset the list of sort fields
+		self.sort_fields = {}
+		for i=1,#cmp,2 do
+			table.insert(self.sort_fields, cmp[i])
+		end
+		--reset the informative sorted flag for each field
+		for i,field in ipairs(self.fields) do
+			field.sorted = nil
+		end
+		for i=1,#cmp,2 do
+			local field, dir = cmp[i], cmp[i+1]
+			self.fields[field].sorted = dir
+		end
+		cmp = self:record_lt_cmp(cmp)
+	else
+		cmp = self.sort_cmp
+	end
 	self.sort_cmp = cmp
+	table.sort(self.records, self.sort_cmp)
 	self.row_order_lost = true
 end
 
 --binary search over sorted rows
 
-local function sorted_row_rec(rec, records, cmp, i, j)
+local function sorted_row_recursive(rec, records, cmp, i, j)
 	local m = math.floor((i + j) / 2 + 0.5)
 	if cmp(rec, records[m]) then
-		return m == i and i or sorted_row_rec(rec, records, cmp, i, m - 1) --tail call
+		return m == i and i or sorted_row_recursive(rec, records, cmp, i, m - 1) --tail call
 	else
-		return m == j and j + 1 or sorted_row_rec(rec, records, cmp, m + 1, j) --tail call
+		return m == j and j + 1 or sorted_row_recursive(rec, records, cmp, m + 1, j) --tail call
 	end
 end
 
 local function sorted_row(rec, records, cmp)
 	if #records == 0 then return 1 end
-	return sorted_row_rec(rec, records, cmp, 1, #records)
+	return sorted_row_recursive(rec, records, cmp, 1, #records)
 end
 
+--find a record's position in a sorted dataset, if that record is to be inserted into the dataset
 function dataset:sorted_row(rec)
 	return sorted_row(rec, self.records, self.sort_cmp)
 end
 
 
+
+
+function dataset:record_eq_cmp(arg) --eq record comparator for a list of fields
+
+	--custom comparator: return it
+	if type(arg) == 'function' then
+		return arg
+	end
+
+	local t = {} --{eq_cmp1, ...}
+	if type(arg) == 'string' then --spec of form 'field1, ...'
+		for s in glue.gsplit(arg, ',') do
+			s = glue.trim(s)
+			t[#t+1] = self:field_eq_cmp(field)
+		end
+	else --spec of form {field_name, ...}
+		for _, field in ipairs(arg) do
+			t[#t+1] = self:field_eq_cmp(field)
+		end
+	end
+
+	--simple case: compare a single column directly
+	if #t == 1 then
+		return t[1]
+	end
+
+	--complex case: compare multiple columns
+	local function cmp(rec1, rec2)
+		for i = 1, #t do
+			if not t[i](rec1, rec2) then
+				return false
+			end
+		end
+		return true
+	end
+
+	return cmp
+end
+
+
+--TODO: sub-groups
+function dataset:group(cmp)
+	self:sort(cmp)
+	local eq = self:record_eq_cmp(self.sort_fields)
+	local rec1 = self.records[1]
+	local row1 = 1
+	local row2 = 1
+	for i = 2, #self.records do
+		local rec2 = self.records[i]
+		if eq(rec1, rec2) then
+			row2 = i
+		else
+			self:make_group(row1, row2)
+			row1 = i
+			row2 = i
+		end
+		rec1 = rec2
+	end
+end
+
+
+function dataset:clone()
+	local ds = self:new(self.fields)
+	--copy records as references
+	for i,rec in ipairs(self.records) do
+		ds.records[i] = rec
+	end
+	self.clones[ds] = true
+end
 
 
 if not ... then
@@ -316,7 +461,7 @@ assert(#ds.deleted == 0)
 ds:clear()
 ds:insert()
 ds:merge()
-ds:update(1)
+ds:update(1, {})
 assert(ds.records[1].old)
 assert(ds.records[1].status == 'changed')
 ds:cancel()
