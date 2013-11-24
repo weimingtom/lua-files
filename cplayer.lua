@@ -349,9 +349,12 @@ function player:window(t)
 	window.on_dead_syskey_down_char = window.on_key_down_char
 
 	--set panel to render continuously
-	if self.continuous_rendering then
-		panel:settimer(1, panel.invalidate)
-	end
+	panel:settimer(1,
+		function()
+			if self.continuous_rendering or next(self.animations) then
+				panel:invalidate()
+			end
+		end)
 
 	window:show()
 
@@ -408,7 +411,7 @@ function animation:finished()
 end
 
 function animation:progress()
-	return (self.player.clock - self.start) / self.duration
+	return math.min((self.player.clock - self.start) / self.duration, 1)
 end
 
 --submodule autoloader
@@ -453,6 +456,8 @@ glue.autoload(player, {
 	tablist      = 'cplayer.tablist',
 	magnifier    = 'cplayer.magnifier',
 	analog_clock = 'cplayer.analog_clock',
+	toolbox      = 'cplayer.toolbox',
+	screen       = 'cplayer.screen',
 	--complex widgets
 	code_editor  = 'cplayer.code_editor',
 	grid         = 'cplayer.grid',

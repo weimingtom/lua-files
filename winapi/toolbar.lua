@@ -114,7 +114,7 @@ TBSTATE_WRAP             = 0x20
 TBSTATE_ELLIPSES         = 0x40
 TBSTATE_MARKED           = 0x80
 
-ffi.cdef([[
+ffi.cdef(string.format([[
 typedef struct _TBBUTTON {
     int iBitmap;
     int idCommand;
@@ -125,7 +125,7 @@ typedef struct _TBBUTTON {
     INT_PTR iString;
 } TBBUTTON, *PTBBUTTON, *LPTBBUTTON;
 typedef const TBBUTTON *LPCTBBUTTON;
-]] % (ffi.abi('64bit') and 6 or 2))
+]], ffi.abi('64bit') and 6 or 2))
 
 TBBUTTON = struct{
 	ctype = 'TBBUTTON',

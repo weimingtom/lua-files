@@ -1,6 +1,7 @@
 local player = require'cplayer'
 
-local function point(n, r, f) --point on the clock
+--point on the circle of radius r, at position n, on a circle with f positions starting at -90 degrees.
+local function point(n, r, f)
 	local a = math.rad((n - f / 4) * (360 / f))
 	local y = math.sin(a) * r
 	local x = math.cos(a) * r
@@ -35,8 +36,6 @@ function player:analog_clock(t)
 	local x2, y2 = point(h, r * 0.4, 12)
 	self:line(cx, cy, cx + x2, cy + y2, t.hour_color or t.color, t.hour_width or t.width)
 
-	m = m + s / 60 --adjust minute by second
-
 	--minute tongue
 	local x2, y2 = point(m, r * 0.7, 60)
 	self:line(cx, cy, cx + x2, cy + y2, t.min_color or t.color, t.min_width or t.width)
@@ -50,7 +49,7 @@ if not ... then
 
 function player:on_render(cr)
 	self:analog_clock{x = 10, y = 10, w = self.w - 20, h = self.h - 20, time = os.date'*t',
-		sec_color = '#ff0000', marker_width = 0}
+		sec_color = '#ff0000', marker_width = 2}
 end
 
 player:play()

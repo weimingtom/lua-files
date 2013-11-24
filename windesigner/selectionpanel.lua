@@ -1,4 +1,5 @@
 setfenv(1, require'windesigner.namespace')
+require'winapi.panelclass'
 
 --helpers
 

@@ -213,5 +213,6 @@ designer:new_control(Button):move(10, 10)
 designer:new_control(Button):move(10, 40)
 designer:new_control(ListView):move(100, 10)
 
+jit.off()
 os.exit(MessageLoop())
 
