@@ -1,3 +1,4 @@
+--hue wheel and picker
 local player = require'cplayer'
 local color = require'color'
 local point = require'path_point'

@@ -1,3 +1,4 @@
+--saturation/Luminance square and picker
 local player = require'cplayer'
 local color = require'color'
 local cairo = require'cairo'
