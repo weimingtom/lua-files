@@ -1,14 +1,18 @@
---color conversions, ripped from Sputnik (MIT/X License)
-
---color module: contains standalone functions and the color object constructor
-
-local color_module = {}
-local color_module_mt = {}
-setmetatable(color_module, color_module_mt)
+--color conversions by Cosmin Apreutesei (public domain), originated from Sputnik (MIT/X License)
 
 local function clamp(x)
 	return math.min(math.max(x, 0), 1)
 end
+
+local function clamp_hsl(h, s, L)
+	return h % 360, clamp(s), clamp(L)
+end
+
+local function clamp_rgb(r, g, b)
+	return clamp(r), clamp(g), clamp(b)
+end
+
+--HSL <-> RGB
 
 local function _h2rgb(m1, m2, h)
 	if h<0 then h = h+1 end
@@ -25,8 +29,9 @@ local function _h2rgb(m1, m2, h)
 end
 
 --hsl is clamped to (0..360, 0..1, 0..1); rgb is (0..1, 0..1, 0..1)
-function color_module.hsl_to_rgb(h, s, L)
-	h = (h % 360) / 360
+local function hsl_to_rgb(h, s, L)
+	h, s, L = clamp_hsl(h, s, L)
+	h = h / 360
 	local m1, m2
 	if L<=0.5 then
 		m2 = L*(s+1)
@@ -35,14 +40,14 @@ function color_module.hsl_to_rgb(h, s, L)
 	end
 	m1 = L*2-m2
 	return
-		clamp(_h2rgb(m1, m2, h+1/3)),
-		clamp(_h2rgb(m1, m2, h)),
-		clamp(_h2rgb(m1, m2, h-1/3))
+		_h2rgb(m1, m2, h+1/3),
+		_h2rgb(m1, m2, h),
+		_h2rgb(m1, m2, h-1/3)
 end
 
 --rgb is clamped to (0..1, 0..1, 0..1); hsl is (0..360, 0..1, 0..1)
-function color_module.rgb_to_hsl(r, g, b)
-	r, g, b = clamp(r), clamp(g), clamp(b)
+local function rgb_to_hsl(r, g, b)
+	r, g, b = clamp_rgb(r, g, b)
 	local min = math.min(r, g, b)
 	local max = math.max(r, g, b)
 	local delta = max - min
@@ -65,53 +70,83 @@ function color_module.rgb_to_hsl(r, g, b)
 	return h * 360, s, l
 end
 
+--RGB(A) <-> string
+
+local rgba_colors = setmetatable({}, {__mode = 'kv'})
+
+local function string_to_rgba(s)
+	if rgba_colors[s] then
+		return unpack(rgba_colors[s])
+	end
+	if s:sub(1,1) ~= '#' then return end
+	local r = tonumber(s:sub(2, 3), 16)
+	local g = tonumber(s:sub(4, 5), 16)
+	local b = tonumber(s:sub(6, 7), 16)
+	local a = tonumber(s:sub(8, 9), 16) or 255
+	if not r or not g or not b then return end
+	r = r / 255
+	g = g / 255
+	b = b / 255
+	a = a / 255
+	rgba_colors[s] = {r, g, b, a} --memoize for speed
+	return r, g, b, a
+end
+
+local function string_to_rgb(s)
+	local r, g, b = string_to_rgba(s)
+	if not r then return end
+	return r, g, b
+end
+
+local function rgb_to_string(r, g, b)
+	return string.format('#%02x%02x%02x',
+		math.floor(r*255 + 0.5),
+		math.floor(g*255 + 0.5),
+		math.floor(b*255 + 0.5))
+end
+
+local function rgba_to_string(r, g, b, a)
+	return rgb_to_string(r, g, b) ..
+		string.format('%02x', math.floor(a*255 + 0.5))
+end
+
 --color class
 
 local color = {}
 local color_mt = {__index = color}
 
-local function rgb_string_to_hsl(rgb)
-	return color.rgb_to_hsl(tonumber(rgb:sub(2,3), 16)/256,
-									tonumber(rgb:sub(4,5), 16)/256,
-									tonumber(rgb:sub(6,7), 16)/256)
-end
-
-local function new(self, H, S, L) --either H, S, L (0..360, 0..1, 0..1) or RGB string '#rrggbb'
-	if type(H) == "string" and H:sub(1,1)=="#" and H:len() == 7 then
-		H, S, L = rgb_string_to_hsl(H)
+local function new(h, s, L) --either H, S, L (0..360, 0..1, 0..1) or RGB string '#rrggbb'
+	if type(h) == 'string' then
+		h, s, L = rgb_to_hsl(string_to_rgb(h))
 	else
-		H, S, L = H % 360, clamp(S), clamp(L)
+		h, s, L = clamp_hsl(h, s, L)
 	end
-	return setmetatable({H = H, S = S, L = L}, color_mt)
+	return setmetatable({h = h, s = s, L = L}, color_mt)
 end
-
-color_module_mt.__call = new
 
 function color:hsl()
-	return self.H, self.S, self.L
+	return self.h, self.s, self.L
 end
 
+color_mt.__call = color.hsl
+
 function color:rgb()
-	return color_module.hsl_to_rgb(self:hsl())
+	return hsl_to_rgb(self())
 end
 
 function color:rgba()
-	local r, g, b = color_module.hsl_to_rgb(self:hsl())
+	local r, g, b = hsl_to_rgb(self())
 	return r, g, b, 1
 end
 
 function color:tostring()
-	local r, g, b = self:rgb()
-	return string.format("#%02x%02x%02x",
-		math.floor(r*256 + 0.5),
-		math.floor(g*256 + 0.5),
-		math.floor(b*256 + 0.5))
+	return rgb_to_string(self:rgb())
 end
 
 color_mt.__tostring = color.tostring
 
 function color:hue_offset(delta)
-	return new(nil, (self.H + delta) % 360, self.S, self.L)
+	return new(self.h + delta, self.s, self.L)
 end
 
 function color:complementary()
@@ -132,19 +167,19 @@ function color:split_complementary(angle)
 end
 
 function color:desaturate_to(saturation)
-	return new(nil, self.H, saturation, self.L)
+	return new(self.h, saturation, self.L)
 end
 
 function color:desaturate_by(r)
-	return new(nil, self.H, self.S*r, self.L)
+	return new(self.h, self.s*r, self.L)
 end
 
 function color:lighten_to(lightness)
-	return new(nil, self.H, self.S, lightness)
+	return new(self.h, self.s, lightness)
 end
 
 function color:lighten_by(r)
-	return new(nil, self.H, self.S, self.L*r)
+	return new(self.h, self.s, self.L*r)
 end
 
 function color:variations(f, n)
@@ -175,6 +210,19 @@ end
 function color:shade(r)
 	return self:lighten_to(self.L - self.L*r)
 end
+
+local color_module = {
+	hsl_to_rgb = hsl_to_rgb,
+	rgb_to_hsl = rgb_to_hsl,
+
+	string_to_rgb = string_to_rgb,
+	rgb_to_string = rgb_to_string,
+
+	string_to_rgba = string_to_rgba,
+	rgba_to_string = rgba_to_string,
+}
+
+setmetatable(color_module, {__call = function(self, ...) return new(...) end})
 
 
 if not ... then require'color_demo' end

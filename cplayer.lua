@@ -474,6 +474,12 @@ function animation:progress()
 	end
 end
 
+--graphics helpers
+
+function player:screenshot(x, y, w, h)
+	--
+end
+
 --submodule autoloader
 
 glue.autoload(player, {
@@ -516,6 +522,8 @@ glue.autoload(player, {
 	tablist      = 'cplayer.tablist',
 	magnifier    = 'cplayer.magnifier',
 	analog_clock = 'cplayer.analog_clock',
+	hue_wheel    = 'cplayer.hue_wheel',
+	sat_lum_square = 'cplayer.sat_lum_square',
 	toolbox      = 'cplayer.toolbox',
 	screen       = 'cplayer.screen',
 	--complex widgets

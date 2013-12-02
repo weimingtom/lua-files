@@ -15,7 +15,7 @@ function player:on_render(cr)
 	if manual then
 		progress = self:slider{id = 'progress', x = 100, y = 10, w = 90, h = 26, i0 = 0, i1 = 1, step = 0.001, i = progress}
 	else
-		duration = self:slider{id = 'duration', x = 100, y = 10, w = 90, h = 26, i0 = 1, i1 = 10, step = 0.01, i = duration}
+		duration = self:slider{id = 'duration', x = 100, y = 10, w = 90, h = 26, i0 = 0.1, i1 = 5, step = 0.01, i = duration}
 		if self:button{id = 'restart', x = 200, y = 10, w = 90, h = 26} then
 			start_time = nil
 		end

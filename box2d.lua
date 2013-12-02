@@ -84,7 +84,7 @@ local function hit(x0, y0, x, y, w, h) --check if a point (x0, y0) is inside rec
 	return x0 >= x and x0 <= x + w and y0 >= y and y0 <= y + h
 end
 
-local function hit_margins(x0, y0, d, x, y, w, h) --true, left, top, right, bottom | nil
+local function hit_margins(x0, y0, d, x, y, w, h) --hit, left, top, right, bottom
 	if hit(x0, y0, offset(d, x, y, 0, 0)) then
 		return true, true, true, false, false
 	elseif hit(x0, y0, offset(d, x + w, y, 0, 0)) then
@@ -102,6 +102,7 @@ local function hit_margins(x0, y0, d, x, y, w, h) --true, left, top, right, bott
 	elseif hit(x0, y0, offset(d, x + w, y, 0, h)) then
 		return true, false, false, true, false
 	end
+	return false, false, false, false, false
 end
 
 --edge snapping
@@ -200,10 +201,86 @@ local function snapped_margins(d, x1, y1, w1, h1, x2, y2, w2, h2)
 	return left or top or right or bottom, left, top, right, bottom
 end
 
+--box class
 
-if not ... then require'cplayer.toolbox_demo' end
+local box = {}
+local box_mt = {__index = box}
 
-return {
+local function new(x, y, w, h)
+	return setmetatable({x = x, y = y, w = w, h = h}, box_mt)
+end
+
+function box:rect()
+	return self.x, self.y, self.w, self.h
+end
+
+box_mt.__call = box.rect
+
+function box:corners()
+	return corners(self())
+end
+
+function box:align(halign, valign, parent_box)
+	return new(align(self.w, self.h, halign, valign, parent_box()))
+end
+
+function box:vsplit(i, sh)
+	return new(vsplit(i, sh, self()))
+end
+
+function box:hsplit(i, sw)
+	return new(hsplit(i, sw, self()))
+end
+
+function box:nsplit(i, n, direction)
+	return new(nsplit(i, n, direction, self()))
+end
+
+function box:translate(x0, y0)
+	return new(translate(x0, y0, self()))
+end
+
+function box:offset(d) --offset a rectangle by d (outward if d is positive)
+	return new(offset(d, self()))
+end
+
+function box:fit(parent_box, halign, valign)
+	local w, h = fit(self.w, self.h, parent_box.w, parent_box.h)
+	local x, y = align(w, h, halign or 'center', valign or 'center', parent_box())
+	return new(x, y, w, h)
+end
+
+function box:hit(x0, y0)
+	return hit(x0, y0, self())
+end
+
+function box:hit_margins(x0, y0, d)
+	return hit_margins(x0, y0, d, self())
+end
+
+local function box_iter(rectangles)
+	return function()
+		local box = rectangles()
+		return box and box()
+	end
+end
+
+function box:snap_margins(d, rectangles)
+	local x, y, w, h = self()
+	return new(snap_margins(d, x, y, w, h, box_iter(rectangles)))
+end
+
+function box:snap_pos(d, rectangles)
+	local x, y, w, h = self()
+	return new(snap_pos(d, x, y, w, h, box_iter(rectangles)))
+end
+
+function box:snapped_margins(d)
+	return snapped_margins(d, self())
+end
+
+
+local box_module = {
 	--representation forms
 	corners = corners,
 	rect = rect,
@@ -224,3 +301,10 @@ return {
 	snapped_margins = snapped_margins,
 }
 
+setmetatable(box_module, {__call = function(self, ...) return new(...) end})
+
+
+if not ... then require'cplayer.toolbox_demo' end
+
+
+return box_module

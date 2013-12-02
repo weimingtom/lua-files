@@ -29,7 +29,7 @@ end
 
 function easing.out_in_quad(t, b, c, d)
 	if t < d / 2 then
-		return easing.out_quad (t * 2, b, c / 2, d)
+		return easing.out_quad(t * 2, b, c / 2, d)
 	else
 		return easing.in_quad((t * 2) - d, b + c / 2, c / 2, d)
 	end

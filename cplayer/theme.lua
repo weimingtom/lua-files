@@ -1,6 +1,7 @@
---cplayer theme api
+--cplayer theme-aware graphics api
 local player = require'cplayer'
 local glue = require'glue'
+local color = require'color'
 
 local default_font = 'MS Sans Serif,8'
 
@@ -62,23 +63,9 @@ end
 
 --theme api / colors
 
-local hexcolors = setmetatable({}, {__mode = 'kv'})
-
-local function hexcolor(s)
-	if hexcolors[s] then
-		return unpack(hexcolors[s])
-	end
-	local r = tonumber(s:sub(2, 3), 16) / 255
-	local g = tonumber(s:sub(4, 5), 16) / 255
-	local b = tonumber(s:sub(6, 7), 16) / 255
-	local a = (tonumber(s:sub(8, 9), 16) or 255) / 255
-	hexcolors[s] = {r, g, b, a} --memoize for speed
-	return r, g, b, a
-end
-
 local function parse_color(c)
 	if type(c) == 'string' then
-		return hexcolor(c)
+		return color.string_to_rgba(c)
 	elseif type(c) == 'table' then
 		return unpack(c)
 	end
