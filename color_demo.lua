@@ -71,6 +71,10 @@ function player:on_render(cr)
 		end
 	end
 
+	if shot or self.active then
+		self.cursor = 'link'
+	end
+
 	local x0 = sx + s * sw
 	local y0 = sy + L * sh
 	x0 = x0 + 0.5
