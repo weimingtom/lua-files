@@ -455,8 +455,8 @@ end
 
 local animation = {}
 
-function player:animation(duration)
-	local t = glue.inherit({player = self, start = self.clock, duration = duration}, animation)
+function player:animation(duration, formula)
+	local t = glue.inherit({player = self, start = self.clock, duration = duration, formula = formula}, animation)
 	self.animations[t] = true
 	return t
 end
@@ -466,7 +466,12 @@ function animation:finished()
 end
 
 function animation:progress()
-	return math.min((self.player.clock - self.start) / self.duration, 1)
+	if formula then
+		local easing = require'easing'
+		return math.min(easing[formula]((self.player.clock - self.start), 0, 1, self.duration), 1)
+	else
+		return math.min((self.player.clock - self.start) / self.duration, 1)
+	end
 end
 
 --submodule autoloader

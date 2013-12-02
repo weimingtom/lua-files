@@ -12,11 +12,11 @@ local t = {
 	theme = 'dark',
 }
 
-local layer = boxlayer:new{x = 50, y = 20, w = 280, h = 300}
+local layer = glue.inherit({x = 50, y = 20, w = 280, h = 300}, boxlayer)
 
 function player:on_render(cr)
 
-	layer:add(self.layers)
+	self.layers:add(layer)
 
 	local cpx, cpy = 10, 10
 
