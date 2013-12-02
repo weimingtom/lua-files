@@ -95,6 +95,9 @@ function player:on_render(cr)
 	self:rect(x1, y1, x2-x1, y2-y1)
 	self:textbox(x1, y1, x2-x1, y2-y1, 'tttsssggg\nttt\nggg\nsss', 'Tahoma,'..font_size, nil, halign, valign)
 
+	self:rect(x1 + x2 + 10, y1, x2-x1, y2-y1)
+	self:textbox(x1 + x2 + 10, y1, x2-x1, y2-y1, 'ggg\nsss\nttt\ntttsssggg', 'Tahoma,'..font_size, nil, halign, valign)
+
 end
 
 return player:play()

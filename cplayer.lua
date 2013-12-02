@@ -7,6 +7,9 @@ require'winapi.keyboard'
 local cairo = require'cairo'
 local ffi = require'ffi'
 local glue = require'glue'
+local layerlist = require'cplayer.layerlist'
+local box = require'box2d'
+local rmgui = require'cplayer.rmgui'
 
 local player = {
 	continuous_rendering = true,
@@ -121,17 +124,19 @@ function player:window(t)
 	--window state
 	self.w = panel.client_w
 	self.h = panel.client_h
+	self.init = true --set to true only on the first frame
 
-	--mouse state (initialized off screen, no buttons pressed; TODO: get actual values from winapi)
-	self.mousex = -1
-	self.mousey = -1
+	--mouse state
+	local pos = winapi.GetCursorPos()
+	self.mousex = pos.x
+	self.mousey = pos.y
+	self.lbutton = bit.band(ffi.C.GetKeyState(winapi.VK_LBUTTON), 0x8000) ~= 0 --left mouse button pressed state
+	self.rbutton = bit.band(ffi.C.GetKeyState(winapi.VK_RBUTTON), 0x8000) ~= 0 --right mouse button pressed state
 	self.clicked = false       --left mouse button clicked (one-shot)
 	self.rightclick = false    --right mouse button clicked (one-shot)
 	self.doubleclicked = false --left mouse button double-clicked (one-shot)
 	self.tripleclicked = false --left mouse button triple-clicked (one-shot)
 	self.waiting_for_tripleclick = false --double-clicked and inside the wait period for triple-click
-	self.lbutton = false       --left mouse button pressed state
-	self.rbutton = false       --right mouse button pressed state
 	self.wheel_delta = 0       --mouse wheel movement as number of scroll pages (one-shot)
 
 	--keyboard state (no key pressed; TODO: get actual values from winapi)
@@ -154,6 +159,13 @@ function player:window(t)
 
 	--animation state
 	self.animations = {} --{[animation] = animation_object}
+
+	--layers state
+	self.layers = layerlist:new()
+	self.current_layer = false
+
+	--rmgui state
+	self.rmgui = rmgui:new()
 
 	--panel receives painting and mouse events
 
@@ -206,13 +218,31 @@ function player:window(t)
 		--render the frame
 		self:on_render(self.cr)
 
+		--render any user-added layers and clear the list
+		self.cr:identity_matrix()
+		self.cr:reset_clip()
+		for i,layer in ipairs(self.layers) do
+			self.current_layer = layer
+			layer:render(self)
+		end
+		self.layers:clear()
+		self.current_layer = false
+
+		--render the rmgui
+		self.rmgui:render(self)
+
 		--magnifier glass: so useful it's enabled by default
 		if self.show_magnifier and self:keypressed'ctrl' then
 			self.cr:identity_matrix()
 			self:magnifier{id = 'mag', x = self.mousex - 200, y = self.mousey - 100, w = 400, h = 200, zoom_level = 4}
 		end
 
+		--reset the one-shot init trigger
+		self.init = false
+
 		--reset the one-shot state vars
+		self.lpressed = false
+		self.rpressed = false
 		self.clicked = false
 		self.rightclick = false
 		self.doubleclicked = false
@@ -240,6 +270,7 @@ function player:window(t)
 		self.mousey = y
 		self.lbutton = buttons.lbutton
 		self.rbutton = buttons.rbutton
+		self.rmgui:update('mouse_move', x, y)
 		panel:invalidate()
 	end
 	panel.on_mouse_over = panel.on_mouse_move
@@ -247,13 +278,18 @@ function player:window(t)
 
 	function panel.on_lbutton_down(panel)
 		winapi.SetCapture(panel.hwnd)
+		if not self.lbutton then
+			self.lpressed = true
+		end
 		self.lbutton = true
 		self.clicked = false
+		self.rmgui:update('mouse_lbutton_down')
 		panel:invalidate()
 	end
 
 	function panel.on_lbutton_up()
 		winapi.ReleaseCapture()
+		self.lpressed = false
 		self.lbutton = false
 		self.clicked = true
 		if self.triple_click_start_time then
@@ -265,18 +301,25 @@ function player:window(t)
 				self.triple_click_start_time = nil
 			end
 		end
+		self.rmgui:update('mouse_lbutton_up')
 		panel:invalidate()
 	end
 
 	function panel.on_rbutton_down()
+		if not self.rbutton then
+			self.rpressed = true
+		end
 		self.rbutton = true
 		self.rightclick = false
+		self.rmgui:update('mouse_rbutton_down')
 		panel:invalidate()
 	end
 
 	function panel.on_rbutton_up()
+		self.rpressed = false
 		self.rbutton = false
 		self.rightclick = true
+		self.rmgui:update('mouse_rbutton_up')
 		panel:invalidate()
 	end
 
@@ -284,6 +327,7 @@ function player:window(t)
 		self.doubleclicked = true
 		self.triple_click_start_time = self.clock
 		panel:invalidate()
+		self.rmgui:update('mouse_lbutton_double_click')
 	end
 
 	function panel.on_set_cursor(_, _, ht)
@@ -298,11 +342,13 @@ function player:window(t)
 	--window receives keyboard and mouse wheel events
 
 	function window.on_close(window)
+		self.rmgui:update('close')
 		self:on_close()
 	end
 
 	function window.on_mouse_wheel(window, x, y, buttons, wheel_delta)
 		self.wheel_delta = self.wheel_delta + (wheel_delta and wheel_delta / 120 or 0)
+		self.rmgui:update('mouse_wheel', wheel_delta)
 		panel:invalidate()
 	end
 
@@ -317,6 +363,7 @@ function player:window(t)
 		self.shift = bit.band(ffi.C.GetKeyState(winapi.VK_SHIFT), 0x8000) ~= 0
 		self.ctrl = bit.band(ffi.C.GetKeyState(winapi.VK_CONTROL), 0x8000) ~= 0
 		self.alt = bit.band(ffi.C.GetKeyState(winapi.VK_MENU), 0x8000) ~= 0
+		self.rmgui:update(down and 'key_down' or 'key_up', self.key)
 		panel:invalidate()
 	end
 	function window.on_key_down(window, vk, flags)
@@ -337,6 +384,7 @@ function player:window(t)
 		else
 			self.char = nil
 		end
+		self.rmgui:update(down and 'key_down' or 'key_up', self.char)
 		panel:invalidate()
 	end
 	function window.on_key_down_char(window, char, flags)
@@ -385,9 +433,16 @@ end
 
 --mouse helpers
 
+function player:mousepos()
+	return self.cr:device_to_user(self.mousex, self.mousey)
+end
+
 function player:hotbox(x, y, w, h)
-	local mx, my = self.cr:device_to_user(self.mousex, self.mousey)
-	return self.cr:in_clip(mx, my) and mx >= x and mx <= x + w and my >= y and my <= y + h
+	local mx, my = self:mousepos()
+	return
+		box.hit(mx, my, x, y, w, h)
+		and self.cr:in_clip(mx, my)
+		and self.layers:hit_layer(mx, my, self.current_layer)
 end
 
 --keyboard helpers

@@ -1,12 +1,17 @@
---screen: window manager for rendering, hit-testing, reordering, and snapping overlapping windows
-local player = require'cplayer'
+--screen: window manager for hit-testing, reordering, snapping, and rendering overlapping windows
+local app = require'cplayer'
 local glue = require'glue'
+local box = require'box2d'
 
-local screen = {}
+local screen = {
+	snapping = true,
+	snap_distance = 20,
+	move_snapped = true,
+}
 
 function screen:new(t)
 	self = glue.inherit(t or {}, self)
-	self.windows = {}
+	self.windows = {} --{window1,...} in reverse z_order
 	return self
 end
 
@@ -21,6 +26,15 @@ function screen:indexof(target_window)
 	for i,window in ipairs(self.windows) do
 		if window == target_window then
 			return i
+		end
+	end
+end
+
+function screen:top_window()
+	for i = #self.windows, 1, -1 do
+		local win = self.windows[i]
+		if win.visible then
+			return win
 		end
 	end
 end
@@ -41,10 +55,10 @@ end
 
 function screen:render()
 
-	if not self.player.active and self.player.lbutton then
-		for i=#self.windows,1,-1 do
+	if not self.app.active and self.app.lpressed then
+		for i = #self.windows, 1, -1 do
 			local window = self.windows[i]
-			if self.player:hotbox(window:window_box()) then
+			if self.app:hotbox(window:getbox()) then
 				self:bring_to_front(window)
 				break
 			end
@@ -57,86 +71,111 @@ function screen:render()
 end
 
 function screen:hotbox(target_window, x, y, w, h)
-	for i=#self.windows,1,-1 do
+	for i = #self.windows, 1, -1 do
 		local window = self.windows[i]
 		if window == target_window then
-			return self.player:hotbox(x, y, w, h)
-		elseif self.player:hotbox(window:window_box()) then
+			return window:_hotbox(x, y, w, h)
+		elseif window:_hotbox(window:getbox()) then
 			break
 		end
 	end
 	return false
 end
 
-local function near(x1, x2, d)
-	return math.abs(x1 - x2) < d
+function screen:snapped_windows(win0)
+	self._target_win = win0
+	self._next_snapped_win = self._next_snapped_win or
+		coroutine.wrap(function()
+			while true do
+				for i, win in ipairs(self.windows) do
+					if win.visible and win ~= self._target_win then
+						local x, y, w, h = self._target_win:getbox()
+						local snapped, left, top, right, bottom = box.snapped_margins(1, x, y, w, h, win:getbox())
+						if snapped then
+							coroutine.yield(win, left, top, right, bottom)
+						end
+					end
+				end
+				coroutine.yield()
+			end
+		end)
+	return self._next_snapped_win
 end
 
-local function overlap(x1, w1, x2, w2, d)
-	return not (x1 + w1 < x2 or x2 + w2 < x1)
+function screen:_snap_rectangles(win0) --internal cached iterator for enumerating rectangles to snap against
+	self._target_win = win0
+	self._next_snap_rectangle = self._next_snap_rectangle or
+		coroutine.wrap(function()
+			while true do
+				coroutine.yield(self.x, self.y, self.w, self.h)
+				for i, win in ipairs(self.windows) do
+					if win.visible and win ~= self._target_win then
+						coroutine.yield(win:getbox())
+					end
+				end
+				coroutine.yield()
+			end
+		end)
+	return self._next_snap_rectangle
 end
 
-function screen:snap_pos(win0, d)
-	d = d or 10
-	for i,win in ipairs(self.windows) do
-		if win ~= win0 then
-			local x1, y1
-
-			if near(win0.y, win.y + win.h, d) then
-				y1 = win.y + win.h
-			elseif near(win0.y + win0.h, win.y, d) then
-				y1 = win.y - win0.h
-			elseif near(win0.y, win.y, d) then
-				y1 = win.y
-			elseif near(win0.y + win0.h, win.y + win.h, d) then
-				y1 = win.y + win.h - win0.h
-			end
-
-			if near(win0.x, win.x + win.w, d) then
-				x1 = win.x + win.w
-			elseif near(win0.x + win0.w, win.x, d) then
-				x1 = win.x - win0.w
-			elseif near(win0.x, win.x, d) then
-				x1 = win.x
-			elseif near(win0.x + win0.w, win.x + win.w, d) then
-				x1 = win.x + win.w - win0.w
-			end
-
-			if (y1 and overlap(win0.x, win0.w, win.x, win.w, d)) or
-				(x1 and overlap(win0.y, win0.h, win.y, win.h, d))
-			then
-				win0.x = x1 or win0.x
-				win0.y = y1 or win0.y
-			end
-		end
+function screen:setpos(win, x, y)
+	if self.snapping then
+		local _, _, w, h = win:getbox()
+		win:_setpos(
+			box.snap_pos(
+				self.snap_distance,
+				x, y, w, h,
+				self:_snap_rectangles(win)))
+	else
+		win:_setpos(x, y)
 	end
 end
 
-function screen:snap_size(win0, d)
-	d = d or 10
-	for i,win in ipairs(self.windows) do
-		if win ~= win0 then
-			local w1, h1
-
-			if near(win0.y + win0.h, win.y, d) then
-				h1 = win.y - win0.y
-			end
-
-			if near(win0.x + win0.w, win.x, d) then
-				w1 = win.x - win0.x
-			end
-
-			if (w1 and overlap(win0.x, win0.w, win.x, win.w, d)) or
-				(h1 and overlap(win0.y, win0.h, win.y, win.h, d))
-			then
-				win0.w = w1 or win0.w
-				win0.h = h1 or win0.h
-			end
-		end
+function screen:setbox(win, x, y, w, h)
+	if self.snapping then
+		win:_setbox(
+			box.snap_margins(
+				self.snap_distance,
+				x, y, w, h,
+				self:_snap_rectangles(win)))
+	else
+		win:_setbox(x, y, w, h)
 	end
 end
 
-function player:screen(t)
+function screen:set_minimized(win, minimized)
+	if self.move_snapped and minimized ~= win.minimized then
+
+		--gather windows snapped to the bottom
+		local t = {}
+		for win, left, top, right, bottom in self:snapped_windows(win) do
+			if bottom then
+				t[win] = true
+			end
+		end
+
+		win:_set_minimized(minimized)
+
+		if next(t) then
+			--move them to win's bottom
+			local x, y, w, h = win:getbox()
+			for win in pairs(t) do
+				local x1, y1 = win:getbox()
+				win:setpos(x1, y + h)
+			end
+
+			--trigger a repaint, since other windows outside of the target window changed
+			self.app:invalidate()
+		end
+	else
+		win:_set_minimized(minimized)
+	end
+end
+
+function app:screen(t)
 	return screen:new(t)
 end
 
+
+if not ... then require'cplayer.toolbox_demo' end

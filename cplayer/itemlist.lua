@@ -1,4 +1,5 @@
 local player = require'cplayer'
+local box = require'box2d'
 
 local function set_hierarchy(items)
 	for i,item in ipairs(items) do
@@ -50,7 +51,7 @@ end
 local function remove_item(item)
 	assert(item.parent[item.index] == item)
 	table.remove(item.parent, item.index)
-	set_layout(items)
+	set_layout(item.parent)
 	item.parent = nil
 	item.index = nil
 end
@@ -64,7 +65,6 @@ local function set_drag_layout(items, drag_item, x, y)
 	drag_item._x = x
 	drag_item._y = y
 
-	--[[
 	if drag_item.parent == items then
 		for i = drag_item.index + 1, #items do
 			local ditem = items[i]
@@ -75,7 +75,6 @@ local function set_drag_layout(items, drag_item, x, y)
 			end
 		end
 	end
-	]]
 
 	--make room for drag_item in layout and return the position where it should be inserted
 	local drop_index
@@ -119,8 +118,7 @@ end
 
 local function hit_test(mx, my, items)
 	for i,item in ipairs(items) do
-		local x, y, w, h = item_box(item)
-		if mx >= x and mx <= x + w and my >= y and my <= y + h then
+		if box.hit(mx, my, item_box(item)) then
 			return item
 		end
 	end
@@ -132,14 +130,15 @@ function player:itemlist(items)
 
 	set_all(items)
 
-	local mx, my = self.cr:device_to_user(self.mousex, self.mousey)
+	local mx, my = self:mousepos()
 	if self.active == id or (self.active and self.ui.item) then
 		if self.lbutton then
 			self.ui.drop_index = set_drag_layout(items, self.ui.item, mx - self.ui.dx, my - self.ui.dy)
 			self.ui.drop_itemlist = items
 		elseif self.active == id then
 			if self.ui.drop_index and self.ui.drop_itemlist == items then
-				move_item(self.ui.item, items, self.ui.drop_index)
+				insert_item(self.ui.item, items, self.ui.drop_index)
+				self:invalidate()
 			end
 			self.active = nil
 			self.ui.item = nil
@@ -153,12 +152,19 @@ function player:itemlist(items)
 				self.ui.dx = mx - item._x
 				self.ui.dy = my - item._y
 				self.ui.item = item
+				remove_item(item)
+				self:invalidate()
 			end
 		end
 	end
 
 	for i,item in ipairs(items) do
 		local x, y, w, h = item_box(item)
+		self:rect(x, y, w, h, 'normal_bg', 'normal_fg')
+	end
+
+	if self.ui.item then
+		local x, y, w, h = item_box(self.ui.item)
 		self:rect(x, y, w, h, 'normal_bg', 'normal_fg')
 	end
 end
@@ -203,5 +209,4 @@ end
 player:play()
 
 end
-
 

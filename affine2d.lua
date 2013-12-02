@@ -1,4 +1,4 @@
---2d affine matrix class, transcribed from cairo by Cosmin Apreutesei.
+--2D affine transforms, transcribed from cairo by Cosmin Apreutesei (public domain).
 --angles are expressed in degrees, not radians.
 
 local min, max, abs, sin, cos, radians, tan, floor =

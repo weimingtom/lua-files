@@ -1,11 +1,8 @@
---box layer stub to use as base class for rectangular layer objects
+--box layer stub to use as base class for rectangular layer objects.
+local glue = require'glue'
 local box = require'box2d'
 
 local boxlayer = {}
-
-function boxlayer:new(t)
-	return setmetatable(t, {__index = self})
-end
 
 function boxlayer:getbox()
 	return self.x, self.y, self.w, self.h

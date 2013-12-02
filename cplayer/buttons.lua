@@ -51,6 +51,7 @@ function player:button(t)
 	local font = t.font
 
 	local down = self.lbutton
+	local pressed = self.lpressed
 	local hot = enabled and self:hotbox(x, y, w, h)
 
 	if hot and (not self.active or self.active == id)  then
@@ -58,7 +59,7 @@ function player:button(t)
 	end
 
 	local clicked = false
-	if not self.active and hot and down then
+	if not self.active and hot and pressed then
 		self.active = id
 	elseif self.active == id then
 		if hot then

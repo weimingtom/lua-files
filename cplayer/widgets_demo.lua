@@ -1,5 +1,6 @@
 local player = require'cplayer'
 local glue = require'glue'
+local boxlayer = require'cplayer.boxlayer'
 
 local t = {
 	tab = 1,
@@ -11,7 +12,11 @@ local t = {
 	theme = 'dark',
 }
 
+local layer = boxlayer:new{x = 50, y = 20, w = 280, h = 300}
+
 function player:on_render(cr)
+
+	layer:add(self.layers)
 
 	local cpx, cpy = 10, 10
 
