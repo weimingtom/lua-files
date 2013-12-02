@@ -79,6 +79,8 @@ end
 local function new(self, H, S, L) --either H, S, L (0..360, 0..1, 0..1) or RGB string '#rrggbb'
 	if type(H) == "string" and H:sub(1,1)=="#" and H:len() == 7 then
 		H, S, L = rgb_string_to_hsl(H)
+	else
+		H, S, L = clamp(H), clamp(S), clamp(L)
 	end
 	return setmetatable({H = H, S = S, L = L}, color_mt)
 end
