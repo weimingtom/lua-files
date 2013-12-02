@@ -1,4 +1,4 @@
---Robert Penner's equations for easing ported by Cosmin Apreutesei (public domain)
+--Robert Penner's equations for easing by Emmanuel Oga (BSD license), modified by Cosmin Apreutesei (public domain)
 --the functions map input d to output r, where d is in 0 .. t and r is in b + 0 .. c.
 --usage: easing[formula_name](current_time - start_time, 0, 1, fixed_duration) -> value in 0..1
 
