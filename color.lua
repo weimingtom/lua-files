@@ -26,7 +26,7 @@ end
 
 --hsl is clamped to (0..360, 0..1, 0..1); rgb is (0..1, 0..1, 0..1)
 function color_module.hsl_to_rgb(h, s, L)
-	h = clamp(h/360)
+	h = (h % 360) / 360
 	local m1, m2
 	if L<=0.5 then
 		m2 = L*(s+1)
@@ -80,7 +80,7 @@ local function new(self, H, S, L) --either H, S, L (0..360, 0..1, 0..1) or RGB s
 	if type(H) == "string" and H:sub(1,1)=="#" and H:len() == 7 then
 		H, S, L = rgb_string_to_hsl(H)
 	else
-		H, S, L = clamp(H), clamp(S), clamp(L)
+		H, S, L = H % 360, clamp(S), clamp(L)
 	end
 	return setmetatable({H = H, S = S, L = L}, color_mt)
 end
@@ -93,6 +93,11 @@ end
 
 function color:rgb()
 	return color_module.hsl_to_rgb(self:hsl())
+end
+
+function color:rgba()
+	local r, g, b = color_module.hsl_to_rgb(self:hsl())
+	return r, g, b, 1
 end
 
 function color:tostring()
@@ -172,18 +177,7 @@ function color:shade(r)
 end
 
 
-if not ... then
-
-local color = color_module
-print(color.hsl_to_rgb(10, 5, .2))
-local c = color(2, .5, .2)
-print(c:rgb())
-print(c, c:tint(0.01))
-for k in pairs(getmetatable(c).__index) do
-	print('', k)
-end
-
-end
+if not ... then require'color_demo' end
 
 
 return color_module
