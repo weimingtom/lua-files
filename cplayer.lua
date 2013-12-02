@@ -453,31 +453,25 @@ end
 
 --animation helpers
 
-local animation = {}
+local stopwatch = {}
 
-function player:animation(duration, formula)
-	local t = glue.inherit({player = self, start = self.clock, duration = duration, formula = formula}, animation)
+function player:stopwatch(duration, formula)
+	local t = glue.inherit({player = self, start = self.clock, duration = duration, formula = formula}, stopwatch)
 	self.animations[t] = true
 	return t
 end
 
-function animation:finished()
+function stopwatch:finished()
 	return self.player.clock - self.start > self.duration
 end
 
-function animation:progress()
-	if formula then
+function stopwatch:progress()
+	if self.formula then
 		local easing = require'easing'
 		return math.min(easing[formula]((self.player.clock - self.start), 0, 1, self.duration), 1)
 	else
 		return math.min((self.player.clock - self.start) / self.duration, 1)
 	end
-end
-
---graphics helpers
-
-function player:screenshot(x, y, w, h)
-	--
 end
 
 --submodule autoloader

@@ -91,18 +91,18 @@ local btn1 = {
 	render = function(self, app)
 		local x, y, w, h = self:getbox()
 		app:rect(x, y, w, h, self.pressed and 'selected_bg' or self.hot and 'hot_bg' or 'normal_bg')
-		if self.animation and not self.animation:finished() then
-			self:circle(x + w / 2, y + h / 2, self.animation:progress() * 100, 'normal_bg')
+		if self.stopwatch and not self.stopwatch:finished() then
+			self:circle(x + w / 2, y + h / 2, self.stopwatch:progress() * 100, 'normal_bg')
 		end
 	end,
 	update = function(self, app, event, ...)
 		--print(event, ...)
 		if event == 'mouse_enter' then
 			self.hot = true
-			self.animation = player:animation(100)
+			self.stopwatch = player:stopwatch(100)
 		elseif event == 'mouse_leave' then
 			self.hot = false
-			self.animation = player:animation(100)
+			self.stopwatch = player:stopwatch(100)
 		elseif event == 'mouse_lbutton_down' then
 			self.pressed = true
 		elseif event == 'mouse_lbutton_double_click' then
@@ -124,7 +124,7 @@ function player:on_render(cr)
 		self.rmgui:add_widget(btn1)
 
 		function btn1.on_click(btn1)
-			--btn1.animation = self:animation(100)
+			--btn1.stopwatch = self:stopwatch(100)
 		end
 	end
 end

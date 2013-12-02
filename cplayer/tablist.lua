@@ -46,17 +46,17 @@ function player:tablist(t)
 			end
 			if drop_index then
 
-				if self.ui.animation then
+				if self.ui.stopwatch then
 					if drop_index ~= self.ui.drop_index then
-						self.ui.animation = nil
+						self.ui.stopwatch = nil
 					end
 				end
 
-				if self.ui.animation then
-					local t = self.ui.animation:progress()
+				if self.ui.stopwatch then
+					local t = self.ui.stopwatch:progress()
 					x1 = x1 + dw * t
 				else
-					self.ui.animation = self:animation(100)
+					self.ui.stopwatch = self:stopwatch(100)
 					self.ui.drop_index = drop_index
 				end
 			end
