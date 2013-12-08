@@ -158,7 +158,7 @@ function player:window(t)
 	self.ui = {}        --state to be used by the active control. when changing self.active, its contents are undefined.
 
 	--animation state
-	self.animations = {} --{[animation] = animation_object}
+	self.stopwatches = {} --{[stopwatch] = stopwatch_object}
 
 	--layers state
 	self.layers = layerlist:new()
@@ -166,6 +166,9 @@ function player:window(t)
 
 	--rmgui state
 	self.rmgui = rmgui:new()
+
+	--id cache state
+	self.cache = setmetatable({}, {mode = 'kv'})
 
 	--panel receives painting and mouse events
 
@@ -208,10 +211,10 @@ function player:window(t)
 		--clear the cursor state
 		self.cursor = nil
 
-		--remove completed animations
-		for t in pairs(self.animations) do
+		--remove completed stopwatches
+		for t in pairs(self.stopwatches) do
 			if t:finished() then
-				self.animations[t] = nil
+				self.stopwatches[t] = nil
 			end
 		end
 
@@ -399,7 +402,7 @@ function player:window(t)
 	--set panel to render continuously
 	panel:settimer(1,
 		function()
-			if self.continuous_rendering or next(self.animations) then
+			if self.continuous_rendering or next(self.stopwatches) then
 				panel:invalidate()
 			end
 		end)
@@ -457,7 +460,7 @@ local stopwatch = {}
 
 function player:stopwatch(duration, formula)
 	local t = glue.inherit({player = self, start = self.clock, duration = duration, formula = formula}, stopwatch)
-	self.animations[t] = true
+	self.stopwatches[t] = true
 	return t
 end
 

@@ -9,11 +9,11 @@
 
 fbclient.caller() -> caller
 
-fbclient.connect(db[, user[, pass[, charset]]]) -> conn
+fbclient.connect(db, [user], [pass], [charset]) -> conn
 fbclient.connect(options_t) -> conn; options_t: role, client_library, dpb
 
-fbclient.create_db(db[, user[, pass[, charset[, db_charset[, page_size]]]]]]) -> conn
-fbclient.create_db_sql(db[, options_t]); options_t: client_library
+fbclient.create_db(db, [user], [pass], [charset], [db_charset], [page_size]) -> conn
+fbclient.create_db_sql(sql[, client_library]) -> conn
 
 conn:clone() -> conn
 conn:close()
@@ -44,7 +44,6 @@ stmt:fetch()
 stmt:close()
 stmt:type() -> s
 
-
 stmt:close_all_blobs()
 stmt:close_cursor()
 conn:close_all_statements()
@@ -59,10 +58,16 @@ stmt.params.<name>
 	:get() -> v
 	:set(v)
 
+stmt.params:get(i|name)
+stmt.params:set(i|name, v)
+stmt.fields:get(i|name)
+stmt.fields:set(i|name, v)
+
 stmt:setparams(p1,...) -> stmt
 stmt:getvalues() -> v1,...
 stmt:getvalues(f1,...) -> v1,...
-stmt:row() -> row_t                   --TODO: mode ?
+stmt:row() -> {name1 = v1, ...}
+
 stmt:exec(p1,...) -> iter() -> v1, ...
 tran:exec_on(conn, sql, p1,...) -> iter() -> v1, ...
 tran:exec(sql, ...) -> iter() -> v1, ...
@@ -79,7 +84,7 @@ local glue = require'glue'
 local dpb_encode = require'fbclient_dpb'
 local tpb_encode = require'fbclient_tpb'
 
-local M = {}
+local fbclient = {}
 
 --helpers
 
@@ -102,7 +107,7 @@ end
 
 --caller object through which to make error-handled calls to fbclient
 
-function M.caller(client_library)
+function fbclient.caller(client_library)
 	client_library = client_library or 'fbclient'
 	local C = ffi.load(client_library)
 
@@ -111,7 +116,7 @@ function M.caller(client_library)
 	local msgsize = 2048
 	local msg = ffi.new('uint8_t[?]', msgsize) --message buffer, for error reporting
 
-	local function status() --false, 335544344
+	local function status()
 		return not (sv[0] == 1 and sv[1] ~= 0), sv[1]
 	end
 
@@ -122,7 +127,7 @@ function M.caller(client_library)
 		return errcodes[err]
 	end
 
-	local function errors() --{'blah', 'blah'}
+	local function errors() --{'msg1', 'msg2'}
 		if status() then return end
 		local errlist = {}
 		while C.fb_interpret(msg, msgsize, ffi.cast('const ISC_STATUS**', psv)) ~= 0 do
@@ -142,8 +147,7 @@ function M.caller(client_library)
 		return ffi.string(msg, 5)
 	end
 
-	local function sqlerror(sqlcode) --'blah blah'
-		if status() then return end
+	local function sqlerror(sqlcode) --'message'
 		C.isc_sql_interprete(sqlcode, msg, msgsize)
 		return ffi.string(msg)
 	end
@@ -192,7 +196,7 @@ local conn_meta = {__index = conn}
 
 local function attach(client_library, attach_function, sql, db, dpb)
 	--caller object
-	local caller = M.caller(client_library)
+	local caller = fbclient.caller(client_library)
 
 	--connection handle
 	local dbh = ffi.new'isc_db_handle[1]'
@@ -210,8 +214,8 @@ local function attach(client_library, attach_function, sql, db, dpb)
 	cn.call = caller.call
 	cn.spool_limit = 0   --fb 2.5+ only: enable recycling of statement handles
 	cn.spool = {}        --statement handle pool to reuse statement objects
-	cn.transactions = {} --keep track of transactions spanning this attachment
-	cn.statements = {}   --keep track of statements made against this attachment
+	cn.transactions = {} --keep track of transactions spanning this connection
+	cn.statements = {}   --keep track of statements made against this connection
 	if db then
 		cn.db = db --for cloning
 		cn.dpb = glue.update({}, dpb) --for cloning
@@ -223,7 +227,7 @@ end
 local function attach_args(create, t, ...)
 	local db, user, pass, charset --common args, available as both positional args and explicit table args
 	local db_charset, page_size --additional common args available for db creation only
-	local role, client_library, user_dpb --special needs args, only available as table args
+	local role, client_library, user_dpb --special args, only available as named args
 	assert(t, 'invalid arguments')
 	if type(t) == 'string' then
 		db, user, pass, charset, db_charset, page_size = t, ...
@@ -240,25 +244,24 @@ local function attach_args(create, t, ...)
 		dpb.isc_dpb_set_db_charset = db_charset
 		dpb.isc_dpb_page_size = page_size
 	end
-	glue.merge(dpb, user_dpb) --user's dpb shouldn't overwrite its own explicit args.
+	glue.merge(dpb, user_dpb) --user's dpb shouldn't overwrite explicit args
 	if create and not dpb.isc_dpb_sql_dialect then
 		dpb.isc_dpb_sql_dialect = 3
 	end
 	return client_library, db, dpb
 end
 
-function M.connect(...)
+function fbclient.connect(...)
 	local client_library, db, dpb = attach_args(nil, ...)
 	return attach(client_library, 'isc_attach_database', nil, db, dpb)
 end
 
-function M.create_db(...)
+function fbclient.create_db(...)
 	local client_library, db, dpb = attach_args(true, ...)
 	return attach(client_library, 'isc_create_database', nil, db, dpb)
 end
 
-function M.create_db_sql(sql, t) --CREATE DATABASE statement
-	local client_library = t and t.client_library
+function fbclient.create_db_sql(sql, client_library) --CREATE DATABASE statement
 	return attach(client_library, 'isc_dsql_execute_immediate', sql, nil, nil)
 end
 
@@ -377,7 +380,7 @@ local function tran_args(t, ...)
 	return tpb
 end
 
-function M.start_transaction(t)
+function fbclient.start_transaction(t)
 	local dt = {}
 	for conn, opt in pairs(t) do
 		dt[conn] = tran_args(opt)
@@ -494,7 +497,7 @@ local function sqldata_buflen(sqltype, sqllen)
 end
 
 --this does three things:
---1) allocate SQLDA/SQLIND buffers accoding to the sqltype and setup the XSQLVAR to point to them.
+--1) allocate SQLDA/SQLIND buffers accoding to sqltype and setup the XSQLVAR to point to them.
 --2) decode the info from XSQLVAR.
 --3) return a table with the info and the data buffers pinned to it.
 local function XSQLVAR(x)
@@ -521,14 +524,14 @@ local function XSQLVAR(x)
 		sqlscale = x.sqlscale,     --for number types
 		sqllen = x.sqllen,         --max. size of the *contents* of the SQLDATA buffer
 		buflen = buflen,           --size of the SQLDATA buffer
-		subtype = subtype,         --how is a blob encoded
+		subtype = subtype,         --blob encoding
 		allow_null = allow_null,   --should we allow nulls?
 		sqldata_buf = sqldata_buf, --pinned SQLDATA buffer
 		sqlind_buf = sqlind_buf,   --pinned SQLIND buffer
-		column_name = sqlname,
-		table_name = relname,
-		table_owner_name = ownname,
-		column_alias_name = aliasname,
+		col_name = sqlname,        --underlying column name
+		table = relname,           --table name
+		owner = ownname,           --table owner's name
+		name = aliasname,          --alias name
 	}
 	return xs
 end
@@ -539,9 +542,10 @@ local function alloc_xsqlvars(x) --alloc data buffers for each column, based on 
 	local t = {}
 	for i=1,used do
 		local xs = XSQLVAR(x.sqlvar[i-1])
+		xs.index = i
 		t[i] = xs
-		if xs.column_alias_name then
-			t[xs.column_alias_name] = xs
+		if xs.name then
+			t[xs.name] = xs
 		end
 	end
 	return t
@@ -595,7 +599,7 @@ function tran:prepare(sql, conn)
 		self.call('isc_dsql_describe_bind', sth, 1, xparams)
 	end
 
-	--alloc xsqlvar buffers
+	--alloc xsqlvar buffers based on XSQLDA descriptions
 	local fields = alloc_xsqlvars(xfields)
 	local params = alloc_xsqlvars(xparams)
 
@@ -745,24 +749,24 @@ end
 function stmt:row()
 	local t = {}
 	for i,col in ipairs(self.fields) do
-		local name = col.column_alias_name
-		glue.assert(name, 'column %d does not have an alias name', i)
+		local name = col.name
+		glue.assert(name, 'column %d does not have a name', i)
 		local val = col:get()
 		t[name] = val
 	end
 	return t
 end
 
-local function statement_exec_iter(st,i)
+local function statement_exec_iter(st, i)
 	if st:fetch() then
-		return i+1, st:values()
+		return i+1, st:getvalues()
 	end
 end
 
 function stmt:exec(...)
 	self:setparams(...)
 	self:run()
-	return statement_exec_iter,self,0
+	return statement_exec_iter, self, 0
 end
 
 local function transaction_exec_iter(st)
@@ -780,7 +784,7 @@ function tran:exec_on(conn, sql, ...)
 	st:setparams(...)
 	st:run()
 	if st.expect_output then
-		return transaction_exec_iter,st
+		return transaction_exec_iter, st
 	else
 		st:close()
 		return null_iter
@@ -791,7 +795,7 @@ function tran:exec(sql, ...)
 	return self:exec_on(next(self.connections), sql, ...)
 end
 
-local function attachment_exec_iter(st)
+local function conn_exec_iter(st)
 	if st:fetch() then
 		return st, st:values()
 	else
@@ -800,14 +804,14 @@ local function attachment_exec_iter(st)
 end
 
 --ATTN: if you break the iteration before fetching all the result rows the
---transaction, statement and fetch cursor all remain open until you close the attachment!
+--transaction, statement and fetch cursor all remain open until you close the connection!
 function conn:exec(sql, ...)
-	local tr = self:start_transaction_ex()
-	local st = tr:prepare_on(self,sql)
+	local tr = self:start_transaction()
+	local st = tr:prepare(sql, self)
 	st:setparams(...)
 	st:run()
 	if st.expect_output then
-		return attachment_exec_iter,st
+		return conn_exec_iter, st
 	else
 		st.transaction:commit()
 	end
@@ -815,15 +819,15 @@ end
 
 function conn:exec_immediate(sql)
 	local tr = self:start_transaction()
-	tr:exec_immediate_on(self, sql)
+	tr:exec_immediate(sql, self)
 	tr:commit()
 end
 
 
 
+if not ... then
 
-require'fbclient_errcodes'
-local fb = M
+local fb = fbclient
 local cn = fb.connect('localhost:x:/work/fbclient/lua/fbclient/gazolin.fdb', 'SYSDBA', 'masterkey')
 --pp(cn:version_info())
 local tr1 = cn:start_transaction('read')
@@ -832,7 +836,20 @@ local tr2 = cn:start_transaction_sql'SET TRANSACTION'
 tr1:exec('select * from rdb$database')
 local st = tr2:prepare('select * from rdb$database')
 --pp(st)
-st:exec()
+for i, field in ipairs(st.fields) do
+	print(i, field.sqltype, field.name)
+end
+for st, v1, v2 in st:exec() do
+	print(v1, v2)
+end
 st:close()
 cn:close()
+
+
+end
+
+
+return glue.autoload(fbclient, {
+	connect_service = 'fbclient_service',
+})
 

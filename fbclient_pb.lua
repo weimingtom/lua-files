@@ -1,7 +1,6 @@
---generic encoder frunction for PBs (Parameter Blocks, eg. TPB, DPB, etc.)
---encode(options_t,codes,encoders) -> encoded_options_string
---encode_*(v) -> encoded option string
---USAGE: see *pb.lua.
+--template-based encoder frunction for PBs (Parameter Blocks, i.e. TPB, DPB, etc.)
+--pb.encode(options_t, codes, encoders) -> encoded_options_string
+--pb.encode_*(v) -> encoded option string
 
 local asserts = require'glue'.assert
 local struct = require'struct'
