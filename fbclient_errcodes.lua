@@ -3,9 +3,7 @@
 --Based on the latest (checked May 15, 2013) include/gen/iberror.h located at:
 	--http://firebird.cvs.sourceforge.net/viewvc/*checkout*/firebird/firebird2/src/include/gen/iberror.h
 
-local glue = require'glue'
-
-local codes = {
+return require'glue'.index{
 	isc_arith_except                    = 335544321,
 	isc_bad_dbkey                       = 335544322,
 	isc_bad_db_format                   = 335544323,
@@ -1049,5 +1047,3 @@ local codes = {
 	isc_trace_param_act_notcompat       = 337182759,
 	isc_trace_mandatory_switch_miss     = 337182760,
 }
-
-return glue.index(codes)

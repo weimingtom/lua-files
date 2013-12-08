@@ -1,5 +1,5 @@
 --[=[
-	fbclient Service Manager API
+	Firebird Service Manager API
 
 	Based on the latest jrd/ibase.h and jrd/svc.cpp located at:
 		http://firebird.cvs.sourceforge.net/viewvc/*checkout*/firebird/firebird2/src/jrd/ibase.h
@@ -21,8 +21,8 @@
 
 ]=]
 
-local fbclient = require 'fbclient'
-local pb = require 'fbclient_pb'
+local fbclient = require'fbclient'
+local pb = require'fbclient_pb'
 local struct = require'struct'
 local glue = require'glue'
 local asserts = glue.assert

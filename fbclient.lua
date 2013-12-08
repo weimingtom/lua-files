@@ -1,4 +1,4 @@
---fbclient2: a ffi binding of firebird's client library.
+--ffi binding for Firebird's client library. supports Firebird 2.5.
 --based on firebird's latest ibase.h with the help of the Interbase 6 API Guide.
 --NOTE: all connections involved in a multi-database transaction should run on the same OS thread.
 --NOTE: avoid sharing a connection between two threads, although fbclient itself is thread-safe from v2.5 on.
@@ -64,8 +64,8 @@ stmt.fields:get(i|name)
 stmt.fields:set(i|name, v)
 
 stmt:setparams(p1,...) -> stmt
-stmt:getvalues() -> v1,...
-stmt:getvalues(f1,...) -> v1,...
+stmt:values() -> v1,...
+stmt:values(f1,...) -> v1,...
 stmt:row() -> {name1 = v1, ...}
 
 stmt:exec(p1,...) -> iter() -> v1, ...
@@ -283,11 +283,10 @@ function conn:drop_db()
 end
 
 local fb_cancel_operation_codes = {
-	fb_cancel_disable = 1, --disable any pending fb_cancel_raise
-	fb_cancel_enable  = 2, --enable any pending fb_cancel_raise
-	fb_cancel_raise   = 3, --cancel any request on db_handle ASAP (at the next rescheduling point),
-								  --and return an error in the status_vector.
-	fb_cancel_abort   = 4,
+	disable = 1, --disable any pending fb_cancel_raise
+	enable  = 2, --enable any pending fb_cancel_raise
+	raise   = 3, --cancel any request on db_handle ASAP (at the next rescheduling point) and return an error.
+	abort   = 4,
 }
 
 --NOTE: don't call this from the main thread (where the signal handler is registered).
@@ -401,11 +400,9 @@ end
 local function tran_close(self, close_function)
 	self:close_all_statements()
 	self.call(close_function, self.trh)
-	local conn = next(self.connections)
-	while conn do
+	for conn in pairs(self.connections) do
 		conn.transactions[self] = nil
 		self.connections[conn] = nil
-		conn = next(self.connections)
 	end
 end
 
@@ -441,14 +438,14 @@ function tran:exec_immediate(sql, conn)
 end
 
 function conn:commit_all()
-	while next(self.transactions) do
-		next(self.transactions):commit()
+	for tran in pairs(self.transactions) do
+		tran:commit()
 	end
 end
 
 function conn:rollback_all()
-	while next(self.transactions) do
-		next(self.transactions):rollback()
+	for tran in pairs(self.transactions) do
+		tran:rollback()
 	end
 end
 
@@ -710,14 +707,14 @@ function stmt:type()
 end
 
 function conn:close_all_statements()
-	while next(self.statements) do
-		next(self.statements):close()
+	for stmt in pairs(self.statements) do
+		stmt:close()
 	end
 end
 
 function tran:close_all_statements()
-	while next(self.statements) do
-		next(self.statements):close()
+	for stmt in pairs(self.statements) do
+		stmt:close()
 	end
 end
 
@@ -730,7 +727,7 @@ function stmt:setparams(...)
 	return self
 end
 
-function stmt:getvalues(...) -- name,descr = st:getvalues('name', 'descr')
+function stmt:values(...) -- name,descr = st:values('name', 'descr')
 	if not ... then
 		local t = {}
 		for i,col in ipairs(self.fields) do
@@ -759,7 +756,7 @@ end
 
 local function statement_exec_iter(st, i)
 	if st:fetch() then
-		return i+1, st:getvalues()
+		return i+1, st:values()
 	end
 end
 
@@ -822,6 +819,36 @@ function conn:exec_immediate(sql)
 	tr:exec_immediate(sql, self)
 	tr:commit()
 end
+
+--info API
+
+function conn:info(opts, info_buf_len)
+	local info = require'fbclient_info_db'
+	local opts, max_len = info.encode(opts)
+	info_buf_len = math.min(MAX_SHORT, info_buf_len or max_len)
+	local info_buf = alien.buffer(info_buf_len)
+	self.call('isc_database_info', dbh, #opts, opts, info_buf_len, info_buf)
+	return info.decode(info_buf, info_buf_len, fbapi)
+end
+
+function tran:info(opts, info_buf_len)
+	local info = require 'fbclient.tr_info'
+	local opts, max_len = info.encode(opts)
+	info_buf_len = math.min(MAX_SHORT, info_buf_len or max_len)
+	local info_buf = alien.buffer(info_buf_len)
+	self.call('isc_transaction_info', trh, #opts, opts, info_buf_len, info_buf)
+	return info.decode(info_buf, info_buf_len)
+end
+
+function stmt:info(opts, info_buf_len)
+	local info = require'fbclient_sqlinfo'
+	local opts, max_len = info.encode(opts)
+	info_buf_len = math.min(MAX_SHORT, info_buf_len or max_len)
+	local info_buf = alien.buffer(info_buf_len)
+	self.call('isc_dsql_sql_info', sth, #opts, opts, info_buf_len, info_buf)
+	return info.decode(info_buf, info_buf_len)
+end
+
 
 
 

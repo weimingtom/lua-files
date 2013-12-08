@@ -1,4 +1,4 @@
---mysql low level binding per mySQL 5.7 manual by Cosmin Apreutesei.
+--mysql ffi binding by Cosmin Apreutesei. supports mysql Connector/C 6.1. based on mySQL 5.7 manual.
 local ffi = require'ffi'
 local bit = require'bit'
 require'mysql_h'

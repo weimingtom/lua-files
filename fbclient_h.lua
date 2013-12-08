@@ -1,4 +1,4 @@
---result of cpp `ibase.h` from firebird 2.5.2 (removed deprecated functions)
+--result of cpp `ibase.h` from firebird 2.5.2 (deprecated functions removed)
 local ffi = require'ffi'
 
 ffi.cdef[[
