@@ -1,4 +1,4 @@
-// extra hunspell API exposures by Cosmin Apreutesei
+// extra hunspell API exposures
 #include "hunspell.hxx"
 #include "hunspell.h"
 

@@ -7,7 +7,7 @@ gcc -shared -o../../../linux/bin/libcairo.so \
 	-O3 -s \
 	-I. -I../../pixman -I../../zlib -I../../libpng -I../../freetype/include \
 	\
-	-L../../../linux/bin -lpixman -lzlib -lpng -lfreetype \
+	-L../../../linux/bin -lpixman -lz -lpng -lfreetype \
 	\
 	-DCAIRO_HAS_PTHREAD=1 \
 	-pthread \

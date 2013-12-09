@@ -301,7 +301,7 @@ ffi.metatype('hb_shape_plan_t', {__index = {
 	collect_lookups = C.hb_ot_shape_plan_collect_lookups,
 }})
 
-if not ... then require'harfbuzz_test' end
+if not ... then require'harfbuzz_demo' end
 
 return M
 

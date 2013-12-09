@@ -3,7 +3,7 @@ gcc -shared -o../../../bin/cairo.dll \
 	-O3 -s -Wl,--enable-stdcall-fixup \
 	-I. -I../../pixman -I../../zlib -I../../libpng -I../../freetype \
 	\
-	-L../../../bin -lpixman -lzlib -llibpng -lfreetype-6 \
+	-L../../../bin -lpixman -lz -llibpng -lfreetype-6 \
 	-L$WINDIR/system32 -lgdi32 -lkernel32 -lmsimg32 \
 	\
 	-DHAVE_STDINT_H=1 \

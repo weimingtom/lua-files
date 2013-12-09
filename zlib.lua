@@ -1,7 +1,7 @@
 --zlib binding
 local ffi = require'ffi'
 require'zlib_h'
-local C = ffi.load'zlib'
+local C = ffi.load'z'
 
 local function version()
 	return ffi.string(C.zlibVersion())

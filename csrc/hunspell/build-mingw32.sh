@@ -13,4 +13,3 @@ g++ -shared -O3 -s -static-libgcc -static-libstdc++ -o ../../../bin/hunspell.dll
 	hunzip.cxx \
 	replist.cxx \
 	../extras.cxx
-
