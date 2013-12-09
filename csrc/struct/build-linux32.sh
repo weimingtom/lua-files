@@ -1,4 +1,4 @@
-gcc struct.c -O2 -s -o ../../bin/struct.dll -shared -I. -I../lua -ansi -L../../bin -llua51 \
+gcc struct.c -O2 -s -o ../../linux/bin/struct.so -shared -I. -I../lua -ansi -L../../bin \
 	-DSTRUCT_INT="long long" \
 	-Wall \
 	-W -pedantic \
@@ -10,4 +10,4 @@ gcc struct.c -O2 -s -o ../../bin/struct.dll -shared -I. -I../lua -ansi -L../../b
 	-Wshadow \
 	-Wwrite-strings
 
-../../bin/luajit teststruct.lua
+../../linux/bin/luajit teststruct.lua

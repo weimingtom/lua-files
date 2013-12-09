@@ -1,0 +1,12 @@
+#!/bin/sh
+#luajit wrapper that loads C libs from this dir and Lua libs from 2 dirs above.
+#linux specific Lua libs are loaded with priority from 1 dir above.
+
+bindir="$( cd "$(dirname "$0")"; pwd -P )" # this script's dir
+luadir="$bindir/../.."                     # platform-indep. Lua modules
+luadir_linux="$bindir/.."                  # linux-only Lua modules
+
+LD_LIBRARY_PATH="$bindir" \
+LUA_CPATH="$bindir/?.so" \
+LUA_PATH="$luadir_linux/?.lua;$luadir/?.lua" \
+"$bindir/luajit-2.0" "$@"

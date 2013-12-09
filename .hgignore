@@ -5,3 +5,4 @@ bin/libvlc*
 password.txt
 cplayer-plugin/*log*.txt
 .codedit_session.lua
+csrc/luajit/luajit-2.0
