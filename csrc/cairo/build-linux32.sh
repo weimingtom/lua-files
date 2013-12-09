@@ -1,11 +1,20 @@
-gcc -shared -o../../linux/bin/cairo.so \
-	-O3 -s -Wl,--enable-stdcall-fixup \
-	-I. -I../pixman -I../zlib -I../libpng -I../freetype \
+#TODO: suppress the "__visibility__ attribute ignored" warning
+
+echo "#define CAIRO_FEATURES_H" > src/cairo-features.h
+
+cd src && \
+gcc -shared -o../../../linux/bin/libcairo.so \
+	-O3 -s \
+	-I. -I../../pixman -I../../zlib -I../../libpng -I../../freetype/include \
 	\
-	-L../../linux/bin -lpixman -lzlib -llibpng -lfreetype-6 \
+	-L../../../linux/bin -lpixman -lzlib -lpng -lfreetype \
 	\
+	-DCAIRO_HAS_PTHREAD=1 \
+	-pthread \
+	-DPTHREAD_MUTEX_RECURSIVE=PTHREAD_MUTEX_RECURSIVE_NP \
 	-DHAVE_STDINT_H=1 \
 	-DHAVE_UINT64_T=1 \
+	-DHAVE_INT128_T=1 \
 	\
 	-DCAIRO_HAS_IMAGE_SURFACE=1 \
 	-DCAIRO_HAS_RECORDING_SURFACE=1 \
@@ -13,8 +22,8 @@ gcc -shared -o../../linux/bin/cairo.so \
 	-DCAIRO_HAS_PS_SURFACE=1 \
 	-DCAIRO_HAS_PDF_SURFACE=1 \
 	-DCAIRO_HAS_SVG_SURFACE=1 \
-	-DCAIRO_HAS_WIN32_SURFACE=1 \
-	-DCAIRO_HAS_WIN32_FONT=1 \
+	-DCAIRO_HAS_WIN32_SURFACE=0 \
+	-DCAIRO_HAS_WIN32_FONT=0 \
 	-DCAIRO_HAS_FT_FONT=1 \
 	\
 	-DCAIRO_HAS_GL_SURFACE=0 \
@@ -25,6 +34,8 @@ gcc -shared -o../../linux/bin/cairo.so \
 	-DCAIRO_HAS_OBSERVER_SURFACE=0 \
 	-DCAIRO_HAS_USER_FONT=0 \
 	-DCAIRO_HAS_INTERPRETER=0 \
+	\
+	cairo-mutex.c \
 	\
 	cairo-analysis-surface.c \
 	cairo-arc.c \
@@ -76,7 +87,6 @@ gcc -shared -o../../linux/bin/cairo.so \
 	cairo-mempool.c \
 	cairo-misc.c \
 	cairo-mono-scan-converter.c \
-	cairo-mutex.c \
 	cairo-no-compositor.c \
 	cairo-observer.c \
 	cairo-output-stream.c \
@@ -131,15 +141,6 @@ gcc -shared -o../../linux/bin/cairo.so \
 	cairo-version.c \
 	cairo-wideint.c \
 	\
-	win32/cairo-win32-debug.c \
-	win32/cairo-win32-device.c \
-	win32/cairo-win32-display-surface.c \
-	win32/cairo-win32-gdi-compositor.c \
-	win32/cairo-win32-printing-surface.c \
-	win32/cairo-win32-surface.c \
-	win32/cairo-win32-system.c \
-	win32/cairo-win32-font.c \
-	\
 	cairo-cff-subset.c \
 	cairo-scaled-font-subsets.c \
 	cairo-truetype-subset.c \
@@ -162,6 +163,8 @@ gcc -shared -o../../linux/bin/cairo.so \
 	cairo-svg-surface.c \
 	\
 	cairo-ft-font.c \
+	\
+	\
 
 <<COMMENT
 	\
