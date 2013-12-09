@@ -1,0 +1,3 @@
+need: nasm
+
+wget, untar, configure, make then copy the .so to ../../linux/bin

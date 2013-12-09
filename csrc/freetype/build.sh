@@ -1,10 +1,13 @@
 # freetype 2.5 custom build script
 # features: truetype format, cff format, truetype bytecode hinter, autohinter,
-# 				non-aa rasterizer, smooth rasterizer, stroker, lcd filtering.
+# non-aa rasterizer, smooth rasterizer, stroker, lcd filtering.
 
-args=(gcc -O3 -s -shared -o ../../bin/libfreetype-6.dll -Icustom -Iinclude -DFT2_BUILD_LIBRARY
+[[ "$(uname)" == *Linux* ]] && libfile=../../linux/bin/libfreetype.so
+[[ "$(uname)" == *MINGW* ]] && libfile=../../bin/libfreetype-6.dll
 
-		src/base/ftsystem.c
+args=(gcc -O3 -s -shared -o "$libfile" -Icustom -Iinclude -DFT2_BUILD_LIBRARY
+
+      src/base/ftsystem.c
       src/base/ftinit.c
       src/base/ftdebug.c
 
