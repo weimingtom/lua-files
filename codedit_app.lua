@@ -19,6 +19,7 @@ player.key_bindings = {
 	['ctrl+S'] = 'save_file',
 	['ctrl+shift+S'] = 'save_file_as',
 	--['f11'] = 'toggle_full_screen',
+	--['F5'] = 'run',
 }
 
 player.session_file = 'x:/work/lua-files' .. '/.codedit_session.lua'

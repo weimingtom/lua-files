@@ -1,7 +1,11 @@
+
+
+echo "#define CAIRO_FEATURES_H" > src/cairo-features.h
+
 cd src && \
 gcc -shared -o../../../bin/cairo.dll \
 	-O3 -s -Wl,--enable-stdcall-fixup \
-	-I. -I../../pixman -I../../zlib -I../../libpng -I../../freetype \
+	-I. -I../../pixman -I../../zlib -I../../libpng -I../../freetype/include \
 	\
 	-L../../../bin -lpixman -lz -llibpng -lfreetype-6 \
 	-L$WINDIR/system32 -lgdi32 -lkernel32 -lmsimg32 \
