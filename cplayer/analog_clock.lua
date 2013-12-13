@@ -24,9 +24,9 @@ function player:analog_clock(t)
 	local s = t.time.sec
 
 	--marker lines
-	for i = 0, 11 do
-		local x1, y1 = point(i, r, 12)
-		local x2, y2 = point(i, r * 0.95, 12)
+	for i = 0, 59 do
+		local x1, y1 = point(i, r, 60)
+		local x2, y2 = point(i, r * 0.95 * (i % 5 == 0 and 0.9 or 1), 60)
 		self:line(cx + x1, cy + y1, cx + x2, cy + y2, t.marker_color or t.color, t.marker_width or t.width)
 	end
 
