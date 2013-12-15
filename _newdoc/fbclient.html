@@ -1,0 +1,54 @@
+<h1 id="fbclient">fbclient</h1>
+<p>Firebird ffi binding</p>
+<p>v2.0 | <a href="http://code.google.com/p/lua-files/source/browse/fbclient.lua">code</a> | <a href="http://code.google.com/p/lua-files/source/browse/fbclient_h.lua">header</a> | [https://code.google.com/p/lua-files/source/browse/fbclient_test.lua test] | Firebird 2.5.2 | LuaJIT 2</p>
+<h2 id="local-fb-requirefbclient"><code>local fb = require'fbclient'</code></h2>
+<p>A complete ffi binding of the [fbclient#Firebird_plug Firebird] client library.</p>
+<h3 id="work-in-progress">Work in progress</h3>
+<p>In the meantime, you can use the old pure-Lua alien-based [https://code.google.com/p/fbclient/ binding] which is stable and complete.</p>
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr class="header">
+<th align="left"><strong>Connections</strong></th>
+<th align="left"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><code>fb.connect(db, [user], [pass], [charset], [port]) -&gt; conn</code></td>
+<td align="left">connect to a firebird server</td>
+</tr>
+<tr class="even">
+<td align="left"><code>fb.connect(options_t) -&gt; conn</code></td>
+<td align="left">connect to a firebird server</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>conn:close()</code></td>
+<td align="left">close the connection</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="firebird-plug">Firebird plug</h2>
+<ul>
+<li>MVCC concurrency</li>
+<li>column-level character sets and collations</li>
+<li>updatable views and triggers</li>
+<li>selectable stored procedures</li>
+<li>elegant procedural language</li>
+<li>multi-database transactions</li>
+<li>global temporary tables (GTEs)</li>
+<li>common table expressions (CTEs)</li>
+<li>asynchronous events</li>
+<li>computed-by columns</li>
+<li>check constraints and foreign key constraints</li>
+<li>datatype domains</li>
+<li>online backup and restore, remotely controlled</li>
+<li>user-defined functions (UDFs)</li>
+<li>full SQL-92 compliance</li>
+<li>multi-process and multi-threading implementations</li>
+<li>feature-full embedded edition</li>
+<li>binaries for Windows, Linux and Mac</li>
+<li>a real <a href="http://ibexpert.net/ibe/index.php?n=Main.IBExpertFeatures">IDE</a> (made by real programmers who don't have time to build a website)</li>
+</ul>
+<p>If you don't need all this, there's also <a href="mysql">bindings</a> for the most <em>popular</em> database in the world.</p>

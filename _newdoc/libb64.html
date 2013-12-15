@@ -1,0 +1,17 @@
+<h1 id="libb64">libb64</h1>
+<p>fast base64 encoding and decoding</p>
+<p>v1.0 | <a href="http://code.google.com/p/lua-files/source/browse/libb64.lua">code</a> | <a href="http://code.google.com/p/lua-files/source/browse/libb64_test.lua">test</a> | libb64 1.2 | LuaJIT 2</p>
+<h2 id="local-b64-requirelibb64"><code>local b64 = require'libb64'</code></h2>
+<p>FFI binding of <a href="http://libb64.sourceforge.net/">libb64</a>, a fast base64 encoder and decoder by Chris Venter.</p>
+<h2 id="b64.encodes-size---s"><code>b64.encode(s[, size]) -&gt; s</code></h2>
+<h2 id="b64.decodes-size---s"><code>b64.decode(s[, size]) -&gt; s</code></h2>
+<h2 id="b64.encodecdata-size---s"><code>b64.encode(cdata, size) -&gt; s</code></h2>
+<h2 id="b64.decodecdata-size---s"><code>b64.decode(cdata, size) -&gt; s</code></h2>
+<p>Encode/decode a string or cdata to a string.</p>
+<h2 id="b64.encode_tobuffers-size-out_buffer-out_size---bytes_written"><code>b64.encode_tobuffer(s, [size], out_buffer, out_size) -&gt; bytes_written</code></h2>
+<h2 id="b64.decode_tobuffers-size-out_buffer-out_size---bytes_written"><code>b64.decode_tobuffer(s, [size], out_buffer, out_size) -&gt; bytes_written</code></h2>
+<h2 id="b64.encode_tobuffercdata-size-out_buffer-out_size---bytes_written"><code>b64.encode_tobuffer(cdata, size, out_buffer, out_size) -&gt; bytes_written</code></h2>
+<h2 id="b64.decode_tobuffercdata-size-out_buffer-out_size---bytes_written"><code>b64.decode_tobuffer(cdata, size, out_buffer, out_size) -&gt; bytes_written</code></h2>
+<p>Encode/decode a string or cdata to a buffer. * encoding needs a buffer of at least <code>size * 2 + 3</code> bytes * decoding needs a buffer of at least <code>math.floor(size * 3 / 4)</code> bytes</p>
+<h2 id="todo">TODO</h2>
+<p>Stream-like interface similar to zlib's inflate/deflate.</p>

@@ -1,0 +1,12 @@
+<h1 id="lanes">lanes</h1>
+<p>Lua lanes</p>
+<p>lanes 3.6.2 | Lua 5.1 | Lua 5.2 | LuaJIT 2</p>
+<ul>
+<li>lanes is now hosted on [https://github.com/LuaLanes/lanes github] - ignore the official website.</li>
+<li>the default value of <code>protect_allocator</code> was changed to <code>true</code> in <code>lanes.lua</code> - LuaJIT2 crashes without that.</li>
+<li>you can read the up-to-date documentation [https://lua-files.googlecode.com/hg/csrc/lanes/docs/index.html here] until lanes will have it online.</li>
+<li>to use ffi inside lanes you have to require the ffi module inside the lane, since the ffi module cannot be transferred as an upvalue to your lane (you will get an error about &quot;destination transfer database&quot;).
+<ul>
+<li>this also means that <em>other modules</em> that depend on ffi cannot be upvalues and must be required explicitly inside the lane or luajit will crash.</li>
+</ul></li>
+</ul>

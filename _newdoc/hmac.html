@@ -1,0 +1,16 @@
+<h1 id="hmac">hmac</h1>
+<p>HMAC hashing</p>
+<p>v1.0 | <a href="http://code.google.com/p/lua-files/source/browse/hmac.lua">code</a> | <a href="http://code.google.com/p/lua-files/source/browse/hmac_md5.lua">hmac-md5</a> | <a href="http://code.google.com/p/lua-files/source/browse/hmac_md5_test.lua">hmac-md5 test</a> | <a href="http://code.google.com/p/lua-files/source/browse/hmac_sha2.lua">hmac-sha2</a> | <a href="http://code.google.com/p/lua-files/source/browse/hmac_sha2_test.lua">hmac-sha2 test</a> | LuaJIT 2</p>
+<h2 id="local-hmac-requirehmac"><code>local hmac = require'hmac'</code></h2>
+<p><a href="http://en.wikipedia.org/wiki/HMAC">HMAC</a> algorithm per <a href="http://tools.ietf.org/html/rfc2104">RFC 2104</a>.</p>
+<h2 id="hmac.computekey-message-hash_function-blocksize-opad-ipad---hash-opad-ipad"><code>hmac.compute(key, message, hash_function, blocksize[, opad][, ipad]) -&gt; hash, opad, ipad</code></h2>
+<p>Any hash function that takes a string as single argument works, like <code>md5.sum</code>. <code>blocksize</code> is that of the underlying hash function, i.e. 64 for MD5 and SHA-256, 128 for SHA-384 and SHA-512.</p>
+<h2 id="hmac.newhash_function-block_size---hmac_function"><code>hmac.new(hash_function, block_size) -&gt; hmac_function</code></h2>
+<p>## <code>hmac_function(message, key) -&gt; hash</code></p>
+<p>Returns a HMAC function that can be used with a specific hash function.</p>
+<h2 id="hmac.md5message-key---hmac-md5-hash"><code>hmac.md5(message, key) -&gt; HMAC-MD5 hash</code></h2>
+<p>Computes HMAC-MD5 (requires [md5]).</p>
+<h2 id="hmac.sha256message-key---hmac-sha256-hash"><code>hmac.sha256(message, key) -&gt; HMAC-SHA256 hash</code></h2>
+<h2 id="hmac.sha384message-key---hmac-sha384-hash"><code>hmac.sha384(message, key) -&gt; HMAC-SHA384 hash</code></h2>
+<h2 id="hmac.sha512message-key---hmac-sha512-hash"><code>hmac.sha512(message, key) -&gt; HMAC-SHA512 hash</code></h2>
+<p>Compute HMAC-SHA2 (requires [sha2]).</p>

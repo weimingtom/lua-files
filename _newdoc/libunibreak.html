@@ -1,0 +1,28 @@
+<h1 id="libunibreak">libunibreak</h1>
+<p>libunibreak ffi binding (unicode line &amp; word breaking)</p>
+<p>v1.0 | <a href="http://code.google.com/p/lua-files/source/browse/libunibreak.lua">binding</a> | <a href="http://code.google.com/p/lua-files/source/browse/libunibreak_demo.lua">demo</a> |libunibreak 0.6.21 | LuaJIT 2 ## <code>local ub = require'libunibreak'</code></p>
+<p>A ffi binding to <a href="http://vimgadgets.sourceforge.net/libunibreak/">libunibreak</a>, a C library implementing the <a href="http://www.unicode.org/reports/tr14/">unicode line breaking algorithm</a> and word breaking from <a href="http://www.unicode.org/reports/tr29/">unicode text segmentation</a>.</p>
+<h2 id="line-breaking">Line breaking</h2>
+<pre><code>                                                                       `ub.linebreaks_utf8(s[,size[,lang]]) -&gt; line_breaks`                                                                            get the line breaks
+                                                                       `ub.linebreaks_utf16(s[,size[,lang]]) -&gt; line_breaks`                                                                            get the line breaks
+                                                                       `ub.linebreaks_utf32(s[,size[,lang]]) -&gt; line_breaks`                                                                            get the line breaks</code></pre>
+<p>The returned <code>line_breaks</code> is a 0-based array of flags, one for each byte of the input string:</p>
+<pre><code>                                                                       0                                                                            Break is mandatory.
+                                                                       1                                                                            Break is allowed.
+                                                                       2                                                                            No break is possible.
+                                                                       3                                                                            A UTF-8/16 sequence is unfinished.</code></pre>
+<h2 id="word-breaking">Word breaking</h2>
+<pre><code>                                                                       `ub.wordbreaks_utf8(s[,size[,lang]]) -&gt; word_breaks`                                                                            get the word breaks
+                                                                       `ub.wordbreaks_utf16(s[,size[,lang]]) -&gt; word_breaks`                                                                            get the word breaks
+                                                                       `ub.wordbreaks_utf32(s[,size[,lang]]) -&gt; word_breaks`                                                                            get the word breaks</code></pre>
+<p>The returned <code>word_breaks</code> is a 0-based array of flags, one for each byte of the input string:</p>
+<pre><code>                                                                       0                                                                            Break is allowed.
+                                                                       1                                                                            No break is allowed.
+                                                                       2                                                                            A UTF-8/16 sequence is unfinished.</code></pre>
+<h2 id="unicode-helpers">Unicode helpers</h2>
+<pre><code>                                                                       `ub.chars_utf8(s) -&gt; iter() -&gt; i, codepoint`                                                                            codepoint iterator
+                                                                       `ub.chars_utf16(s) -&gt; iter() -&gt; i, codepoint`                                                                            codepoint iterator
+                                                                       `ub.chars_utf32(s) -&gt; iter() -&gt; i, codepoint`                                                                            codepoint iterator
+                                                                       `ub.len_utf8(s[,size]) -&gt; len`                                                                            number of codepoints in string
+                                                                       `ub.len_utf16(s[,size]) -&gt; len`                                                                            number of codepoints in string
+                                                                       `ub.len_utf32(s[,size]) -&gt; len`                                                                            number of codepoints in string</code></pre>
